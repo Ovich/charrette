@@ -26,7 +26,7 @@ how to use it. Supporting files (checklists, catalogs, references) sit alongside
 
 | Skill | Category | What it does |
 |---|---|---|
-| [architecture-brainstorming](general/architecture-brainstorming/SKILL.md) | general | Idea → questions → approaches → approved spec → phased plan, drawn while it's discussed: a live board in aiview, the diagram that answers each open question, hard approval gates before any code. |
+| [brainstorm](general/brainstorm/SKILL.md) | general | Idea → questions → approaches → approved spec → phased plan, drawn while it's discussed: a live board in aiview, the diagram that answers each open question, hard approval gates before any code. |
 | [write-diagrams](general/write-diagrams/SKILL.md) | general | The diagram contract every document-producing skill delegates to: a catalog mapping each open question to the diagram that answers it (C4, sequence, state, ER, data flow, dependency, phasing…), plus the discipline that keeps diagrams from becoming soup. Mermaid, renders in aiview and on any git host. |
 | [technical-writing](general/technical-writing/SKILL.md) | general | Technical documentation (architecture docs, READMEs, ADRs, runbooks, onboarding, API guides): structured around the reader's question, the system drawn before it's described, iterated live in aiview. |
 | [pr-review](general/pr-review/SKILL.md) | general | Stack-agnostic PR analysis for informed merge decisions: intent (quoted, never inferred), the change drawn as a delta map, verified blast radius, explicit decision points, two independent finding axes with mandatory citations, and a ready-to-post proposed comment. A `pr-analysis` document in aiview. |
@@ -35,7 +35,7 @@ how to use it. Supporting files (checklists, catalogs, references) sit alongside
 | [frontend-design](general/frontend-design/SKILL.md) | general | Visual controller: extracts the project's design language once, then designs each screen as a self-contained HTML mockup in that language, rendered live in aiview (viewport presets, states), approved before any component code. |
 | [frontend-review](react/frontend-review/SKILL.md) | react | Opinionated quality review of React/TSX code: readability, structure, naming, rendering, perf. Findings in chat for a diff; an aiview report with diagrams for a whole-scope review. |
 
-They compose, roughly in the order work happens: `architecture-brainstorming` designs
+They compose, roughly in the order work happens: `brainstorm` designs
 the thing and produces the spec and plan; `frontend-design` turns each screen into an
 approved mockup before it's built; `project-conventions` records the decisions as
 rules in `AGENTS.md`; `pr-review` maps each change so a human can decide the merge;

@@ -8,7 +8,7 @@ description: Use before building or changing any screen (a new page, dialog, pan
 The controller for visual work: **learn the project's design language → propose mockups
 in that language → iterate live → hand off to implementation.** A mockup is a thinking
 tool the user can look at and argue with cheaply, the same way a diagram is in
-`architecture-brainstorming`. It is not the implementation.
+`brainstorm`. It is not the implementation.
 
 <HARD-GATE>
 No component code, no route, no CSS in the app for the screen being designed until a

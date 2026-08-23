@@ -1,9 +1,9 @@
 ---
-name: architecture-brainstorming
+name: brainstorm
 description: Use before building anything non-trivial (a new feature, service, integration, or system) to turn an idea into an approved spec and an implementation plan, with architecture diagrams. Covers the design conversation itself: requirements, approaches, boundaries, data flow. Not for bug fixes or mechanical edits.
 ---
 
-# Architecture brainstorming
+# Brainstorm
 
 Turns an idea into a design, a written spec, and a plan (through questions, not
 assumptions) and **draws the design while discussing it.**
