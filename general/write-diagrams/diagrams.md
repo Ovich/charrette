@@ -22,14 +22,14 @@ needed.
 
 **On Mermaid's C4 support:** `C4Context` / `C4Container` blocks exist but are still
 experimental and render inconsistently across viewers. Use `flowchart` with C4
-conventions instead — person, system, external system, styled by `classDef`. Same
+conventions instead: person, system, external system, styled by `classDef`. Same
 information, renders everywhere.
 
 ---
 
 ## 1. System context
 
-**Q:** What is this system, who uses it, what does it depend on — and what is *not* ours?
+**Q:** What is this system, who uses it, what does it depend on, and what is *not* ours?
 **Draw when:** starting anything new, or when scope is being argued.
 **Skip when:** adding a feature inside a system whose boundary is already settled.
 
@@ -37,8 +37,8 @@ information, renders everywhere.
 flowchart LR
     student([Student]):::person
     teacher([Teacher]):::person
-    roster[["Roster — lab & group management"]]:::system
-    github[("GitHub — repos, org membership")]:::external
+    roster[["Roster: lab & group management"]]:::system
+    github[("GitHub: repos, org membership")]:::external
 
     student -->|"joins a group, submits work"| roster
     teacher -->|"creates labs, reviews groups"| roster
@@ -61,9 +61,9 @@ flowchart LR
 flowchart TB
     teacher([Teacher])
     subgraph roster["Roster"]
-        spa["apps/www — React SPA (Vite)"]
-        api["apps/api — Hono Worker"]
-        d1[("D1 — SQLite")]
+        spa["apps/www: React SPA (Vite)"]
+        api["apps/api: Hono Worker"]
+        d1[("D1: SQLite")]
     end
     gh[("GitHub API")]
 
@@ -73,7 +73,7 @@ flowchart TB
     api -->|"REST, only from lib/github/"| gh
 ```
 
-**Wrong-diagram tell:** two boxes that always deploy together and share a process —
+**Wrong-diagram tell:** two boxes that always deploy together and share a process:
 they're components, not containers. That's §3.
 
 ## 3. Component
@@ -84,9 +84,9 @@ they're components, not containers. That's §3.
 
 ```mermaid
 flowchart LR
-    routes["routes/ — paths + middleware"] --> handlers["handlers/ — request logic"]
-    handlers --> lib["lib/ — named units"]
-    lib --> ghlib["lib/github/ — one call + narrowing per fn"]
+    routes["routes/: paths + middleware"] --> handlers["handlers/: request logic"]
+    handlers --> lib["lib/: named units"]
+    lib --> ghlib["lib/github/: one call + narrowing per fn"]
 ```
 
 **Wrong-diagram tell:** you're naming functions. That's §4, and it's usually not worth
@@ -95,7 +95,7 @@ drawing.
 ## 4. Code
 
 **Q:** How do these specific types relate?
-**Draw when:** a genuinely intricate relationship — a variance problem, a state-carrying
+**Draw when:** a genuinely intricate relationship: a variance problem, a state-carrying
 hierarchy. Rare.
 **Skip when:** almost always. The IDE generates this on demand and it goes stale fastest.
 
@@ -109,7 +109,7 @@ classDiagram
 ## 5. System architecture
 
 **Q:** What does the whole solution look like, cloud services and all?
-**Draw when:** infrastructure is part of the design — queues, CDNs, buckets, auth
+**Draw when:** infrastructure is part of the design: queues, CDNs, buckets, auth
 providers, schedulers.
 **Skip when:** it would be §2 with logos on it. Only draw this if infra choices are
 genuinely under discussion.
@@ -123,7 +123,7 @@ the edges or delete the diagram.
 ## 6. Sequence
 
 **Q:** In what order does this happen, who calls whom, and where can it fail midway?
-**Draw when:** ordering *is* the design — auth flows, webhooks, retries, multi-step
+**Draw when:** ordering *is* the design: auth flows, webhooks, retries, multi-step
 writes, anything with a partial-failure window.
 **Skip when:** one call, one response.
 
@@ -147,7 +147,7 @@ Put the failure note in. The happy path was never the reason to draw this.
 
 **Q:** What states can this entity be in, what transitions are legal, and what's
 unreachable?
-**Draw when:** anything with a lifecycle — invitations, jobs, submissions, subscriptions.
+**Draw when:** anything with a lifecycle: invitations, jobs, submissions, subscriptions.
 Very high value, very under-drawn.
 **Skip when:** the thing has two states and one transition.
 
@@ -177,8 +177,8 @@ erDiagram
     GROUP }o--o{ USER : "membership"
 ```
 
-Say the cardinality out loud while drawing — "a group has many users, a user is in many
-groups" — that sentence is where the wrong assumption surfaces.
+Say the cardinality out loud while drawing: "a group has many users, a user is in many
+groups". That sentence is where the wrong assumption surfaces.
 
 ## 9. Data flow with trust boundaries
 
@@ -194,7 +194,7 @@ flowchart LR
         u([User input])
         wh([GitHub webhook])
     end
-    subgraph trusted["trusted — our worker"]
+    subgraph trusted["trusted: our worker"]
         v["zod validation (drizzle-zod)"]
         h["handler"]
         db[("D1")]
@@ -205,7 +205,7 @@ flowchart LR
     h --> db
 ```
 
-**Wrong-diagram tell:** no boundary drawn. Then it's §2 with different words — the
+**Wrong-diagram tell:** no boundary drawn. Then it's §2 with different words: the
 boundary is the entire point.
 
 ## 10. Deployment
@@ -257,25 +257,25 @@ only one the non-engineers in the room can check.
 **Q:** Which of these approaches?
 **Draw when:** the options differ *structurally*. Two small diagrams side by side beat
 two paragraphs.
-**Skip when:** they differ only in a library choice — that's a sentence.
+**Skip when:** they differ only in a library choice: that's a sentence.
 
 ```mermaid
 flowchart LR
-    subgraph A["Option A — sync in handler"]
+    subgraph A["Option A: sync in handler"]
         a1["handler"] --> a2["GitHub"] --> a3[("D1")]
     end
-    subgraph B["Option B — queue"]
+    subgraph B["Option B: queue"]
         b1["handler"] --> b2[["queue"]] --> b3["worker"] --> b4["GitHub"]
     end
 ```
 
-State the deciding trade-off under it in one line — not a feature matrix.
+State the deciding trade-off under it in one line, not a feature matrix.
 
 ## 14. Phasing
 
 **Q:** What ships first, and what blocks what?
 **Draw when:** the plan has 4+ phases or a real dependency order.
-**Skip when:** three sequential steps — a numbered list is clearer.
+**Skip when:** three sequential steps: a numbered list is clearer.
 
 ```mermaid
 flowchart LR

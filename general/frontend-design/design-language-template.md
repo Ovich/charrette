@@ -1,4 +1,4 @@
-# <Project> — design language
+# <Project>: design language
 
 _Extracted <YYYY-MM-DD> from the codebase; every claim cites its source file. Re-extract when tokens or the UI kit change._
 

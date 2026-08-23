@@ -8,7 +8,7 @@ one click away.
 
 One npm package: a React + TypeScript + Tailwind + shadcn-style UI (`app/`, built to
 `dist/`), a small plain-Node server (5 API routes + static, `src/server/`), and a CLI
-(`src/cli/`) — all sharing `src/core/` (typed sqlite index, path rules, file watcher).
+(`src/cli/`), all sharing `src/core/` (typed sqlite index, path rules, file watcher).
 
 ## Requirements
 
@@ -36,18 +36,18 @@ $A serve [file] [--port 4321] [--open] [--detach]
 $A status
 ```
 
-- **open** — idempotent one-shot: ensure the file is registered (same meta flags as
+- **open**: idempotent one-shot: ensure the file is registered (same meta flags as
   `add`), ensure a server is running (starts one detached if not), print the URL.
   Safe to repeat; the standard way for an agent to say "make this visible".
-- **add** — register a document. **Kind is mandatory**: from the filename convention
+- **add**: register a document. **Kind is mandatory**: from the filename convention
   `<name>.<kind>.md` (`….brainstorm.md` → `brainstorm`) or `--kind`. Tags via `--tag`
   (repeatable). `--group <slug>` puts the doc in a group (at most one per doc);
   `--group-title` names or renames that group. Start date-time = first registration,
   or `--started <ISO>`.
-- **update** — change metadata without remove/re-add. `--ungroup` clears membership.
-- **serve** — start the viewer. `--detach` daemonizes: writes `aiview.pid` +
+- **update**: change metadata without remove/re-add. `--ungroup` clears membership.
+- **serve**: start the viewer. `--detach` daemonizes: writes `aiview.pid` +
   `aiview.port` next to the sqlite and returns; `open`/`status` find it through them.
-- **status** — sqlite path, doc count, server up/down (stale pidfiles detected).
+- **status**: sqlite path, doc count, server up/down (stale pidfiles detected).
 - **--json** on every verb: compact machine-readable output.
 
 ## UI
@@ -63,7 +63,7 @@ document; live reload via SSE. `#doc=<id>` selects a doc. Dark mode follows the 
 `aiview.sqlite` next to `aiview.mjs`: `documents` (one row per doc, `group_slug`
 nullable) + `groups` (slug → title). Files are the truth; the index only points.
 Document paths are stored relative to the repo root above the tool when inside it,
-absolute otherwise. The index is written only by the CLI — the UI is read-only.
+absolute otherwise. The index is written only by the CLI. The UI is read-only.
 
 ## Development
 

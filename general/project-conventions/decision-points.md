@@ -1,10 +1,10 @@
 # Decision points
 
 The questions every codebase answers, whether or not anyone writes them down. This is
-deliberately a catalog of **questions, not rules** — the answers are stack-specific and
+deliberately a catalog of **questions, not rules**: the answers are stack-specific and
 the rules must be written in the stack's own vocabulary.
 
-Each entry gives: the question, why an unanswered version costs you, and **the tell** —
+Each entry gives: the question, why an unanswered version costs you, and **the tell**,
 what an unresolved decision looks like in a repo, which is what `harvest` mode looks for.
 
 `[forced]` = ask during **bootstrap**; the stack forces an answer before real code exists.
@@ -16,7 +16,7 @@ gets made.
 ## A. Shapes and contracts
 
 **1. Where does the source of truth for data shapes live? `[forced]`**
-Every project has one — a schema, a proto/OpenAPI file, a set of structs, or nothing,
+Every project has one: a schema, a proto/OpenAPI file, a set of structs, or nothing,
 in which case it's "whatever each file assumed." Unanswered, the same entity gets three
 slightly different shapes and they drift silently.
 *Tell:* the same field list typed by hand in two or more places; a field added in one
@@ -50,7 +50,7 @@ vendor's response shape ends up load-bearing in ten files.
 **6. When does code become its own module or file? `[later]`**
 Second caller, or "distinct concern with its own reason to change"? These give
 different codebases. Say which, because otherwise every developer applies their own.
-*Tell:* a `utils/` or `helpers/` grab bag; or the opposite — a one-line file per function.
+*Tell:* a `utils/` or `helpers/` grab bag; or the opposite: a one-line file per function.
 
 **7. Shared or colocated by default? `[later]`**
 Does a helper live next to its user until a second one appears, or go straight to a
@@ -60,7 +60,7 @@ three feature folders.
 
 ## C. Granularity and naming
 
-**8. When is a unit too big to leave alone — and when must it stay inline? `[later]`**
+**8. When is a unit too big to leave alone, and when must it stay inline? `[later]`**
 Both halves matter. A rule that only says "split large things" produces a codebase of
 single-use fragments scattered across files.
 *Tell:* a file that everyone dreads opening; or a component split into six files, five
@@ -69,11 +69,11 @@ used once.
 **9. What must be named, and named after what? `[later]`**
 The strongest convention a UI or domain codebase can have. Name after what a thing
 *is* or *renders*, not how it's built. Applies wherever meaning would otherwise live
-in a literal — a utility-class string, a magic number, a status flag.
+in a literal: a utility-class string, a magic number, a status flag.
 *Tell:* you must read an element's classes, or a condition's body, to know what it is.
 
 **10. What is the domain vocabulary? `[forced]`**
-One concept, one word, everywhere — code, database, UI, and docs. Cheap to decide on
+One concept, one word, everywhere: code, database, UI, and docs. Cheap to decide on
 day one and very expensive to unify later.
 *Tell:* `class` here, `course` there, `section` in the schema, for one thing.
 
@@ -86,7 +86,7 @@ into every feature, so it is worth one rule early.
 shared client and loses its types.
 
 **12. How are schema and data migrations produced and reviewed? `[forced]` if there's a database**
-Generated migrations are a starting point, not an authority — most generators can't see
+Generated migrations are a starting point, not an authority: most generators can't see
 a semantic change and won't write the backfill. Naming matters too: a list of
 auto-generated names tells a future reader nothing about the shape the database is in.
 *Tell:* migrations with generator-invented names; a generated file applied unread; a
@@ -100,14 +100,14 @@ read, and what a missing value does.
 ## E. Failure, evidence, and work
 
 **14. What shape does failure take? `[later]`**
-Exceptions, result unions, error codes — and what crosses the API boundary versus what
+Exceptions, result unions, error codes, and what crosses the API boundary versus what
 stays internal. Mixed conventions mean every caller handles errors differently and some
 handle them not at all.
 *Tell:* a function that both throws and returns `null` for failure; a stack trace
 reaching the client.
 
 **15. What gets tested, at what level, and where do tests live? `[later]`**
-Not "write tests" — *which* things earn one, and what a test is allowed to touch
+Not "write tests": *which* things earn one, and what a test is allowed to touch
 (a real database? the network?). The unanswered version is a suite nobody trusts.
 *Tell:* a test file next to nothing that's tested; tests that fail when run in a
 different order.
@@ -125,7 +125,7 @@ Queue, cron, in-request. And whether handlers may do slow work inline.
 
 ## Using this catalog
 
-**bootstrap:** ask only the `[forced]` points the chosen stack actually opens — a
+**bootstrap:** ask only the `[forced]` points the chosen stack actually opens: a
 project with no database skips 12, a CLI skips 11. Expect 5–8 rules. Leave the rest.
 
 **harvest:** read the code for the *tells*, not for the questions. A tell with several

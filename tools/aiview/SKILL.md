@@ -1,9 +1,9 @@
 ---
 name: aiview
-description: Use whenever a skill or task produces a document the user should look at while it evolves — a brainstorm board, a spec, a plan, a design language, an HTML mockup, a PR analysis, a review report, a live PDF. aiview renders Markdown (GFM + mermaid), HTML mockups and PDFs on localhost with live reload and keeps a versioned, tagged, grouped index of every such document. This skill is the contract for using it; do not improvise around it.
+description: Use whenever a skill or task produces a document the user should look at while it evolves: a brainstorm board, a spec, a plan, a design language, an HTML mockup, a PR analysis, a review report, a live PDF. aiview renders Markdown (GFM + mermaid), HTML mockups and PDFs on localhost with live reload and keeps a versioned, tagged, grouped index of every such document. This skill is the contract for using it; do not improvise around it.
 ---
 
-# aiview — the contract
+# aiview: the contract
 
 aiview is a local viewer + index for documents the agent writes for a human to read. The
 **files are the truth** (they live in the repo, under `docs/`); the index (`aiview.sqlite`
@@ -12,12 +12,12 @@ next to the tool) only points at them.
 The tool lives **next to this SKILL.md**: `<skill-dir>/aiview.mjs`, where
 `<skill-dir>` is this skill's base directory (the harness states it when the skill
 loads). Node ≥ 22.5. One-time per machine: `npm install && npm run build` in
-`<skill-dir>` — every verb prints exactly this if the build is missing, and
+`<skill-dir>`. Every verb prints exactly this if the build is missing, and
 `open`/`serve` rebuild the UI themselves when only `dist/` is missing.
 
 ## Invocation
 
-This skill is operated by intent — a caller (user or another skill) states what it
+This skill is operated by intent: a caller (user or another skill) states what it
 wants, this skill maps it to a verb and runs it:
 
 | The ask | Verb |
@@ -74,27 +74,27 @@ $A serve  [file] [--port 4321] [--open] [--detach]
 $A status                                        # server up? port? sqlite? doc count?
 ```
 
-Every verb takes `--json` for machine-readable output — prefer it when you parse the
+Every verb takes `--json` for machine-readable output. Prefer it when you parse the
 result. `status --json` answers "is a server running and where" in one call; a stale
 pidfile (dead process) is detected and reported, and `open` safely replaces it.
 
 ## What the user sees
 
-Left: documents newest-activity first — search, kind chips (deterministic colour per
+Left: documents newest-activity first: search, kind chips (deterministic colour per
 kind, click to filter), tag chips (multi-select), grouped docs inside collapsible
 containers (display title + member count, members in reading order), ungrouped docs
 flat, missing files struck through. Right: title, **absolute local path
-(click-to-copy)**, kind · started · tags · updated, then the rendered document — GFM +
+(click-to-copy)**, kind · started · tags · updated, then the rendered document (GFM +
 mermaid for Markdown, sandboxed iframe with viewport presets for HTML mockups, the
-browser's PDF viewer for PDFs — live-reloading on save.
+browser's PDF viewer for PDFs), live-reloading on save.
 
 ## Contract for calling skills
 
 A skill that produces viewable documents says: *"Register and serve via the `aiview`
-skill (`tools/aiview/SKILL.md` in this collection)"* — name plus
+skill (`tools/aiview/SKILL.md` in this collection)"* (name plus
 collection-relative path, never an absolute path, so the reference works from any
-checkout with any harness — and then states only the **metadata semantics** of its
-document type — which kind, which tags, which group, when the start
+checkout with any harness) and then states only the **metadata semantics** of its
+document type: which kind, which tags, which group, when the start
 time predates the file. It never restates command syntax; this file owns the syntax,
 so flags evolve in one place. Example of a caller's whole instruction:
 
@@ -105,7 +105,7 @@ so flags evolve in one place. Example of a caller's whole instruction:
 ## Conventions that keep the index useful
 
 - File names: `YYYY-MM-DD-<topic>.<kind>.md` under `docs/specs/`, `docs/design/`,
-  `docs/design/mockups/`, `docs/analysis/`… — the date is the start date.
+  `docs/design/mockups/`, `docs/analysis/`… (the date is the start date).
 - One document per subject; iterate the same file rather than creating v2 files.
   A rejected variant is **removed** from the index (and usually deleted).
 - When a board produces a spec or plan, register them with the board's tags and the
@@ -122,5 +122,5 @@ so flags evolve in one place. Example of a caller's whole instruction:
 | "I'll run serve in a background task and watch it" | `open`/`serve --detach` daemonize; `status` finds the server. Nothing to babysit. |
 | "This needs a new kind: `autograding`" | That's a topic → tag. Kinds are document types. |
 | "These two docs are related, one more tag will do" | Same piece of work → same `--group`. Tags are topics, groups are identity. |
-| "Wrong kind — remove and re-add" | `update <file> --kind <k>` in one call, history intact. |
+| "Wrong kind: remove and re-add" | `update <file> --kind <k>` in one call, history intact. |
 | "I'll clean up by deleting rows in the sqlite" | Use `remove`; the index is shared state. |
