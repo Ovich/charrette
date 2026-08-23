@@ -49,6 +49,29 @@ rules in `AGENTS.md`; `pr-review` maps each change so a human can decide the mer
 the shared layer all of them delegate to. House rules win over general principles
 wherever the two disagree. That's the point of writing them down.
 
+Flow: how one piece of work iterates through the documents, and the gates it must pass.
+
+```mermaid
+flowchart LR
+  idea([idea]) -->|"opens"| board
+  subgraph docs["local documents, rendered live in aiview"]
+    board["brainstorm board"]
+    spec["spec"]
+    plan["phased plan"]
+    mockup["HTML mockups"]
+    analysis["pr-analysis /<br/>review reports"]
+  end
+  board -->|"question loop:<br/>options, diagrams"| board
+  board -->|"design approved"| spec
+  spec -->|"spec approved"| plan
+  plan -->|"screens drawn first"| mockup
+  mockup -->|"mockup approved"| code["implementation"]
+  plan -->|"phase by phase"| code
+  code -->|"PR"| analysis
+  analysis -->|"merge decision"| merged([merged])
+  analysis -->|"design findings<br/>reopen the board"| board
+```
+
 ## The viewer
 
 ![aiview: grouped documents in the sidebar, a live board with its decisions table on the right](assets/aiview.png)
