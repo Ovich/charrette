@@ -4,9 +4,9 @@
 drawn, argued over, and decided — before anything expensive is built.)*
 
 **Agent skills for the drawing-board loop: brainstorm → diagram → spec → plan →
-review.** Everything is a living local document — boards, specs, plans, mockups, PR
+review.** Everything is a local document — boards, specs, plans, mockups, PR
 analyses — rendered live in the bundled viewer ([aiview](tools/aiview/SKILL.md)),
-with diagrams as first-class thinking tools rather than decoration.
+with diagrams as thinking tools rather than decoration.
 
 No lock-in by design: the skills are plain markdown any agent can read, the tooling
 is plain Node, references between skills use names plus paths relative to this repo
