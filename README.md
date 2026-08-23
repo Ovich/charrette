@@ -49,20 +49,6 @@ rules in `AGENTS.md`; `pr-review` maps each change so a human can decide the mer
 the shared layer all of them delegate to. House rules win over general principles
 wherever the two disagree. That's the point of writing them down.
 
-The cycle: each phase produces a document, each arrow is a gate, review findings
-start the next pass. Every document renders live in aiview.
-
-```mermaid
-flowchart TD
-  idea([idea]) --> design
-  design["<b>Design</b>: brainstorm board"] -->|"design approved"| specify["<b>Specify</b>: spec"]
-  specify -->|"spec approved"| plan["<b>Plan</b>: phased plan"]
-  plan -->|"screens: mockup approved first"| build["<b>Build</b>: implementation"]
-  build -->|"PR"| review["<b>Review</b>: pr-analysis, reports"]
-  review -->|"merge decision"| shipped([shipped])
-  review -->|"findings"| design
-```
-
 ## The viewer
 
 ![aiview: grouped documents in the sidebar, a live board with its decisions table on the right](assets/aiview.png)
