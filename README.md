@@ -24,16 +24,21 @@ how to use it. Supporting files (checklists, catalogs, references) sit alongside
 
 ## Skills
 
-| Skill | Category | What it does |
+Once a skill is loaded (its `SKILL.md` pointed to, or discovered by name), the ask is
+plain language: each skill states when it applies and maps your request onto its flow.
+In the order work usually happens:
+
+| Skill | Use case | Example ask |
 |---|---|---|
-| [brainstorm](general/brainstorm/SKILL.md) | general | Idea → questions → approaches → approved spec → phased plan, drawn while it's discussed: a live board in aiview, the diagram that answers each open question, hard approval gates before any code. |
-| [write-diagrams](general/write-diagrams/SKILL.md) | general | The diagram contract every document-producing skill delegates to: a catalog mapping each open question to the diagram that answers it (C4, sequence, state, ER, data flow, dependency, phasing…), plus the discipline that keeps diagrams from becoming soup. Mermaid, renders in aiview and on any git host. |
-| [technical-writing](general/technical-writing/SKILL.md) | general | Technical documentation (architecture docs, READMEs, ADRs, runbooks, onboarding, API guides): structured around the reader's question, the system drawn before it's described, iterated live in aiview. |
-| [pr-review](general/pr-review/SKILL.md) | general | Stack-agnostic PR analysis for informed merge decisions: intent (quoted, never inferred), the change drawn as a delta map, verified blast radius, explicit decision points, two independent finding axes with mandatory citations, and a ready-to-post proposed comment. A `pr-analysis` document in aiview. |
-| [code-design-review](general/code-design-review/SKILL.md) | general | Program design review of a PR, diff, or codebase against DRY, KISS, YAGNI, SOLID, cohesion, coupling, and the Law of Demeter. Any language. |
-| [project-conventions](general/project-conventions/SKILL.md) | general | Writes and grows a repo's `AGENTS.md`: bootstraps conventions for a new stack, harvests unwritten ones from an existing codebase, captures a decision as it's made. Any stack. |
-| [frontend-design](general/frontend-design/SKILL.md) | general | Visual controller: extracts the project's design language once, then designs each screen as a self-contained HTML mockup in that language, rendered live in aiview (viewport presets, states), approved before any component code. |
-| [frontend-review](react/frontend-review/SKILL.md) | react | Opinionated quality review of React/TSX code: readability, structure, naming, rendering, perf. Findings in chat for a diff; an aiview report with diagrams for a whole-scope review. |
+| [brainstorm](general/brainstorm/SKILL.md) | A feature, service, or system is about to be built and the design conversation hasn't happened | *"Run brainstorm: I want per-user rate limiting on the API."* Expect one question at a time, a live board in aiview, and no code until the spec and plan are approved. |
+| [write-diagrams](general/write-diagrams/SKILL.md) | A design question would settle faster drawn than argued (the other skills also call it for their documents) | *"Use write-diagrams to draw today's login flow: I need to see where the redirect happens."* |
+| [frontend-design](general/frontend-design/SKILL.md) | A screen is about to be built or visually reworked | *"Before we code the settings page, run frontend-design and propose a mockup."* The first run extracts the project's design language; every screen after that is an HTML mockup approved in aiview. |
+| [technical-writing](general/technical-writing/SKILL.md) | A system or procedure needs to be understood by a defined reader | *"Use technical-writing for an architecture doc of the payments service, audience: new backend hires."* |
+| [project-conventions](general/project-conventions/SKILL.md) | A decision was just made, or a repo's unwritten rules need writing down | *"We just settled on soft deletes everywhere: capture that with project-conventions."* Also: *"Harvest this repo's conventions into AGENTS.md."* |
+| [pr-review](general/pr-review/SKILL.md) | A pull request needs an informed merge decision | *"Run pr-review on PR #142."* The analysis lands in aiview: quoted intent, delta map, blast radius, decision points, a ready-to-post comment. |
+| [code-design-review](general/code-design-review/SKILL.md) | Program design quality is the question, in any language | *"Code-design-review this branch's diff against main."* |
+| [frontend-review](react/frontend-review/SKILL.md) | React/TSX quality is the question | *"Run frontend-review on src/features/checkout."* Findings in chat for a diff; a whole-scope review becomes an aiview report with diagrams. |
+| [aiview](tools/aiview/SKILL.md) | Mostly called by the other skills; directly, when a document should be shown or the index queried | *"Open docs/notes/cache-idea.md in aiview, tagged payments."* Also: *"List every document we produced for the payments work."* |
 
 They compose, roughly in the order work happens: `brainstorm` designs
 the thing and produces the spec and plan; `frontend-design` turns each screen into an
@@ -67,24 +72,6 @@ your harness's skill discovery, if it has one). Each file is self-contained and
 resolves its references relative to this repo. For aiview, run the one-time build in
 `tools/aiview/`, then `node tools/aiview/aiview.mjs open <your-doc.md>` is the whole
 gesture.
-
-## Running the skills
-
-Once a skill is loaded (its `SKILL.md` pointed to, or discovered by name), the ask is
-plain language: each skill states when it applies and maps your request onto its flow.
-In the order work usually happens:
-
-| Skill | Use case | Example ask |
-|---|---|---|
-| [brainstorm](general/brainstorm/SKILL.md) | A feature, service, or system is about to be built and the design conversation hasn't happened | *"Run brainstorm: I want per-user rate limiting on the API."* Expect one question at a time, a live board in aiview, and no code until the spec and plan are approved. |
-| [write-diagrams](general/write-diagrams/SKILL.md) | A design question would settle faster drawn than argued (the other skills also call it for their documents) | *"Use write-diagrams to draw today's login flow: I need to see where the redirect happens."* |
-| [frontend-design](general/frontend-design/SKILL.md) | A screen is about to be built or visually reworked | *"Before we code the settings page, run frontend-design and propose a mockup."* The first run extracts the project's design language; every screen after that is an HTML mockup approved in aiview. |
-| [technical-writing](general/technical-writing/SKILL.md) | A system or procedure needs to be understood by a defined reader | *"Use technical-writing for an architecture doc of the payments service, audience: new backend hires."* |
-| [project-conventions](general/project-conventions/SKILL.md) | A decision was just made, or a repo's unwritten rules need writing down | *"We just settled on soft deletes everywhere: capture that with project-conventions."* Also: *"Harvest this repo's conventions into AGENTS.md."* |
-| [pr-review](general/pr-review/SKILL.md) | A pull request needs an informed merge decision | *"Run pr-review on PR #142."* The analysis lands in aiview: quoted intent, delta map, blast radius, decision points, a ready-to-post comment. |
-| [code-design-review](general/code-design-review/SKILL.md) | Program design quality is the question, in any language | *"Code-design-review this branch's diff against main."* |
-| [frontend-review](react/frontend-review/SKILL.md) | React/TSX quality is the question | *"Run frontend-review on src/features/checkout."* Findings in chat for a diff; a whole-scope review becomes an aiview report with diagrams. |
-| [aiview](tools/aiview/SKILL.md) | Mostly called by the other skills; directly, when a document should be shown or the index queried | *"Open docs/notes/cache-idea.md in aiview, tagged payments."* Also: *"List every document we produced for the payments work."* |
 
 ## License
 
