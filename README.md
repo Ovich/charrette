@@ -46,6 +46,14 @@ wherever the two disagree. That's the point of writing them down.
 
 ## The viewer
 
+![aiview: grouped documents in the sidebar, a live board with its decisions table on the right](assets/aiview.png)
+
+aiview is the collection's central tool: one browser tab with full visibility on the
+ongoing work. Every document the skills produce registers in its index, documents that
+belong to one piece of work share a container, and each save re-renders in the open
+tab. The human watches decisions, diagrams, and drafts land as they happen, instead of
+asking the agent what state things are in.
+
 | Tool | What it does |
 |---|---|
 | [aiview](tools/aiview/SKILL.md) | Local document viewer + index in one npm package: React/TypeScript/Tailwind UI, small plain-Node server, agent-facing CLI. Renders Markdown (GFM + mermaid), HTML mockups and PDFs at `localhost:4321` with live reload; related documents grouped in collapsible containers; every doc header shows its absolute path (click-to-copy). CLI: `open` (idempotent register + detached server + URL), `add`, `update`, `list`, `remove`, `serve --detach`, `status`, all with `--json`. Node ≥ 22.5; one-time `npm install && npm run build` in `tools/aiview/`. Its `SKILL.md` is the contract every skill follows (kinds, tags, groups, start time). |

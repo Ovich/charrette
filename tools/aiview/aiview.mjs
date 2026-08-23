@@ -6,7 +6,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-process.env.AIVIEW_ROOT = here;
+// respect a pre-set AIVIEW_ROOT (tests, demo indexes); default to the tool's home
+process.env.AIVIEW_ROOT ??= here;
 
 const bundle = path.join(here, "dist-cli", "cli.mjs");
 if (!existsSync(bundle)) {
