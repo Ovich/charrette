@@ -101,7 +101,7 @@ export function Sidebar({
       </div>
 
       <div className="flex items-center gap-1.5 border-t border-border px-3.5 py-2 text-[10.5px] text-faint-foreground">
-        {docs.length} documents · aiview.sqlite · versioned
+        {docs.length} documents · aiview.sqlite
       </div>
     </aside>
   );

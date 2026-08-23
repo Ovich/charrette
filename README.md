@@ -51,8 +51,7 @@ wherever the two disagree. That's the point of writing them down.
 aiview is the collection's central tool: one browser tab with full visibility on the
 ongoing work. Every document the skills produce registers in its index, documents that
 belong to one piece of work share a container, and each save re-renders in the open
-tab. The human watches decisions, diagrams, and drafts land as they happen, instead of
-asking the agent what state things are in.
+tab. You watch decisions, diagrams, and drafts land as they happen.
 
 | Tool | What it does |
 |---|---|
