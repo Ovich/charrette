@@ -53,12 +53,12 @@ The cycle: each phase produces a document, each arrow is a gate, review findings
 start the next pass. Every document renders live in aiview.
 
 ```mermaid
-flowchart LR
+flowchart TD
   idea([idea]) --> design
-  design["<b>Design</b><br/>brainstorm board"] -->|"design approved"| specify["<b>Specify</b><br/>spec"]
-  specify -->|"spec approved"| plan["<b>Plan</b><br/>phased plan"]
-  plan -->|"screens: mockup<br/>approved first"| build["<b>Build</b><br/>implementation"]
-  build -->|"PR"| review["<b>Review</b><br/>pr-analysis, reports"]
+  design["<b>Design</b>: brainstorm board"] -->|"design approved"| specify["<b>Specify</b>: spec"]
+  specify -->|"spec approved"| plan["<b>Plan</b>: phased plan"]
+  plan -->|"screens: mockup approved first"| build["<b>Build</b>: implementation"]
+  build -->|"PR"| review["<b>Review</b>: pr-analysis, reports"]
   review -->|"merge decision"| shipped([shipped])
   review -->|"findings"| design
 ```
