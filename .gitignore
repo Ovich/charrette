@@ -1,0 +1,9 @@
+# dependencies and build output (aiview)
+node_modules/
+tools/aiview/dist/
+tools/aiview/dist-cli/
+
+# per-machine state (aiview): personal document index + running-server files
+tools/aiview/aiview.sqlite
+tools/aiview/aiview.pid
+tools/aiview/aiview.port
