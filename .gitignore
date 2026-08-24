@@ -1,10 +1,10 @@
 # dependencies and build output (aiview)
 node_modules/
-tools/aiview/dist/
-tools/aiview/dist-cli/
+skills/tools/aiview/dist/
+skills/tools/aiview/dist-cli/
 
 # Per-machine state now lives in the data home (~/charrette_appdata), not here.
 # These are only left by pre-appdata installs; ignored so an old checkout stays clean.
-tools/aiview/aiview.sqlite
-tools/aiview/aiview.pid
-tools/aiview/aiview.port
+skills/tools/aiview/aiview.sqlite
+skills/tools/aiview/aiview.pid
+skills/tools/aiview/aiview.port

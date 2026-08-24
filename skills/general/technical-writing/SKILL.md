@@ -20,14 +20,14 @@ the author's journey is debt.
 3. **Draw the system before describing it.** The structural diagram comes first, not
    as illustration afterwards: if you can't draw the thing (its boxes, its arrows,
    its order), you don't understand it well enough to document it yet. Diagrams: use
-   the `write-diagrams` skill (`general/write-diagrams/SKILL.md` in this
+   the `write-diagrams` skill (`../write-diagrams/SKILL.md` in this
    collection): pick from its catalog by the reader's question, follow its
    discipline. See § Diagrams for what each document type typically carries.
 4. **Skeleton, then prose.** Headings first, ordered by the reader's priority:
    answer first, context after (a reader who needs background will scroll up; one who
    needs the command will not scroll down). Fill in prose last.
 5. **Render and iterate.** Register and serve the document via the `aiview` skill
-   (`tools/aiview/SKILL.md` in this collection): kind `reference` for durable
+   (`../../tools/aiview/SKILL.md` in this collection): kind `reference` for durable
    docs, `report` for one-off analyses; tags = project + subject; when the doc
    belongs to a piece of work with a board or spec, the same group. Tell the user the
    URL; edit the same file: it live-reloads, diagrams render.

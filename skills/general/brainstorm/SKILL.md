@@ -45,7 +45,7 @@ Structure:
 decisions table (status: agreed / proposed / open / deferred), context being built on,
 design sections, diagrams, research notes.
 
-Open the board via the `aiview` skill (`tools/aiview/SKILL.md` in this collection)
+Open the board via the `aiview` skill (`../../tools/aiview/SKILL.md` in this collection)
 the moment you create it: kind `brainstorm` (from the filename), tags = project + topic,
 group = the topic (titled: the spec and plan will join it), started honestly. Tell
 the user the URL it prints. Nothing to babysit: the server is detached; keep editing
@@ -55,7 +55,7 @@ asking the user anything again.
 
 ## Diagrams
 
-Use the `write-diagrams` skill (`general/write-diagrams/SKILL.md` in this
+Use the `write-diagrams` skill (`../write-diagrams/SKILL.md` in this
 collection). Pick from its catalog by the open question, follow its discipline. Brainstorm-specific guidance: use
 diagrams **during the question loop**, not only in the spec: a diagram with a `?` on
 the contested arrow is the cheapest way to ask a question. Expect 2–4 for a feature;
