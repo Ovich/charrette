@@ -4,11 +4,16 @@ export type SidebarEntry =
   | { type: "doc"; doc: DocumentWithState }
   | { type: "group"; slug: string; title: string; docs: DocumentWithState[] };
 
+/** When a document last actually changed. The file's mtime, not `last_seen_at`:
+ *  registering or moving a document bumps the latter, and bookkeeping must never
+ *  reorder the sidebar. Falls back to `last_seen_at` when the file is missing. */
+export const docActivity = (d: DocumentWithState): string => d.updated_at ?? d.last_seen_at;
+
 /** Sidebar order (pure, tested):
  *  - grouped docs collapse into one container entry per group
  *  - members inside a group read oldest-first (the board that started it on top)
- *  - every entry sorts by its latest member activity (last_seen_at), newest first —
- *    an active group floats up */
+ *  - every entry sorts by its most recently changed member, newest first — so the
+ *    group holding the latest document is on top */
 export function sidebarEntries(
   docs: DocumentWithState[],
   groups: Record<string, string>,
@@ -30,6 +35,6 @@ export function sidebarEntries(
     entries.push({ type: "group", slug, title: groups[slug] ?? slug, docs: members });
   }
   const activity = (e: SidebarEntry): string =>
-    e.type === "doc" ? e.doc.last_seen_at : e.docs.reduce((m, d) => (d.last_seen_at > m ? d.last_seen_at : m), "");
+    e.type === "doc" ? docActivity(e.doc) : e.docs.reduce((m, d) => (docActivity(d) > m ? docActivity(d) : m), "");
   return entries.sort((a, b) => activity(b).localeCompare(activity(a)));
 }

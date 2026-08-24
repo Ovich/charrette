@@ -7,7 +7,15 @@ export interface DocumentsResponse {
   documents: DocumentWithState[];
   /** slug -> display title. Empty until groups land (Phase 6). */
   groups: Record<string, string>;
+  /** slug -> display title. `paths` stays server-side: the UI has no use for it. */
+  projects: Record<string, string>;
+  /** The active project slug, or `*` for All projects. */
+  activeProject: string;
   start: number | null;
+}
+
+export interface ActiveProjectResponse {
+  project: string;
 }
 
 export interface DocumentResponse {
@@ -20,4 +28,17 @@ export interface DocumentResponse {
 export interface ChangedEventPayload {
   type: "changed";
   id: number;
+}
+
+/** Broadcast when the active project changes, from either the UI or the CLI. */
+export interface ProjectEventPayload {
+  type: "project";
+  slug: string;
+}
+
+/** Broadcast when the set of documents changed — one was registered, moved, re-tagged
+ *  or dropped. `changed` only covers edits to a file the server already watches, so
+ *  without this a newly registered document stays invisible until a manual refresh. */
+export interface IndexEventPayload {
+  type: "index";
 }

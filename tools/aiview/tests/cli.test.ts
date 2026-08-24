@@ -10,10 +10,12 @@ const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "sr
 
 let toolRoot: string;
 
+// AIVIEW_ROOT = where the code/dist would be; CHARRETTE_HOME = where the data goes.
+// The suite points both at one temp dir so a run leaves nothing in the real home.
 const run = (...argv: string[]) =>
   spawnSync(process.execPath, [CLI, ...argv], {
     encoding: "utf8",
-    env: { ...process.env, AIVIEW_ROOT: toolRoot },
+    env: { ...process.env, AIVIEW_ROOT: toolRoot, CHARRETTE_HOME: toolRoot },
   });
 
 const write = (rel: string, content: string): string => {
@@ -153,4 +155,161 @@ test("unknown verb prints usage and fails", () => {
   const r = run("frobnicate");
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /usage: aiview/);
+});
+
+test("project add creates the record and its docs directory; list shows it", () => {
+  const covered = path.join("C:", path.sep, "CIIP");
+  const added = run("project", "add", "CIIP", "--title", "CIIP", "--path", covered, "--json");
+  assert.equal(added.status, 0, added.stderr);
+  const p = JSON.parse(added.stdout);
+  assert.equal(p.slug, "CIIP");
+  assert.deepEqual(p.paths, [covered]);
+  assert.ok(fs.existsSync(path.join(toolRoot, "docs", "CIIP")), "project add makes <docs>/<slug>/");
+
+  const listed = run("project", "list", "--json");
+  assert.deepEqual(JSON.parse(listed.stdout).map((x: { slug: string }) => x.slug), ["CIIP"]);
+});
+
+test("a document filed under <docs>/<slug>/ takes that project, no flag needed", () => {
+  const f = write("docs/CIIP/a.spec.md", "# A\n");
+  const d = JSON.parse(run("add", f, "--json").stdout);
+  assert.equal(d.project, "CIIP");
+});
+
+test("--project overrides where the file sits", () => {
+  const f = write("docs/CIIP/b.spec.md", "# B\n");
+  assert.equal(JSON.parse(run("add", f, "--project", "Roster", "--json").stdout).project, "Roster");
+});
+
+test("use: sets the active project, refuses an unknown one", () => {
+  run("project", "add", "CIIP");
+  const ok = run("use", "CIIP", "--json");
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.equal(JSON.parse(ok.stdout).project, "CIIP");
+  assert.equal(JSON.parse(run("status", "--json").stdout).project, "CIIP");
+
+  const bad = run("use", "Nope");
+  assert.notEqual(bad.status, 0);
+  assert.match(bad.stderr, /no such project: Nope/);
+  assert.match(bad.stderr, /known: CIIP/);
+  // the refusal changed nothing
+  assert.equal(JSON.parse(run("status", "--json").stdout).project, "CIIP");
+});
+
+test("list scopes to the active project; --all and --project override", () => {
+  run("add", write("docs/CIIP/a.spec.md", "# A\n"));
+  run("add", write("docs/JOBS/b.spec.md", "# B\n"));
+  run("use", "CIIP");
+
+  assert.equal(JSON.parse(run("list", "--json").stdout).length, 1);
+  assert.equal(JSON.parse(run("list", "--all", "--json").stdout).length, 2);
+  assert.equal(JSON.parse(run("list", "--project", "JOBS", "--json").stdout).length, 1);
+});
+
+test("status --json reports where to write, and which project the cwd is in", () => {
+  run("project", "add", "CIIP", "--path", toolRoot);
+  run("use", "CIIP");
+  const s = JSON.parse(run("status", "--json").stdout);
+  assert.equal(s.project, "CIIP");
+  assert.equal(s.projectDocs, path.join(toolRoot, "docs", "CIIP"));
+  // '*' means All projects: write to the docs root itself
+  run("use", "*");
+  const all = JSON.parse(run("status", "--json").stdout);
+  assert.equal(all.project, "*");
+  assert.equal(all.projectDocs, path.join(toolRoot, "docs"));
+});
+
+test("project rm is refused while documents reference it", () => {
+  run("add", write("docs/CIIP/a.spec.md", "# A\n"));
+  const refused = run("project", "rm", "CIIP");
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /still has 1 document\./);
+
+  run("remove", "#1");
+  const gone = run("project", "rm", "CIIP");
+  assert.equal(gone.status, 0, gone.stderr);
+  assert.deepEqual(JSON.parse(run("project", "list", "--json").stdout), []);
+});
+
+test("move --project refiles a document into another project, file and row together", () => {
+  run("project", "add", "CIIP");
+  run("project", "add", "Charrette");
+  const f = write("docs/CIIP/a.spec.md", "# A\n");
+  run("add", f, "--tag", "keep", "--group", "g", "--group-title", "Group G");
+
+  const moved = JSON.parse(run("move", "#1", "--project", "Charrette", "--json").stdout).moved[0];
+  assert.equal(moved.project, "Charrette");
+  assert.equal(moved.file_path, "docs/Charrette/a.spec.md");
+  assert.ok(fs.existsSync(path.join(toolRoot, "docs", "Charrette", "a.spec.md")), "the file moved");
+  assert.ok(!fs.existsSync(f), "the original is gone");
+  // reclassifying must not cost the metadata that made the document findable
+  assert.equal(moved.id, 1);
+  assert.ok(moved.tags.includes("keep"));
+  assert.equal(moved.group_slug, "g");
+});
+
+test("move --project refuses an unknown project rather than inventing one", () => {
+  run("project", "add", "CIIP");
+  const f = write("docs/CIIP/a.spec.md", "# A\n");
+  run("add", f);
+  const r = run("move", "#1", "--project", "Ghost");
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /no such project: Ghost/);
+  assert.ok(fs.existsSync(f), "a refused move leaves the file alone");
+  assert.equal(JSON.parse(run("list", "--all", "--json").stdout)[0].project, "CIIP");
+});
+
+test("bare move pulls a stray back into its own project's directory", () => {
+  run("project", "add", "CIIP");
+  const stray = write("elsewhere/a.spec.md", "# A\n");
+  run("add", stray, "--project", "CIIP");
+  const moved = JSON.parse(run("move", "#1", "--json").stdout).moved[0];
+  assert.equal(moved.file_path, "docs/CIIP/a.spec.md");
+});
+
+test("update --project points at move instead of silently doing nothing", () => {
+  run("project", "add", "CIIP");
+  run("add", write("docs/CIIP/a.spec.md", "# A\n"));
+  const r = run("update", "#1", "--project", "Charrette");
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /use: aiview move #1 --project <slug>/);
+});
+
+test("path: the tool joins the location, so no caller ever builds one", () => {
+  run("project", "add", "CIIP");
+  run("use", "CIIP");
+
+  const p = run("path", "2026-08-25-topic.spec.md", "--json");
+  assert.equal(p.status, 0, p.stderr);
+  const out = JSON.parse(p.stdout);
+  // joined with THIS platform's separator, under THIS machine's home
+  assert.equal(out.path, path.join(toolRoot, "docs", "CIIP", "2026-08-25-topic.spec.md"));
+  assert.equal(out.dir, path.join(toolRoot, "docs", "CIIP"));
+  assert.equal(out.project, "CIIP");
+  assert.ok(fs.existsSync(out.dir), "the directory is ready to be written into");
+
+  // a caller that passes a path by mistake still gets a correctly located file
+  assert.equal(
+    JSON.parse(run("path", "some/wrong/place/2026-08-25-topic.spec.md", "--json").stdout).path,
+    out.path,
+  );
+
+  // --project targets another project without switching the active one
+  run("project", "add", "JOBS");
+  assert.equal(
+    JSON.parse(run("path", "x.spec.md", "--project", "JOBS", "--json").stdout).dir,
+    path.join(toolRoot, "docs", "JOBS"),
+  );
+  assert.equal(JSON.parse(run("status", "--json").stdout).project, "CIIP");
+});
+
+test("path refuses when there is nothing to resolve against", () => {
+  const noActive = run("path", "x.spec.md");
+  assert.notEqual(noActive.status, 0);
+  assert.match(noActive.stderr, /no active project/);
+
+  run("project", "add", "CIIP");
+  const ghost = run("path", "x.spec.md", "--project", "Ghost");
+  assert.notEqual(ghost.status, 0);
+  assert.match(ghost.stderr, /no such project: Ghost/);
 });

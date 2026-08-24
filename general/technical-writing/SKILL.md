@@ -80,8 +80,14 @@ whether the reader needs the clever part at all.
 
 ## Maintenance
 
-- Docs live **next to what they describe** and change in the same commit: a doc
-  updated "later" is a doc that lies.
+- **This skill is the exception in the collection: its output is usually repo
+  content.** A README, an architecture doc, a runbook, an API guide is a deliverable
+  for whoever clones the project, so it lives **next to what it describes** and changes
+  in the same commit: a doc updated "later" is a doc that lies. Boards, specs, plans and
+  analyses are scaffolding and stay in the data home (the `aiview` skill); documentation
+  is not. When this skill is used for a one-off analysis rather than a durable document
+  (kind `report`, not `reference`), that one follows the scaffolding rule instead.
+  Either way aiview renders it: `open` takes any path, in a repo or out of one.
 - Evergreen docs keep stable names (README.md, docs/architecture.md); dated names
   (`YYYY-MM-DD-….md`) are for point-in-time documents (analyses, ADRs, notes).
 - Every claim a reader could act on must be verifiable: a command that was run, a

@@ -1,7 +1,8 @@
 import { Search } from "lucide-react";
 import type { DocumentWithState } from "../../lib/api.ts";
-import type { ConnectionState } from "../../hooks/useDocuments.ts";
+import { ALL_PROJECTS, type ConnectionState } from "../../hooks/useDocuments.ts";
 import { useFilters } from "../../hooks/useFilters.ts";
+import { ProjectSelector } from "./ProjectSelector.tsx";
 import { sidebarEntries } from "../../hooks/useSidebarEntries.ts";
 import { Input } from "../ui/input.tsx";
 import { Badge } from "../ui/badge.tsx";
@@ -21,19 +22,27 @@ function FilterLabel({ children }: { children: string }) {
 export function Sidebar({
   docs,
   groups,
+  projects,
+  activeProject,
   connection,
   currentId,
   onOpen,
+  onPickProject,
 }: {
   docs: DocumentWithState[];
   groups: Record<string, string>;
+  projects: Record<string, string>;
+  activeProject: string;
   connection: ConnectionState;
   currentId: number | null;
   onOpen: (id: number) => void;
+  onPickProject: (slug: string) => void;
 }) {
-  const f = useFilters(docs);
+  // project scope first, so the kind and tag chips below are themselves scoped
+  const f = useFilters(docs, activeProject);
   // grouping happens after filtering, so a container shows only its matching members
   const entries = sidebarEntries(f.shown, groups);
+  const scoped = activeProject !== ALL_PROJECTS;
   return (
     <aside
       data-component="Sidebar"
@@ -47,6 +56,10 @@ export function Sidebar({
           aiview
         </span>
         <LiveIndicator state={connection} />
+      </div>
+
+      <div className="px-3.5 pb-2.5">
+        <ProjectSelector projects={projects} active={activeProject} docs={docs} onPick={onPickProject} />
       </div>
 
       <div className="px-3.5 pb-2.5">
@@ -93,15 +106,16 @@ export function Sidebar({
         )}
         {entries.map((e) =>
           e.type === "doc" ? (
-            <DocItem key={`d${e.doc.id}`} doc={e.doc} active={e.doc.id === currentId} onOpen={onOpen} />
+            <DocItem key={`d${e.doc.id}`} doc={e.doc} active={e.doc.id === currentId} showProject={!scoped} onOpen={onOpen} />
           ) : (
-            <DocGroup key={`g${e.slug}`} title={e.title} docs={e.docs} currentId={currentId} onOpen={onOpen} />
+            <DocGroup key={`g${e.slug}`} title={e.title} docs={e.docs} currentId={currentId} showProject={!scoped} onOpen={onOpen} />
           ),
         )}
       </div>
 
       <div className="flex items-center gap-1.5 border-t border-border px-3.5 py-2 text-[10.5px] text-faint-foreground">
-        {docs.length} documents · aiview.sqlite
+        {f.shown.length} documents ·{" "}
+        {scoped ? (projects[activeProject] ?? activeProject) : `${Object.keys(projects).length} projects`}
       </div>
     </aside>
   );

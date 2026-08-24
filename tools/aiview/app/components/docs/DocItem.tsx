@@ -1,4 +1,5 @@
 import { cn, fmtStart, fmtUpdated, projectName } from "../../lib/utils.ts";
+import { docActivity } from "../../hooks/useSidebarEntries.ts";
 import type { DocumentWithState } from "../../lib/api.ts";
 import { KindChip } from "./KindChip.tsx";
 
@@ -6,12 +7,15 @@ export function DocItem({
   doc,
   active,
   grouped = false,
+  showProject = true,
   onOpen,
 }: {
   doc: DocumentWithState;
   active: boolean;
   /** Rendered inside a DocGroup container (square corners, divider handled by parent). */
   grouped?: boolean;
+  /** Only in All-projects mode: scoped, it is the same string on every row. */
+  showProject?: boolean;
   onOpen: (id: number) => void;
 }) {
   return (
@@ -36,8 +40,8 @@ export function DocItem({
         {doc.title ?? "(untitled)"}
       </div>
       <div className="flex items-center gap-2 text-[10.5px] text-faint-foreground">
-        <span>{projectName(doc.project)}</span>
-        <span className="font-mono">updated {fmtUpdated(doc.last_seen_at)}</span>
+        {showProject && <span className="text-accent">{projectName(doc.project)}</span>}
+        <span className="font-mono">updated {fmtUpdated(docActivity(doc))}</span>
       </div>
     </div>
   );

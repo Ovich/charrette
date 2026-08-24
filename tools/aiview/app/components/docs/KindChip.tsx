@@ -20,7 +20,9 @@ export function KindChip({
       data-component="KindChip"
       className={cn(
         "inline-flex items-center whitespace-nowrap rounded-[5px] border px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide",
-        onClick && "cursor-pointer",
+        // Without a handler the chip is decoration sitting on top of a clickable row,
+        // so it must not be an event target at all: the click belongs to the row.
+        onClick ? "cursor-pointer" : "pointer-events-none",
         dim && "opacity-40",
       )}
       style={{

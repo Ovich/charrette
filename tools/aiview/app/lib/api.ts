@@ -18,5 +18,16 @@ export async function fetchDocument(id: number): Promise<DocumentResponse | null
   return (await r.json()) as DocumentResponse;
 }
 
+/** The one write path for the active project — the CLI posts here too. */
+export async function setActiveProject(project: string): Promise<string> {
+  const r = await fetch("/api/active", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ project }),
+  });
+  if (!r.ok) throw new Error(`POST /api/active: ${r.status}`);
+  return ((await r.json()) as { project: string }).project;
+}
+
 export const rawUrl = (id: number): string => `/api/raw/${id}?t=${Date.now()}`;
 export const assetUrl = (docId: number, rel: string): string => `/api/asset/${docId}/${rel}`;

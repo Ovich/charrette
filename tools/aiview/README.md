@@ -15,25 +15,51 @@ One npm package: a React + TypeScript + Tailwind + shadcn-style UI (`app/`, buil
 Node ≥ 22.5 (`node:sqlite`). One-time per machine, in this directory:
 
 ```sh
-npm install && npm run build
+npm install && npm run build && node aiview.mjs init
 ```
 
 `aiview.mjs` is the only entry point and its path never changes. If the build is
 missing, every verb says exactly what to run; `serve`/`open` rebuild the UI
 automatically when `dist/` is absent.
 
+## Two roots
+
+| Root | Holds | |
+|---|---|---|
+| This checkout | `app/`, `dist/`, `dist-cli/`, `node_modules/` | Rebuildable. Delete it, clone again, rebuild: nothing of yours was here. |
+| **Data home**: `$CHARRETTE_HOME`, else `charrette_appdata` in the OS home dir | `aiview.sqlite`, `aiview.pid`, `aiview.port`, and documents under `docs/<project>/` | Yours. Never versioned, never inside a project repo. |
+
+`init` creates the home and adopts an index left next to the tool by a pre-appdata
+install (the original is kept, unused). Paths inside the home are stored relative, so a
+synced home carries a working index to another machine; anything outside is stored
+absolute. `status` prints all of this; `status --json` exposes `home`, `docs`, `sqlite`,
+`tool`, plus `project`, `projectDocs` and `cwdProject`.
+
+Inside the home, documents are filed one directory per project
+(`docs/CIIP/`, `docs/JOBS/`…), and that directory *is* the document's project. Projects
+themselves are records — slug, optional title, and the **working directories** they
+cover — so a working directory under CIIP resolves to CIIP by longest-prefix match without any
+document ever being classified by its own path.
+
 ## Usage
 
 ```sh
 A="node <path-to>/aiview.mjs"   # wherever this folder lives
 
-$A open  docs/specs/2026-08-23-topic.brainstorm.md --tag proj --tag topic   # THE agent gesture (see below)
-$A add   docs/specs/2026-08-23-topic.brainstorm.md --tag proj [--group g --group-title "Title"] [--started ISO]
+F=$($A path 2026-08-23-topic.brainstorm.md)   # never hand-build a path: this joins it for your OS
+
+$A open  "$F" --tag proj --tag topic   # THE agent gesture (see below)
+$A add   "$F" --tag proj [--group g --group-title "Title"] [--started ISO]
 $A update <file|#id> [--kind k] [--tag t] [--untag t] [--group g|--ungroup] [--group-title T] [--started ISO]
 $A list  [--kind brainstorm] [--tag proj]
 $A remove <file|#id>...
+$A move   <file|#id>... [--project <slug>]
+$A project <add|list|rm> [slug] [--title T] [--path P]...
+$A use    <slug|*>
 $A serve [file] [--port 4321] [--open] [--detach]
+$A path   <filename> [--project <slug>]
 $A status
+$A init
 ```
 
 - **open**: idempotent one-shot: ensure the file is registered (same meta flags as
@@ -45,9 +71,26 @@ $A status
   `--group-title` names or renames that group. Start date-time = first registration,
   or `--started <ISO>`.
 - **update**: change metadata without remove/re-add. `--ungroup` clears membership.
+- **move**: refile a document, file and index row together. `--project <slug>` puts it
+  in another project — the only way to reclassify one, since the project *is* the
+  directory; bare, it pulls a stray back into its own project's directory. Id, start
+  time, tags and group survive. An unknown project is refused rather than invented. If
+  a previous run moved the file but failed to write the index, re-running re-points the
+  stale row.
 - **serve**: start the viewer. `--detach` daemonizes: writes `aiview.pid` +
   `aiview.port` next to the sqlite and returns; `open`/`status` find it through them.
-- **status**: sqlite path, doc count, server up/down (stale pidfiles detected).
+- **project**: manage projects — `slug`, an optional `title`, and the **working
+  directories** the project covers (`--path`, repeatable). `add` also creates
+  `<docs>/<slug>/`. `rm` is refused while documents still reference it.
+- **use**: set the active project (`*` = All projects). With a server running this
+  POSTs, so every open tab re-scopes over SSE; with none, it writes the row.
+- **status**: the two roots, the active project, `projectDocs` (where to write),
+  `cwdProject` (which project claims the working directory), doc count, server
+  up/down (stale pidfiles detected).
+- **path**: prints where a document with that name belongs, joined with this OS's
+  separator under this machine's home. Agents call this instead of building a path;
+  `--json` gives `{path, dir, project}`.
+- **init**: create the data home, adopt a legacy index, print where everything lives.
 - **--json** on every verb: compact machine-readable output.
 
 ## UI
@@ -58,12 +101,25 @@ latest member activity), ungrouped docs flat. Right: doc header (title, **absolu
 local path with click-to-copy**, kind, started, tags, updated) and the rendered
 document; live reload via SSE. `#doc=<id>` selects a doc. Dark mode follows the OS.
 
+`/events` carries three kinds: `changed` when a watched file is edited on disk,
+`index` when the document list itself moves (a document registered, moved, re-tagged or
+dropped), and `project` when the active project changes. The CLI writes sqlite in its
+own process, so `index` is what it POSTs to `/api/index-changed` after a mutating verb —
+without it a newly registered document would stay invisible until a manual refresh.
+
 ## Storage
 
-`aiview.sqlite` next to `aiview.mjs`: `documents` (one row per doc, `group_slug`
-nullable) + `groups` (slug → title). Files are the truth; the index only points.
-Document paths are stored relative to the repo root above the tool when inside it,
-absolute otherwise. The index is written only by the CLI. The UI is read-only.
+`aiview.sqlite` in the **data home** (not next to the tool): `documents` (one row per
+doc) + `groups` (slug → title) + `projects` (slug, title, covered working directories)
++ `state` (the active project). Files are the truth; the index only points at them.
+
+Document paths are stored **relative to the data home** when inside it — which is what
+lets a synced home carry a working index to another machine or another OS — and
+absolute anywhere else. Relative paths are stored with posix separators and re-joined
+with the local separator on read, so they mean the same thing everywhere.
+
+The index is written only by the CLI, except the active project, which the UI also sets
+through `POST /api/active`. Everything else in the UI is read-only.
 
 ## Development
 

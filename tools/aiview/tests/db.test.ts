@@ -144,3 +144,45 @@ test("migration: v1 schema (no kind/tags, revisions table) upgrades in place", a
   check.close();
   upgraded.close();
 });
+
+test("projects: upsert creates, title renames, paths merge without duplicates", () => {
+  const a = index.upsertProject("CIIP");
+  assert.equal(a.slug, "CIIP");
+  assert.equal(a.title, null); // falls back to the slug in the UI, as groups do
+  assert.deepEqual(a.paths, []);
+
+  index.upsertProject("CIIP", { title: "CIIP", addPaths: ["C:/CIIP"] });
+  const b = index.upsertProject("CIIP", { addPaths: ["C:/CIIP", "C:/srv/ciip-legacy"] });
+  assert.equal(b.title, "CIIP"); // an absent title never wipes the stored one
+  assert.deepEqual(b.paths, ["C:/CIIP", "C:/srv/ciip-legacy"]);
+});
+
+test("projects: registering a document upserts its project so none is ever orphaned", () => {
+  index.register(write("docs/x.spec.md", "# X\n"), { project: "Roster" });
+  assert.deepEqual(index.allProjects().map((p) => p.slug), ["Roster"]);
+});
+
+test("projects: an explicit --project beats the derived fallback", () => {
+  const d = index.register(write("docs/x.spec.md", "# X\n"), { project: "CIIP" });
+  assert.equal(d.project, "CIIP");
+  // re-registering without one keeps what the row already has
+  assert.equal(index.register(d.abs_path).project, "CIIP");
+});
+
+test("removeProject: refused while documents reference it, allowed once empty", () => {
+  const d = index.register(write("docs/x.spec.md", "# X\n"), { project: "CIIP" });
+  assert.deepEqual(index.removeProject("CIIP"), { removed: false, documents: 1 });
+  index.remove(d.id);
+  assert.deepEqual(index.removeProject("CIIP"), { removed: true, documents: 0 });
+  assert.deepEqual(index.allProjects(), []);
+});
+
+test("active project: defaults to All, round-trips, and never reads back as a ghost", () => {
+  assert.equal(index.activeProject(), "*");
+  index.upsertProject("CIIP");
+  assert.equal(index.setActiveProject("CIIP"), "CIIP");
+  assert.equal(index.activeProject(), "CIIP");
+  // the project disappears behind the pointer -> All projects, not a stale name
+  index.removeProject("CIIP");
+  assert.equal(index.activeProject(), "*");
+});

@@ -38,7 +38,8 @@ Each maps to a section of `checklist.md` (**read that section, don't review from
    Give each agent: the file list, its lens section from `checklist.md`, and the output contract below. Tight prompts, compact returns.
 3. **Merge:** dedup findings on the same line/mechanism, drop anything biome or lint already flags, rank most-impactful first.
 4. **Report** grouped by lens. *Diff scope:* in chat, terse, no diagrams. *`all` / folder scope:*
-   write `docs/analysis/YYYY-MM-DD-<scope>.report.md` and open it via the `aiview` skill
+   write `YYYY-MM-DD-<scope>.report.md` in the data home (ask the `aiview` skill for the
+   path; never in the repo under review) and open it via the `aiview` skill
    (`tools/aiview/SKILL.md` in this collection). Mermaid renders there, not in the
    terminal.
    Kind `report` (from the filename), tags = roster + review.

@@ -19,10 +19,11 @@ it's approved.
 
 ## Flow
 
-1. **Load or build the design language** (§ below). If `docs/design/design-language.md`
-   exists and is younger than the last change to the token/UI files, read it and skip to 2.
-   Otherwise extract it now, write it, register it in aiview (kind `reference`), and ask
-   the user to skim it: one message, "does this match how you see the product?".
+1. **Load or build the design language** (§ below). If the project's
+   `design-language.reference.md` exists and is younger than the last change to the
+   token/UI files, read it and skip to 2. Otherwise extract it now, write it, register
+   it in aiview (kind `reference`), and ask the user to skim it: one message, "does
+   this match how you see the product?".
 2. **Frame the screen**: one question at a time, only what changes the layout: who uses
    it, the primary action, the data it shows, the states it must handle (empty, loading,
    error, permission-denied), where it sits in navigation. Reuse names from
@@ -48,7 +49,12 @@ it's approved.
    copy strings, and the acceptance list (states × viewports). Then stop; implementation
    is a separate step the user starts.
 
-## The design language (`docs/design/design-language.md`)
+## The design language (`design-language.reference.md`)
+
+It lives in the project's folder in the data home like everything else, but it is the
+one document here that does **not** retire when a PR merges: every future mockup builds
+on it. It is a cache of what the codebase already says, so when the token or UI files
+have moved on, re-extract rather than patch.
 
 Extract, don't guess. Read in this order and cite the file for every claim:
 
@@ -59,7 +65,7 @@ Extract, don't guess. Read in this order and cite the file for every claim:
 | Custom/wrapped components (`components/custom/`, `layout/`, `typography/`, `shell/`) | the project's *named vocabulary*: layout primitives, chips, pills, hints, state chips, dialogs, the words the codebase already uses for visual things |
 | 2–3 representative existing screens (pages/routes) | page skeleton (shell, header, content width, section spacing), density, how lists/cards/tables are used, empty and loading states, where actions sit |
 | Copy in those screens, `nomenclature.md`, `AGENTS.md` | tone, capitalization, button verbs, how errors are phrased |
-| Existing mockups (`*.mockup.html`, `*mockup*.html`) | what has already been proposed and accepted or rejected |
+| Existing mockups for this project (`aiview list --kind mockup --tag <project>`) | what has already been proposed and accepted or rejected |
 
 Write it as the template in `design-language-template.md`: tokens (as CSS custom
 properties, light + dark), type scale, spacing/radius/shadow, component vocabulary (name
@@ -70,8 +76,9 @@ tags = project + design.
 
 ## Mockups
 
-- **File:** `docs/design/mockups/YYYY-MM-DD-<screen>.mockup.html` (user's
-  stated location wins). One screen per file; variants as `…-<screen>-b.mockup.html`.
+- **File:** `YYYY-MM-DD-<screen>.mockup.html` in the data home (ask the `aiview`
+  skill for the path). One screen per file; variants as
+  `…-<screen>-b.mockup.html`.
 - **Self-contained:** inline `<style>` and, if needed, inline `<script>`; no CDN, no
   build. Start the `<style>` with the design-language tokens as `:root` custom properties
   (light) plus the dark overrides under `@media (prefers-color-scheme: dark)`, and use

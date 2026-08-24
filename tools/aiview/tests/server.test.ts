@@ -36,7 +36,7 @@ before(async () => {
   boardId = index.register(board, { tags: ["t1"] }).id;
   pdfId = index.register(write("out/cv.pdf", "%PDF-1.4"), { kind: "pdf" }).id;
 
-  server = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp });
+  server = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp, writeState: false });
   await new Promise<void>((r) => server.on("listening", () => r()));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -57,6 +57,9 @@ test("GET /api/documents matches the shared shape, groups present", async () => 
   assert.equal(body.documents.length, 2);
   assert.deepEqual(body.groups, {});
   assert.equal(body.start, null);
+  // every document's project has a record, so the selector can always place it
+  for (const d of body.documents) assert.ok(d.project in body.projects, `${d.project} missing from projects`);
+  assert.equal(body.activeProject, "*");
   const board = body.documents.find((d) => d.id === boardId)!;
   assert.equal(board.kind, "brainstorm");
   assert.equal(board.format, "markdown");
@@ -106,7 +109,7 @@ test("dist/ takes over static serving with SPA fallback", async () => {
   fs.writeFileSync(path.join(tmp, "dist", "index.html"), "<title>new app</title>");
   fs.writeFileSync(path.join(tmp, "dist", "assets", "app.js"), "console.log(1)");
   // new server instance: dist presence is read at startup
-  const s2 = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp });
+  const s2 = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp, writeState: false });
   await new Promise<void>((r) => s2.on("listening", () => r()));
   const b2 = `http://127.0.0.1:${(s2.address() as AddressInfo).port}`;
   try {
@@ -149,4 +152,56 @@ test("SSE /events pushes changed on file edit", async () => {
   await readUntil('"changed"');
   assert.match(buf, new RegExp(`"id":${boardId}`));
   ctrl.abort();
+});
+
+test("POST /api/active writes the row and broadcasts to open tabs", async () => {
+  index.upsertProject("CIIP");
+  const es = await fetch(`${base}/events`);
+  const reader = es.body!.getReader();
+  await reader.read(); // the hello frame
+
+  const post = await fetch(`${base}/api/active`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ project: "CIIP" }),
+  });
+  assert.equal(post.status, 200);
+  assert.deepEqual(await post.json(), { project: "CIIP" });
+
+  const frame = new TextDecoder().decode((await reader.read()).value);
+  assert.match(frame, /"type":"project"/);
+  assert.match(frame, /"slug":"CIIP"/);
+  await reader.cancel();
+
+  // the row really moved, and the next tab to load reads it
+  assert.equal(index.activeProject(), "CIIP");
+  const docs = (await (await fetch(`${base}/api/documents`)).json()) as DocumentsResponse;
+  assert.equal(docs.activeProject, "CIIP");
+});
+
+test("POST /api/active rejects an unknown project and bad input", async () => {
+  const post = (body: string) =>
+    fetch(`${base}/api/active`, { method: "POST", headers: { "content-type": "application/json" }, body });
+  assert.equal((await post(JSON.stringify({ project: "Ghost" }))).status, 404);
+  assert.equal((await post(JSON.stringify({}))).status, 400);
+  assert.equal((await post("not json")).status, 400);
+  // '*' is always valid: All projects needs no record
+  assert.equal((await post(JSON.stringify({ project: "*" }))).status, 200);
+});
+
+test("POST /api/index-changed tells open tabs the document list moved", async () => {
+  const es = await fetch(`${base}/events`);
+  const reader = es.body!.getReader();
+  await reader.read(); // hello
+
+  const post = await fetch(`${base}/api/index-changed`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(post.status, 200);
+
+  const frame = new TextDecoder().decode((await reader.read()).value);
+  assert.match(frame, /"type":"index"/);
+  await reader.cancel();
 });

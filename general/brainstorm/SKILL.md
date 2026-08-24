@@ -37,9 +37,11 @@ simple. A simple project's spec is three paragraphs, but it exists and it's appr
 ## The board (live document)
 
 The design lives in one Markdown file from the first question, not in chat. Create
-`docs/specs/YYYY-MM-DD-<topic>.brainstorm.md` (user's stated location wins) as soon as
-the context is read, and keep every decision, open question, considered option, diagram,
-and research note in it: the chat is transient, the board is the record. Structure:
+`YYYY-MM-DD-<topic>.brainstorm.md` in the data home — ask the `aiview` skill for the
+path rather than composing one, and never write inside the project repo — as soon as
+the context is read, and keep every decision, open question, considered option,
+diagram, and research note in it: the chat is transient, the board is the record.
+Structure:
 decisions table (status: agreed / proposed / open / deferred), context being built on,
 design sections, diagrams, research notes.
 
@@ -68,9 +70,9 @@ diagrams side by side beat two paragraphs. Say which you'd pick and why.
 
 ## The spec
 
-Write to `docs/specs/YYYY-MM-DD-<topic>.spec.md` (a user's stated location wins), register it
-with aiview as kind `spec` carrying the board's tags **and the board's `--group`** (one piece
-of work, one container), and note the spec path at the top of the board. Contents:
+Write `YYYY-MM-DD-<topic>.spec.md` beside the board, register it with aiview as kind
+`spec` carrying the board's tags **and the board's `--group`** (one piece of work, one
+container), and note the spec path at the top of the board. Contents:
 
 **Problem**: what's wrong today, who feels it · **Goals / non-goals**: the non-goals
 are the valuable half · **Design**: prose plus the diagrams that earned their place ·
@@ -106,8 +108,8 @@ mental model and durable context for every later AI session that reads the plan:
   board produced no diagram for a boundary the plan depends on, draw it now: its
   absence is a review finding, not a pass.
 
-Write to `docs/specs/YYYY-MM-DD-<topic>.plan.md` (a user's stated location wins) and
-register it with aiview as kind `plan`, carrying the board's tags and `--group`.
+Write `YYYY-MM-DD-<topic>.plan.md` beside the board and spec, and register it with
+aiview as kind `plan`, carrying the board's tags and `--group`.
 
 ## Red flags
 

@@ -1,10 +1,11 @@
-// Pidfile + portfile next to the sqlite: how `open` and `status` find a running server.
+// Pidfile + portfile next to the sqlite in the data home: how `open` and `status`
+// find a running server. One data home = one server, shared by every project.
 import fs from "node:fs";
 import path from "node:path";
-import { TOOL_ROOT } from "./db.ts";
+import { DATA_ROOT, ensureHome } from "./home.ts";
 
-export const PID_FILE = path.join(TOOL_ROOT, "aiview.pid");
-export const PORT_FILE = path.join(TOOL_ROOT, "aiview.port");
+export const PID_FILE = path.join(DATA_ROOT, "aiview.pid");
+export const PORT_FILE = path.join(DATA_ROOT, "aiview.port");
 
 export interface ServerStatus {
   running: boolean;
@@ -33,6 +34,7 @@ const alive = (pid: number): boolean => {
 };
 
 export function writeServerFiles(port: number): void {
+  ensureHome();
   fs.writeFileSync(PID_FILE, String(process.pid));
   fs.writeFileSync(PORT_FILE, String(port));
 }

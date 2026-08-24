@@ -24,8 +24,9 @@ working tree is dirty. Skip vendored, generated, build, and lockfile paths.
 
 ## The analysis document (the deliverable)
 
-Write `docs/analysis/YYYY-MM-DD-pr-<id>.pr-analysis.md` and open it via the `aiview`
-skill (`tools/aiview/SKILL.md` in this collection): kind `pr-analysis` (from the
+Write `YYYY-MM-DD-pr-<id>.pr-analysis.md` in the data home (ask the `aiview` skill
+for the path; never in the repo under review) and open it via the `aiview` skill
+(`tools/aiview/SKILL.md` in this collection): kind `pr-analysis` (from the
 filename), tags = project + the feature; if the work has a board/spec group, join it.
 Tell the user the URL. Sections, in reading order:
 

@@ -9,11 +9,13 @@ export function DocGroup({
   title,
   docs,
   currentId,
+  showProject = true,
   onOpen,
 }: {
   title: string;
   docs: DocumentWithState[];
   currentId: number | null;
+  showProject?: boolean;
   onOpen: (id: number) => void;
 }) {
   const containsCurrent = docs.some((d) => d.id === currentId);
@@ -41,7 +43,7 @@ export function DocGroup({
           <div className="border-t border-border">
             {docs.map((d, i) => (
               <div key={d.id} className={cn(i > 0 && "border-t border-border")}>
-                <DocItem doc={d} active={d.id === currentId} grouped onOpen={onOpen} />
+                <DocItem doc={d} active={d.id === currentId} grouped showProject={showProject} onOpen={onOpen} />
               </div>
             ))}
           </div>

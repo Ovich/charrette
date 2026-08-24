@@ -8,6 +8,17 @@ review.** Everything is a local document (boards, specs, plans, mockups, PR
 analyses) rendered live in the bundled viewer ([aiview](tools/aiview/SKILL.md)),
 with diagrams as thinking tools, not decoration.
 
+These documents have two jobs: make it unambiguous between a developer and an agent
+what is being built, and be efficient context while it is built. Both end when the PR
+merges, so **none of them are versioned and none live in a project repository.** They
+are written to a data home outside your repos (`charrette_appdata` in your OS home
+directory by default, `$CHARRETTE_HOME` to move it), and
+whatever outlives the work is distilled into places that *are* versioned: durable rules
+into `AGENTS.md` via [project-conventions](general/project-conventions/SKILL.md), the
+story of the change into the PR description. [technical-writing](general/technical-writing/SKILL.md)
+is the deliberate exception: a README or an architecture doc is a deliverable, and it
+belongs in the repo next to the code it describes.
+
 No lock-in by design: the skills are plain markdown any agent can read, the tooling
 is plain Node, references between skills use names plus paths relative to this repo
 ("in this collection"), and nothing depends on a specific harness, plugin format, or
@@ -60,18 +71,30 @@ tab. You watch decisions, diagrams, and drafts land as they happen.
 
 | Tool | What it does |
 |---|---|
-| [aiview](tools/aiview/SKILL.md) | Local document viewer + index in one npm package: React/TypeScript/Tailwind UI, small plain-Node server, agent-facing CLI. Renders Markdown (GFM + mermaid), HTML mockups and PDFs at `localhost:4321` with live reload; related documents grouped in collapsible containers; every doc header shows its absolute path (click-to-copy). CLI: `open` (idempotent register + detached server + URL), `add`, `update`, `list`, `remove`, `serve --detach`, `status`, all with `--json`. Node ≥ 22.5; one-time `npm install && npm run build` in `tools/aiview/`. Its `SKILL.md` is the contract every skill follows (kinds, tags, groups, start time). |
+| [aiview](tools/aiview/SKILL.md) | Local document viewer + index in one npm package: React/TypeScript/Tailwind UI, small plain-Node server, agent-facing CLI. Renders Markdown (GFM + mermaid), HTML mockups and PDFs at `localhost:4321` with live reload; related documents grouped in collapsible containers; every doc header shows its absolute path (click-to-copy). Documents are filed per project (CIIP, JOBS, …); one active project scopes the sidebar and is shared between you and the agent — either can switch it, and every open tab follows. CLI: `open` (idempotent register + detached server + URL), `add`, `update`, `list`, `remove`, `move`, `project`, `use`, `path` (where a document belongs, joined for your OS), `serve --detach`, `status`, `init`, all with `--json`. Node ≥ 22.5; one-time `npm install && npm run build && node aiview.mjs init` in `tools/aiview/`. Its `SKILL.md` is the contract every skill follows (kinds, tags, groups, start time). |
 
-aiview creates its index (`aiview.sqlite`) next to the tool on first use. The file
-is gitignored here: it's your machine's document catalog, not the repo's.
+aiview keeps its index (`aiview.sqlite`), its server files and every document in the
+**data home** — `$CHARRETTE_HOME`, or `charrette_appdata` in your OS home directory — never in this
+checkout and never in a project repo. The split is deliberate: the checkout holds only
+what `npm run build` can recreate, so you can delete it, clone it again, rebuild, and
+lose nothing. Documents land in `<home>/docs/<project>/`, and because that folder name
+is what aiview reports as the project, the layout labels itself.
 
 ## Using the collection
 
 Clone anywhere. Point your agent at a skill's `SKILL.md` (or wire the folder into
 your harness's skill discovery, if it has one). Each file is self-contained and
-resolves its references relative to this repo. For aiview, run the one-time build in
-`tools/aiview/`, then `node tools/aiview/aiview.mjs open <your-doc.md>` is the whole
-gesture.
+resolves its references relative to this repo. For aiview, one command sets up a fresh
+machine:
+
+```sh
+cd tools/aiview && npm install && npm run build && node aiview.mjs init
+```
+
+`init` creates the data home and prints where everything lives; `status` says so again
+later. After that, `node tools/aiview/aiview.mjs open <doc>` is the whole gesture. An
+existing index left next to the tool by an older install is adopted automatically on
+first run, documents and all.
 
 ## License
 

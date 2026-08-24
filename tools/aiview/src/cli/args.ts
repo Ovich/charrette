@@ -1,5 +1,16 @@
 // Centralized flag parsing — one place knows which flags take values.
-const VALUE_FLAGS = new Set(["--port", "--tag", "--untag", "--kind", "--started", "--group", "--group-title"]);
+const VALUE_FLAGS = new Set([
+  "--port",
+  "--tag",
+  "--untag",
+  "--kind",
+  "--started",
+  "--group",
+  "--group-title",
+  "--project",
+  "--title",
+  "--path",
+]);
 
 export interface ParsedArgs {
   verb: string | undefined;
