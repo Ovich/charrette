@@ -1,5 +1,6 @@
 import type { Document } from "../../lib/api.ts";
 import { Button } from "../ui/button.tsx";
+import { DocPath } from "../docs/DocPath.tsx";
 
 export function TopBar({
   doc,
@@ -27,7 +28,8 @@ export function TopBar({
           {doc ? (doc.title ?? "(untitled)") : "aiview"}
         </b>
       </span>
-      <div className="ml-auto flex gap-1.5">
+      <div className="ml-auto flex min-w-0 items-center gap-1.5">
+        {doc && <DocPath path={doc.abs_path} />}
         {printable && (
           <Button variant="primary" onClick={() => window.print()} title="Export to PDF via the browser print dialog">
             Export PDF
