@@ -26,22 +26,22 @@ cloud service.
 
 ## The drawing-board loop
 
-User flow: the path a change takes, and which skill acts at each step.
+User flow: the phases a change passes through, and the gate on each arrow.
 
 ```mermaid
-flowchart LR
-  I["idea"] -- "one question at a time" --> B["brainstorm<br/>board → spec → plan"]
-  B -- "approved plan" --> C["implementation<br/>your harness, not charrette"]
-  C -- "diff or PR" --> R["review<br/>pr-review, code-design-review,<br/>frontend-review"]
-  R -- "merge decision" --> M["merge"]
-  D["write-diagrams"] -. "diagrams" .-> B
-  D -. "diagrams" .-> R
+flowchart TD
+  idea([idea]) --> design
+  design["<b>Design</b>: brainstorm board"] -->|"design approved"| specify["<b>Specify</b>: spec"]
+  specify -->|"spec approved"| plan["<b>Plan</b>: phased plan"]
+  plan -->|"screens: mockup approved first"| build["<b>Build</b>: implementation"]
+  build -->|"PR"| review["<b>Review</b>: pr-analysis, reports"]
+  review -->|"merge decision"| shipped([shipped])
+  review -->|"findings"| design
 ```
 
 The board is a Markdown file opened at the first question and edited through the whole
 conversation; chat scrolls away, the board is the record. Charrette has no
-implementation skill: the plan is the input to whatever harness you already use, and
-the review skills judge what comes back.
+implementation skill: the plan is the input to whatever harness you already use.
 
 ## Layout
 
