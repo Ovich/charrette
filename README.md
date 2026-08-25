@@ -112,9 +112,7 @@ wherever the two disagree. That's the point of writing them down.
 
 ## The viewer
 
-![aiview: grouped documents in the sidebar, a live board with its decisions table on the right](assets/aiview.png)
-
-![aiview in dark mode: the Guest checkout spec for an example shop project, its container and sequence diagrams rendered, with the board and plan grouped beside it](assets/aiview-spec.png)
+![aiview in dark mode: the Guest checkout spec for an example shop project, its container and sequence diagrams rendered, with the board and plan grouped beside it](assets/aiview.png)
 
 *A spec for an example project: the board, plan and spec grouped as one piece of work,
 diagrams rendered inline.*
