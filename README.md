@@ -26,17 +26,14 @@ cloud service.
 
 ## The drawing-board loop
 
-User flow: the phases a change passes through, and the gate on each arrow.
-
 ```mermaid
-flowchart TD
-  idea([idea]) --> design
-  design["<b>Design</b>: brainstorm board"] -->|"design approved"| specify["<b>Specify</b>: spec"]
-  specify -->|"spec approved"| plan["<b>Plan</b>: phased plan"]
-  plan -->|"screens: mockup approved first"| build["<b>Build</b>: implementation"]
-  build -->|"PR"| review["<b>Review</b>: pr-analysis, reports"]
-  review -->|"merge decision"| shipped([shipped])
-  review -->|"findings"| design
+flowchart LR
+  I["idea"] --> B["brainstorm<br/>board + spec + plan"]
+  B --> C["implementation"]
+  C --> R["review<br/>pr-analysis, findings"]
+  R --> M["merge"]
+  D["write-diagrams"] -.-> B
+  D -.-> R
 ```
 
 The board is a Markdown file opened at the first question and edited through the whole
