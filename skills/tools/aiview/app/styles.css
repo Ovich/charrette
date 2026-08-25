@@ -94,3 +94,13 @@ body {
   .md pre { overflow-x: visible; white-space: pre-wrap; word-break: break-word; }
   .md table { display: table; overflow-x: visible; }
 }
+
+/* Shiki renders both themes into one block (--shiki-light / --shiki-dark); the
+   theme is chosen here, so an OS theme switch needs no re-render. The box keeps
+   aiview's own surface — only the tokens come from the theme. */
+.md .shiki-box pre { background: var(--surface-2) !important; }
+.md .shiki-box code { background: none; border: 0; padding: 0; }
+.md .shiki-box span { color: var(--shiki-light); }
+@media (prefers-color-scheme: dark) {
+  .md .shiki-box span { color: var(--shiki-dark); }
+}
