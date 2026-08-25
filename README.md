@@ -75,11 +75,10 @@ output.
 
 ## aiview
 
-aiview owns four answers the skills must not each invent: where a document belongs, how
-it is registered, how it is rendered, and how the viewer starts. A skill asks
-`aiview path <filename>` for a location and calls `aiview open <file>` to show it — it
-never joins a path itself. That is why documents could move out of project
-repositories and into the data home without editing eight skills.
+aiview owns the answers the skills must not each invent: where a document belongs, how
+it is registered, how it is rendered, how the viewer starts. A skill asks
+`aiview path <filename>` for a location and calls `aiview open <file>` to show it. It
+never joins a path itself.
 
 One tab at `http://localhost:4321` holds every registered document: Markdown (GFM +
 Mermaid), self-contained HTML mockups in a sandboxed iframe, and PDFs. A file watcher
@@ -99,18 +98,12 @@ storage, API routes and development commands.
 ## Where the documents live
 
 Boards, specs, plans, mockups and review reports are working material between you and
-the agent. Most are superseded by the merged code.
+the agent, and most are superseded by the merged code. Charrette writes them to a
+**data home outside every repository** — `$CHARRETTE_HOME`, or `charrette_appdata` in
+your home directory — under `docs/<project>/`, alongside the SQLite index and the
+server's pid and port files. The checkout holds only what `npm run build` recreates.
 
-A working document kept in the project repository has to be reviewed like code and
-kept current like code, and it is read by people who want the code rather than its
-scaffolding. It gets none of that, so it goes stale.
-
-Charrette therefore writes them to a **data home outside every repository** —
-`$CHARRETTE_HOME`, or `charrette_appdata` in your home directory — under
-`docs/<project>/`, alongside the SQLite index and the server's pid and port files. The
-checkout holds only what `npm run build` recreates.
-
-The consequences:
+What that commits you to:
 
 - Delete the checkout, clone it again, rebuild: nothing of yours was in it.
 - The data home can be its own git repository, purely to sync between machines.
