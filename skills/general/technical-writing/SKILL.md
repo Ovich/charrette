@@ -66,25 +66,19 @@ If the structure cannot be drawn, the author's understanding is probably still t
 
 ### 3. Draw before explaining
 
-The structural diagram is part of the reasoning, not decoration.
+The structural diagram is part of the reasoning, not decoration. It comes before the
+prose, because drawing is where the author finds out the structure is wrong.
 
-Use the `write-diagrams` skill.
+This skill does not own diagrams and does not restate their rules.
 
-Choose the diagram according to the reader's question.
+**Diagrams: use the `write-diagrams` skill (`../write-diagrams/SKILL.md` in this
+collection). Pick from its catalog by the reader's question, follow its discipline.**
 
-An architecture document normally needs a container diagram.
+The catalog entry each document type usually needs is in § Document types.
 
-A system with important layering constraints may also need a dependency graph.
-
-A runbook needs the failure path.
-
-An API with a handshake needs the interaction sequence.
-
-An ADR needs the alternatives and the deciding trade-off.
-
-Do not draw a diagram that merely repeats a paragraph.
-
-Do not replace a structure that belongs in a diagram with several paragraphs of prose.
+A technical concept that has a structure — components, ordering, states, ownership,
+dependencies, trust boundaries — is illustrated from the catalog, not narrated. Reach
+for prose only when the concept has no structure to draw.
 
 ### 4. Explain boundaries
 
@@ -285,7 +279,7 @@ It is a tool for the next engineer.
 3. **Define the system or decision boundary.**
 4. **Identify the important constraints.**
 5. **Find the conceptual structure.**
-6. **Draw it.**
+6. **Draw it** with the `write-diagrams` skill.
 7. **Identify consequential decisions.**
 8. **Build the skeleton around the reader's question.**
 9. **Write facts and examples.**
@@ -358,15 +352,15 @@ It is omission of information that does not change understanding.
 
 ## Document types
 
-| Type                      | Reader's question                   | Shape                                                                            |
-| ------------------------- | ----------------------------------- | -------------------------------------------------------------------------------- |
-| README                    | "What is this and how do I run it?" | What it is → requirements → run → repository map                                 |
-| Architecture / system doc | "How does this work?"               | Constraints → structural diagram → components → flows → decisions → consequences |
-| ADR                       | "Why is it like this?"              | Context → constraints → alternatives → decision → consequences                   |
-| Runbook                   | "It's broken. What do I do?"        | Preconditions → procedure → expected result → failure branches → rollback        |
-| Onboarding                | "Where do I start?"                 | System map → reading path → first task → deeper references                       |
-| API guide                 | "How do I call this?"               | Working example → interaction flow → authentication → errors → reference         |
-| Migration note            | "What changed and what must I do?"  | What changes → before/after → migration order → failure/rollback                 |
+| Type | Reader's question | Shape | Diagram, from the `write-diagrams` catalog |
+| --- | --- | --- | --- |
+| README | "What is this and how do I run it?" | What it is → requirements → run → repository map | Usually none. A README that needs one is an architecture doc under the wrong name |
+| Architecture / system doc | "How does this work?" | Constraints → structural diagram → components → flows → decisions → consequences | Container. Add a dependency graph when the document asserts a layering rule |
+| ADR | "Why is it like this?" | Context → constraints → alternatives → decision → consequences | Option comparison: the alternatives side by side, deciding trade-off beneath |
+| Runbook | "It's broken. What do I do?" | Preconditions → procedure → expected result → failure branches → rollback | User flow for the operator's path; sequence when several systems take turns. The unhappy path is why it exists |
+| Onboarding | "Where do I start?" | System map → reading path → first task → deeper references | System context or container as the map; user flow when the product itself needs explaining |
+| API guide | "How do I call this?" | Working example → interaction flow → authentication → errors → reference | Sequence, for any handshake: auth, retries, webhooks, pagination |
+| Migration note | "What changed and what must I do?" | What changes → before/after → migration order → failure/rollback | Phasing: what moves first, what blocks what |
 
 ## Verification
 
@@ -454,6 +448,9 @@ If not, remove it or move it elsewhere.
 | ---------------------------------------- | ------------------------------------------------------------------------- |
 | "I'll add the diagram later."            | The diagram is part of understanding the structure.                       |
 | "The architecture is clearer in prose."  | Structure and relationships belong in diagrams.                           |
+| "I'll explain this concept in a paragraph." | If it has components, ordering, states, ownership or dependencies, it has a structure. Draw it from the catalog. |
+| "The catalog has no entry for this document type." | Pick by the reader's question, not by document type. That is what the catalog indexes. |
+| "I'll restate the diagram rules here."   | `write-diagrams` owns them. Reference the skill; do not copy its discipline. |
 | "The technology explains the design."    | Constraints and decisions explain the design.                             |
 | "This is the best solution."             | Explain the deciding trade-off.                                           |
 | "We use Kubernetes."                     | Explain why Kubernetes is part of the solution.                           |
