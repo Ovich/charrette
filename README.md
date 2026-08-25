@@ -1,121 +1,101 @@
 # Charrette
 
-*(French, from architecture studios: the working session where a design is drawn,
-argued over, and decided before anything expensive is built.)*
+*(French, from architecture studios: the intense working session where a design is
+drawn, argued over, and decided before anything expensive is built.)*
 
-Charrette is a set of agent skills for the drawing-board loop — brainstorm, diagram,
-spec, plan, review — plus one local tool that renders what they write. The skills are
-plain Markdown an agent reads. The tool, [aiview](skills/tools/aiview/SKILL.md), is a
-Node CLI, an HTTP server and a browser UI. Nothing calls a network service.
+**Agent skills for the drawing-board loop: brainstorm → diagram → spec → plan →
+review.** Everything is a local document (boards, specs, plans, mockups, PR
+analyses) rendered live in the bundled viewer ([aiview](skills/tools/aiview/SKILL.md)),
+with diagrams as thinking tools, not decoration.
 
-![aiview: the project selector open over the scoped sidebar, grouped documents beneath it, and a live board with its decisions table on the right](assets/aiview.png)
+These documents have two jobs: make it unambiguous between a developer and an agent
+what is being built, and be efficient context while it is built. Both end when the PR
+merges, so **none of them are versioned and none live in a project repository.** They
+are written to a data home outside your repos (`charrette_appdata` in your OS home
+directory by default, `$CHARRETTE_HOME` to move it), and
+whatever outlives the work is distilled into places that *are* versioned: durable rules
+into `AGENTS.md` via [project-conventions](skills/general/project-conventions/SKILL.md), the
+story of the change into the PR description. [technical-writing](skills/general/technical-writing/SKILL.md)
+is the deliberate exception: a README or an architecture doc is a deliverable, and it
+belongs in the repo next to the code it describes.
 
-## Requirements
+No lock-in by design: the skills are plain markdown any agent can read, the tooling
+is plain Node, references between skills use names plus paths relative to the
+referencing file ("in this collection"), and nothing depends on a specific harness, plugin format, or
+cloud service.
 
-Node ≥ 22.5 for aiview: the index uses `node:sqlite`, which arrived in that version.
-The skills are Markdown and need nothing.
+## Layout
 
-## Install
+Everything the agent loads lives under `skills/`, grouped by scope. Each skill has
+its own folder and starts with a `SKILL.md` that says when and how to use it.
+Supporting files (checklists, catalogs, references) sit alongside.
 
-```sh
-git clone https://github.com/Ovich/charrette.git
-cd charrette/skills/tools/aiview
-npm install && npm run build && node aiview.mjs init
-```
-
-`init` prints three paths: the data home, the documents directory inside it, and this
-checkout. `status` prints them again, plus whether a server is running.
-
-Point your agent at the skills — a `SKILL.md` path, or the `skills/` tree in your
-harness's discovery mechanism — then declare a project, so documents have somewhere to
-go:
-
-```sh
-node skills/tools/aiview/aiview.mjs project add CIIP --path /path/to/ciip
-node skills/tools/aiview/aiview.mjs use CIIP
-```
-
-`--path` is a working directory, not a document directory: it answers "which project
-is this checkout?", and it is repeatable, so one project can list a path per machine.
-
-Then ask in plain language: *"Run brainstorm: I want per-user rate limiting on the
-API."* Each skill states when it applies and maps the request onto its flow.
-
-## Repository map
-
-| Path | Holds |
-|---|---|
-| `skills/general/` | Skills that apply to any language or stack |
-| `skills/react/` | Skills that assume React/TSX |
-| `skills/tools/aiview/` | The viewer: `aiview.mjs`, `src/cli`, `src/core`, `src/server`, `app/` (React UI), `tests/` |
-| `assets/` | Images used by this README |
-
-A skill is a directory holding a `SKILL.md` — front matter naming it and stating when
-it applies, then the procedure — plus any checklist or catalog it needs. Skills contain
-no code and name no directory on disk; they ask aiview where documents go.
+- `skills/general/`: language- and framework-agnostic, for any codebase.
+- `skills/react/`: React and frontend work.
+- `skills/tools/`: shared local tooling the skills call into (not skills themselves).
 
 ## Skills
 
-| Skill | Use when | Produces |
+Once a skill is loaded (its `SKILL.md` pointed to, or discovered by name), the ask is
+plain language: each skill states when it applies and maps your request onto its flow.
+In the order work usually happens:
+
+| Skill | Use case | Example ask |
 |---|---|---|
-| [brainstorm](skills/general/brainstorm/SKILL.md) | A feature, service, or system is about to be built and the design conversation hasn't happened | A live board (decisions table, diagrams, open questions), then an approved spec and a phased plan. No code until the spec is approved |
-| [write-diagrams](skills/general/write-diagrams/SKILL.md) | A design question would settle faster drawn than argued; the other skills call it for their documents | Mermaid diagrams chosen by the open question, and the discipline that keeps them from multiplying |
-| [frontend-design](skills/general/frontend-design/SKILL.md) | A screen is about to be built or visually reworked | On first use, the project's design language extracted from its own code; then one self-contained HTML mockup per screen, approved before it is coded |
-| [technical-writing](skills/general/technical-writing/SKILL.md) | A system or procedure needs to be understood by a defined reader | A document shaped by its type — README, architecture doc, ADR, runbook, onboarding guide, API guide, migration note — drawn before it is described |
-| [project-conventions](skills/general/project-conventions/SKILL.md) | A decision was just made, or a repo's unwritten rules need writing down | Numbered rules proposed for `AGENTS.md` / `CLAUDE.md`, applied only on confirmation |
-| [pr-review](skills/general/pr-review/SKILL.md) | A pull request needs an informed merge decision | An analysis: the author's stated intent quoted, what actually changed, the structure drawn, blast radius verified against the repo, and the decision points only a human can settle |
-| [code-design-review](skills/general/code-design-review/SKILL.md) | Program design quality is the question, in any language | Findings against DRY, KISS, YAGNI, SOLID, cohesion, coupling and the Law of Demeter. Not a bug hunt |
-| [frontend-review](skills/react/frontend-review/SKILL.md) | React/TSX quality is the question | Findings on readability, component structure, rendering and performance. The diff by default; a whole-scope review becomes a report |
+| [brainstorm](skills/general/brainstorm/SKILL.md) | A feature, service, or system is about to be built and the design conversation hasn't happened | *"Run brainstorm: I want per-user rate limiting on the API."* Expect one question at a time, a live board in aiview, and no code until the spec and plan are approved. |
+| [write-diagrams](skills/general/write-diagrams/SKILL.md) | A design question would settle faster drawn than argued (the other skills also call it for their documents) | *"Use write-diagrams to draw today's login flow: I need to see where the redirect happens."* |
+| [frontend-design](skills/general/frontend-design/SKILL.md) | A screen is about to be built or visually reworked | *"Before we code the settings page, run frontend-design and propose a mockup."* The first run extracts the project's design language; every screen after that is an HTML mockup approved in aiview. |
+| [technical-writing](skills/general/technical-writing/SKILL.md) | A system or procedure needs to be understood by a defined reader | *"Use technical-writing for an architecture doc of the payments service, audience: new backend hires."* |
+| [project-conventions](skills/general/project-conventions/SKILL.md) | A decision was just made, or a repo's unwritten rules need writing down | *"We just settled on soft deletes everywhere: capture that with project-conventions."* Also: *"Harvest this repo's conventions into AGENTS.md."* |
+| [pr-review](skills/general/pr-review/SKILL.md) | A pull request needs an informed merge decision | *"Run pr-review on PR #142."* The analysis lands in aiview: quoted intent, delta map, blast radius, decision points, a ready-to-post comment. |
+| [code-design-review](skills/general/code-design-review/SKILL.md) | Program design quality is the question, in any language | *"Code-design-review this branch's diff against main."* |
+| [frontend-review](skills/react/frontend-review/SKILL.md) | React/TSX quality is the question | *"Run frontend-review on src/features/checkout."* Findings in chat for a diff; a whole-scope review becomes an aiview report with diagrams. |
+| [aiview](skills/tools/aiview/SKILL.md) | Mostly called by the other skills; directly, when a document should be shown or the index queried | *"Open docs/notes/cache-idea.md in aiview, tagged payments."* Also: *"List every document we produced for the payments work."* |
 
-`write-diagrams` and `aiview` are the shared layer the others delegate to.
+They compose, roughly in the order work happens: `brainstorm` designs
+the thing and produces the spec and plan; `frontend-design` turns each screen into an
+approved mockup before it's built; `project-conventions` records the decisions as
+rules in `AGENTS.md`; `pr-review` maps each change so a human can decide the merge;
+`code-design-review` judges the implementation against durable general principles and
+`frontend-review` judges the React layer on top. `write-diagrams` and `aiview` are
+the shared layer all of them delegate to. House rules win over general principles
+wherever the two disagree. That's the point of writing them down.
 
-**Charrette contains no implementation skill.** Implementation happens in whatever
-harness or editor you already use. The plan is its input; the review skills judge its
-output.
+## The viewer
 
-## aiview
+![aiview: grouped documents in the sidebar, a live board with its decisions table on the right](assets/aiview.png)
 
-aiview owns the answers the skills must not each invent: where a document belongs, how
-it is registered, how it is rendered, how the viewer starts. A skill asks
-`aiview path <filename>` for a location and calls `aiview open <file>` to show it. It
-never joins a path itself.
+aiview is the collection's central tool: one browser tab with full visibility on the
+ongoing work. Every document the skills produce registers in its index, documents that
+belong to one piece of work share a container, and each save re-renders in the open
+tab. You watch decisions, diagrams, and drafts land as they happen.
 
-One tab at `http://localhost:4321` holds every registered document: Markdown (GFM +
-Mermaid), self-contained HTML mockups in a sandboxed iframe, and PDFs. A file watcher
-pushes changes over server-sent events, so a save re-renders the open tab. Documents
-are indexed by project, kind, tags and group. The active project lives on the server
-and every tab follows it, so when the agent runs `aiview use CIIP` the tab you already
-have open re-scopes.
+| Tool | What it does |
+|---|---|
+| [aiview](skills/tools/aiview/SKILL.md) | Local document viewer + index in one npm package: React/TypeScript/Tailwind UI, small plain-Node server, agent-facing CLI. Renders Markdown (GFM + mermaid), HTML mockups and PDFs at `localhost:4321` with live reload; related documents grouped in collapsible containers; every doc header shows its absolute path (click-to-copy). Documents are filed per project (CIIP, JOBS, …); one active project scopes the sidebar and is shared between you and the agent — either can switch it, and every open tab follows. CLI: `open` (idempotent register + detached server + URL), `add`, `update`, `list`, `remove`, `move`, `project`, `use`, `path` (where a document belongs, joined for your OS), `serve --detach`, `status`, `init`, all with `--json`. Node ≥ 22.5; one-time `npm install && npm run build && node aiview.mjs init` in `skills/tools/aiview/`. Its `SKILL.md` is the contract every skill follows (kinds, tags, groups, start time). |
 
-The files are the truth; the index only points at them. Deleting a row loses metadata,
-not work.
+aiview keeps its index (`aiview.sqlite`), its server files and every document in the
+**data home** — `$CHARRETTE_HOME`, or `charrette_appdata` in your OS home directory — never in this
+checkout and never in a project repo. The split is deliberate: the checkout holds only
+what `npm run build` can recreate, so you can delete it, clone it again, rebuild, and
+lose nothing. Documents land in `<home>/docs/<project>/`, and because that folder name
+is what aiview reports as the project, the layout labels itself.
 
-[skills/tools/aiview/SKILL.md](skills/tools/aiview/SKILL.md) is the contract every
-skill follows — kinds, tags, groups, where documents go.
-[skills/tools/aiview/README.md](skills/tools/aiview/README.md) documents the flags,
-storage, API routes and development commands.
+## Using the collection
 
-## Where the documents live
+Clone anywhere. Point your agent at a skill's `SKILL.md` (or wire the folder into
+your harness's skill discovery, if it has one). Each file is self-contained and
+resolves its references relative to itself, so the whole `skills/` tree moves as one. For aiview, one command sets up a fresh
+machine:
 
-Boards, specs, plans, mockups and review reports are working material between you and
-the agent, and most are superseded by the merged code. Charrette writes them to a
-**data home outside every repository** — `$CHARRETTE_HOME`, or `charrette_appdata` in
-your home directory — under `docs/<project>/`, alongside the SQLite index and the
-server's pid and port files. The checkout holds only what `npm run build` recreates.
+```sh
+cd skills/tools/aiview && npm install && npm run build && node aiview.mjs init
+```
 
-What that commits you to:
-
-- Delete the checkout, clone it again, rebuild: nothing of yours was in it.
-- The data home can be its own git repository, purely to sync between machines.
-  Document paths inside it are stored relative, so the index travels with it.
-- Nothing reaches a project repository by default. What outlives the work has to be
-  distilled deliberately: durable rules into `AGENTS.md` via
-  [project-conventions](skills/general/project-conventions/SKILL.md), the story of the
-  change into the PR description.
-
-[technical-writing](skills/general/technical-writing/SKILL.md) is the exception. A
-README or an architecture doc is a deliverable for whoever clones the project, so it
-belongs in the repository and changes in the same commit as the code.
+`init` creates the data home and prints where everything lives; `status` says so again
+later. After that, `node skills/tools/aiview/aiview.mjs open <doc>` is the whole gesture. An
+existing index left next to the tool by an older install is adopted automatically on
+first run, documents and all.
 
 ## License
 
