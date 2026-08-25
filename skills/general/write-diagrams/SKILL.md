@@ -38,6 +38,10 @@ only in the final document.
   sentence, say the sentence.
 - **Every arrow is labeled** with what flows and in which direction. An unlabeled arrow
   means "these are related somehow," which is worth nothing.
+- **Unless the shape carries it.** When every arrow in the diagram means the same thing
+  and no node has two outgoing arrows, the node names already say it and a label on each
+  one reads as noise. The test is the drawing, not your taste: the moment a node
+  branches, or two arrows mean different things, every arrow gets a label.
 - Real names of real things: actual service, table, and module names, not `Service A`.
 - A box whose responsibility you can't state in a phrase gets deleted.
 - 2–4 diagrams for a feature. The full C4 set only for a genuinely new system.
@@ -71,3 +75,4 @@ restate the rules.
 | "The prose already covers the boundary" | If the artifact answering "what may import what" is a prose bullet, the instructed form was a dependency graph. Two questions ≠ one artifact. |
 | "The diagram from the board still matches" | The design changed in review. Update it in the same edit or it will be believed wrongly. |
 | "I'll invent a hybrid diagram" | The catalog's forms exist because each answers one question. Pick one; two questions get two diagrams. |
+| "I'll label the arrows to be safe" | On a straight unbranched chain of one arrow type, labels are noise. Count the branches before reaching for them. |
