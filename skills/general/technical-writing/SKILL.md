@@ -31,9 +31,10 @@ the author's journey is debt.
    docs, `report` for one-off analyses; tags = project + subject; when the doc
    belongs to a piece of work with a board or spec, the same group. Tell the user the
    URL; edit the same file: it live-reloads, diagrams render.
-6. **Tighten.** Apply the `elements-of-style` skill (`text/elements-of-style/SKILL.md`
-   in this collection): omit needless words, active voice, one idea per sentence.
-   Then cut once more: the last pass always finds a paragraph the reader never needed.
+6. **Tighten.** One pass with the knife: omit needless words, active voice, one idea
+   per sentence, every sentence carrying something the reader didn't already have
+   (§ Register). Then cut once more: the last pass always finds a paragraph the reader
+   never needed.
 
 ## Document types
 
