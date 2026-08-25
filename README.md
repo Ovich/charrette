@@ -24,6 +24,25 @@ is plain Node, references between skills use names plus paths relative to the
 referencing file ("in this collection"), and nothing depends on a specific harness, plugin format, or
 cloud service.
 
+## The drawing-board loop
+
+User flow: the path a change takes, and which skill acts at each step.
+
+```mermaid
+flowchart LR
+  I["idea"] -- "one question at a time" --> B["brainstorm<br/>board → spec → plan"]
+  B -- "approved plan" --> C["implementation<br/>your harness, not charrette"]
+  C -- "diff or PR" --> R["review<br/>pr-review, code-design-review,<br/>frontend-review"]
+  R -- "merge decision" --> M["merge"]
+  D["write-diagrams"] -. "diagrams" .-> B
+  D -. "diagrams" .-> R
+```
+
+The board is a Markdown file opened at the first question and edited through the whole
+conversation; chat scrolls away, the board is the record. Charrette has no
+implementation skill: the plan is the input to whatever harness you already use, and
+the review skills judge what comes back.
+
 ## Layout
 
 Everything the agent loads lives under `skills/`, grouped by scope. Each skill has
@@ -33,6 +52,39 @@ Supporting files (checklists, catalogs, references) sit alongside.
 - `skills/general/`: language- and framework-agnostic, for any codebase.
 - `skills/react/`: React and frontend work.
 - `skills/tools/`: shared local tooling the skills call into (not skills themselves).
+
+Container diagram: what runs where, and which of the three roots each file belongs to.
+
+```mermaid
+flowchart TB
+  AG["agent"] -- "reads" --> SK
+
+  subgraph CO["charrette checkout — versioned, rebuildable"]
+    SK["skills/*/SKILL.md<br/>the workflow layer, Markdown"]
+    AV["skills/tools/aiview<br/>CLI + server + UI"]
+  end
+
+  subgraph DH["data home — $CHARRETTE_HOME or ~/charrette_appdata"]
+    DOC["docs/PROJECT/*.md, *.html, *.pdf"]
+    IDX["aiview.sqlite<br/>index + active project"]
+  end
+
+  subgraph PR["project repository — versioned"]
+    AGM["AGENTS.md"]
+    SRC["source, README, docs/"]
+  end
+
+  SK -- "path, open" --> AV
+  AV -- "writes documents" --> DOC
+  AV -- "registers, scopes" --> IDX
+  AV -- "serves on :4321" --> DEV["developer, in a browser tab"]
+  SK -- "durable rules" --> AGM
+  SK -- "README, architecture docs" --> SRC
+```
+
+Nothing crosses those boundaries by accident: the agent writes documents only through
+aiview, and reaches a project repository only for the two things meant to outlive the
+work.
 
 ## Skills
 
