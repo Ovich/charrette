@@ -8,3 +8,6 @@ skills/tools/aiview/dist-cli/
 skills/tools/aiview/aiview.sqlite
 skills/tools/aiview/aiview.pid
 skills/tools/aiview/aiview.port
+
+# Playwright MCP scratch output (screenshots, console logs).
+.playwright-mcp/
