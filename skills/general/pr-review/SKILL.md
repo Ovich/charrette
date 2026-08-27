@@ -35,6 +35,36 @@ separates *violates a house rule* (a finding) from *unusual but unruled* (a deci
 point), and it is usually how you learn that a consumer of this change lives in another
 repository entirely.
 
+## Depth: the reviewer opts in, before anything runs
+
+The two axes in § Findings are the review and always run. **Everything deeper is opt-in,
+and the human opts in.** Ask once — after the diff resolves, before any agent is
+dispatched. That order matters: by then you can describe what this change would gain
+rather than read out a menu, and nothing has been spent on a depth nobody wanted.
+
+Put the choice as three things per option: what it would look at here, what it costs,
+and what it would miss if skipped. Then a recommendation, because you have read the diff
+and they have not.
+
+- **`code-design-review`** (`../code-design-review/SKILL.md` in this collection) — DRY,
+  SOLID, cohesion, coupling: whether this change will cost someone later.
+  **Say the price out loud: it dispatches one subagent per lens, four of them, so it
+  roughly triples what the review would otherwise spend, and it is minutes of wall
+  clock, not seconds.** Worth it on a change that sets a pattern others will copy;
+  rarely worth it on a fix that touches three lines.
+- **`frontend-review`** (`../../react/frontend-review/SKILL.md`) — only on a project it
+  declares support for, and only when the diff has frontend in it. Usually the answer is
+  *not applicable*, which you say rather than leave out.
+- **A correctness bug hunt** — the harness's own review, where the harness has one. Not
+  optional in the sense the others are: if nothing runs it, nobody is checking whether
+  the code works, and the verdict has to say so.
+
+Four rules. Ask **once**, batched — one decision, not a question per skill. Name what
+does not apply **and why**, in a clause, so the reviewer can see it was considered rather
+than forgotten. **Never start a chained skill without an explicit yes** — silence is a
+no. And when the answer is no, that is a fine answer: record it and move on, because a
+review that ran two axes and says so beats one that ran five and buried the verdict.
+
 ## Two documents, two readers
 
 A review produces two files, in the data home (ask the `aiview` skill for the path;
@@ -230,17 +260,13 @@ axis cites evidence and the section disagrees, the citation wins. Findings are
 hypotheses until the citation is read — re-verify the ones that carry the verdict
 yourself, because a well-argued wrong finding reaches the author in your name.
 
-For deeper axes, chain the siblings instead of duplicating them: design cost →
-`code-design-review` (`../code-design-review/SKILL.md` in this collection); React
-quality → `frontend-review` (`../../react/frontend-review/SKILL.md`), only on a project
-it declares support for; bug hunt → the harness's own review. Link their reports from
-the analysis document rather than inlining.
+Deeper axes are chained rather than duplicated here, and only with the reviewer's yes
+(§ Depth). Link their reports from the analysis document rather than inlining.
 
-**Chaining is a decision, and the document records it either way** — *"Chained:
-code-design-review (link). frontend-review not run: no frontend in the diff.
-Correctness: not covered."* Left implicit, the default is silently *none*, and a review
-that never looked at design or correctness reads exactly like one that looked and found
-nothing.
+**However it was decided, the document records it** — *"Chained: code-design-review
+(link). frontend-review not run: no frontend in the diff. Correctness: not covered."*
+Left implicit, the default is silently *none*, and a review that never looked at design
+or correctness reads exactly like one that looked and found nothing.
 
 ## Red flags
 
@@ -260,5 +286,7 @@ nothing.
 | "The recommendation decides the merge" | It drafts the reviewer's words. They post it only if they agree: the decision stays theirs. |
 | "The axes came back clean" | Clean on the axes that ran. Name the ones that didn't, in the verdict and in the comment. |
 | "The siblings didn't seem necessary" | Then say so in the document, with the reason. An unrecorded skip is indistinguishable from a check that passed. |
+| "I'll run the design review too, to be thorough" | It is four more subagents on someone's budget. Ask first, with the price attached. |
+| "They didn't answer, so I'll run it" | Silence is a no. The two axes are the review; the rest is theirs to buy. |
 | "The subagent marked it non-blocking" | An axis sees its own lane. Severity is yours, at merge, with every axis in view. |
 | "The dependents are all in this repo" | You know that only if you looked elsewhere. The repo docs say where the consumers live. |
