@@ -117,6 +117,11 @@ a small one often only the change map, and a trivial one none (then say so).
 
 ## Findings
 
+Write the document first and publish it while the axes run: the reader gets the
+change described and drawn without waiting. Add one `aiview pending` card per axis as
+you dispatch it, and close it when its findings land — a document that is deliberately
+incomplete has to say so, and say what is still coming.
+
 Two axes, run as **independent fresh-context subagents**: each gets only the diff,
 its brief, and the output contract; no conversation history, no opinion of the
 change inherited from this session, and the explicit instruction: *"Do not invoke

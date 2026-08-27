@@ -180,6 +180,9 @@ $A serve  [file] [--port 4321] [--open] [--detach]
 $A project <add|list|rm> [slug] [--title T] [--path P]...
 $A use    <slug|*>                               # set the active project ('*' = All projects)
 $A path   <filename> [--project <slug>]          # where it belongs, joined for this OS
+$A pending add  <file|#id> --label L [--note N]   # work the reader is still waiting on
+$A pending done <#pendingId>                     # it landed; the card disappears
+$A pending list [<file|#id>] | clear <file|#id>
 $A status                                        # home? projectDocs? cwdProject? server up?
 $A init                                          # create the data home (first clone / new machine)
 ```
@@ -187,6 +190,34 @@ $A init                                          # create the data home (first c
 Every verb takes `--json` for machine-readable output. Prefer it when you parse the
 result. `status --json` answers "is a server running and where" in one call; a stale
 pidfile (dead process) is detected and reported, and `open` safely replaces it.
+
+## Pending work: publish early, say what is missing
+
+A long document is useful before it is finished — the reader gets the sections that
+are ready. What makes that honest rather than confusing is saying what is still
+coming. `pending` puts a card at the foot of the document for each unit of work
+still running: its label, one line on what it is doing, and how long it has been going.
+
+Use it whenever you write a document **before** the work behind it has finished —
+above all when you fan out to subagents. Add one card per agent as you dispatch it,
+and close it when its result lands:
+
+```sh
+ID=$($A pending add "#37" --label "Blast-radius axis" \
+       --note "what breaks around the change — callers, consumers, migrations" --json)
+# ... the agent runs, you write its section into the document ...
+$A pending done "#<id from the json above>"
+```
+
+Three properties worth knowing. The row exists exactly while the work does, so
+finishing is deleting and nothing accumulates. It lives in the index, never in the
+file — the file is the deliverable, and a *"still working"* placeholder left behind in
+it is worse than no feature at all. And nothing can tell the index that a process
+died, so after 30 minutes a card stops claiming to be live and says *"no news for
+40m"*; `pending clear <doc>` removes leftovers from a session that never came back.
+
+**Close every card you open**, including on the paths where the work fails or you
+abandon it. A card that never closes is a document that lies about being unfinished.
 
 ## What the user sees
 
@@ -196,7 +227,8 @@ containers (display title + member count, members in reading order), ungrouped d
 flat, missing files struck through. Right: title, **absolute local path
 (click-to-copy)**, kind · started · tags · updated, then the rendered document (GFM +
 mermaid for Markdown, sandboxed iframe with viewport presets for HTML mockups, the
-browser's PDF viewer for PDFs), live-reloading on save.
+browser's PDF viewer for PDFs), live-reloading on save — and, at the foot, a card per
+unit of work the document is still waiting on, appearing and disappearing live.
 
 ## Contract for calling skills
 
