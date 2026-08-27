@@ -243,6 +243,42 @@ skills or spawn agents: review directly."*
   contracts changed without their consumers, migrations without rollback, config
   the deploy needs. Every finding cites the file:line of the evidence, both sides.
 
+### The briefs are disjoint by construction
+
+Two agents that cannot see each other, given the same question, both answer it in
+full. The cost is not one duplicated file read: it is one agent's entire investigation
+run twice, and each tool call is an inference pass over a context that keeps growing.
+Settle jurisdiction **before** dispatching:
+
+| The question | Owner |
+|---|---|
+| Does the diff deliver what the PR says? Missing pieces, scope, TODOs left behind | Intent |
+| Whether the new behavior is covered by a test | Intent |
+| Callers, consumers, contracts, other repos | Blast radius |
+| Migrations, schema, config, what the deploy needs | Blast radius |
+| Whether a changed behavior is reachable, and by whom | Blast radius |
+| Whether a big file is real change or re-encoding churn | **Neither** — you, before dispatch |
+
+**A brief contains exactly four things, in this order:** where to read the diff; that
+axis's jurisdiction from the table; the facts you have already established, given as
+facts; the output contract.
+
+The third slot is what saves the most time, and it is the one most often left empty.
+Anything both axes would otherwise derive independently — the merge-base, which branch
+the sibling repos are on, whether a 300-line fixture diff is two real lines under an
+encoding rewrite — **you establish once and hand over as a stated fact.** A
+normalize-and-diff that costs you twenty seconds costs an agent minutes, and you are
+paying for it twice.
+
+**A brief names a surface, not a suspicion.** *"Check the FK on the new collection table
+against how the sync deletes its parent"* is a surface. *"This is the highest-value thing
+in the diff"* is your hypothesis, and an agent handed a hypothesis spends its budget
+confirming it — including when it is wrong, which is exactly when you needed the budget
+spent elsewhere.
+
+Sizing follows from this: if a brief has more numbered surfaces than the axis has
+jurisdiction for, it is two agents' work in one and will run like it.
+
 **Separate what this PR introduces from what it inherits.** A defect that predates the
 branch is noted, attributed as pre-existing, and told to the author — it is never a
 reason to withhold approval, and it never feeds the recommendation. Holding a PR
@@ -289,4 +325,7 @@ or correctness reads exactly like one that looked and found nothing.
 | "I'll run the design review too, to be thorough" | It is four more subagents on someone's budget. Ask first, with the price attached. |
 | "They didn't answer, so I'll run it" | Silence is a no. The two axes are the review; the rest is theirs to buy. |
 | "The subagent marked it non-blocking" | An axis sees its own lane. Severity is yours, at merge, with every axis in view. |
+| "This matters, so I'll ask both axes to check it" | Then it is investigated twice, in full, by two agents who cannot see each other. It has one owner; pick it. |
+| "I'll mention what I suspect so the axis looks there" | It will look there, and it will come back with your suspicion — right or wrong. Name the surface, keep the hypothesis. |
+| "The axis can work out the merge-base itself" | It can, and so can the other one, and you already know it. Established facts go in the brief. |
 | "The dependents are all in this repo" | You know that only if you looked elsewhere. The repo docs say where the consumers live. |
