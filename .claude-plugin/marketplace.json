@@ -1,0 +1,18 @@
+{
+  "name": "charrette",
+  "owner": {
+    "name": "Stefan Teofanovic"
+  },
+  "metadata": {
+    "description": "The Charrette skill collection",
+    "homepage": "https://github.com/Ovich/charrette"
+  },
+  "plugins": [
+    {
+      "name": "charrette",
+      "version": "1.0.0",
+      "source": "./",
+      "description": "Agent skills for the drawing-board loop: brainstorm, diagram, spec, plan, review, with a live local document viewer."
+    }
+  ]
+}

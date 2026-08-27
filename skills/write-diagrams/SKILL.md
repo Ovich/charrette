@@ -60,9 +60,8 @@ person / system / external): Mermaid's native `C4Context` blocks render inconsis
 A skill that wants diagrams says: *"Diagrams: use the `write-diagrams` skill
 (`../write-diagrams/SKILL.md` in this collection). Pick from its catalog by
 the open question, follow its discipline."* Name plus a path relative to the calling
-skill's own file (`../write-diagrams/SKILL.md` from a sibling in `general/`,
-`../../general/write-diagrams/SKILL.md` from another group), never an absolute path,
-so the reference works from any checkout with any harness. Plus at most one line of skill-specific guidance (e.g. how many
+skill's own file — every skill is a sibling, so it is always `../<name>/SKILL.md` —
+never an absolute path, so the reference works from any checkout with any harness. Plus at most one line of skill-specific guidance (e.g. how many
 are expected, or which catalog entries its documents most often need). It does not
 restate the rules.
 

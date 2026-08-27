@@ -40,7 +40,7 @@ Each maps to a section of `checklist.md` (**read that section, don't review from
 4. **Report** grouped by lens. *Diff scope:* in chat, terse, no diagrams. *`all` / folder scope:*
    write `YYYY-MM-DD-<scope>.report.md` in the data home (ask the `aiview` skill for the
    path; never in the repo under review) and open it via the `aiview` skill
-   (`../../tools/aiview/SKILL.md` in this collection). Mermaid renders there, not in the
+   (`../aiview/SKILL.md` in this collection). Mermaid renders there, not in the
    terminal.
    Kind `report` (from the filename), tags = roster + review.
 5. With `--fix`, apply only the safe ones (skip anything that changes behavior or reaches outside the scope), then re-verify with `pnpm typecheck` + `pnpm run biome`.
@@ -51,7 +51,7 @@ Each maps to a section of `checklist.md` (**read that section, don't review from
 
 ## Diagrams (file reports only)
 
-Diagrams: use the `write-diagrams` skill (`../../general/write-diagrams/SKILL.md` in
+Diagrams: use the `write-diagrams` skill (`../write-diagrams/SKILL.md` in
 this collection). Pick from its catalog by the open question, follow its discipline. Review-specific guidance:
 per-finding prose stays prose; a diagram appears only in a file report, and only in
 these shapes:

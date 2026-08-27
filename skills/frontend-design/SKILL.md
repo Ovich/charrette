@@ -90,7 +90,7 @@ tags = project + design.
 - **States:** default, empty, loading, error, and any permission/role state the screen
   has, as separate sections or a small state switcher in the mockup. Responsive at the
   aiview presets (mobile 390 · tablet 820 · laptop 1280).
-- **Register + serve** via the `aiview` skill (`../../tools/aiview/SKILL.md` in this collection):
+- **Register + serve** via the `aiview` skill (`../aiview/SKILL.md` in this collection):
   kind `mockup` (from the filename), tags = project + feature, and when the mockup
   belongs to a brainstorm's piece of work, the board's group, so they share a
   container. Tell the user the URL it prints. aiview renders `.html` in a sandboxed

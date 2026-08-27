@@ -1,0 +1,19 @@
+{
+  "name": "charrette",
+  "description": "Agent skills for the drawing-board loop: brainstorm, diagram, spec, plan, review. Every document rendered live in the bundled aiview viewer, outside your repositories.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Stefan Teofanovic"
+  },
+  "homepage": "https://github.com/Ovich/charrette",
+  "repository": "https://github.com/Ovich/charrette",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "brainstorm",
+    "diagrams",
+    "specs",
+    "pr-review",
+    "technical-writing"
+  ]
+}

@@ -1,13 +1,13 @@
 # dependencies and build output (aiview)
 node_modules/
-skills/tools/aiview/dist/
-skills/tools/aiview/dist-cli/
+skills/aiview/dist/
+skills/aiview/dist-cli/
 
 # Per-machine state now lives in the data home (~/charrette_appdata), not here.
 # These are only left by pre-appdata installs; ignored so an old checkout stays clean.
-skills/tools/aiview/aiview.sqlite
-skills/tools/aiview/aiview.pid
-skills/tools/aiview/aiview.port
+skills/aiview/aiview.sqlite
+skills/aiview/aiview.pid
+skills/aiview/aiview.port
 
 # Playwright MCP scratch output (screenshots, console logs).
 .playwright-mcp/

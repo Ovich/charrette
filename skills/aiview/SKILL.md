@@ -242,9 +242,9 @@ per unit of work the document is still waiting on, appearing and disappearing li
 ## Contract for calling skills
 
 A skill that produces viewable documents says: *"Register and serve via the `aiview`
-skill (`../../tools/aiview/SKILL.md` in this collection)"* (name plus a path
+skill (`../aiview/SKILL.md` in this collection)"* (name plus a path
 relative to the calling skill's own file — every skill sits at `skills/<group>/<name>/`,
-so the viewer is `../../tools/aiview/SKILL.md` — never an absolute path, so the
+so the viewer is `../aiview/SKILL.md` — never an absolute path, so the
 reference works from any checkout with any harness) and then states only the **metadata semantics** of its
 document type: which kind, which tags, which group, when the start
 time predates the file. It never restates command syntax and never names a directory:

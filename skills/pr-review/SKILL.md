@@ -52,7 +52,7 @@ and they have not.
   roughly triples what the review would otherwise spend, and it is minutes of wall
   clock, not seconds.** Worth it on a change that sets a pattern others will copy;
   rarely worth it on a fix that touches three lines.
-- **`frontend-review`** (`../../react/frontend-review/SKILL.md`) — only on a project it
+- **`frontend-review`** (`../frontend-review/SKILL.md`) — only on a project it
   declares support for, and only when the diff has frontend in it. Usually the answer is
   *not applicable*, which you say rather than leave out.
 - **A correctness bug hunt** — the harness's own review, where the harness has one. Not
@@ -69,7 +69,7 @@ review that ran two axes and says so beats one that ran five and buried the verd
 
 A review produces two files, in the data home (ask the `aiview` skill for the path;
 never in the repo under review), both registered through the `aiview` skill
-(`../../tools/aiview/SKILL.md` in this collection) and both joined to the **same
+(`../aiview/SKILL.md` in this collection) and both joined to the **same
 group** (`pr-<id>`), so they sit together in the sidebar. Each links the other.
 
 | | `YYYY-MM-DD-pr-<id>.pr-report.md` | `YYYY-MM-DD-pr-<id>.pr-analysis.md` |

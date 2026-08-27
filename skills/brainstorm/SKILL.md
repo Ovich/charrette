@@ -45,7 +45,7 @@ Structure:
 decisions table (status: agreed / proposed / open / deferred), context being built on,
 design sections, diagrams, research notes.
 
-Open the board via the `aiview` skill (`../../tools/aiview/SKILL.md` in this collection)
+Open the board via the `aiview` skill (`../aiview/SKILL.md` in this collection)
 the moment you create it: kind `brainstorm` (from the filename), tags = project + topic,
 group = the topic (titled: the spec and plan will join it), started honestly. Tell
 the user the URL it prints. Nothing to babysit: the server is detached; keep editing
