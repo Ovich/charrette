@@ -4,8 +4,7 @@
     "name": "Stefan Teofanovic"
   },
   "metadata": {
-    "description": "The Charrette skill collection",
-    "homepage": "https://github.com/Ovich/charrette"
+    "description": "The Charrette skill collection"
   },
   "plugins": [
     {
