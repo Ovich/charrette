@@ -133,8 +133,6 @@ is what aiview reports as the project, the layout labels itself.
 
 ## Using the collection
 
-Prompt for your agent:
-
 On Claude Code, install it as a plugin. The skills then answer to `charrette:` —
 `/charrette:pr-review`, `/charrette:brainstorm` — so nothing collides with skills you
 already have:
@@ -144,19 +142,39 @@ already have:
 /plugin install charrette@charrette
 ```
 
-Then one thing the install does not cover:
+Then the one thing the install does not cover:
 
 > Build the bundled aiview viewer in the Charrette plugin, create its data home, and
 > tell me the URL.
 
-On any other harness, or to work from a checkout you can edit, clone
-`https://github.com/Ovich/charrette.git` and hand that over instead:
+On any other harness, or to work from a copy you can edit, clone
+`https://github.com/Ovich/charrette.git` and hand **the checkout** — wherever you put
+it — to your agent instead:
 
-> Set up Charrette from `<the directory you cloned it into>`: build the bundled viewer,
-> and make every skill under `skills/` discoverable to you (symlink or otherwise). Then
-> tell me the aiview URL and the skills you can reach by name.
+> Set up Charrette from `<the checkout>`: build the bundled viewer, and make every
+> skill under `skills/` discoverable to you (symlink or otherwise). Then tell me the
+> aiview URL and the skills you can reach by name.
 
-Linked rather than copied, `git pull` in the checkout updates every skill in place.
+## Updating
+
+The plugin updates itself:
+
+```
+/plugin marketplace update charrette
+/plugin update charrette@charrette
+```
+
+A checkout takes a prompt, because three things move and only one of them is `git pull`:
+
+> Update Charrette in `<the checkout>`: pull, rebuild the bundled viewer and restart
+> its server if one is running, and repair skill discovery — links made against the old
+> `skills/general/…` paths are dangling since the layout flattened. Leave the data home
+> alone. Then tell me the aiview URL and the skills you can reach by name.
+
+The build output is not versioned, so a pull alone leaves a stale viewer — and a
+running server keeps serving the old one until it restarts. Skills are linked rather
+than copied, so they update with the pull; links made before the layout flattened point
+at directories that no longer exist.
 
 ## License
 
