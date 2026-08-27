@@ -150,6 +150,11 @@ Sections, in reading order:
    Verified by searching the code, not assumed from the diff — and **the search does
    not stop at the repo under review**: the consumer in another repo or another service
    is the one the diff can never show you.
+   Then ask what the system **already does about it**. A change that looks destructive
+   is often repaired by something that re-runs: a full rebuild, a scheduled job, a
+   retry, a reconciliation pass. Read the recovery path before pricing the damage. What
+   survives is the case that path misses — the persistent failure rather than the
+   transient one, the window before it next runs, the state nothing re-derives.
 6. **Decision points**: each stated as the trade-off, what the diff currently chooses,
    and the alternative. Scope creep beyond the stated intent lands here, as do
    irreversible choices (schema migrations, API contract changes, dropped
