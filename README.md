@@ -135,10 +135,32 @@ is what aiview reports as the project, the layout labels itself.
 
 ## Using the collection
 
-Clone anywhere. Point your agent at a skill's `SKILL.md` (or wire the folder into
-your harness's skill discovery, if it has one). Each file is self-contained and
-resolves its references relative to itself, so the whole `skills/` tree moves as one. For aiview, one command sets up a fresh
-machine:
+Clone anywhere. Each file is self-contained and resolves its references relative to
+itself, so the whole `skills/` tree moves as one. Then point your agent at a skill's
+`SKILL.md`, or let it wire the tree into your harness's own skill discovery — which is
+the part worth handing over.
+
+### Setup, by your agent
+
+You already have the thing that installs this. These are skills for agents, so whoever
+is reading this README has one in front of them. Give it the job:
+
+> Set up Charrette from this checkout. Build the bundled `aiview` tool and create its
+> data home, then make the skills under `skills/` discoverable to you the way this
+> harness expects — copying, symlinking, or registering them, whichever is right here.
+> Read `skills/tools/aiview/SKILL.md` first; it is the contract for the tool. Then tell
+> me the aiview URL, and which skills you can now reach by name.
+
+That asks for an outcome, not a procedure, on purpose. The build is three commands
+anyone could run. **Skill discovery is the step that actually varies** — a directory for
+one agent, a config entry for another, a bare path for a third — and your agent knows
+which of those it is, where this README would only guess. The closing request is the
+verification: a URL that answers and a list of names it can see means the two halves
+are wired, and an agent that reports neither has not finished.
+
+### Setup, by hand
+
+Node ≥ 22.5, nothing installed globally, one command:
 
 ```sh
 cd skills/tools/aiview && npm install && npm run build && node aiview.mjs init
