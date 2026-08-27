@@ -142,36 +142,25 @@ the part worth handing over.
 
 ### Setup, by your agent
 
-You already have the thing that installs this. These are skills for agents, so whoever
-is reading this README has one in front of them. Fill in where you want the checkout,
+You already have the thing that installs this. Fill in where you want the checkout,
 paste the rest:
 
 > Set up Charrette. Clone `https://github.com/Ovich/charrette.git` into
-> **`<the directory you want it in>`**, then:
->
-> 1. Build the bundled viewer and create its data home — `npm install && npm run build
->    && node aiview.mjs init` from `skills/tools/aiview/`. Node ≥ 22.5, nothing global.
-> 2. Make every skill discoverable to you. Read `skills/tools/aiview/SKILL.md` first; it
->    is the contract for the tool. The skills are **grouped on disk** (`skills/general/`,
->    `skills/react/`, `skills/tools/`) while most harnesses want them flat, one directory
->    per skill — so link each skill folder individually, not the tree. For Claude Code
->    that is `~/.claude/skills/<name>` → `<clone>/skills/<group>/<name>`, one per skill.
->    Symlink on macOS and Linux. On Windows prefer a directory junction (`mklink /J`,
->    or `New-Item -ItemType Junction`): it needs no elevation, where a symbolic link
->    needs admin rights or Developer Mode. If my harness discovers skills some other
->    way, do that instead.
-> 3. Report back: the aiview URL, and the skills you can now reach by name.
+> **`<the directory you want it in>`**, build the viewer (`npm install && npm run build
+> && node aiview.mjs init`, from `skills/tools/aiview/`), and make the skills
+> discoverable to you. They are grouped on disk — `skills/general/`, `skills/react/`,
+> `skills/tools/` — while harnesses want them flat, so link each skill folder
+> individually rather than the tree. Then tell me the aiview URL and the skills you can
+> reach by name.
 
-Still an outcome rather than a procedure, with two exceptions worth making explicit
-because no agent can infer them. **The grouping has to be flattened** — a link to
-`skills/` produces a tree nothing discovers, and the failure is silent. And on
-**Windows the obvious choice is the wrong one**: a symbolic link is what you would
-reach for and it fails without elevation, where a junction does the same job unprivileged.
-Everything else — which harness, which directory, what to do when it is neither of
-these — your agent knows and this README would only guess at.
+The flattening is the one thing worth saying, because it is a fact about this
+repository rather than about your setup, and getting it wrong fails silently: link
+`skills/` wholesale and you get a tree nothing discovers and no error. The rest —
+which harness, which mechanism, what Windows needs — your agent settles faster than
+this README could specify it.
 
-Step 3 is the verification. A URL that answers and a list of names it can see means
-both halves are wired; an agent that reports neither has not finished.
+The closing question is the check: a URL that answers and a list of names means both
+halves are wired.
 
 ### Setup, by hand
 
