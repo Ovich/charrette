@@ -140,9 +140,6 @@ itself, so the whole `skills/` tree moves as one. Then point your agent at a ski
 `SKILL.md`, or let it wire the tree into your harness's own skill discovery — which is
 the part worth handing over.
 
-You already have the thing that installs this. Fill in where you want the checkout,
-paste the rest:
-
 > Set up Charrette. Clone `https://github.com/Ovich/charrette.git` into
 > **`<the directory you want it in>`**, build the bundled viewer, and make every skill
 > under `skills/` discoverable to you. Then tell me the aiview URL and the skills you
