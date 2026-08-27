@@ -140,8 +140,6 @@ itself, so the whole `skills/` tree moves as one. Then point your agent at a ski
 `SKILL.md`, or let it wire the tree into your harness's own skill discovery — which is
 the part worth handing over.
 
-### Setup, by your agent
-
 You already have the thing that installs this. Fill in where you want the checkout,
 paste the rest:
 
@@ -150,39 +148,8 @@ paste the rest:
 > under `skills/` discoverable to you. Then tell me the aiview URL and the skills you
 > can reach by name.
 
-### Setup, by hand
-
-Node ≥ 22.5, nothing installed globally. The build half is one command:
-
-```sh
-cd skills/tools/aiview && npm install && npm run build && node aiview.mjs init
-```
-
-`init` creates the data home and prints where everything lives; `status` says so again
-later. After that, `node skills/tools/aiview/aiview.mjs open <doc>` is the whole gesture. An
-existing index left next to the tool by an older install is adopted automatically on
-first run, documents and all.
-
-The other half is discovery. From the repo root, for Claude Code on macOS or Linux —
-one link per skill, groups flattened:
-
-```sh
-mkdir -p ~/.claude/skills
-for d in skills/*/*/; do ln -sfn "$PWD/$d" ~/.claude/skills/"$(basename "$d")"; done
-```
-
-On Windows, from the repo root in PowerShell:
-
-```powershell
-$dst = "$HOME\.claude\skills"; New-Item -ItemType Directory -Force -Path $dst | Out-Null
-Get-ChildItem skills\*\* -Directory | ForEach-Object {
-  New-Item -ItemType Junction -Path "$dst\$($_.Name)" -Target $_.FullName -Force
-}
-```
-
-Junctions rather than symbolic links, so no elevation is needed. Because these are
-links, `git pull` in the checkout updates every skill in place: there is nothing to
-reinstall.
+Ask it to link rather than copy, and `git pull` in the checkout updates every skill in
+place.
 
 ## License
 
