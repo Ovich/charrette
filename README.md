@@ -149,11 +149,6 @@ with skills you already have:
 /plugin install charrette@charrette
 ```
 
-Then the one thing the install does not cover:
-
-> Build the bundled aiview viewer in the Charrette plugin, create its data home, and
-> tell me the URL.
-
 ## Updating
 
 A checkout takes a prompt, because three things move and only one of them is `git pull`:
