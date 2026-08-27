@@ -139,11 +139,10 @@ Prompt for your agent:
 
 > Set up Charrette. Clone `https://github.com/Ovich/charrette.git` into
 > **`<the directory you want it in>`**, build the bundled viewer, and make every skill
-> under `skills/` discoverable to you. Then tell me the aiview URL and the skills you
-> can reach by name.
+> under `skills/` discoverable to you (symlink). Then tell me the aiview URL and the
+> skills you can reach by name.
 
-Ask it to link rather than copy, and `git pull` in the checkout updates every skill in
-place.
+`git pull` in the checkout then updates every skill in place.
 
 ## License
 
