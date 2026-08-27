@@ -195,8 +195,11 @@ pidfile (dead process) is detected and reported, and `open` safely replaces it.
 
 A long document is useful before it is finished — the reader gets the sections that
 are ready. What makes that honest rather than confusing is saying what is still
-coming. `pending` puts a card at the foot of the document for each unit of work
-still running: its label, one line on what it is doing, and how long it has been going.
+coming. `pending` puts a card at the **head** of the document — above the title, where the
+reader meets it before the content — for each unit of work still running: its label,
+one line on what it is doing, and how long it has been going. *"This is incomplete, and
+here is what is missing"* has to arrive before someone reads to the end and draws
+conclusions from a document with holes in it.
 
 Use it whenever you write a document **before** the work behind it has finished —
 above all when you fan out to subagents. Add one card per agent as you dispatch it,
@@ -219,6 +222,12 @@ died, so after 30 minutes a card stops claiming to be live and says *"no news fo
 **Close every card you open**, including on the paths where the work fails or you
 abandon it. A card that never closes is a document that lies about being unfinished.
 
+**Closing a card means the section it produced is written.** The card disappears and the
+content takes its place, so the reader's eye moves from *"this is coming"* to *"here it
+is"*. Where that content came from an agent rather than from you, say so in the
+document — the card is gone, and nothing else records that a section arrived by way of
+an unattended worker.
+
 ## What the user sees
 
 Left: documents newest-activity first: search, kind chips (deterministic colour per
@@ -227,8 +236,8 @@ containers (display title + member count, members in reading order), ungrouped d
 flat, missing files struck through. Right: title, **absolute local path
 (click-to-copy)**, kind · started · tags · updated, then the rendered document (GFM +
 mermaid for Markdown, sandboxed iframe with viewport presets for HTML mockups, the
-browser's PDF viewer for PDFs), live-reloading on save — and, at the foot, a card per
-unit of work the document is still waiting on, appearing and disappearing live.
+browser's PDF viewer for PDFs), live-reloading on save — and, above the content, a card
+per unit of work the document is still waiting on, appearing and disappearing live.
 
 ## Contract for calling skills
 

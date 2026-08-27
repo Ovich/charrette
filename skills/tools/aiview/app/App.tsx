@@ -123,6 +123,7 @@ export function App() {
           {doc && (
             <>
               <DocHeader doc={doc} />
+              <PendingCards items={response!.pending ?? []} />
               {response!.content === null && format !== "pdf" && (
                 <p className="text-muted-foreground">
                   File is missing on disk: <code className="font-mono text-[12px]">{doc.abs_path}</code>
@@ -133,7 +134,6 @@ export function App() {
               {format === "markdown" && response!.content !== null && (
                 <MarkdownView content={response!.content} docId={doc.id} />
               )}
-              <PendingCards items={response!.pending ?? []} />
             </>
           )}
         </main>

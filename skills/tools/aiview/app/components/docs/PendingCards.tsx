@@ -21,7 +21,11 @@ const isStale = (since: string, now: number): boolean => now - new Date(since).g
  *
  *  The point is that a long document does not have to be finished to be useful: the
  *  reader gets the parts that are ready, and these cards say — precisely, not vaguely —
- *  what is still coming and who is fetching it. */
+ *  what is still coming and who is fetching it.
+ *
+ *  They sit at the HEAD, above the content: "this is incomplete, and here is what is
+ *  missing" is something the reader has to know before they start, not after they have
+ *  read to the end and drawn conclusions from a document with holes in it. */
 export function PendingCards({ items }: { items: Pending[] }) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -35,8 +39,8 @@ export function PendingCards({ items }: { items: Pending[] }) {
   if (!items.length) return null;
 
   return (
-    <section className="mt-12 border-t border-border pt-6" aria-live="polite">
-      <h2 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+    <section className="mb-9 rounded-[10px] border border-border bg-surface-2 px-4 py-3.5" aria-live="polite">
+      <h2 className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
         <span className="relative flex h-2 w-2" aria-hidden="true">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
@@ -50,7 +54,7 @@ export function PendingCards({ items }: { items: Pending[] }) {
           return (
             <li
               key={p.id}
-              className="rounded-[10px] border border-border bg-surface px-3.5 py-3 shadow-[var(--shadow-sm)]"
+              className="rounded-[8px] border border-border bg-background px-3.5 py-2.5"
             >
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-[13px] font-semibold text-foreground">{p.label}</span>

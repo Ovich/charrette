@@ -58,7 +58,23 @@ the group, or from the link.
 Write both from the start. The report's Abstract, What changed and diagram are
 knowable before any axis returns, so publish them immediately and carry one
 `aiview pending` card per running axis on the report — that is the document the
-developer has open while they wait.
+developer has open while they wait. The cards sit above the content and vanish as each
+axis lands, replaced by the section it produced.
+
+**Stamp what an agent produced.** A section written from a subagent's return carries a
+one-line attribution under its heading, naming the axis and what you did to its output
+before believing it:
+
+> *From the blast-radius axis. Merged, deduplicated, and every citation re-read before
+> inclusion.*
+
+Two reasons, and the second is the one that bites. It tells a later reader which prose
+is your own synthesis and which came from an unattended worker — the card that
+announced it is gone by then, and nothing else records it. And it forces you to state
+the treatment, which is the difference between *an agent said this* and *I checked
+this*: an axis in this very skill has raised a confident, well-argued finding that a
+second axis then refuted. Attribution is provenance, never endorsement. Sections you
+wrote yourself carry no stamp; absence is the default and means exactly that.
 
 ### The report
 
