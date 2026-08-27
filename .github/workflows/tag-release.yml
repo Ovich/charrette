@@ -1,0 +1,83 @@
+# Tags a release when a version bump lands on main.
+#
+# The version in .claude-plugin/plugin.json is what Claude Code compares against a
+# user's installed copy, so it is the release. This workflow turns that bump into the
+# matching charrette--v<version> tag, which is the step easiest to forget by hand.
+# It does not decide to release; it records one that already happened.
+#
+# Equivalent to `claude plugin tag --push`, minus the CLI. See RELEASING.md.
+
+name: tag release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .claude-plugin/plugin.json
+      - .claude-plugin/marketplace.json
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags, so an already-released version is a no-op rather than a failure
+
+      - name: Read and agree the declared versions
+        id: version
+        run: |
+          set -euo pipefail
+          plugin=$(jq -r '.version // empty' .claude-plugin/plugin.json)
+          market=$(jq -r '.plugins[0].version // empty' .claude-plugin/marketplace.json)
+
+          if [ -z "$plugin" ]; then
+            echo "::error file=.claude-plugin/plugin.json::No version declared. Claude Code would fall back to the commit SHA; if that is intended, delete this workflow."
+            exit 1
+          fi
+
+          # plugin.json silently overrides marketplace.json, so a disagreement ships the
+          # wrong number rather than an error. Catch it here instead.
+          if [ "$plugin" != "$market" ]; then
+            echo "::error::Version disagreement: plugin.json says '$plugin', marketplace.json says '$market'. plugin.json wins at install time, so this would release '$plugin' while the catalogue advertises '$market'."
+            exit 1
+          fi
+
+          # Cheap typo guard. Permissive enough for a prerelease (1.2.0-rc1).
+          case "$plugin" in
+            v*|V*)            bad="a leading v (the tag adds its own)" ;;
+            [!0-9]*)          bad="no leading digit" ;;
+            *[!0-9A-Za-z.-]*) bad="unexpected characters" ;;
+            *..*|*.)          bad="malformed dots" ;;
+            *)                bad="" ;;
+          esac
+          if [ -n "$bad" ]; then
+            echo "::error file=.claude-plugin/plugin.json::Version '$plugin' has $bad."
+            exit 1
+          fi
+
+          echo "version=$plugin" >> "$GITHUB_OUTPUT"
+          echo "tag=charrette--v$plugin" >> "$GITHUB_OUTPUT"
+
+      - name: Tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # A push touching these files without a bump is normal (a description edit, a
+          # keyword). Nothing to release, and re-tagging would move a published tag.
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::notice::$TAG already exists — version unchanged, nothing to release."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "charrette $VERSION"
+          git push origin "refs/tags/$TAG"
+          echo "::notice::Released $TAG. Users get it with /plugin marketplace update charrette, /plugin update charrette@charrette, then a restart."

@@ -46,13 +46,19 @@ cd skills/aiview && npm install && npm run build && cd ../..   # refresh dist/ +
 #   .claude-plugin/marketplace.json
 claude plugin validate .                        # manifests, skills, commands
 git add -A && git commit -m "release: v<version>"
-claude plugin tag --push -m "charrette %s"      # tags charrette--v<version>, pushes the tag
-git push
+git push                                        # the tag is created for you
 ```
 
-`claude plugin tag` refuses to run when the two manifests disagree on the version, or on
-a dirty tree — that check is the reason to use it rather than `git tag`. It does not and
-cannot check that you bumped the version at all; that part is yours.
+The tag is not yours to make. `.github/workflows/tag-release.yml` watches the two
+manifests on `main`; when the version they agree on has no `charrette--v<version>` tag,
+it creates and pushes one. A push that touches those files without changing the version
+is a no-op, so editing a description or a keyword costs nothing. The workflow fails loudly
+on the one case that would otherwise ship silently wrong — the two manifests disagreeing,
+where `plugin.json` wins at install time while the catalogue advertises the other number.
+
+`claude plugin tag --push -m "charrette %s"` does the same thing locally and remains the
+fallback when Actions is unavailable. Neither it nor the workflow can tell that you failed
+to bump the version at all; that part stays yours.
 
 Verify against a real install rather than trusting the push:
 
