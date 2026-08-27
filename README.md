@@ -146,11 +146,9 @@ You already have the thing that installs this. Fill in where you want the checko
 paste the rest:
 
 > Set up Charrette. Clone `https://github.com/Ovich/charrette.git` into
-> **`<the directory you want it in>`**, build the bundled viewer, and make the skills
-> discoverable to you. They are grouped on disk — `skills/general/`, `skills/react/`,
-> `skills/tools/` — while harnesses want them flat, so link each skill folder
-> individually rather than the tree. Then tell me the aiview URL and the skills you can
-> reach by name.
+> **`<the directory you want it in>`**, build the bundled viewer, and make every skill
+> under `skills/` discoverable to you. Then tell me the aiview URL and the skills you
+> can reach by name.
 
 ### Setup, by hand
 
