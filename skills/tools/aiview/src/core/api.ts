@@ -1,7 +1,7 @@
 // Shared API payload types — the contract between src/server and app/.
 // The contract-guard test asserts the server actually returns these shapes.
 import type { DocFormat } from "./paths.ts";
-import type { Document, DocumentWithState } from "./db.ts";
+import type { Document, DocumentWithState, Pending } from "./db.ts";
 
 export interface DocumentsResponse {
   documents: DocumentWithState[];
@@ -23,6 +23,8 @@ export interface DocumentResponse {
   format?: DocFormat;
   /** null = file missing on disk (markdown/html) or binary (pdf). */
   content: string | null;
+  /** Work still running behind this document. Empty when nothing is pending. */
+  pending: Pending[];
 }
 
 export interface ChangedEventPayload {
@@ -34,6 +36,13 @@ export interface ChangedEventPayload {
 export interface ProjectEventPayload {
   type: "project";
   slug: string;
+}
+
+/** Broadcast when a document's pending work changed — one started or finished. Reuses
+ *  the `changed` event so an open tab reloads through the path it already has. */
+export interface PendingEventPayload {
+  type: "changed";
+  id: number;
 }
 
 /** Broadcast when the set of documents changed — one was registered, moved, re-tagged

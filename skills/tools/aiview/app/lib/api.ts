@@ -1,9 +1,9 @@
 // Typed client over the backend-for-frontend API. Types come from src/core (type-only,
 // erased at build) so the contract-guard test can hold server and app to one shape.
 import type { DocumentsResponse, DocumentResponse } from "../../src/core/api.ts";
-import type { Document, DocumentWithState } from "../../src/core/db.ts";
+import type { Document, DocumentWithState, Pending } from "../../src/core/db.ts";
 
-export type { DocumentsResponse, DocumentResponse, Document, DocumentWithState };
+export type { DocumentsResponse, DocumentResponse, Document, DocumentWithState, Pending };
 
 export async function fetchDocuments(): Promise<DocumentsResponse> {
   const r = await fetch("/api/documents");

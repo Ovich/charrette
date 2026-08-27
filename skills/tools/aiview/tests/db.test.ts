@@ -186,3 +186,44 @@ test("active project: defaults to All, round-trips, and never reads back as a gh
   index.removeProject("CIIP");
   assert.equal(index.activeProject(), "*");
 });
+
+test("pending: added rows come back for that document only, in order", () => {
+  const a = index.register(write("a.spec.md", "# A"));
+  const b = index.register(write("b.spec.md", "# B"));
+  const first = index.addPending(a.id, "Intent axis", "checks the diff against the PR's claims");
+  index.addPending(a.id, "Blast-radius axis");
+  index.addPending(b.id, "Elsewhere");
+
+  const rows = index.pendingFor(a.id);
+  assert.equal(rows.length, 2);
+  assert.deepEqual(
+    rows.map((r) => r.label),
+    ["Intent axis", "Blast-radius axis"],
+  );
+  assert.equal(rows[0].id, first);
+  assert.equal(rows[0].note, "checks the diff against the PR's claims");
+  assert.equal(rows[1].note, ""); // note is optional
+  assert.ok(rows[0].started_at);
+});
+
+test("pending: done deletes the row and reports which document to refresh", () => {
+  const doc = index.register(write("c.spec.md", "# C"));
+  const id = index.addPending(doc.id, "Axis");
+
+  assert.equal(index.donePending(id), doc.id);
+  assert.deepEqual(index.pendingFor(doc.id), []);
+  // Finishing is deleting, so a second call is a no-op rather than an error.
+  assert.equal(index.donePending(id), null);
+});
+
+test("pending: clear empties one document without touching another", () => {
+  const a = index.register(write("d.spec.md", "# D"));
+  const b = index.register(write("e.spec.md", "# E"));
+  index.addPending(a.id, "One");
+  index.addPending(b.id, "Two");
+
+  index.clearPending(a.id);
+  assert.deepEqual(index.pendingFor(a.id), []);
+  assert.equal(index.pendingFor(b.id).length, 1);
+  assert.equal(index.allPending().length, 1);
+});

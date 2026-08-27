@@ -5,6 +5,7 @@ import { Sidebar } from "./components/shell/Sidebar.tsx";
 import { TopBar } from "./components/shell/TopBar.tsx";
 import { DocHeader } from "./components/docs/DocHeader.tsx";
 import { MarkdownView } from "./components/viewers/MarkdownView.tsx";
+import { PendingCards } from "./components/docs/PendingCards.tsx";
 import { MockupFrame } from "./components/viewers/MockupFrame.tsx";
 import { PdfFrame } from "./components/viewers/PdfFrame.tsx";
 
@@ -132,6 +133,7 @@ export function App() {
               {format === "markdown" && response!.content !== null && (
                 <MarkdownView content={response!.content} docId={doc.id} />
               )}
+              <PendingCards items={response!.pending ?? []} />
             </>
           )}
         </main>

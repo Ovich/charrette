@@ -9,6 +9,7 @@ import type {
   ActiveProjectResponse,
   DocumentsResponse,
   DocumentResponse,
+  PendingEventPayload,
   IndexEventPayload,
   ProjectEventPayload,
 } from "../core/api.ts";
@@ -147,6 +148,28 @@ export function startServer(
       });
       return;
     }
+    // The CLI writes pending rows in its own process; this tells an open tab which
+    // document's cards moved. It reuses the `changed` event so the reload path is the
+    // one already proven by the file watcher.
+    if (p === "/api/pending-changed" && req.method === "POST") {
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+        if (body.length > 4096) req.destroy(); // an id, not a payload
+      });
+      req.on("end", () => {
+        let id: unknown;
+        try {
+          id = (JSON.parse(body) as { id?: unknown }).id;
+        } catch {
+          return json(res, { error: "bad json" }, 400);
+        }
+        if (typeof id !== "number") return json(res, { error: "id required" }, 400);
+        sse.broadcast({ type: "changed", id } satisfies PendingEventPayload);
+        json(res, { ok: true });
+      });
+      return;
+    }
     // Doc-relative assets, confined to the document's folder.
     const a = p.match(/^\/api\/asset\/(\d+)\/(.+)$/);
     if (a) {
@@ -175,14 +198,17 @@ export function startServer(
     if (m) {
       const doc = index.get(Number(m[1]));
       if (!doc) return json(res, { error: "not found" }, 404);
-      if (!fs.existsSync(doc.abs_path)) return json(res, { document: doc, content: null } satisfies DocumentResponse);
+      const pending = index.pendingFor(doc.id);
+      if (!fs.existsSync(doc.abs_path))
+        return json(res, { document: doc, content: null, pending } satisfies DocumentResponse);
       watcher.ensureWatch(doc);
       if (isPdf(doc.file_path))
-        return json(res, { document: doc, format: "pdf", content: null } satisfies DocumentResponse);
+        return json(res, { document: doc, format: "pdf", content: null, pending } satisfies DocumentResponse);
       return json(res, {
         document: doc,
         format: formatOf(doc.file_path),
         content: readDoc(doc.abs_path),
+        pending,
       } satisfies DocumentResponse);
     }
     if (p.startsWith("/api/")) return send(res, 404, "not found", "text/plain");

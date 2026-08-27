@@ -58,6 +58,17 @@ export interface Document {
   last_seen_at: string;
 }
 
+/** One unit of work a document is still waiting on. */
+export interface Pending {
+  id: number;
+  document_id: number;
+  /** Short name of the worker, e.g. "Intent axis". */
+  label: string;
+  /** One line on what it is actually doing. */
+  note: string;
+  started_at: string;
+}
+
 export interface Group {
   slug: string;
   /** Display title; falls back to the slug in the UI. */
@@ -131,6 +142,13 @@ export interface Index {
   setActiveProject(slug: string): string;
   remove(id: number): boolean;
   touch(id: number): void;
+  /** Register work the document is waiting on; returns the pending id. */
+  addPending(documentId: number, label: string, note?: string): number;
+  /** Finish one unit of work — the row is deleted. Returns its document id, or null. */
+  donePending(id: number): number | null;
+  clearPending(documentId: number): void;
+  pendingFor(documentId: number): Pending[];
+  allPending(): Pending[];
   close(): void;
 }
 
@@ -166,6 +184,20 @@ export function openIndex(dbPath: string = SQLITE_PATH, root: string = STORE_ROO
     "CREATE TABLE IF NOT EXISTS projects (slug TEXT PRIMARY KEY, title TEXT, paths TEXT NOT NULL DEFAULT '[]')",
   );
   db.exec("CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+  // Work still running behind a document the reader can already open. Deliberately the
+  // only ephemeral state in the index: a row exists exactly while the work is pending,
+  // and finishing means deleting it, so nothing accumulates and nothing needs cleaning.
+  // It lives here rather than in the file because the file is the deliverable — a
+  // "still working" placeholder left in a shared document is worse than no feature.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pending (
+      id INTEGER PRIMARY KEY,
+      document_id INTEGER NOT NULL,
+      label TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      started_at TEXT NOT NULL
+    )
+  `);
   db.exec("DROP TABLE IF EXISTS revisions");
 
   const parse = (row: Row): Document => ({
@@ -350,6 +382,38 @@ export function openIndex(dbPath: string = SQLITE_PATH, root: string = STORE_ROO
         "INSERT INTO state (key, value) VALUES ('active_project', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
       ).run(slug);
       return slug;
+    },
+
+    addPending(documentId, label, note = "") {
+      const started = new Date().toISOString();
+      db.prepare("INSERT INTO pending (document_id, label, note, started_at) VALUES (?, ?, ?, ?)").run(
+        documentId,
+        label,
+        note,
+        started,
+      );
+      return Number(db.prepare("SELECT last_insert_rowid() AS id").get()!.id);
+    },
+    donePending(id) {
+      const row = db.prepare("SELECT document_id FROM pending WHERE id = ?").get(id) as
+        | { document_id: number }
+        | undefined;
+      if (!row) return null;
+      db.prepare("DELETE FROM pending WHERE id = ?").run(id);
+      return row.document_id;
+    },
+    clearPending(documentId) {
+      db.prepare("DELETE FROM pending WHERE document_id = ?").run(documentId);
+    },
+    pendingFor(documentId) {
+      return db
+        .prepare("SELECT id, document_id, label, note, started_at FROM pending WHERE document_id = ? ORDER BY id")
+        .all(documentId) as unknown as Pending[];
+    },
+    allPending() {
+      return db
+        .prepare("SELECT id, document_id, label, note, started_at FROM pending ORDER BY document_id, id")
+        .all() as unknown as Pending[];
     },
 
     remove(id) {

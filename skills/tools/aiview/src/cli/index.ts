@@ -33,6 +33,9 @@ const USAGE = [
   "  remove <file|#id>...",
   "  move <file|#id>... [--project <slug>]    # refile: file + index together",
   "  serve [file] [--port 4321] [--open] [--detach]",
+  "  pending add <file|#id> --label L [--note N]   # work the reader is waiting on",
+  "  pending done <#pendingId>                     # the work landed; the card goes away",
+  "  pending list [<file|#id>] | clear <file|#id>",
   "  status",
   "  path <filename> [--project <slug>]       # where this document belongs, joined for this OS",
   "  init                                     # create the data home; report where everything lives",
@@ -74,6 +77,12 @@ function postToServer(route: string, body: unknown): boolean {
 function setActive(index: Index, slug: string): string {
   if (!postToServer("/api/active", { project: slug })) index.setActiveProject(slug);
   return slug;
+}
+
+/** Tell an open tab that one document's pending cards moved. Reuses the `changed`
+ *  event, so the tab reloads through the path the file watcher already uses. */
+function notifyPendingChanged(documentId: number): void {
+  postToServer("/api/pending-changed", { id: documentId });
 }
 
 /** Tell an open tab that the document list moved. The CLI writes sqlite in its own
@@ -478,7 +487,74 @@ async function cmdServe(): Promise<void> {
   });
 }
 
+function cmdPending(): void {
+  const sub = args.positional[0];
+  const index = openIndex();
+  const needDoc = (ref: string | undefined): Document => {
+    if (!ref) {
+      console.error("usage: aiview pending <add|done|list|clear> ...");
+      process.exit(1);
+    }
+    const doc = resolveRef(ref);
+    if (!doc) {
+      console.error(`no such document: ${ref}`);
+      process.exit(1);
+    }
+    return doc;
+  };
+
+  if (sub === "add") {
+    const doc = needDoc(args.positional[1]);
+    const label = args.flag("--label");
+    if (!label) {
+      console.error("usage: aiview pending add <file|#id> --label L [--note N]");
+      process.exit(1);
+    }
+    const id = index.addPending(doc.id, label, args.flag("--note") ?? "");
+    index.close();
+    notifyPendingChanged(doc.id);
+    emit({ id, document: doc.id, label }, `pending #${id}  ${label}  (doc #${doc.id})`);
+    return;
+  }
+  if (sub === "done") {
+    const raw = (args.positional[1] ?? "").replace(/^#/, "");
+    const id = Number(raw);
+    if (!raw || Number.isNaN(id)) {
+      console.error("usage: aiview pending done <#pendingId>");
+      process.exit(1);
+    }
+    const docId = index.donePending(id);
+    index.close();
+    if (docId === null) {
+      console.error(`no such pending item: #${id}`);
+      process.exit(1);
+    }
+    notifyPendingChanged(docId);
+    emit({ id, document: docId }, `done #${id}`);
+    return;
+  }
+  if (sub === "clear") {
+    const doc = needDoc(args.positional[1]);
+    index.clearPending(doc.id);
+    index.close();
+    notifyPendingChanged(doc.id);
+    emit({ document: doc.id, cleared: true }, `cleared pending for #${doc.id}`);
+    return;
+  }
+  // list, the default
+  const ref = args.positional[1];
+  const rows = ref ? index.pendingFor(needDoc(ref).id) : index.allPending();
+  index.close();
+  emit(rows, () => {
+    if (!rows.length) return console.log("nothing pending");
+    for (const r of rows) console.log(`#${r.id}  doc #${r.document_id}  ${r.label}${r.note ? ` — ${r.note}` : ""}  since ${r.started_at}`);
+  });
+}
+
 switch (args.verb) {
+  case "pending":
+    cmdPending();
+    break;
   case "status":
     cmdStatus();
     break;
