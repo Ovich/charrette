@@ -133,12 +133,12 @@ is what aiview reports as the project, the layout labels itself.
 
 ## Using the collection
 
-Clone `https://github.com/Ovich/charrette.git`, then hand **the checkout** — wherever
-you put it — to your agent:
+Prompt for your agent:
 
-> Set up Charrette from `<the checkout>`: build the bundled viewer, and make every
-> skill under `skills/` discoverable to you (symlink or otherwise). Then tell me the
-> aiview URL and the skills you can reach by name.
+> Set up Charrette: clone `https://github.com/Ovich/charrette.git` into
+> `<the checkout>`, build the bundled viewer, and make every skill under `skills/`
+> discoverable to you (symlink or otherwise). Then tell me the aiview URL and the
+> skills you can reach by name.
 
 On Claude Code you can install it as a plugin instead. The skills then answer to
 `charrette:` — `/charrette:pr-review`, `/charrette:brainstorm` — so nothing collides
