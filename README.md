@@ -146,21 +146,11 @@ You already have the thing that installs this. Fill in where you want the checko
 paste the rest:
 
 > Set up Charrette. Clone `https://github.com/Ovich/charrette.git` into
-> **`<the directory you want it in>`**, build the viewer (`npm install && npm run build
-> && node aiview.mjs init`, from `skills/tools/aiview/`), and make the skills
+> **`<the directory you want it in>`**, build the bundled viewer, and make the skills
 > discoverable to you. They are grouped on disk — `skills/general/`, `skills/react/`,
 > `skills/tools/` — while harnesses want them flat, so link each skill folder
 > individually rather than the tree. Then tell me the aiview URL and the skills you can
 > reach by name.
-
-The flattening is the one thing worth saying, because it is a fact about this
-repository rather than about your setup, and getting it wrong fails silently: link
-`skills/` wholesale and you get a tree nothing discovers and no error. The rest —
-which harness, which mechanism, what Windows needs — your agent settles faster than
-this README could specify it.
-
-The closing question is the check: a URL that answers and a list of names means both
-halves are wired.
 
 ### Setup, by hand
 
