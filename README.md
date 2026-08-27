@@ -143,24 +143,39 @@ the part worth handing over.
 ### Setup, by your agent
 
 You already have the thing that installs this. These are skills for agents, so whoever
-is reading this README has one in front of them. Give it the job:
+is reading this README has one in front of them. Fill in where you want the checkout,
+paste the rest:
 
-> Set up Charrette from this checkout. Build the bundled `aiview` tool and create its
-> data home, then make the skills under `skills/` discoverable to you the way this
-> harness expects — copying, symlinking, or registering them, whichever is right here.
-> Read `skills/tools/aiview/SKILL.md` first; it is the contract for the tool. Then tell
-> me the aiview URL, and which skills you can now reach by name.
+> Set up Charrette. Clone `https://github.com/Ovich/charrette.git` into
+> **`<the directory you want it in>`**, then:
+>
+> 1. Build the bundled viewer and create its data home — `npm install && npm run build
+>    && node aiview.mjs init` from `skills/tools/aiview/`. Node ≥ 22.5, nothing global.
+> 2. Make every skill discoverable to you. Read `skills/tools/aiview/SKILL.md` first; it
+>    is the contract for the tool. The skills are **grouped on disk** (`skills/general/`,
+>    `skills/react/`, `skills/tools/`) while most harnesses want them flat, one directory
+>    per skill — so link each skill folder individually, not the tree. For Claude Code
+>    that is `~/.claude/skills/<name>` → `<clone>/skills/<group>/<name>`, one per skill.
+>    Symlink on macOS and Linux. On Windows prefer a directory junction (`mklink /J`,
+>    or `New-Item -ItemType Junction`): it needs no elevation, where a symbolic link
+>    needs admin rights or Developer Mode. If my harness discovers skills some other
+>    way, do that instead.
+> 3. Report back: the aiview URL, and the skills you can now reach by name.
 
-That asks for an outcome, not a procedure, on purpose. The build is three commands
-anyone could run. **Skill discovery is the step that actually varies** — a directory for
-one agent, a config entry for another, a bare path for a third — and your agent knows
-which of those it is, where this README would only guess. The closing request is the
-verification: a URL that answers and a list of names it can see means the two halves
-are wired, and an agent that reports neither has not finished.
+Still an outcome rather than a procedure, with two exceptions worth making explicit
+because no agent can infer them. **The grouping has to be flattened** — a link to
+`skills/` produces a tree nothing discovers, and the failure is silent. And on
+**Windows the obvious choice is the wrong one**: a symbolic link is what you would
+reach for and it fails without elevation, where a junction does the same job unprivileged.
+Everything else — which harness, which directory, what to do when it is neither of
+these — your agent knows and this README would only guess at.
+
+Step 3 is the verification. A URL that answers and a list of names it can see means
+both halves are wired; an agent that reports neither has not finished.
 
 ### Setup, by hand
 
-Node ≥ 22.5, nothing installed globally, one command:
+Node ≥ 22.5, nothing installed globally. The build half is one command:
 
 ```sh
 cd skills/tools/aiview && npm install && npm run build && node aiview.mjs init
@@ -170,6 +185,27 @@ cd skills/tools/aiview && npm install && npm run build && node aiview.mjs init
 later. After that, `node skills/tools/aiview/aiview.mjs open <doc>` is the whole gesture. An
 existing index left next to the tool by an older install is adopted automatically on
 first run, documents and all.
+
+The other half is discovery. From the repo root, for Claude Code on macOS or Linux —
+one link per skill, groups flattened:
+
+```sh
+mkdir -p ~/.claude/skills
+for d in skills/*/*/; do ln -sfn "$PWD/$d" ~/.claude/skills/"$(basename "$d")"; done
+```
+
+On Windows, from the repo root in PowerShell:
+
+```powershell
+$dst = "$HOME\.claude\skills"; New-Item -ItemType Directory -Force -Path $dst | Out-Null
+Get-ChildItem skills\*\* -Directory | ForEach-Object {
+  New-Item -ItemType Junction -Path "$dst\$($_.Name)" -Target $_.FullName -Force
+}
+```
+
+Junctions rather than symbolic links, so no elevation is needed. Because these are
+links, `git pull` in the checkout updates every skill in place: there is nothing to
+reinstall.
 
 ## License
 
