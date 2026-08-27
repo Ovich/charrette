@@ -72,7 +72,9 @@ Tell the user the URL. Sections, in reading order:
    (schema migrations, API contract changes, dropped compatibility). Each one traces to
    the diff or to a repo doc: this section carries no citations, so it is the easiest
    place for the session's own opinion of the change to enter unchallenged.
-7. **Findings** (§ Findings): per axis, each with its citation.
+7. **Findings** (§ Findings): per axis, each with its citation. Grouped so a reader can
+   tell at a glance what this PR introduced from what it merely stands next to:
+   pre-existing defects get their own group, marked as not counting against the change.
 8. **Verdict**: one line per axis (worst issue), plus the open decision count, plus a
    line naming **what this review did not cover** — the sibling axes not chained, and
    correctness if no bug hunt ran. A reader takes silence for coverage.
@@ -128,6 +130,13 @@ skills or spawn agents: review directly."*
   contracts changed without their consumers, migrations without rollback, config
   the deploy needs. Every finding cites the file:line of the evidence, both sides.
 
+**Separate what this PR introduces from what it inherits.** A defect that predates the
+branch is noted, attributed as pre-existing, and told to the author — it is never a
+reason to withhold approval, and it never feeds the recommendation. Holding a PR
+hostage to the state of the code it landed in is how review stops being useful. Say
+which it is for every finding: the diff answers it, and *"this PR does not create the
+exposure, it increases it"* is a third, honest answer that belongs in Decision points.
+
 An axis reports **evidence and consequence, never severity**: ranking needs the whole
 picture, and an axis has only its own. Expect one axis to raise what another refutes —
 that is the design working, and the refutation is worth as much as the finding.
@@ -159,6 +168,8 @@ nothing.
 | "The diff shows what changed" | The diff shows lines. The change map and blast radius are what the reviewer lacks. |
 | "I reviewed it in the session that wrote it" | That's confirmation bias with a slash command. Fresh context, or at least fresh subagents. |
 | "More findings = better review" | The deliverable is decisions the human can make. Ten cited findings beat forty hunches. |
+| "The code around it is a mess too" | Not this PR's bill. Note it, attribute it, approve anyway. |
+| "Unverifiable from here, so it blocks" | Ask the author. A question they can answer in one line is not a change request. |
 | "Diagram every touched file" | Draw the delta that answers a reviewer's question; a trivial PR earns zero diagrams. |
 | "The proposed comment is the deliverable" | The analysis is. The comment is its condensate: nothing appears there that isn't in a section above. |
 | "The recommendation decides the merge" | It drafts the reviewer's words. They post it only if they agree: the decision stays theirs. |
