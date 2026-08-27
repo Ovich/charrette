@@ -1,7 +1,9 @@
-# dependencies and build output (aiview)
+# dependencies (aiview)
 node_modules/
-skills/aiview/dist/
-skills/aiview/dist-cli/
+
+# aiview build output is COMMITTED, not ignored: a plugin update lands as a fresh
+# copy under ~/.claude/plugins/cache/, so anything not in git means every user
+# re-runs a 347 MB npm install to rebuild it. See RELEASING.md.
 
 # Per-machine state now lives in the data home (~/charrette_appdata), not here.
 # These are only left by pre-appdata installs; ignored so an old checkout stays clean.

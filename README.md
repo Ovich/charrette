@@ -122,13 +122,12 @@ tab. You watch decisions, diagrams, and drafts land as they happen.
 
 | Tool | What it does |
 |---|---|
-| [aiview](skills/aiview/SKILL.md) | Local document viewer + index in one npm package: React/TypeScript/Tailwind UI, small plain-Node server, agent-facing CLI. Renders Markdown (GFM + mermaid), HTML mockups and PDFs at `localhost:4321` with live reload; related documents grouped in collapsible containers; every doc header shows its absolute path (click-to-copy). Documents are filed per project (CIIP, JOBS, …); one active project scopes the sidebar and is shared between you and the agent — either can switch it, and every open tab follows. CLI: `open` (idempotent register + detached server + URL), `add`, `update`, `list`, `remove`, `move`, `project`, `use`, `path` (where a document belongs, joined for your OS), `serve --detach`, `status`, `init`, all with `--json`. Node ≥ 22.5; one-time `npm install && npm run build && node aiview.mjs init` in `skills/aiview/`. Its `SKILL.md` is the contract every skill follows (kinds, tags, groups, start time). |
+| [aiview](skills/aiview/SKILL.md) | Local document viewer + index in one npm package: React/TypeScript/Tailwind UI, small plain-Node server, agent-facing CLI. Renders Markdown (GFM + mermaid), HTML mockups and PDFs at `localhost:4321` with live reload; related documents grouped in collapsible containers; every doc header shows its absolute path (click-to-copy). Documents are filed per project (CIIP, JOBS, …); one active project scopes the sidebar and is shared between you and the agent — either can switch it, and every open tab follows. CLI: `open` (idempotent register + detached server + URL), `add`, `update`, `list`, `remove`, `move`, `project`, `use`, `path` (where a document belongs, joined for your OS), `serve --detach`, `status`, `init`, all with `--json`. Node ≥ 22.5 and nothing else — the built UI (`dist/`) and CLI bundle (`dist-cli/cli.mjs`, no runtime dependencies) are versioned, so an install is never a build. One-time `node aiview.mjs init` in `skills/aiview/` creates the data home. Changing aiview's own source means `npm install && npm run build` there, and committing what it produces. Its `SKILL.md` is the contract every skill follows (kinds, tags, groups, start time). |
 
 aiview keeps its index (`aiview.sqlite`), its server files and every document in the
 **data home** — `$CHARRETTE_HOME`, or `charrette_appdata` in your OS home directory — never in this
-checkout and never in a project repo. The split is deliberate: the checkout holds only
-what `npm run build` can recreate, so you can delete it, clone it again, rebuild, and
-lose nothing. Documents land in `<home>/docs/<project>/`, and because that folder name
+checkout and never in a project repo. The split is deliberate: the checkout holds nothing
+you cannot get back from git, so you can delete it, clone it again, and lose nothing. Documents land in `<home>/docs/<project>/`, and because that folder name
 is what aiview reports as the project, the layout labels itself.
 
 ## Using the collection
@@ -153,22 +152,26 @@ with skills you already have:
 
 A checkout takes a prompt, because three things move and only one of them is `git pull`:
 
-> Update Charrette in `<the checkout>`: pull, rebuild the bundled viewer and restart
-> its server if one is running, and repair skill discovery — links made against the old
-> `skills/general/…` paths are dangling since the layout flattened. Leave the data home
-> alone. Then tell me the aiview URL and the skills you can reach by name.
+> Update Charrette in `<the checkout>`: pull, restart the viewer's server if one is
+> running, and repair skill discovery — links made against the old `skills/general/…`
+> paths are dangling since the layout flattened. Leave the data home alone. Then tell me
+> the aiview URL and the skills you can reach by name.
 
-The build output is not versioned, so a pull alone leaves a stale viewer — and a
-running server keeps serving the old one until it restarts. Skills are linked rather
-than copied, so they update with the pull; links made before the layout flattened point
-at directories that no longer exist.
+The viewer's build output arrives with the pull, but a running server keeps serving the
+copy it started with until it restarts. Skills are linked rather than copied, so they
+update with the pull; links made before the layout flattened point at directories that
+no longer exist.
 
-The plugin updates itself:
+The plugin takes three steps, and the third is not optional — an update is only applied
+to a session that starts after it:
 
 ```
 /plugin marketplace update charrette
 /plugin update charrette@charrette
 ```
+
+Then restart Claude Code. `/plugin marketplace update` alone refreshes the catalogue
+without touching the installed copy, which is why both commands are here.
 
 ## License
 
