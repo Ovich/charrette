@@ -135,10 +135,7 @@ is what aiview reports as the project, the layout labels itself.
 
 ## Using the collection
 
-Clone anywhere. Each file is self-contained and resolves its references relative to
-itself, so the whole `skills/` tree moves as one. Then point your agent at a skill's
-`SKILL.md`, or let it wire the tree into your harness's own skill discovery — which is
-the part worth handing over.
+Prompt for your agent:
 
 > Set up Charrette. Clone `https://github.com/Ovich/charrette.git` into
 > **`<the directory you want it in>`**, build the bundled viewer, and make every skill
