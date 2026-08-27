@@ -100,7 +100,6 @@ export function App() {
 
   const doc = response?.document ?? null;
   const format = response?.format;
-  const wide = format === "html" || format === "pdf";
 
   return (
     <div className="grid min-h-screen grid-cols-[320px_minmax(0,1fr)] max-md:grid-cols-1">
@@ -116,7 +115,7 @@ export function App() {
       />
       <div className="flex min-w-0 flex-col">
         <TopBar doc={doc} groups={groups} printable={format === "markdown"} />
-        <main className={`w-full px-7 pb-20 pt-8 max-md:px-4 max-md:pt-5 ${wide ? "" : "mx-auto max-w-[780px]"}`}>
+        <main className="w-full px-7 pb-20 pt-8 max-md:px-4 max-md:pt-5">
           {doc === null && !loading && (
             <p className="text-muted-foreground">Pick a document on the left.</p>
           )}
