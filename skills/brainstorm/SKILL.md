@@ -119,19 +119,25 @@ later session with none of the conversation in context, sometimes weeks later. T
 reader needs **state**, and phases alone do not carry it.
 
 So the plan's phasing diagram does double duty: it is the **tracker**, the single place
-that says where the work stands. Not an illustration of progress recorded elsewhere —
-the record itself.
+that says where the work stands. Not an illustration of progress recorded elsewhere — the
+record itself.
 
 **Every step is a node**, at the granularity someone would pause at, with the dependency
-edges and the decision gates that already belong in a phasing diagram. Each node's label
-opens with its status:
+edges and decision gates that already belong in a phasing diagram. Each label opens with
+its status:
 
 | Glyph | Means |
 |---|---|
 | ✅ | Done — its done-when was met, and the evidence is written into the step below |
-| ▶ | In progress — at most one, or the diagram stops answering "where am I" |
+| ▶ | In progress — the one place work is happening |
+| ⏸ | Blocked on someone else — the node says what it waits on and when it was asked for |
 | ⬜ | Not started |
-| ✖ | Failed or abandoned — the step text says what happened and what changed because of it |
+| ✖ | Failed or abandoned — the step says what happened and what changed because of it |
+
+**One ▶ at a time**, or the diagram stops answering "where am I". ⏸ is what keeps that
+rule honest: when a step stalls on something outside your control — an approval, a
+registration, another team's deploy — it becomes ⏸ and the frontier moves to whatever can
+proceed without it. A step parked as ▶ for days claims attention it is not getting.
 
 **One node carries the resume state**, drawn apart from the flow and connected to nothing:
 the branch and the commit it was cut from, what is uncommitted and why (including anything
@@ -143,52 +149,36 @@ error you stopped in the middle of.
 That node is what makes the plan **pausable**. A step can be abandoned mid-flight as long
 as the diagram says where the work sat when it stopped.
 
+#### When it gets written
+
 **Tick as you go, never in a batch at the end.** A node turns ✅ only when its own done-when
 is met; the evidence — what was observed, not "worked" — goes into the step's prose. A
 tracker updated once at the end of a session was wrong for the whole session, and a stale
-diagram is worse than none: it is confidently misleading. When an outcome changes the plan
-— a spike that fails, a decision reopened — amend the step and mark it ✖, rather than
-leaving intent and reality disagreeing.
+diagram is worse than none: it is confidently misleading.
+
+**And always before handing control back** — a question for the user, a request to approve
+something, the end of a turn. That moment is where a session can end without warning, and
+whatever the tracker does not say by then is lost with it. A question asked over a stale
+tracker also wastes the answer: the human has to correct the record before they can address
+the question. So the order is fixed and worth being rigid about: **finish the work, write
+the evidence into the step, move the glyphs and the state node, then ask.**
+
+**If you paused in the middle of a step, the step was too coarse.** Split it where the pause
+fell and let the glyphs sit on either side. A step whose first half is done and second half
+is not cannot be marked, and an unmarkable step is a hole in the tracker — which is what
+"the granularity someone would pause at" means in practice. The split is usually the same
+shape: work that can be checked locally, then the verification that needs something you do
+not control.
 
 **Nowhere else records progress.** No checklist, no status table, no second summary at the
 top. Two trackers drift, and then the plan has to be read twice to find out which half is
 lying. The steps hold detail and evidence; the diagram holds state.
 
-**Update the tracker before handing control back.** Not only as steps land — *before every
-handoff*: a question for the user, a request to approve something, the end of a turn.
-That moment is the one where a session can end without warning, and whatever the tracker
-does not say by then is lost with it. A question asked over a stale tracker also wastes
-the answer: the human has to correct the record before they can address the question.
+#### Keeping it readable
 
-So the order is fixed, and it is worth being rigid about: **finish the work, write the
-evidence into the step, move the glyphs and the state node, then ask.** If a step ended in
-a way that changes the plan — a spike that failed, a decision reopened, a step that turned
-out to be two — amend the plan first as well. The question then arrives on top of a
-document that is true.
-
-**If you paused in the middle of a step, the step was too coarse.** Split it where the
-pause fell, and let the glyphs sit on either side. A step whose first half is done and
-second half is not cannot be marked, and an unmarkable step is a hole in the tracker —
-which is what "steps at the granularity someone would pause at" means in practice. The
-split is usually the same shape: work that can be checked locally, then the verification
-that needs something you do not control — a deploy, a real identity provider, another
-person's review.
-
-The glyph carries the meaning so the diagram survives a dark theme, a grayscale print and
-a colour-blind reader. Colour only repeats what the glyph already said:
-
-```
-classDef done stroke:#4a9d5f,stroke-width:2px,fill:#7f7f7f1a
-classDef next stroke:#d08b28,stroke-width:2px,fill:#7f7f7f1a
-classDef todo stroke-dasharray:4 3
-classDef state stroke:#8a8a8a,stroke-width:1px,fill:#7f7f7f12
-```
-
-Eight-digit hex and translucent fills, for the reasons the `write-diagrams` skill gives.
-
-**Keep it one column.** A tracker is scanned, not studied, and the scan is ruined by width.
-`flowchart TB`, steps chained linearly, and only the gates allowed to branch sideways —
-that is the whole shape. Three things widen it in practice:
+**One column.** A tracker is scanned, not studied, and the scan is ruined by width.
+`flowchart TB`, steps chained linearly, only the gates branching sideways. Three things
+widen it in practice:
 
 - **The state node is connected to nothing, so the layout parks it beside the flow.** Pin
   it above with an invisible edge — `ST ~~~ S01` — and the column starts at the top.
@@ -196,6 +186,16 @@ that is the whole shape. Three things widen it in practice:
   line short; the state node is the usual offender, since it wants to say everything.
 - **`direction` inside a subgraph that is itself an edge endpoint** fights the outer
   layout. Leave it out; the outer `TB` already governs.
+
+Styling repeats what the glyph already said, never replaces it (`write-diagrams` has the
+reasoning, and the eight-digit hex rather than `rgba()`):
+
+```
+classDef done stroke:#4a9d5f,stroke-width:2px,fill:#7f7f7f1a
+classDef next stroke:#d08b28,stroke-width:2px,fill:#7f7f7f1a
+classDef todo stroke-dasharray:4 3
+classDef state stroke:#8a8a8a,stroke-width:1px,fill:#7f7f7f12
+```
 
 **Parse the diagram, do not eyeball it.** Mermaid fails quietly — a broken `classDef` still
 renders, just wrong — and a tracker nobody can read is a tracker nobody updates.
@@ -211,3 +211,4 @@ renders, just wrong — and a tracker nobody can read is a tracker nobody update
 | "The plan says what to do, that is enough to resume" | It says the intent. Which branch, what is uncommitted, what already failed — none of that is in the phases. |
 | "I'll add a checklist at the top as well" | Two trackers drift, and then the reader has to work out which one is lying. The diagram, and nothing else. |
 | "I'll ask the user first, then update the tracker" | The handoff is where the session may end. Ask over a stale tracker and the human spends their answer fixing the record. |
+| "This step is blocked, so it is ✖" | ✖ is abandoned. Blocked is ⏸, it names what it waits on, and the frontier moves to what can proceed meanwhile. |
