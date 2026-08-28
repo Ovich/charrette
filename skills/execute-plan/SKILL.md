@@ -87,6 +87,24 @@ node and its layout). Running the plan is what keeps it true:
   Whatever the tracker does not say by then is lost if the session ends. A question asked
   over a stale tracker wastes the answer: the human corrects the record before addressing
   the question.
+- **The state node has fixed fields, and you overwrite them.** It describes *now*, never how
+  now was arrived at:
+
+  ```
+  📍 state · <date>
+  branch   — <branch> @ <sha>, pushed / not pushed
+  deployed — <where and which version>
+  next     — <the one step to start on>
+  blocked  — <what and on whom, or nothing>
+  parked   — <side work, stashes, environments left behind, or nothing>
+  ```
+
+  The failure this prevents is accretion: a line gets added each time something happens, and
+  within a day the node holds three deployed versions, a fixed bug and a deleted file. Then
+  a resumer has to work out which lines are still true, which is exactly the work the node
+  was supposed to save them. If a line is history, it belongs in the step that produced it.
+  Add a field only when a resumer would genuinely act on it.
+
 - **Deviations are drawn, not narrated.** Work the plan does not list becomes a node
   *before* it is done. An unforeseen dependency becomes an arc, and if it waits on someone
   else, a ⏸ node naming what was asked for and when. A step that dissolves is ✖ with the
@@ -110,3 +128,4 @@ node and its layout). Running the plan is what keeps it true:
 | "They said yes to deploying yesterday" | Outward-facing actions are approved once each, not once forever. |
 | "I'll ask what they want to do" | Bring the options and a recommendation. An open question hands the work back rather than the decision. |
 | "The step is done, I'll write it up later" | Later is after the context is gone. The evidence goes in when it is observed. |
+| "I'll add a line to the state node" | You overwrite its fields. A node you append to becomes a log, and a log of states is not a state. |
