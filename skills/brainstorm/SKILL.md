@@ -201,6 +201,26 @@ it can fail, pause, or need someone else, it is a step. A migration nobody plann
 credential that has to be reissued, a spike to settle an argument — each is a node, even
 when the work itself is twenty minutes.
 
+#### The past is a record, the future is a hypothesis
+
+They are written differently, and a plan that does not distinguish them decays into
+archaeology. **When a step finishes, rewrite it as what happened** — past tense, what was
+actually done, what it found, what that changed. Do not leave the original intent standing
+with evidence appended underneath: two accounts of one step force the reader to diff them
+to learn which parts occurred.
+
+What survives the rewrite: values, versions, commands, and the findings someone would
+otherwise rediscover — including **wrong turns worth keeping**, because a deleted mistake
+invites the next person to repeat it. What goes: the framing that only mattered while the
+step was ahead — *watch out for*, *if this fails*, the order to do things in, options
+weighed and since settled.
+
+Mark the phase heading with the date it completed, so a reader knows before they start
+which half of the document is history.
+
+The test: a stranger reading a finished step should learn what the work *did*, not what
+someone once hoped it would do.
+
 #### Keeping it readable
 
 **One column.** A tracker is scanned, not studied, and the scan is ruined by width.
@@ -241,3 +261,4 @@ renders, just wrong — and a tracker nobody can read is a tracker nobody update
 | "This step is blocked, so it is ✖" | ✖ is abandoned. Blocked is ⏸, it names what it waits on, and the frontier moves to what can proceed meanwhile. |
 | "I'll add the step to the plan once it works" | Then the plan was wrong while the risky part happened, which is the window where someone else picks it up. Draw it, then do it. |
 | "The plan didn't predict this, so the plan was wrong" | Plans are hypotheses. The tracker is where reality is recorded — a diagram that never changed is one nobody was using. |
+| "Keep the step as written and add a note on how it went" | Now there are two accounts of one step and the reader has to diff them. Rewrite the step; keep the wrong turns that teach something. |
