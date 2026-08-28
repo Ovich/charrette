@@ -149,77 +149,18 @@ error you stopped in the middle of.
 That node is what makes the plan **pausable**. A step can be abandoned mid-flight as long
 as the diagram says where the work sat when it stopped.
 
-#### When it gets written
+#### Running it is another skill's job
 
-**Tick as you go, never in a batch at the end.** A node turns ✅ only when its own done-when
-is met; the evidence — what was observed, not "worked" — goes into the step's prose. A
-tracker updated once at the end of a session was wrong for the whole session, and a stale
-diagram is worse than none: it is confidently misleading.
+Everything about *executing* this plan — how much to do without asking, when to stop, how
+the tracker is kept true while the work happens, and what to do when reality departs from
+it — belongs to the `execute-plan` skill (`../execute-plan/SKILL.md` in this collection).
+Author the tracker here; that skill runs it — and it will refuse a plan without one, because
+a plan that cannot record progress cannot be resumed by whoever picks it up.
 
-**And always before handing control back** — a question for the user, a request to approve
-something, the end of a turn. That moment is where a session can end without warning, and
-whatever the tracker does not say by then is lost with it. A question asked over a stale
-tracker also wastes the answer: the human has to correct the record before they can address
-the question. So the order is fixed and worth being rigid about: **finish the work, write
-the evidence into the step, move the glyphs and the state node, then ask.**
-
-**If you paused in the middle of a step, the step was too coarse.** Split it where the pause
-fell and let the glyphs sit on either side. A step whose first half is done and second half
-is not cannot be marked, and an unmarkable step is a hole in the tracker — which is what
-"the granularity someone would pause at" means in practice. The split is usually the same
-shape: work that can be checked locally, then the verification that needs something you do
-not control.
-
-**Nowhere else records progress.** No checklist, no status table, no second summary at the
-top. Two trackers drift, and then the plan has to be read twice to find out which half is
-lying. The steps hold detail and evidence; the diagram holds state.
-
-#### When reality departs from the plan
-
-A plan is a hypothesis about the work. Doing the work discovers steps it never had,
-dependencies it did not know about, and steps that turn out to be unnecessary. Each of
-those is a change to the diagram, and **the diagram is changed before the work, not
-written up after it**:
-
-- **Work the plan does not list → add a node, then do it.** The moment you notice you are
-  about to do something with no node, draw it. A session that dies halfway through
-  undrawn work leaves a plan that does not know the work exists — and that is exactly
-  when someone else picks it up.
-- **A dependency you did not know about → add the arc.** If the thing being waited on is
-  outside your control, it gets its own ⏸ node naming what was asked for and when.
-- **A step that dissolves → ✖ with the reason, never deleted.** A deleted step reads as
-  one that was never considered, and the next person re-proposes it.
-- **A gate that got answered → show which branch was taken**, so the route through the
-  diagram is the route the work actually took.
-
-**Number insertions, do not renumber.** A discovered step between 0.2 and 0.3 is `0.2b`.
-Renumbering looks tidier for exactly as long as it takes to notice that the spec, the
-board and three commit messages all cite the old numbers.
-
-The test for whether a discovery deserves a node is not its size but its failure modes: if
-it can fail, pause, or need someone else, it is a step. A migration nobody planned, a
-credential that has to be reissued, a spike to settle an argument — each is a node, even
-when the work itself is twenty minutes.
-
-#### The past is a record, the future is a hypothesis
-
-They are written differently, and a plan that does not distinguish them decays into
-archaeology. **When a step finishes, rewrite it as what happened** — past tense, what was
-actually done, what it found, what that changed. Do not leave the original intent standing
-with evidence appended underneath: two accounts of one step force the reader to diff them
-to learn which parts occurred.
-
-What survives the rewrite: values, versions, commands, and the findings someone would
-otherwise rediscover — including **wrong turns worth keeping**, because a deleted mistake
-invites the next person to repeat it. What goes: the framing that only mattered while the
-step was ahead — *watch out for*, *if this fails*, the order to do things in, options
-weighed and since settled.
-
-Mark the phase heading with the date it completed, so a reader knows before they start
-which half of the document is history.
-
-The test: a stranger reading a finished step should learn what the work *did*, not what
-someone once hoped it would do.
+Two rules matter while authoring, because they shape what you draw: **one ▶ at a time**,
+and **steps at the granularity someone would pause at**. A step whose first half can finish
+while the second waits on someone else is two steps, and drawing it as one guarantees a
+hole in the tracker the day it happens.
 
 #### Keeping it readable
 
@@ -254,11 +195,7 @@ renders, just wrong — and a tracker nobody can read is a tracker nobody update
 | "This is simple, I'll just build it" | The gate applies to every project. Simple ones are where wrong assumptions hide. |
 | "The user knows what they want" | They know the outcome. The boundaries are what you're for. |
 | "Let me scaffold while we talk" | Files created before approval get defended instead of discarded. |
-| "I'll update the tracker when the phase is done" | Then it was wrong for the whole phase. Tick each step as it lands, or the block misleads the next session. |
 | "The plan says what to do, that is enough to resume" | It says the intent. Which branch, what is uncommitted, what already failed — none of that is in the phases. |
 | "I'll add a checklist at the top as well" | Two trackers drift, and then the reader has to work out which one is lying. The diagram, and nothing else. |
-| "I'll ask the user first, then update the tracker" | The handoff is where the session may end. Ask over a stale tracker and the human spends their answer fixing the record. |
 | "This step is blocked, so it is ✖" | ✖ is abandoned. Blocked is ⏸, it names what it waits on, and the frontier moves to what can proceed meanwhile. |
-| "I'll add the step to the plan once it works" | Then the plan was wrong while the risky part happened, which is the window where someone else picks it up. Draw it, then do it. |
 | "The plan didn't predict this, so the plan was wrong" | Plans are hypotheses. The tracker is where reality is recorded — a diagram that never changed is one nobody was using. |
-| "Keep the step as written and add a note on how it went" | Now there are two accounts of one step and the reader has to diff them. Rewrite the step; keep the wrong turns that teach something. |
