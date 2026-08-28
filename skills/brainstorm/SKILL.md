@@ -174,6 +174,33 @@ not control.
 top. Two trackers drift, and then the plan has to be read twice to find out which half is
 lying. The steps hold detail and evidence; the diagram holds state.
 
+#### When reality departs from the plan
+
+A plan is a hypothesis about the work. Doing the work discovers steps it never had,
+dependencies it did not know about, and steps that turn out to be unnecessary. Each of
+those is a change to the diagram, and **the diagram is changed before the work, not
+written up after it**:
+
+- **Work the plan does not list → add a node, then do it.** The moment you notice you are
+  about to do something with no node, draw it. A session that dies halfway through
+  undrawn work leaves a plan that does not know the work exists — and that is exactly
+  when someone else picks it up.
+- **A dependency you did not know about → add the arc.** If the thing being waited on is
+  outside your control, it gets its own ⏸ node naming what was asked for and when.
+- **A step that dissolves → ✖ with the reason, never deleted.** A deleted step reads as
+  one that was never considered, and the next person re-proposes it.
+- **A gate that got answered → show which branch was taken**, so the route through the
+  diagram is the route the work actually took.
+
+**Number insertions, do not renumber.** A discovered step between 0.2 and 0.3 is `0.2b`.
+Renumbering looks tidier for exactly as long as it takes to notice that the spec, the
+board and three commit messages all cite the old numbers.
+
+The test for whether a discovery deserves a node is not its size but its failure modes: if
+it can fail, pause, or need someone else, it is a step. A migration nobody planned, a
+credential that has to be reissued, a spike to settle an argument — each is a node, even
+when the work itself is twenty minutes.
+
 #### Keeping it readable
 
 **One column.** A tracker is scanned, not studied, and the scan is ruined by width.
@@ -212,3 +239,5 @@ renders, just wrong — and a tracker nobody can read is a tracker nobody update
 | "I'll add a checklist at the top as well" | Two trackers drift, and then the reader has to work out which one is lying. The diagram, and nothing else. |
 | "I'll ask the user first, then update the tracker" | The handoff is where the session may end. Ask over a stale tracker and the human spends their answer fixing the record. |
 | "This step is blocked, so it is ✖" | ✖ is abandoned. Blocked is ⏸, it names what it waits on, and the frontier moves to what can proceed meanwhile. |
+| "I'll add the step to the plan once it works" | Then the plan was wrong while the risky part happened, which is the window where someone else picks it up. Draw it, then do it. |
+| "The plan didn't predict this, so the plan was wrong" | Plans are hypotheses. The tracker is where reality is recorded — a diagram that never changed is one nobody was using. |
