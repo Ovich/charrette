@@ -55,6 +55,18 @@ Mermaid in fenced ```mermaid blocks, so it renders in aiview and on any git host
 no tooling. For C4-style diagrams use `flowchart` with C4 conventions (`classDef` for
 person / system / external): Mermaid's native `C4Context` blocks render inconsistently.
 
+Two mechanics that bite every styled diagram. **Colours as eight-digit hex, never
+`rgba(...)`**: a `classDef`'s properties are comma-separated, so the commas inside an
+`rgba()` split the colour into fragments and the definition fails — usually silently, the
+diagram still rendering, just wrong. And **translucent over opaque** (`#7f7f7f1a`), because
+a page is read in whatever theme the reader has: a translucent fill darkens a light
+background and lightens a dark one, where an opaque light fill burns a white slab into a
+dark page. Where the styling carries meaning, put that meaning in the label too — a glyph,
+a word — so it survives grayscale, dark mode and a colour-blind reader.
+
+**Parse the block, don't eyeball it.** Mermaid fails quietly, and a diagram nobody can read
+is a diagram nobody updates.
+
 ## Contract for calling skills
 
 A skill that wants diagrams says: *"Diagrams: use the `write-diagrams` skill
