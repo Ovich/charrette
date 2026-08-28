@@ -6,6 +6,11 @@
 # It does not decide to release; it records one that already happened.
 #
 # Equivalent to `claude plugin tag --push`, minus the CLI. See RELEASING.md.
+#
+# It also runs on demand, for the cases the push trigger cannot cover: a bump that
+# landed before this workflow existed, a tag deleted by hand, or a release whose run
+# failed for a reason since fixed. Manual runs tag whatever the checked-out ref
+# declares, so they are refused anywhere but main.
 
 name: tag release
 
@@ -15,6 +20,7 @@ on:
     paths:
       - .claude-plugin/plugin.json
       - .claude-plugin/marketplace.json
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -26,6 +32,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # tags, so an already-released version is a no-op rather than a failure
+
+      - name: Refuse a manual run off main
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Dispatched on ${{ github.ref }}. A release tag names what users install, and that is main — re-run this from main."
+          exit 1
 
       - name: Read and agree the declared versions
         id: version
