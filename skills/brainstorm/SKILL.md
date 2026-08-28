@@ -154,6 +154,26 @@ leaving intent and reality disagreeing.
 top. Two trackers drift, and then the plan has to be read twice to find out which half is
 lying. The steps hold detail and evidence; the diagram holds state.
 
+**Update the tracker before handing control back.** Not only as steps land — *before every
+handoff*: a question for the user, a request to approve something, the end of a turn.
+That moment is the one where a session can end without warning, and whatever the tracker
+does not say by then is lost with it. A question asked over a stale tracker also wastes
+the answer: the human has to correct the record before they can address the question.
+
+So the order is fixed, and it is worth being rigid about: **finish the work, write the
+evidence into the step, move the glyphs and the state node, then ask.** If a step ended in
+a way that changes the plan — a spike that failed, a decision reopened, a step that turned
+out to be two — amend the plan first as well. The question then arrives on top of a
+document that is true.
+
+**If you paused in the middle of a step, the step was too coarse.** Split it where the
+pause fell, and let the glyphs sit on either side. A step whose first half is done and
+second half is not cannot be marked, and an unmarkable step is a hole in the tracker —
+which is what "steps at the granularity someone would pause at" means in practice. The
+split is usually the same shape: work that can be checked locally, then the verification
+that needs something you do not control — a deploy, a real identity provider, another
+person's review.
+
 The glyph carries the meaning so the diagram survives a dark theme, a grayscale print and
 a colour-blind reader. Colour only repeats what the glyph already said:
 
@@ -190,3 +210,4 @@ renders, just wrong — and a tracker nobody can read is a tracker nobody update
 | "I'll update the tracker when the phase is done" | Then it was wrong for the whole phase. Tick each step as it lands, or the block misleads the next session. |
 | "The plan says what to do, that is enough to resume" | It says the intent. Which branch, what is uncommitted, what already failed — none of that is in the phases. |
 | "I'll add a checklist at the top as well" | Two trackers drift, and then the reader has to work out which one is lying. The diagram, and nothing else. |
+| "I'll ask the user first, then update the tracker" | The handoff is where the session may end. Ask over a stale tracker and the human spends their answer fixing the record. |
