@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "charrette",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "source": "./",
       "description": "Agent skills for the drawing-board loop: brainstorm, diagram, spec, plan, review, with a live local document viewer."
     }

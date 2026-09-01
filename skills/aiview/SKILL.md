@@ -206,7 +206,7 @@ above all when you fan out to subagents. Add one card per agent as you dispatch 
 and close it when its result lands:
 
 ```sh
-ID=$($A pending add "#37" --label "Blast-radius axis" \
+ID=$($A pending add "#37" --label "L4 Integration" \
        --note "what breaks around the change — callers, consumers, migrations" --json)
 # ... the agent runs, you write its section into the document ...
 $A pending done "#<id from the json above>"

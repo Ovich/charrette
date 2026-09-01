@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: Use when reviewing a pull request, branch, or diff in any language: to produce a PR analysis the author's reviewer can decide from: what changed, why, how the structure moved (drawn), what it can break, and the decisions only a human can make. Describes and maps the change first; findings second. Not a bug hunt (the harness's own review does that) and not framework-specific review.
+description: Use when reviewing a pull request, branch, or diff in any language: to produce a PR analysis the author's reviewer can decide from: what changed, why, how the structure moved (drawn), what it can break, and the decisions only a human can make. Reviews at five altitudes — code primitives, code structure, data model, integration, delivery-and-intent — each a disjoint subagent, dispatched by what the diff contains. Design lenses (DRY, SOLID, cohesion, coupling) are built in. Not a bug hunt (the harness's own review does that) and not framework-specific review.
 ---
 
 # PR review
@@ -10,7 +10,9 @@ which questions to send back. Most review tools emit findings and leave the deci
 context in the reviewer's head. This skill produces the context: a **PR analysis
 document** that describes the change, draws how the structure moved, names the blast
 radius, and lists the decision points, then attaches findings, each citing its
-source. Stack-agnostic: it reads diffs and repo docs, not framework knowledge.
+source. It reviews in **layers**: independent subagents, each reading the change at
+one altitude, dispatched only where the diff gives them material. Stack-agnostic: it
+reads diffs and repo docs, not framework knowledge.
 
 ## Scope (explicit, refused when broken)
 
@@ -24,46 +26,92 @@ working tree is dirty. Skip vendored, generated, build, and lockfile paths.
 
 **Resolve the diff and the search base to the same revision.** Reviewing by PR number
 needs no checkout, so the working tree stays on whatever branch it was on, and every
-blast-radius search then runs against code that does not contain the PR: cited
+integration search then runs against code that does not contain the PR: cited
 `file:line`, confidently wrong. Check out the PR's head, or say plainly that the blast
 radius was not repo-verified.
 
-**Then read the repo's own conventions, before the axes run**: `AGENTS.md`, `CLAUDE.md`,
-architecture docs, and `project-conventions` (`../project-conventions/SKILL.md` in this
-collection) where its rules apply. This is what the stack-agnostic claim rests on. It
-separates *violates a house rule* (a finding) from *unusual but unruled* (a decision
-point), and it is usually how you learn that a consumer of this change lives in another
-repository entirely.
+**Then read the repo's own conventions, before anything is dispatched**: `AGENTS.md`,
+`CLAUDE.md`, architecture docs, and `project-conventions`
+(`../project-conventions/SKILL.md` in this collection) where its rules apply. This is
+what the stack-agnostic claim rests on. It separates *violates a house rule* (a
+finding) from *unusual but unruled* (a decision point), and it is usually how you
+learn that a consumer of this change lives in another repository entirely.
 
-## Depth: the reviewer opts in, before anything runs
+## The five layers
 
-The two axes in § Findings are the review and always run. **Everything deeper is opt-in,
-and the human opts in.** Ask once — after the diff resolves, before any agent is
-dispatched. That order matters: by then you can describe what this change would gain
-rather than read out a menu, and nothing has been spent on a depth nobody wanted.
+Each layer reads the change at one altitude. Two always run; three run when the diff
+gives them material. **The diff decides — there is no opt-in question to the human**,
+and every layer that does not run is recorded, with its reason, in the analysis and
+in the verdict. A reader takes silence for coverage; a recorded skip is the
+difference between *not checked* and *checked and clean*.
 
-Put the choice as three things per option: what it would look at here, what it costs,
-and what it would miss if skipped. Then a recommendation, because you have read the diff
-and they have not.
+| Layer | Altitude | Owns | Dispatched when |
+|---|---|---|---|
+| **L1 Code Primitives** | how code is written | classes, types, functions, individual lines; DRY and SOLID; races visible in a function body; test code quality | **always** |
+| **L2 Code Structure** | how code is organised | directories, modules, files; placement and naming; cohesion and coupling; test file placement | **always** |
+| **L3 Data** | the data model | schema, ORM mappings, tables, migration files as artifacts | schema, ORM or migration files are in the diff |
+| **L4 Integration** | how the change lands | blast radius: callers, consumers, contracts, other repos, config, deploy needs, migration execution order | the diff changes a surface something else consumes |
+| **L5 Delivery & Intent** | why the change exists | stated intent vs the diff, feature completeness, scope creep, documentation, coverage of the stated behaviour | the PR states an intent — description, linked issue, commit messages |
 
-- **`code-design-review`** (`../code-design-review/SKILL.md` in this collection) — DRY,
-  SOLID, cohesion, coupling: whether this change will cost someone later.
-  **Say the price out loud: it dispatches one subagent per lens, four of them, so it
-  roughly triples what the review would otherwise spend, and it is minutes of wall
-  clock, not seconds.** Worth it on a change that sets a pattern others will copy;
-  rarely worth it on a fix that touches three lines.
-- **`frontend-review`** (`../frontend-review/SKILL.md`) — only on a project it
-  declares support for, and only when the diff has frontend in it. Usually the answer is
-  *not applicable*, which you say rather than leave out.
-- **A correctness bug hunt** — the harness's own review, where the harness has one. Not
-  optional in the sense the others are: if nothing runs it, nobody is checking whether
-  the code works, and the verdict has to say so.
+A PR with no stated intent skips L5 entirely: *"L5: not run — no stated intent."*
+Never infer an intent so the layer has something to check against; the layer would
+then be checking the code against itself.
 
-Four rules. Ask **once**, batched — one decision, not a question per skill. Name what
-does not apply **and why**, in a clause, so the reviewer can see it was considered rather
-than forgotten. **Never start a chained skill without an explicit yes** — silence is a
-no. And when the answer is no, that is a fine answer: record it and move on, because a
-review that ran two axes and says so beats one that ran five and buried the verdict.
+The design lenses live here, not in a chained skill: DRY and SOLID are L1's, cohesion
+and coupling are L2's. This skill **no longer chains `code-design-review`** — its
+ground is covered by the always-on layers. The standalone skill remains for reviewing
+existing code outside a PR.
+
+Cost follows the diff: the floor is two agents, the ceiling five, a typical review
+three or four. No layer is bought by a human; none is skipped silently.
+
+```mermaid
+flowchart TB
+    O[Orchestrator<br/>reads diff · triages · settles seams · briefs · merges]
+    O ==> L1[L1 Code Primitives — always]
+    O ==> L2[L2 Code Structure — always]
+    O -.->|schema in diff| L3[L3 Data]
+    O -.->|consumed surface changed| L4[L4 Integration]
+    O -.->|stated intent exists| L5[L5 Delivery & Intent]
+    L1 --> AN[pr-analysis: frame + stamped layer returns]
+    L2 --> AN
+    L3 --> AN
+    L4 --> AN
+    L5 --> AN
+    AN --> RP[pr-report: verdict one line per layer]
+```
+
+## Jurisdiction: who owns a question
+
+Two agents that cannot see each other, given the same question, both answer it in
+full. The cost is not one duplicated file read: it is one agent's entire
+investigation run twice. So jurisdiction is settled **before** dispatch, by one rule
+and one table, and **no two agents in a review ever hold the same question** — that
+holds between layers and inside one, if a layer is ever split.
+
+**The altitude rule.** A layer owns the questions answerable at its altitude without
+descending. L2 never reads function bodies; L1 never reasons about deployment; L3
+reads the model, not the code that queries it.
+
+**The seam table** — the known cases where altitudes touch:
+
+| Seam | Owner | Why |
+|---|---|---|
+| Function in the wrong module | L2 | Placement is organisation |
+| Type mirroring a DB column | L3 | The schema is the truth |
+| Consumers in another repo | L4 | Blast radius owns reach |
+| Race inside a function body | L1 | Visible at line altitude |
+| Migration deploy/execution order | L4 | A deploy question, not a model question |
+| Coverage of the stated behaviour | L5 | An intent question |
+| README, catalogs, discovery surfaces | L4 | They are consumed surfaces; L5 checks claims against the code, not the catalog |
+| Duplicated content within one file / between files | L1 / L2 | Same evidence, two altitudes — split it before both agents find it |
+| Test code quality / test placement | L1 / L2 | Tests are just code at those altitudes |
+| Big file: real change or churn? | You, before dispatch | Established once, handed to every brief as fact |
+
+A seam the table does not list is yours to assign before dispatch, and the winning
+brief says it was assigned. A defect that genuinely spans altitudes — a transaction
+bug touching code, model and deploy — comes back as facets, one per layer, and joins
+into one finding at merge, citing every contributing return.
 
 ## Two documents, two readers
 
@@ -72,7 +120,7 @@ never in the repo under review), both registered through the `aiview` skill
 (`../aiview/SKILL.md` in this collection) and both joined to the **same
 group** (`pr-<id>`), so they sit together in the sidebar. Each links the other.
 
-| | `YYYY-MM-DD-pr-<id>.pr-report.md` | `YYYY-MM-DD-pr-<id>.pr-analysis.md` |
+| | `YYYY-MM-DD-pr-<id>.report.md` | `YYYY-MM-DD-pr-<id>.pr-analysis.md` |
 |---|---|---|
 | Reader | the human deciding whether to merge | the next agent — and the human asking *"why does it say that?"* |
 | Life | read once, now | consulted on demand, and by whoever picks this up later |
@@ -86,24 +134,24 @@ applied one level up. Tell the user the **report's** URL; they reach the analysi
 the group, or from the link.
 
 Write both from the start. The report's Abstract, What changed and diagram are
-knowable before any axis returns, so publish them immediately and carry one
-`aiview pending` card per running axis on the report — that is the document the
+knowable before any layer returns, so publish them immediately and carry one
+`aiview pending` card per dispatched layer on the report — that is the document the
 developer has open while they wait. The cards sit above the content and vanish as each
-axis lands, replaced by the section it produced.
+layer lands, replaced by the section it produced.
 
 **Stamp what an agent produced.** A section written from a subagent's return carries a
-one-line attribution under its heading, naming the axis and what you did to its output
+one-line attribution under its heading, naming the layer and what you did to its output
 before believing it:
 
-> *From the blast-radius axis. Merged, deduplicated, and every citation re-read before
+> *From L4 Integration. Merged, deduplicated, and every citation re-read before
 > inclusion.*
 
 Two reasons, and the second is the one that bites. It tells a later reader which prose
 is your own synthesis and which came from an unattended worker — the card that
 announced it is gone by then, and nothing else records it. And it forces you to state
 the treatment, which is the difference between *an agent said this* and *I checked
-this*: an axis in this very skill has raised a confident, well-argued finding that a
-second axis then refuted. Attribution is provenance, never endorsement. Sections you
+this*: layers in this very skill have raised confident, well-argued findings that
+another layer then refuted. Attribution is provenance, never endorsement. Sections you
 wrote yourself carry no stamp; absence is the default and means exactly that.
 
 ### The report
@@ -122,8 +170,10 @@ understanding the change; the cure is a sharper Abstract, not a smaller font.
 3. **What you have to decide**: one line per open decision — the question, and what
    the diff currently chooses. The trade-offs and alternatives live in the analysis.
    This section is the skill's whole thesis, so it is never the one you cut.
-4. **Verdict**: one line per axis (worst issue), the open-decision count, and what this
-   review did **not** cover. A reader takes silence for coverage.
+4. **Verdict**: **one line per layer** — `L<n> <name>: <worst issue | clean | not run
+   — reason>` — then the open-decision count, and what this review did **not** cover;
+   correctness gets its line whether or not anything ran it. A reader takes silence
+   for coverage.
 5. **Proposed comment**: the whole review condensed into a PR comment the reviewer can
    post as-is *if they agree*. In a fenced markdown block, so it copy-pastes raw.
    Contents: the recommendation on the first line (**Approve** / **Approve with
@@ -131,12 +181,12 @@ understanding the change; the cure is a sharper Abstract, not a smaller font.
    (one sentence), the must-address items, the open questions, genuine appreciation
    where earned. Rules: written in the PR's own language (title/description/commits set
    it); every claim traceable to a section above (the comment introduces nothing new);
-   questions phrased as questions, not verdicts.
-   Recommendation mapping: blocking finding on either axis **or in any linked report**
+   questions phrased as questions, not verdicts; **it says which layers ran**, so an
+   Approve cannot imply coverage that never happened.
+   Recommendation mapping: blocking finding on any layer **or in any linked report**
    → Request changes; nothing blocking but open decisions or non-blocking findings →
-   Approve with comments; clean on every axis that ran, with no open decisions →
-   Approve. The comment says which axes ran, so an Approve cannot imply coverage that
-   never happened.
+   Approve with comments; clean on every layer that ran, with no open decisions →
+   Approve.
 
 **Voice.** Write it with the `technical-writing` skill
 (`../technical-writing/SKILL.md` in this collection), in **Fred Brooks's register**:
@@ -166,37 +216,27 @@ Sections, in reading order:
 2. **Intent**: what the PR claims, from its description, linked issue and commit
    messages. Quote, do not paraphrase. No stated intent → say "no stated intent", never
    infer one and present it as theirs.
-3. **What actually changed**: prose per area (not per file), sized to the change. A
-   files-touched table when it adds orientation.
+3. **What actually changed**: prose per area (not per file), sized to the change; a
+   files-touched table when it adds orientation. **And the triage record**: which
+   layers ran, which did not, and why — the dispatch decision is evidence too.
 4. **Diagrams** that support a specific finding (§ Diagrams).
-5. **Blast radius**: what depends on the changed surface: callers of changed
-   signatures, consumers of changed contracts/schemas/events, configs and migrations
-   that must accompany the change, behavior changes observable by users. Those are
-   places to look; the test is what makes them findings. For each dependent found, ask
-   *does it still work, unchanged, once this merges?* Report the ones where the answer
-   is **no**, and the ones where it **cannot be established** — an unverifiable
-   dependent is a finding, not a pass. Whether a behavior change is a fix or a
-   regression is not this section's call: surface it, and let Decision points hold it.
-   Verified by searching the code, not assumed from the diff — and **the search does
-   not stop at the repo under review**: the consumer in another repo or another service
-   is the one the diff can never show you.
-   Then ask what the system **already does about it**. A change that looks destructive
-   is often repaired by something that re-runs: a full rebuild, a scheduled job, a
-   retry, a reconciliation pass. Read the recovery path before pricing the damage. What
-   survives is the case that path misses — the persistent failure rather than the
-   transient one, the window before it next runs, the state nothing re-derives.
+5. **Layer returns**: one section per dispatched layer, attribution-stamped, holding
+   that layer's verified evidence; a skipped layer's slot holds the one-line skip and
+   its reason. This is where a later reader checks what a layer actually said, before
+   the merge shaped it.
 6. **Decision points**: each stated as the trade-off, what the diff currently chooses,
    and the alternative. Scope creep beyond the stated intent lands here, as do
    irreversible choices (schema migrations, API contract changes, dropped
    compatibility). Each one traces to the diff or to a repo doc: this section carries no
    citations, so it is the easiest place for the session's own opinion to enter
    unchallenged.
-7. **Findings** (§ Findings), grouped so the reader can tell at a glance what this PR
-   introduced from what it merely stands next to: *introduced by this PR*,
-   *pre-existing* (noted, never counted against the change), and *checked and clear* —
-   the claims that were raised and did not survive verification, with the reason. That
-   last group is what stops a reviewer re-raising settled ground, and it is why the
-   analysis is worth keeping after the merge.
+7. **Findings**, merged across layers, each tagged with its source layer and grouped
+   so the reader can tell at a glance what this PR introduced from what it merely
+   stands next to: *introduced by this PR*, *pre-existing* (noted, never counted
+   against the change), and *checked and clear* — the claims that were raised and did
+   not survive verification, with the reason. That last group is what stops a reviewer
+   re-raising settled ground, and it is why the analysis is worth keeping after the
+   merge.
 
 ## Diagrams
 
@@ -223,52 +263,30 @@ One diagram per question a reviewer would actually ask; a big PR usually earns 2
 across both documents, a small one often only the change map, and a trivial one none
 (then say so).
 
-## Findings
+## Running the layers
 
-Write the document first and publish it while the axes run: the reader gets the
-change described and drawn without waiting. Add one `aiview pending` card per axis as
-you dispatch it, and close it when its findings land — a document that is deliberately
-incomplete has to say so, and say what is still coming.
+Triage first, in this session: read the diff, decide which of L3–L5 have material,
+settle every seam the review will meet, and establish the shared facts. Then publish
+both documents — the reader gets the change described and drawn without waiting — with
+one `aiview pending` card per dispatched layer, closed as each return lands.
 
-Two axes, run as **independent fresh-context subagents**: each gets only the diff,
-its brief, and the output contract; no conversation history, no opinion of the
+Each dispatched layer is an **independent fresh-context subagent**: it gets only the
+diff, its brief, and the output contract; no conversation history, no opinion of the
 change inherited from this session, and the explicit instruction: *"Do not invoke
 skills or spawn agents: review directly."*
 
-- **Intent axis**: does the diff do what the PR says? Missing or partial pieces,
-  scope creep, requirements implemented differently than stated. Every finding
-  quotes the intent line it checks against. No stated intent → this axis reports
-  only scope observations, flagged as such.
-- **Blast-radius axis**: what breaks around the change: call sites not updated,
-  contracts changed without their consumers, migrations without rollback, config
-  the deploy needs. Every finding cites the file:line of the evidence, both sides.
+### The brief
 
-### The briefs are disjoint by construction
-
-Two agents that cannot see each other, given the same question, both answer it in
-full. The cost is not one duplicated file read: it is one agent's entire investigation
-run twice, and each tool call is an inference pass over a context that keeps growing.
-Settle jurisdiction **before** dispatching:
-
-| The question | Owner |
-|---|---|
-| Does the diff deliver what the PR says? Missing pieces, scope, TODOs left behind | Intent |
-| Whether the new behavior is covered by a test | Intent |
-| Callers, consumers, contracts, other repos | Blast radius |
-| Migrations, schema, config, what the deploy needs | Blast radius |
-| Whether a changed behavior is reachable, and by whom | Blast radius |
-| Whether a big file is real change or re-encoding churn | **Neither** — you, before dispatch |
-
-**A brief contains exactly four things, in this order:** where to read the diff; that
-axis's jurisdiction from the table; the facts you have already established, given as
-facts; the output contract.
+**A brief contains exactly four things, in this order:** where to read the diff; the
+layer's jurisdiction — its row of the layer table, plus any seam assigned to it; the
+facts you have already established, given as facts; the output contract.
 
 The third slot is what saves the most time, and it is the one most often left empty.
-Anything both axes would otherwise derive independently — the merge-base, which branch
+Anything two layers would otherwise derive independently — the merge-base, which branch
 the sibling repos are on, whether a 300-line fixture diff is two real lines under an
 encoding rewrite — **you establish once and hand over as a stated fact.** A
-normalize-and-diff that costs you twenty seconds costs an agent minutes, and you are
-paying for it twice.
+normalize-and-diff that costs you twenty seconds costs an agent minutes, and with five
+agents you would be paying for it five times.
 
 **A brief names a surface, not a suspicion.** *"Check the FK on the new collection table
 against how the sync deletes its parent"* is a surface. *"This is the highest-value thing
@@ -276,8 +294,19 @@ in the diff"* is your hypothesis, and an agent handed a hypothesis spends its bu
 confirming it — including when it is wrong, which is exactly when you needed the budget
 spent elsewhere.
 
-Sizing follows from this: if a brief has more numbered surfaces than the axis has
-jurisdiction for, it is two agents' work in one and will run like it.
+Sizing follows from this: a brief with more numbered surfaces than its layer has
+jurisdiction for is two agents' work in one and will run like it. Splitting a layer is
+allowed — on a huge diff, L1 by area, say — but the sub-briefs obey the same
+disjointness rule as everything else.
+
+### The return
+
+A layer reports **evidence and consequence, never severity**: ranking needs the whole
+picture, and a layer has only its own altitude. Every finding cites the `file:line` of
+the evidence, both sides where there are two. *"Nothing in jurisdiction"* is a valid
+return and is recorded as such. Expect one layer to raise what another refutes — that
+is the design working, and the refutation is worth as much as the finding: it becomes
+a *checked and clear* entry.
 
 **Separate what this PR introduces from what it inherits.** A defect that predates the
 branch is noted, attributed as pre-existing, and told to the author — it is never a
@@ -286,30 +315,50 @@ hostage to the state of the code it landed in is how review stops being useful. 
 which it is for every finding: the diff answers it, and *"this PR does not create the
 exposure, it increases it"* is a third, honest answer that belongs in Decision points.
 
-An axis reports **evidence and consequence, never severity**: ranking needs the whole
-picture, and an axis has only its own. Expect one axis to raise what another refutes —
-that is the design working, and the refutation is worth as much as the finding.
+L4's search does not stop at the repo under review: the consumer in another repo or
+another service is the one the diff can never show you, and the repo docs say where to
+look. Then ask what the system **already does about it**. A change that looks
+destructive is often repaired by something that re-runs: a full rebuild, a scheduled
+job, a retry, a reconciliation pass. Read the recovery path before pricing the damage.
+What survives is the case that path misses — the persistent failure rather than the
+transient one, the window before it next runs, the state nothing re-derives.
 
-Then merge: dedup, rank by cost, drop anything the project's own linter/CI already
-flags. **Blast radius (§5) is written from the blast-radius axis's return**; where the
-axis cites evidence and the section disagrees, the citation wins. Findings are
+### The merge
+
+Then merge, in this session: dedup, rank by cost, drop anything the project's own
+linter/CI already flags. A finding outside its layer's jurisdiction is dropped from
+that return — if it matters, it is re-verified under the owning layer's ground and
+attributed honestly. A finding that implicates a skipped layer's ground reopens the
+triage: say so, and either dispatch the layer or record why not. Findings are
 hypotheses until the citation is read — re-verify the ones that carry the verdict
 yourself, because a well-argued wrong finding reaches the author in your name.
 
-Deeper axes are chained rather than duplicated here, and only with the reviewer's yes
-(§ Depth). Link their reports from the analysis document rather than inlining.
+## Beyond the layers
 
-**However it was decided, the document records it** — *"Chained: code-design-review
-(link). frontend-review not run: no frontend in the diff. Correctness: not covered."*
-Left implicit, the default is silently *none*, and a review that never looked at design
-or correctness reads exactly like one that looked and found nothing.
+- **A correctness bug hunt** — the harness's own review, where the harness has one.
+  The layers do not run one: if nothing does, nobody is checking whether the code
+  works, and the verdict has to say so, every time.
+- **`frontend-review`** (`../frontend-review/SKILL.md`) — chained, opt-in, only on a
+  project it declares support for and only when the diff has frontend in it. Never
+  started without an explicit yes; usually the answer is *not applicable*, which you
+  say rather than leave out.
+
+**However it was decided, the document records it** — *"Chained: frontend-review
+(link). Correctness: not covered."* Left implicit, the default is silently *none*, and
+a review that never looked reads exactly like one that looked and found nothing.
 
 ## Red flags
 
 | Thought | Reality |
 |---|---|
-| "I'll infer the intent from the code" | Then the Intent axis checks the code against itself. No stated intent → say so. |
-| "One overall score for the PR" | A blended verdict hides the failing axis. Per-axis worst issue + open decisions. |
+| "I'll infer the intent from the code" | Then L5 checks the code against itself. No stated intent → L5 is skipped, and the verdict says so. |
+| "This layer probably has nothing" | The triage test decides, not the hunch — and either way the verdict records it. |
+| "The L1 agent also flagged a schema issue, bonus" | Out of its jurisdiction. Drop it from the return; re-verify it under L3's ground if it matters. |
+| "L1 can check the module layout while it's in there" | The altitude rule exists so investigations don't run twice. Placement is L2's. |
+| "This matters, so I'll ask two layers to check it" | Then it is investigated twice, in full, by agents who cannot see each other. Every question has one owner; the seam table or you, before dispatch. |
+| "I'll mention what I suspect so the layer looks there" | It will look there, and it will come back with your suspicion — right or wrong. Name the surface, keep the hypothesis. |
+| "The layer can work out the merge-base itself" | It can, and so can four others, and you already know it. Established facts go in the brief. |
+| "One overall score for the PR" | A blended verdict hides the failing layer. One line per layer + open decisions. |
 | "The diff shows what changed" | The diff shows lines. The change map and blast radius are what the reviewer lacks. |
 | "I reviewed it in the session that wrote it" | That's confirmation bias with a slash command. Fresh context, or at least fresh subagents. |
 | "More findings = better review" | The deliverable is decisions the human can make. Ten cited findings beat forty hunches. |
@@ -320,12 +369,7 @@ or correctness reads exactly like one that looked and found nothing.
 | "I'll put it in the report to be safe" | The report is a screen competing for a busy human's attention. Everything else goes in the analysis, one click away. |
 | "The report can just summarise the analysis" | A summary of evidence is still evidence. The report answers *what should I do*; the analysis answers *how do you know*. |
 | "The recommendation decides the merge" | It drafts the reviewer's words. They post it only if they agree: the decision stays theirs. |
-| "The axes came back clean" | Clean on the axes that ran. Name the ones that didn't, in the verdict and in the comment. |
-| "The siblings didn't seem necessary" | Then say so in the document, with the reason. An unrecorded skip is indistinguishable from a check that passed. |
-| "I'll run the design review too, to be thorough" | It is four more subagents on someone's budget. Ask first, with the price attached. |
-| "They didn't answer, so I'll run it" | Silence is a no. The two axes are the review; the rest is theirs to buy. |
-| "The subagent marked it non-blocking" | An axis sees its own lane. Severity is yours, at merge, with every axis in view. |
-| "This matters, so I'll ask both axes to check it" | Then it is investigated twice, in full, by two agents who cannot see each other. It has one owner; pick it. |
-| "I'll mention what I suspect so the axis looks there" | It will look there, and it will come back with your suspicion — right or wrong. Name the surface, keep the hypothesis. |
-| "The axis can work out the merge-base itself" | It can, and so can the other one, and you already know it. Established facts go in the brief. |
+| "The layers came back clean" | Clean on the layers that ran. The skips and the correctness line are in the verdict for exactly this reason. |
+| "The subagent marked it non-blocking" | A layer sees its own altitude. Severity is yours, at merge, with every layer in view. |
+| "This PR deserves the design lenses too" | They already ran: DRY/SOLID in L1, cohesion/coupling in L2, on every review. |
 | "The dependents are all in this repo" | You know that only if you looked elsewhere. The repo docs say where the consumers live. |
