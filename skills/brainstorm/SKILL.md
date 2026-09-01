@@ -97,14 +97,17 @@ unknown first: that's where the plan will change.
 **The plan carries diagrams** (`write-diagrams` skill): they are the implementer's
 mental model and durable context for every later AI session that reads the plan:
 
+- A **phasing diagram always**, even for a plain chain: it is the tracker (below), so the
+  plan cannot record progress without it — and it is the plan's **opening section**,
+  first in the file after the title and links. The tracker is the plan's working core:
+  a resumer meets where the work stands before any prose, and a stale one is caught the
+  moment the file opens rather than after the phases have been re-read.
 - The **boundary diagram the implementation must hold** (usually the dependency
-  graph, forbidden edges drawn) goes at the top, before phase 1: every extraction
-  or refactor phase is checked against it.
+  graph, forbidden edges drawn) comes right after the tracker, before phase 1: every
+  extraction or refactor phase is checked against it.
 - A phase whose behavior is an **ordering with failure branches** (a daemon
   handshake, a retry flow, a migration) gets its sequence or state diagram inside
   the phase, drawn before the phase is executed.
-- A **phasing diagram always**, even for a plain chain: it is the tracker (below), so the
-  plan cannot record progress without it.
 - Carry the relevant spec/board diagram into the phase that implements it; if the
   board produced no diagram for a boundary the plan depends on, draw it now: its
   absence is a review finding, not a pass.

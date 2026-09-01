@@ -20,6 +20,13 @@ carrying a status glyph and one node — connected to nothing — holds the resu
 step has a done-when that can be checked. The `brainstorm` skill produces this; the
 `aiview` skill is where it lives and renders.
 
+**Before running a single step, open the plan via the `aiview` skill
+(`../aiview/SKILL.md`).** That one gesture guarantees both halves of the working surface:
+the viewer is running — it starts one when none is — and the plan itself is the document
+on screen, registered and displayed in the same call. Do it in every session that picks
+the plan up, not only the first; it is idempotent. Tell the user the URL it prints, so
+they can watch the tracker move while the work happens.
+
 That diagram is the working surface. It says which step is next, what is blocked and on
 whom, and where the work stood when someone last stopped — which is what makes the plan
 runnable by a session that was not there when it was written.
