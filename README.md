@@ -121,37 +121,38 @@ ongoing work. Every document the skills produce registers in its index, document
 belong to one piece of work share a container, and each save re-renders in the open
 tab. You watch decisions, diagrams, and drafts land as they happen.
 
-Both screenshots below are one example project: a shop adding guest checkout. The
-viewer follows the OS theme; these are dark.
+Both screenshots below are one real piece of work: the redesign of this collection's
+own `pr-review` skill into layers, from board to release. The viewer follows the OS
+theme; these are dark.
 
 ### A spec, with the work it belongs to
 
 What `brainstorm` leaves behind for one feature: the board where the design was
 argued, the spec it settled on, and the plan that came out of it, grouped as one
-container in the sidebar. The spec's diagrams render inline (here the container diagram
-and the checkout sequence), so a boundary is checked drawn, not described. The header
-shows the document's absolute path, click to copy.
+container in the sidebar. The spec's diagrams render inline, here the five layers as a
+table and the orchestrator that dispatches them, so a boundary is checked drawn, not
+described. The header shows the document's absolute path, click to copy.
 
-![aiview in dark mode: the Guest checkout spec for an example shop project, its container and sequence diagrams rendered, with the board and plan grouped beside it](assets/aiview-cart-shop.png)
+![aiview in dark mode: the pr-review layered redesign spec, its layer table and orchestrator diagram rendered, with the board and plan grouped beside it](assets/aiview-pr-review-spec.png)
 
 ### The same plan, mid-execution
 
-The plan opens on its tracker: the phasing diagram whose nodes carry the status of each
-step. Phases 1 and 2 are done (✅, including a step 2.1b that was discovered while doing
-2.1 and drawn in before it was done), 3.2 is the one ▶ where work is happening, 3.3 is
-a gate that needs a human's eyes, and 4.1 is ⏸, waiting on another team since a stated
-date. The state node at the top, connected to nothing, is what makes the plan
-resumable: branch and commit, what is deployed where, the next step, what is blocked,
-what is parked. A session that ends here loses nothing. One that picks the plan up a
-week later, with none of the conversation in context, reads the state node and
-continues.
+The plan's phasing diagram is the tracker: every step a node carrying its status and,
+once done, what it found. Here the trial and the fixes it produced are ✅ with their
+evidence written in, the gate asks whether the trials were clean, the branch taken
+leads to the one ▶ step, the release in progress with its done-when, and the branch not
+taken is ✖ with the reason, never deleted. Above the flow, out of frame, a state node
+connected to nothing holds branch and commit, what is deployed where, the next step,
+what is blocked and what is parked. That node is what makes the plan resumable: a
+session that ends here loses nothing, and one that picks the plan up a week later, with
+none of the conversation in context, reads the state node and continues.
 
 `execute-plan` is what keeps this true while the work happens: a node turns ✅ only
 when its own done-when is met and the evidence goes into the step, the tracker is
 updated before every handoff, deviations are drawn before they are done, and the state
 node is overwritten, never appended to.
 
-![aiview in dark mode: the Guest checkout implementation plan opened on its tracker, phases 1 and 2 done, step 3.2 in progress, step 4.1 blocked on ops, the state node above the flow](assets/aiview-cart-shop-plan.png)
+![aiview in dark mode: the pr-review redesign plan at its gate, the trial steps done with evidence, the release step in progress, the untaken branch marked not needed](assets/aiview-pr-review-plan.png)
 
 | Tool | What it does |
 |---|---|
