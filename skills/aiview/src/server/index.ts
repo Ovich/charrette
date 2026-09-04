@@ -13,6 +13,7 @@ import type {
   IndexEventPayload,
   ProjectEventPayload,
 } from "../core/api.ts";
+import { resolveBindings } from "../core/bind.ts";
 import { formatOf, isHtml, isPdf, readDoc } from "../core/paths.ts";
 import { clearServerFiles, writeServerFiles } from "../core/serverstate.ts";
 import { DocWatcher } from "../core/watcher.ts";
@@ -204,6 +205,26 @@ export function startServer(
       watcher.ensureWatch(doc);
       if (isPdf(doc.file_path))
         return json(res, { document: doc, format: "pdf", content: null, pending } satisfies DocumentResponse);
+      // An html mockup is composed here, never on disk: data-bind placeholders are replaced
+      // from sibling files of the same folder (bare names only), and the watcher learns
+      // which files this document now depends on. readDoc stays raw for the indexer.
+      if (isHtml(doc.file_path)) {
+        const dir = path.dirname(doc.abs_path);
+        const reader = (name: string): string | undefined => {
+          if (/[\\/]/.test(name) || name.includes("..")) return undefined;
+          const f = path.join(dir, name);
+          return fs.existsSync(f) && fs.statSync(f).isFile() ? readDoc(f) : undefined;
+        };
+        const { html, sources, errors, warnings } = resolveBindings(readDoc(doc.abs_path), reader);
+        watcher.setSources(doc.id, sources.map((s) => path.join(dir, s)));
+        return json(res, {
+          document: doc,
+          format: "html",
+          content: html,
+          pending,
+          bindings: { sources, errors, warnings },
+        } satisfies DocumentResponse);
+      }
       return json(res, {
         document: doc,
         format: formatOf(doc.file_path),

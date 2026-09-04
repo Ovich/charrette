@@ -61,3 +61,60 @@ test("unrelated files in the same dir emit nothing", async () => {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test("a change on a source emits changed for every host composed from it", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "aiview-watch3-"));
+  const hostA = { id: 11, abs_path: path.join(tmp, "a.mockup.html") };
+  const hostB = { id: 12, abs_path: path.join(tmp, "b.mockup.html") };
+  const source = path.join(tmp, "tools.mockup.html"); // not a registered document
+  for (const f of [hostA.abs_path, hostB.abs_path, source]) fs.writeFileSync(f, "<html></html>");
+  const events: ChangedEvent[] = [];
+  const watcher = new DocWatcher((dir, name) =>
+    [hostA, hostB].find((d) => path.join(dir, name) === d.abs_path),
+  );
+  watcher.on("changed", (e: ChangedEvent) => events.push(e));
+  try {
+    watcher.ensureWatch(hostA);
+    watcher.setSources(hostA.id, [source]);
+    watcher.setSources(hostB.id, [source]);
+    fs.writeFileSync(source, "<html><b data-component='X'>x</b></html>");
+    await waitFor(() => (events.length >= 2 ? events : undefined));
+    const ids = events.map((e) => e.id).sort();
+    assert.deepEqual(ids, [11, 12]);
+    // the map is replaced, not merged: host B no longer depends on the source
+    events.length = 0;
+    watcher.setSources(hostB.id, [path.join(tmp, "other.html")]);
+    fs.writeFileSync(source, "<html>v3</html>");
+    await waitFor(() => events[0]);
+    await new Promise((r) => setTimeout(r, 300));
+    assert.deepEqual(events.map((e) => e.id), [11]);
+    assert.deepEqual(watcher.hostsOf(source), [11]);
+    watcher.setSources(hostA.id, []);
+    assert.deepEqual(watcher.hostsOf(source), []);
+  } finally {
+    watcher.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("a registered source emits for itself and for its hosts", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "aiview-watch4-"));
+  const host = { id: 21, abs_path: path.join(tmp, "host.mockup.html") };
+  const source = { id: 22, abs_path: path.join(tmp, "tools.mockup.html") };
+  for (const d of [host, source]) fs.writeFileSync(d.abs_path, "<html></html>");
+  const events: ChangedEvent[] = [];
+  const watcher = new DocWatcher((dir, name) =>
+    [host, source].find((d) => path.join(dir, name) === d.abs_path),
+  );
+  watcher.on("changed", (e: ChangedEvent) => events.push(e));
+  try {
+    watcher.ensureWatch(host);
+    watcher.setSources(host.id, [source.abs_path]);
+    fs.writeFileSync(source.abs_path, "<html>v2</html>");
+    await waitFor(() => (events.length >= 2 ? events : undefined));
+    assert.deepEqual(events.map((e) => e.id).sort(), [21, 22]);
+  } finally {
+    watcher.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

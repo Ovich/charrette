@@ -205,3 +205,53 @@ test("POST /api/index-changed tells open tabs the document list moved", async ()
   assert.match(frame, /"type":"index"/);
   await reader.cancel();
 });
+
+test("an html document is served composed: bindings resolved, summary carried, title from the raw file", async () => {
+  write(
+    "docs/tools.mockup.html",
+    `<!doctype html><html><head><title>Tools</title><style>[data-component="Pill"]{color:red}</style></head>` +
+      `<body><span data-component="Pill">v1</span><script>window.x=1</script></body></html>`,
+  );
+  const hostAbs = write(
+    "docs/host.mockup.html",
+    `<!doctype html><html><head><title>Host</title></head><body><div data-bind="tools.mockup.html#Pill" class="here"></div><div data-bind="tools.mockup.html#Nope"></div></body></html>`,
+  );
+  const hostId = index.register(hostAbs, { kind: "mockup" }).id;
+  assert.equal(index.get(hostId)!.title, "Host", "the indexer read the raw file");
+
+  const r = (await (await fetch(`${base}/api/document/${hostId}`)).json()) as DocumentResponse;
+  assert.equal(r.format, "html");
+  assert.ok(r.content!.includes('<span data-component="Pill" class="here" data-bound="tools.mockup.html#Pill">v1</span>'), r.content!);
+  assert.ok(r.content!.includes('<style data-bound-style="tools.mockup.html">'), "source styles injected");
+  assert.ok(!r.content!.includes("window.x"), "source scripts ignored");
+  assert.deepEqual(r.bindings!.sources, ["tools.mockup.html"]);
+  assert.equal(r.bindings!.errors.length, 1);
+  assert.match(r.bindings!.errors[0].message, /Component Nope not in/);
+
+  // markdown is untouched by resolution
+  const md = (await (await fetch(`${base}/api/document/${boardId}`)).json()) as DocumentResponse;
+  assert.equal(md.bindings, undefined);
+
+  // saving the unregistered source reloads the host: changed carries the host's id
+  const ctrl = new AbortController();
+  const res = await fetch(`${base}/events`, { signal: ctrl.signal });
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  const readUntil = async (match: string): Promise<void> => {
+    const t0 = Date.now();
+    while (!buf.includes(match)) {
+      if (Date.now() - t0 > 5000) throw new Error(`timed out waiting for ${match}; got: ${buf}`);
+      const { value, done } = await reader.read();
+      if (done) throw new Error("stream ended");
+      buf += decoder.decode(value, { stream: true });
+    }
+  };
+  await readUntil('"hello"');
+  fs.appendFileSync(path.join(root, "docs", "tools.mockup.html"), "\n");
+  await readUntil(`"id":${hostId}`);
+  ctrl.abort();
+
+  const again = (await (await fetch(`${base}/api/document/${hostId}`)).json()) as DocumentResponse;
+  assert.ok(again.content!.includes('data-bound="tools.mockup.html#Pill"'));
+});
