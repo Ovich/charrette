@@ -14,6 +14,16 @@ const hashId = (): number | null => {
   return m ? Number(m[1]) : null;
 };
 
+const folderOf = (p: string): string => p.replace(/[\\/][^\\/]*$/, "");
+const baseOf = (p: string): string => p.replace(/^.*[\\/]/, "");
+
+/** The registered document a binding's source file name points at: same folder as the
+ *  host, matched by base name. Undefined when the source is not registered. */
+export function sourceDocFor<D extends { abs_path: string }>(docs: D[], host: D, file: string): D | undefined {
+  const folder = folderOf(host.abs_path);
+  return docs.find((d) => folderOf(d.abs_path) === folder && baseOf(d.abs_path) === file);
+}
+
 /** Does the reading pane need to fetch?
  *
  *  Two different reasons to load, and they must not be confused:
@@ -40,6 +50,9 @@ export function App() {
   /** Which document the pane is actually showing, so a selection is never mistaken
    *  for a refetch of the same one. */
   const loadedId = useRef<number | null>(null);
+  /** Set when a document was opened from a Composition label: which component to scroll to. */
+  const [sourceTarget, setSourceTarget] = useState<{ id: number; component: string } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   // The server owns the active project; the SSE echo is what actually moves this tab,
   // so picking is fire-and-follow rather than optimistic local state.
@@ -58,6 +71,29 @@ export function App() {
     },
     [docs, activeProject, pickProject],
   );
+
+  // A Composition label was clicked in the frame: open the source mockup at that component.
+  // The source is looked up by base name in the host's folder; an unregistered file gets
+  // a toast rather than a silent nothing.
+  const openSource = useCallback(
+    (file: string, component: string) => {
+      const host = response?.document;
+      const source = host ? sourceDocFor(docs, host, file) : undefined;
+      if (!source) {
+        setToast(`${file} is not registered. Register it with: aiview open <path>`);
+        return;
+      }
+      setSourceTarget({ id: source.id, component });
+      open(source.id);
+    },
+    [docs, response, open],
+  );
+
+  useEffect(() => {
+    if (toast === null) return;
+    const t = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   // initial doc: hash wins, then the serve --open start doc, then the newest
   useEffect(() => {
@@ -130,7 +166,14 @@ export function App() {
                 </p>
               )}
               {format === "pdf" && <PdfFrame docId={doc.id} changedTick={changedTick} />}
-              {format === "html" && response!.content !== null && <MockupFrame html={response!.content} />}
+              {format === "html" && response!.content !== null && (
+                <MockupFrame
+                  html={response!.content}
+                  bindings={response!.bindings}
+                  target={sourceTarget?.id === doc.id ? sourceTarget.component : undefined}
+                  onOpenSource={openSource}
+                />
+              )}
               {format === "markdown" && response!.content !== null && (
                 <MarkdownView content={response!.content} docId={doc.id} />
               )}
@@ -138,6 +181,15 @@ export function App() {
           )}
         </main>
       </div>
+      {toast !== null && (
+        <div
+          data-component="Toast"
+          role="status"
+          className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-md border border-border bg-background px-4 py-2 text-[12px] text-foreground shadow-lg"
+        >
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

@@ -292,3 +292,67 @@ describe("Sidebar — clicking a row's kind chip", () => {
     expect(filterChip.className).not.toContain("pointer-events-none");
   });
 });
+
+describe("composition overlay", () => {
+  test("withOverlay appends the layer before </body> with the summary and target", async () => {
+    const { withOverlay, OVERLAY_MARK, shortName } = await import("./lib/overlay.ts");
+    const summary = { sources: ["2026-09-03-dock-tools.mockup.html"], errors: [{ ref: "a#B", message: 'Not "found"' }], warnings: [] };
+    const out = withOverlay("<html><body><p>host</p></body></html>", { bindings: summary, target: "ToolPrefix" });
+    expect(out.indexOf(OVERLAY_MARK)).toBeGreaterThan(out.indexOf("<p>host</p>"));
+    expect(out.indexOf(OVERLAY_MARK)).toBeLessThan(out.indexOf("</body>"));
+    expect(out).toContain('data-target="ToolPrefix"');
+    // the summary rides on an attribute, escaped, and comes back intact
+    const raw = out.match(/data-summary="([^"]*)"/)![1];
+    const unescaped = raw.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&amp;/g, "&");
+    expect(JSON.parse(unescaped)).toEqual(summary);
+    expect(out).toContain("<script " + OVERLAY_MARK + ">");
+    expect(withOverlay("<p>no body</p>")).toContain(OVERLAY_MARK);
+    expect(shortName("2026-09-03-dock-tools.mockup.html")).toBe("dock-tools");
+  });
+
+  test("sourceDocFor matches by base name inside the host's folder only", async () => {
+    const { sourceDocFor } = await import("./App.tsx");
+    const host = doc({ id: 1, abs_path: "C:\\home\\docs\\JOBS\\host.mockup.html" });
+    const docs = [
+      host,
+      doc({ id: 2, abs_path: "C:\\home\\docs\\JOBS\\tools.mockup.html" }),
+      doc({ id: 3, abs_path: "C:\\home\\docs\\OTHER\\tools.mockup.html" }),
+      doc({ id: 4, abs_path: "/home/docs/JOBS/posix.mockup.html" }),
+    ];
+    expect(sourceDocFor(docs, host, "tools.mockup.html")?.id).toBe(2);
+    expect(sourceDocFor(docs, host, "missing.mockup.html")).toBeUndefined();
+    const posixHost = doc({ id: 5, abs_path: "/home/docs/JOBS/host.mockup.html" });
+    expect(sourceDocFor(docs, posixHost, "posix.mockup.html")?.id).toBe(4);
+  });
+});
+
+describe("MockupFrame modes", () => {
+  afterEach(() => localStorage.clear());
+
+  test("the mode toggle persists and Composition injects the overlay", async () => {
+    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    const { OVERLAY_MARK } = await import("./lib/overlay.ts");
+    const bindings = { sources: ["tools.mockup.html"], errors: [], warnings: [] };
+    render(<MockupFrame html="<html><body><p>h</p></body></html>" bindings={bindings} />);
+    const frame = () => document.querySelector("iframe")!;
+    expect(frame().getAttribute("srcdoc")).not.toContain(OVERLAY_MARK);
+    expect(screen.getByText("1 source")).toBeTruthy();
+    fireEvent.click(screen.getByText("composition"));
+    expect(localStorage.getItem("aiview.mockupMode")).toBe("composition");
+    expect(frame().getAttribute("srcdoc")).toContain(OVERLAY_MARK);
+    fireEvent.click(screen.getByText("rendered"));
+    expect(frame().getAttribute("srcdoc")).not.toContain(OVERLAY_MARK);
+  });
+
+  test("a message from the frame's own window opens the source; others are ignored", async () => {
+    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    const onOpenSource = vi.fn();
+    render(<MockupFrame html="<html><body></body></html>" onOpenSource={onOpenSource} />);
+    const frame = document.querySelector("iframe")!;
+    const data = { type: "aiview:open", file: "tools.mockup.html", component: "ToolPrefix" };
+    window.dispatchEvent(new MessageEvent("message", { data, source: null }));
+    expect(onOpenSource).not.toHaveBeenCalled();
+    window.dispatchEvent(new MessageEvent("message", { data, source: frame.contentWindow }));
+    expect(onOpenSource).toHaveBeenCalledWith("tools.mockup.html", "ToolPrefix");
+  });
+});
