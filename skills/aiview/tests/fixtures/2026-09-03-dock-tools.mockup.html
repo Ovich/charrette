@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dock tools, one per card</title>
+<style>
+:root {
+  --background:#f7f7f5; --foreground:#1c1c1e; --muted:#efefec; --muted-foreground:#6b6b70;
+  --card:#ffffff; --border:#e3e3df; --input:#d3d3ce;
+  --primary:#1d4ed8; --primary-foreground:#ffffff; --accent:#eef2ff; --accent-foreground:#1d4ed8;
+  --ok:#15803d; --ok-soft:#15803d1a; --warn:#b45309; --warn-soft:#d977061a; --danger:#b91c1c; --danger-soft:#dc26261a;
+  --radius:10px; --radius-lg:16px; --shadow:0 1px 2px #0000000a, 0 6px 20px #0000000d;
+  --font-sans:"Segoe UI", Inter, system-ui, sans-serif;
+  --cv-ink:#18181b; --cv-muted:#71717a; --cv-accent:#172554; --cv-hairline:#e2e8f0;
+}
+* { box-sizing:border-box; }
+html, body { margin:0; height:100%; }
+body { font:18px/1.6 var(--font-sans); color:var(--foreground); background:var(--background); display:flex; flex-direction:column; height:100vh; }
+button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+@media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+
+/* ── App bar ── */
+.app-bar { height:60px; display:flex; align-items:center; gap:20px; padding:0 24px; border-bottom:1px solid var(--border); background:var(--card); flex:none; }
+.wordmark { font-weight:600; font-size:18px; display:flex; align-items:center; gap:10px; }
+.wordmark i { width:12px; height:12px; border-radius:50%; background:var(--primary); display:inline-block; }
+.ctx { color:var(--muted-foreground); font-size:16px; }
+.ctx b { color:var(--foreground); font-weight:600; }
+.spacer { flex:1; }
+.btn { display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:var(--radius); font-size:16px; font-weight:600; border:1px solid var(--border); background:var(--card); }
+.btn.primary { background:var(--primary); color:var(--primary-foreground); border-color:transparent; }
+.btn.ghost { border-color:transparent; background:transparent; color:var(--muted-foreground); }
+.btn.sm { font-size:16.5px; padding:10px 18px; }
+.btn[disabled] { opacity:.5; cursor:not-allowed; }
+
+/* ── Shell ── */
+.shell { flex:1; display:grid; grid-template-columns:minmax(480px, 46%) minmax(0, 1fr); min-height:0; }
+.chat { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--border); background:var(--card); }
+.sheet-col { overflow:auto; padding:28px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+
+/* ── Progress ── */
+.progress { padding:16px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; font-size:16px; }
+.progress .bar { flex:1; height:6px; background:var(--muted); border-radius:3px; overflow:hidden; }
+.progress .bar i { display:block; height:100%; width:37.5%; background:var(--ok); border-radius:3px; transition:width .3s; }
+.progress b { font-weight:600; }
+
+/* ── Stream ── */
+.stream { flex:1; overflow:auto; padding:24px; display:flex; flex-direction:column; gap:22px; }
+.msg.me { align-self:flex-end; background:var(--accent); color:var(--accent-foreground); padding:12px 16px; border-radius:var(--radius-lg); border-bottom-right-radius:4px; max-width:85%; font-size:17px; }
+.msg.ai { display:grid; grid-template-columns:30px 1fr; gap:12px; }
+.msg.ai .av { width:30px; height:30px; border-radius:50%; background:var(--primary); color:var(--primary-foreground); display:grid; place-items:center; font-size:13px; font-weight:600; margin-top:3px; }
+.msg.ai p { margin:0 0 8px; }
+.msg.ai p:last-child { margin-bottom:0; }
+.msg.ai.history p, .msg.ai.history .av { opacity:.6; }
+.time { font-size:13px; color:var(--muted-foreground); text-align:center; }
+.card { border-left:3px solid var(--border); padding:6px 0 6px 16px; margin-top:6px; }
+.counts { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-top:10px; }
+.counts button { text-align:left; padding:12px 14px; border:1px solid var(--border); border-radius:var(--radius); }
+.counts button:hover { background:var(--muted); }
+.counts b { display:block; font-size:26px; font-weight:600; line-height:1.1; }
+.counts span { font-size:15px; color:var(--muted-foreground); }
+.counts .ok b { color:var(--ok); } .counts .warn b { color:var(--warn); } .counts .gap b { color:var(--danger); }
+.receipt { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:var(--radius); background:var(--muted); color:var(--muted-foreground); font-size:16px; }
+.receipt b { color:var(--foreground); font-weight:600; }
+.receipt .ok-mark { color:var(--ok); font-weight:600; }
+.receipt .undo { margin-left:auto; font-size:15px; text-decoration:underline; color:var(--muted-foreground); }
+.ok-line { color:var(--ok); font-weight:600; }
+.typing { display:inline-flex; gap:5px; padding:8px 0; }
+.typing i { width:8px; height:8px; border-radius:50%; background:var(--muted-foreground); animation:blink 1.2s infinite; }
+.typing i:nth-child(2) { animation-delay:.2s; } .typing i:nth-child(3) { animation-delay:.4s; }
+@keyframes blink { 0%,80%,100% { opacity:.25; } 40% { opacity:1; } }
+
+/* ── Composer and dock ── */
+.composer { padding:18px 28px 24px; border-top:1px solid var(--border); background:var(--card); position:relative; }
+.tool { margin-bottom:10px; max-height:62vh; overflow:auto; }
+.tool[hidden] { display:none; }
+.thead { position:relative; display:flex; align-items:center; gap:12px; padding:10px 110px 16px 0; min-height:48px; font-size:15px; color:var(--muted-foreground); }
+.seg { display:inline-flex; border:1px solid var(--input); border-radius:10px; padding:2px; background:var(--card); }
+.seg button { padding:8px 16px; border-radius:7px; font-size:16px; color:var(--muted-foreground); }
+.seg button:hover { color:var(--foreground); }
+.seg button[aria-pressed="true"] { background:var(--primary); color:var(--primary-foreground); font-weight:600; }
+.seg[hidden] { display:none; }
+.toolbar { position:absolute; right:0; top:8px; display:inline-flex; align-items:center; gap:8px; }
+.toolbar .reset { font-size:16px; font-weight:600; padding:8px 16px; border:1px solid var(--input); border-radius:10px; background:var(--card); display:inline-flex; align-items:center; gap:6px; }
+.toolbar .reset::before { content:"↺"; }
+.toolbar .reset:hover { border-color:var(--primary); color:var(--primary); }
+.toolbar .reset[hidden] { display:none; }
+.toolbar .x { width:38px; height:38px; border-radius:10px; border:1px solid var(--input); display:grid; place-items:center; font-size:22px; line-height:1; color:var(--muted-foreground); background:var(--card); }
+.toolbar .x:hover { border-color:var(--primary); color:var(--primary); }
+.tbody { padding:0 0 6px; }
+.tbody p.lead { margin:0 0 12px; font-size:17px; }
+.box { display:flex; gap:8px; align-items:center; border:1px solid var(--border); border-radius:var(--radius-lg); padding:10px 10px 10px 20px; background:var(--card); }
+.box input { flex:1; border:0; background:transparent; font:inherit; font-size:18px; color:inherit; }
+.box input:focus { outline:0; }
+.hint { font-size:14px; color:var(--muted-foreground); margin-top:10px; }
+
+/* Current / After */
+.pair { display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:stretch; }
+.side { display:flex; flex-direction:column; padding:10px 0 12px 16px; border-left:3px solid var(--border); }
+.side .h { display:flex; align-items:center; gap:12px; min-height:42px; margin-bottom:12px; font-size:14px; color:var(--muted-foreground); }
+.side .h b { font-size:14px; letter-spacing:.1em; text-transform:uppercase; font-weight:600; color:var(--muted-foreground); line-height:1; }
+.side.current .h .fnname { font-size:16.5px; font-weight:600; color:var(--foreground); }
+.side .t, .side li { font-size:18px; line-height:1.65; margin:0; }
+.side ul { margin:0; padding-left:22px; }
+.side li { margin-bottom:10px; }
+.side.current .t, .side.current li { color:var(--muted-foreground); }
+.side.current .t s, .side.current li s { text-decoration-color:var(--danger); text-decoration-thickness:1.5px; }
+.side.after { border-left-color:var(--primary); }
+.side.after .h b { color:var(--primary); }
+.side.after .t ins, .side.after li ins { text-decoration:none; background:var(--ok-soft); border-radius:3px; padding:0 2px; }
+.side.after.empty .t, .side.after.empty li { color:var(--muted-foreground); font-style:italic; }
+.side .lock, .side .note { font-size:15.5px; color:var(--warn); margin-top:10px; line-height:1.5; }
+.side .note { color:var(--muted-foreground); } .side .note b { color:var(--foreground); font-weight:600; }
+.fnsel { appearance:none; -webkit-appearance:none; font:inherit; font-size:16.5px; font-weight:600; color:var(--foreground); background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%236b6b70' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 12px center; border:1px solid var(--input); border-radius:10px; padding:8px 36px 8px 16px; cursor:pointer; max-width:100%; }
+.fnsel:hover { border-color:var(--primary); }
+.fnsel.empty { color:var(--muted-foreground); font-weight:400; }
+@media (max-width:1300px) { .pair { grid-template-columns:1fr; } }
+
+/* Rows: one decision per row */
+.opts { display:grid; }
+.opt { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:12px 2px; border-bottom:1px solid var(--border); font-size:17px; }
+.opt:last-child { border-bottom:0; }
+.opt .lbl { flex:1 1 220px; }
+.opt .lbl small { display:block; color:var(--muted-foreground); font-size:15px; }
+.opt .ctl { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-left:auto; }
+.opt input[type=checkbox] { width:20px; height:20px; accent-color:var(--primary); }
+.opt .grip { color:var(--muted-foreground); cursor:grab; }
+.opt.muted { color:var(--muted-foreground); }
+.opt .free { font-size:15px; color:var(--ok); font-weight:600; white-space:nowrap; }
+.opt .lbl small.why { color:var(--warn); }
+.seg.small button { padding:5px 12px; font-size:15px; }
+h5 { margin:16px 0 4px; font-size:14px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); font-weight:600; }
+h5:first-child { margin-top:0; }
+.leftout { margin-top:14px; padding-top:6px; border-top:1px dashed var(--border); }
+
+/* Choices: one block per text */
+.alts { display:grid; gap:10px; }
+.alt { text-align:left; padding:10px 0 10px 16px; border-left:3px solid var(--border); font-size:17px; line-height:1.55; }
+.alt:hover { border-left-color:var(--input); background:var(--muted); }
+.alt[aria-pressed="true"] { border-left-color:var(--primary); background:var(--accent); }
+.alt b { display:block; font-weight:600; margin-bottom:2px; }
+.alt small { color:var(--muted-foreground); font-size:15px; font-weight:400; }
+
+/* Tokens (skills) */
+.group-box { padding:10px 0 12px 16px; border-left:3px solid var(--border); margin-top:12px; }
+.group-box .gh { font-size:16px; font-weight:600; margin-bottom:8px; display:flex; gap:8px; align-items:center; }
+.group-box .gh .grip { color:var(--muted-foreground); font-weight:400; cursor:grab; }
+.tokens { display:flex; flex-wrap:wrap; gap:8px; }
+.token { display:inline-flex; align-items:center; gap:6px; padding:6px 10px 6px 14px; border:1px solid var(--input); border-radius:999px; font-size:16px; cursor:grab; }
+.token b { font-weight:600; }
+.token.add { border-style:dashed; color:var(--ok); border-color:var(--ok); }
+.token.flag { border-color:var(--warn); }
+.token .x { color:var(--muted-foreground); font-size:14px; }
+
+/* Goal bar (make room) */
+.goal { display:flex; align-items:center; gap:14px; font-size:16px; margin:4px 0 12px; }
+.goal .bar { flex:1; height:8px; background:var(--muted); border-radius:4px; overflow:hidden; }
+.goal .bar i { display:block; height:100%; width:0; background:var(--warn); border-radius:4px; transition:width .2s; }
+.goal .bar i.ok { background:var(--ok); }
+.goal b { font-weight:600; min-width:120px; text-align:right; }
+
+/* Checks, loading */
+.check { display:flex; gap:12px; align-items:flex-start; padding:12px 14px; border-radius:var(--radius); font-size:16px; margin-top:12px; }
+.check.ok { background:var(--ok-soft); color:var(--ok); }
+.check.warn { background:var(--warn-soft); color:var(--warn); }
+.check.danger { background:var(--danger-soft); color:var(--danger); }
+.check .btn { margin-left:auto; color:var(--foreground); flex:none; }
+.loading { display:grid; gap:12px; padding:6px 0; }
+.loading .line { display:flex; align-items:center; gap:12px; font-size:17px; color:var(--muted-foreground); }
+.loading .sk { height:12px; border-radius:6px; background:linear-gradient(90deg,var(--muted),var(--border),var(--muted)); background-size:200% 100%; animation:sh 1.2s infinite; }
+@keyframes sh { to { background-position:-200% 0; } }
+
+/* Findings drawer (opened from the analysis card, Q6) */
+.findings { position:absolute; left:28px; right:28px; bottom:calc(100% - 6px); background:var(--card); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow); padding:14px; max-height:60vh; overflow:auto; display:none; z-index:5; }
+.findings.open { display:block; }
+.findings .fh { display:flex; align-items:center; gap:10px; font-size:15.5px; color:var(--muted-foreground); padding:0 4px 10px; }
+.findings .fh b { color:var(--foreground); font-weight:600; }
+.findings .fh .btn { margin-left:auto; }
+.findings .grp { font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); padding:10px 4px 4px; }
+.list { display:grid; gap:6px; }
+.list button { text-align:left; display:grid; grid-template-columns:14px 1fr auto; gap:12px; align-items:center; padding:12px 14px; border:1px solid var(--border); border-radius:var(--radius); font-size:16px; }
+.list button:hover { background:var(--muted); }
+.list button.done { color:var(--muted-foreground); text-decoration:line-through; }
+.list .where { font-size:14px; color:var(--muted-foreground); }
+.dot { width:10px; height:10px; display:inline-block; }
+.dot.met { border-radius:50%; background:var(--ok); }
+.dot.adjust { width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-bottom:10px solid var(--warn); }
+.dot.gap { border-radius:2px; background:var(--danger); }
+
+/* Overflow warning on the CV */
+.overflow { width:100%; max-width:794px; display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:var(--radius-lg); background:var(--warn-soft); color:var(--warn); border:1px solid #d9770640; font-size:16px; position:sticky; top:0; z-index:2; }
+.overflow b { font-weight:600; }
+.overflow .btn { margin-left:auto; color:var(--foreground); }
+.overflow[hidden] { display:none; }
+
+/* ── CV sheet, Modern model (paper, own palette) ── */
+.cv-sheet { width:100%; max-width:794px; background:#fff; color:var(--cv-ink); box-shadow:var(--shadow); padding:0; font-size:13px; line-height:1.45; }
+.cv-sheet .band { background:var(--cv-accent); color:#fff; padding:34px 44px 26px; display:grid; grid-template-columns:1fr auto; gap:20px; align-items:center; }
+.cv-sheet .band h1 { color:#fff; font-size:26px; margin:0; letter-spacing:-.01em; }
+.cv-sheet .band .title { color:#c7d2fe; font-size:15px; font-weight:500; margin-top:4px; }
+.cv-sheet .band .contact { color:#dbe4ff; font-size:12px; margin-top:12px; display:flex; flex-wrap:wrap; gap:6px 18px; }
+.cv-sheet .band .contact span::before { content:"◦ "; color:#93a4f5; }
+.cv-sheet .band .photo-slot { width:84px; height:84px; border-radius:50%; border:2px dashed #93a4f5; display:grid; place-items:center; color:#c7d2fe; font-size:10px; text-align:center; }
+.cv-sheet .body { padding:26px 44px 40px; }
+.cv-sheet h2 { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--cv-accent); margin:22px 0 10px; display:flex; align-items:center; gap:10px; cursor:pointer; }
+.cv-sheet h2::after { content:""; flex:1; height:1px; background:var(--cv-hairline); }
+.cv-sheet h2:first-child { margin-top:0; }
+.cv-sheet h2:hover { color:#1d4ed8; }
+.cv-sheet .summary { padding-left:14px; border-left:3px solid var(--cv-accent); font-size:13.5px; margin:0 0 6px; }
+.cv-sheet .tks { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+.cv-sheet .tk { border:0; background:#eef2ff; color:var(--cv-accent); padding:2px 9px; font-size:11.5px; border-radius:999px; }
+.cv-sheet .tk b { font-weight:600; }
+.cv-sheet .timeline { display:grid; grid-template-columns:118px 1fr; column-gap:18px; }
+.cv-sheet .timeline .when { color:var(--cv-muted); font-size:12px; text-align:right; padding-top:2px; position:relative; }
+.cv-sheet .timeline .when::after { content:""; position:absolute; right:-14px; top:6px; width:9px; height:9px; border-radius:50%; background:var(--cv-accent); box-shadow:0 0 0 3px #fff, 0 0 0 4px var(--cv-hairline); }
+.cv-sheet .timeline .what { border-left:1px solid var(--cv-hairline); padding:0 0 16px 18px; margin-left:-9px; }
+.cv-sheet .timeline .what .head b { font-size:14px; }
+.cv-sheet .timeline .sub2 { color:var(--cv-muted); font-size:12px; margin-bottom:4px; }
+.cv-sheet .timeline ul { margin:4px 0 0; padding-left:14px; }
+.cv-sheet .timeline li { margin:3px 0; }
+.cv-sheet .cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.cv-sheet .pcard { display:block; padding:10px 12px; border:1px solid var(--cv-hairline); border-radius:8px; }
+.cv-sheet .pcard b { display:block; font-size:13.5px; color:var(--cv-accent); margin-bottom:2px; }
+.cv-sheet .pcard .tks { margin-top:6px; }
+.cv-sheet .skillgrp { display:grid; grid-template-columns:110px 1fr; gap:10px; align-items:start; margin-bottom:8px; }
+.cv-sheet .skillgrp .g { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--cv-muted); padding-top:4px; }
+.cv-sheet .skillgrp .tks { margin-top:0; }
+.cv-sheet .twocol { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.cv-sheet .twocol h2 { margin-top:0; }
+.cv-sheet .lines div { display:flex; justify-content:space-between; padding:2px 0; }
+.cv-sheet .lines span:last-child { color:var(--cv-muted); }
+.region { border-radius:6px; transition:box-shadow .15s, background .15s; cursor:pointer; }
+.region:hover { box-shadow:0 0 0 1px var(--input); }
+.region.is-lit, .region.is-selected { padding:4px 8px; margin:-4px -8px; }
+.region[data-status="adjust"].is-lit, .region.is-selected { background:var(--warn-soft); box-shadow:0 0 0 2px #d97706; }
+.region[data-status="met"].is-lit { background:var(--ok-soft); box-shadow:0 0 0 2px #15803d; }
+.region[data-status="gap"].is-lit { background:var(--danger-soft); box-shadow:0 0 0 2px #dc2626; }
+.pcard.region.is-lit, .pcard.region.is-selected { padding:10px 12px; margin:0; }
+.band.region.is-lit, .band.region.is-selected { padding:34px 44px 26px; margin:0; box-shadow:inset 0 0 0 3px #d97706; }
+.region.just-applied { animation:pulse 1.2s ease-out; }
+@keyframes pulse { 0% { background:var(--ok-soft); box-shadow:0 0 0 2px #15803d; } 100% { background:transparent; box-shadow:none; } }
+
+/* ── Mockup chrome ── */
+.mockup-bar { position:fixed; bottom:12px; right:12px; display:flex; gap:4px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:4px; font-size:13px; z-index:9; }
+.mockup-bar button { padding:4px 8px; border-radius:6px; }
+.mockup-bar button:hover { background:var(--muted); }
+.mobile-toggle { display:none; }
+@media (max-width:1023px) {
+  .shell { grid-template-columns:1fr; }
+  .sheet-col { display:none; }
+  body[data-view="cv"] .sheet-col { display:flex; }
+  body[data-view="cv"] .chat { display:none; }
+  .mobile-toggle { display:inline-flex; }
+  .ctx { display:none; }
+}
+
+/* ── Toggle group without its outer border ── */
+.seg, .thead .seg { border:0; padding:0; gap:4px; background:transparent; }
+.seg button, .thead .seg button { border:1px solid transparent; }
+.seg button:hover, .thead .seg button:hover { background:var(--muted); }
+
+/* ── The active tool as a prefix of the chat bar: the input builds on top of it, × cancels it ── */
+.thead { padding-right:0; min-height:0; }
+.thead .toolbar { display:none; }
+.thead:empty, .thead:has(.seg[hidden]):not(:has(.seg:not([hidden]))) { display:none; }
+.prefix { display:none; align-items:center; gap:8px; padding:6px 8px 6px 12px; border-radius:8px; background:var(--accent); color:var(--accent-foreground); font-size:15.5px; font-weight:600; white-space:nowrap; max-width:46%; }
+.prefix.on { display:inline-flex; }
+.prefix .what { overflow:hidden; text-overflow:ellipsis; }
+.prefix .what small { font-weight:400; opacity:.8; }
+.prefix button { width:24px; height:24px; border-radius:6px; display:grid; place-items:center; color:var(--accent-foreground); font-size:16px; line-height:1; opacity:.75; }
+.prefix button:hover { background:#1d4ed81a; opacity:1; }
+.prefix .reset::before { content:"↺"; }
+.prefix .reset[hidden] { display:none; }
+.box { padding-left:10px; }
+
+/* ── Current: no bar, no left padding. After: the app's one blue. ── */
+.side.current { border-left:0 !important; padding-left:0; }
+.side.after, .side.after.empty { border-left:3px solid var(--primary) !important; }
+.side.after .h b, .prefix, .seg button[aria-pressed="true"] { color:var(--primary); }
+.seg button[aria-pressed="true"] { background:var(--primary); color:var(--primary-foreground); }
+.prefix { color:var(--primary); }
+.prefix button { color:var(--primary); }
+.msg.me { color:var(--primary); }
+
+/* ── The applied selection, in words, as the person's message ── */
+.msg.me.choice { max-width:92%; background:var(--card); border:1px solid var(--border); color:var(--foreground); font-size:16.5px; }
+.msg.me.choice .k { display:block; font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin-bottom:4px; }
+.msg.me.choice b { font-weight:600; }
+.msg.me.choice q { quotes:"« " " »"; }
+.msg.me.choice ul { margin:4px 0 0; padding-left:20px; }
+
+.msg.me.choice .diffrow { display:grid; grid-template-columns:70px 1fr; gap:10px; margin-top:6px; font-size:16px; line-height:1.55; }
+.msg.me.choice .diffrow .k2 { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); padding-top:4px; margin:0; }
+.msg.me.choice .diffrow.cur { color:var(--muted-foreground); }
+.msg.me.choice .diffrow.cur s { text-decoration-color:var(--danger); text-decoration-thickness:1.5px; }
+.msg.me.choice .diffrow.aft ins { text-decoration:none; background:var(--ok-soft); border-radius:3px; padding:0 2px; }
+.msg.me.choice .chg { margin-top:6px; }
+.msg.me.choice .chg li { margin:2px 0; }
+.msg.me.choice .chg s { color:var(--muted-foreground); }
+.msg.me.choice .chg .arrow { color:var(--muted-foreground); padding:0 4px; }
+.msg.me.choice details { margin-top:8px; }
+.msg.me.choice details summary { cursor:pointer; color:var(--muted-foreground); font-size:14px; }
+
+/* ── Focus: the rest of the CV greys out behind the part being worked on ── */
+.cv-sheet { position:relative; }
+.cv-sheet.focused::after { content:""; position:absolute; inset:0; background:#f7f7f5b8; z-index:3; pointer-events:auto; cursor:pointer; border-radius:inherit; }
+.cv-sheet.focused .region.is-selected, .cv-sheet.focused .region.is-lit, .cv-sheet.focused li.sel { position:relative; z-index:4; background:#fff; }
+.cv-sheet.focused .band.region.is-selected { background:var(--cv-accent); }
+
+/* ── Hover: a coloured shadow border around the part, before the click ── */
+.region:hover:not(.is-selected), .entry li:hover:not(.sel), .entry .head:hover { box-shadow:0 0 0 2px var(--primary), 0 0 0 6px #1d4ed81f; background:#f5f8ff; cursor:pointer; }
+.cv-sheet h2:hover { box-shadow:0 0 0 2px var(--primary), 0 0 0 6px #1d4ed81f; background:#f5f8ff; border-radius:6px; }
+.band.region:hover:not(.is-selected) { background:var(--cv-accent); box-shadow:inset 0 0 0 3px var(--primary); }
+.cv-sheet.focused .region:hover:not(.is-selected) { box-shadow:none; background:transparent; }
+
+/* ── Recommended: a green tag beside the dropdown, which says there are other ways ── */
+.rec { display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px; background:var(--ok-soft); color:var(--ok); font-size:14px; font-weight:600; white-space:nowrap; }
+.rec::before { content:"✓"; }
+
+/* ── Same way everywhere: one dropdown, one row per prose part, Current/After folded ── */
+.sw-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; font-size:16px; }
+.sw-row { border-bottom:1px solid var(--border); padding:10px 2px; }
+.sw-row:last-child { border-bottom:0; }
+.sw-row .top { display:flex; align-items:center; gap:12px; }
+.sw-row .top .lbl { flex:1; font-weight:600; font-size:16px; }
+.sw-row .top input { width:20px; height:20px; accent-color:var(--primary); }
+.sw-row details { margin:6px 0 0; }
+.sw-row details summary { font-size:15px; color:var(--muted-foreground); cursor:pointer; }
+.sw-row .pair { margin-top:8px; gap:16px; }
+.sw-row .side .h { min-height:0; margin-bottom:6px; }
+.sw-row .side .t { font-size:16.5px; }
+.sw-row.off .top .lbl { color:var(--muted-foreground); text-decoration:line-through; }
+.sw-note { font-size:15px; color:var(--muted-foreground); margin-top:10px; }
+.offer { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+
+body { display:block; height:auto; min-height:100vh; }
+.sheet-head { max-width:1360px; margin:0 auto; padding:28px 32px 8px; }
+.sheet-head h1 { font-size:28px; margin:0 0 6px; }
+.sheet-head p { margin:0; color:var(--muted-foreground); max-width:820px; }
+.toc { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+.toc a { font-size:14px; padding:5px 12px; border:1px solid var(--border); border-radius:999px; text-decoration:none; color:var(--muted-foreground); }
+section.block { max-width:1360px; margin:0 auto; padding:12px 32px; }
+section.block h2 { font-size:20px; margin:24px 0 12px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(560px, 1fr)); gap:28px; align-items:start; }
+.demo { display:grid; gap:10px; }
+.demo .cap { font-size:15px; color:var(--muted-foreground); }
+.demo .cap b { color:var(--foreground); font-weight:600; font-size:16px; }
+.demo .cap code { font:13px Consolas, monospace; background:var(--muted); padding:1px 6px; border-radius:6px; margin-left:6px; }
+.dockdemo { border:1px solid var(--border); border-radius:var(--radius-lg); background:var(--card); padding:16px 20px 20px; }
+.dockdemo .tool { max-height:none; }
+.dockdemo .box { display:flex; gap:8px; align-items:center; border:1px solid var(--border); border-radius:var(--radius-lg); padding:10px 10px 10px 20px; }
+.dockdemo .box span { flex:1; color:var(--muted-foreground); font-size:17px; }
+.rw { border-left:3px solid var(--primary); padding:6px 0 6px 16px; font-size:17px; color:var(--muted-foreground); }
+@media (max-width:900px) { section.block, .sheet-head { padding:16px; } .grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="sheet-head">
+  <h1>The dock tools, one by one</h1>
+  <p>Every tool of the CV builder as it sits in the composer dock: the header with the scope toggle where it applies and the Reset and Close toolbar, the body, and the composer underneath whose button carries the tool's verb. Generated from the same templates as the chat mockup, so a change there shows here.</p>
+  <div class="toc"><a href="#the-text-tool">The text tool</a><a href="#ai-driven-opened-from-a-finding">AI-driven, opened from a finding</a><a href="#component-editors-opened-by-clicking-the-part">Component editors, opened by clicking the part</a><a href="#focus-left-out-and-make-room">Focus: left out, and make room</a><a href="#scope-and-states">Scope and states</a></div>
+</div>
+<div id="sheets"></div>
+<div style="height:48px"></div>
+<script>
+const FUNCS = [
+    { key:'reader', name:'Reader awareness' }, { key:'compress', name:'Compression' }, { key:'precision', name:'Technical precision' },
+    { key:'positioning', name:'Positioning' }, { key:'engineering', name:'Engineering thinking' }, { key:'narrative', name:'Narrative', lock:'held here by your rule: it stays a contribution, never authorship' },
+  ];
+  const REWRITE = {
+    'exp-b1': { reader:"Référent technique auprès des enseignants, chercheurs et administration : besoins traduits en solutions, conception, support en production.", compress:"Référent technique des plateformes : besoins traduits en solutions, conception, support en production.", precision:"Référent technique des plateformes Opendidac, Roster et CIIP auprès des enseignants, chercheurs et administration : recueil des besoins, conception technique documentée, support de production.", positioning:"Le référent technique que les enseignants, chercheurs et administration appellent : besoins traduits en solutions, conception, support en production.", engineering:"Entre les besoins des enseignants et les contraintes des plateformes, la conception technique arbitrée puis soutenue en production.", narrative:"Le premier appelé par les enseignants et les chercheurs quand une plateforme doit changer : besoins écoutés, solutions conçues, production soutenue." },
+    'exp-b2': { reader:"Interfaces web d'Opendidac, Roster et CIIP, de la maquette à la mise en production.", compress:"Interfaces web d'Opendidac, Roster et CIIP, de la maquette à la production.", precision:"Conception et développement des interfaces web (Next.js, React, Nuxt) d'Opendidac, Roster et CIIP, de la maquette à la mise en production.", positioning:"Les interfaces web de trois plateformes en production, Opendidac, Roster et CIIP, de la maquette à la mise en service.", engineering:"Des interfaces conçues pour trois plateformes en production, chaque maquette passée à la mise en service sans reprise.", narrative:"Trois plateformes dont les interfaces sont passées de la maquette à des milliers d'utilisateurs." },
+    'exp-b3': { reader:"Travail en équipe agile de plusieurs développeurs, backlog et sprints sur Jira, sur la plateforme CIIP pour un client public externe.", compress:"Évolution de la plateforme CIIP en équipe agile, pour un client public.", precision:"Maintenance corrective et évolutive de la plateforme CIIP (Nuxt, Spring Boot) : backlog et sprints sur Jira, revues de code entre pairs, au sein d'une équipe de plusieurs développeurs.", positioning:"Un portail public de 43 000 comptes et 565 établissements, maintenu et développé en équipe agile de plusieurs développeurs.", engineering:"Sur une plateforme en production pour 43 000 comptes, évolutions livrées en sprints sans interruption de service, au sein d'une équipe agile.", narrative:"Arrivé sur une plateforme déjà en production, contribution à son évolution sprint après sprint avec plusieurs développeurs et un client public exigeant." },
+    'exp-b4': { reader:"Livraison automatisée : Docker, Docker Compose, CI/CD (GitHub Actions, GitLab CI), exploitation sur Kubernetes.", compress:"Livraison automatisée : Docker, CI/CD, Kubernetes.", precision:"Automatisation de la livraison : Docker et Docker Compose, pipelines CI/CD sur GitHub Actions, GitLab CI et Bitbucket Pipelines, exploitation sur Kubernetes.", positioning:"Une chaîne de livraison automatisée de bout en bout : Docker, CI/CD, Kubernetes.", engineering:"Une livraison automatisée pour supprimer les mises en production manuelles : Docker, CI/CD, Kubernetes.", narrative:"Des livraisons qui ne réveillent plus personne : Docker, CI/CD, Kubernetes." },
+    'summary': { reader:"Développeur full-stack JavaScript, React et Vue, à l'aise seul sur un produit comme au sein d'une équipe agile. Intégration d'API REST, CI/CD et exploitation en production. Ergonomie et expérience utilisateur au premier plan, IA au quotidien.", compress:"Développeur full-stack JavaScript, seul sur un produit ou en équipe agile. React et Next.js, Vue et Nuxt, API REST, CI/CD, production. Ergonomie et IA au quotidien.", precision:"Développeur full-stack JavaScript et TypeScript : React et Next.js, Vue et Nuxt, API REST, CI/CD (GitHub Actions, GitLab CI), exploitation sur Kubernetes. Produits pris en charge seul de bout en bout et livrés en équipe agile.", positioning:"Développeur full-stack JavaScript, des interfaces construites de la maquette à la mise en production, seul sur un produit ou au sein d'équipes agiles. React et Next.js, Vue et Nuxt, API REST, CI/CD. L'ergonomie comme pilier, l'IA au quotidien.", engineering:"Développeur full-stack JavaScript : chaque produit pris de la maquette à la production, seul ou en équipe agile, avec la contrainte d'exploitation décidée avant le code. React, Vue, API REST, CI/CD.", narrative:"Développeur full-stack JavaScript, aussi à l'aise seul sur un produit entier qu'au sein d'une équipe agile. Ce qui compte : des interfaces que les gens ont envie d'utiliser, et l'IA comme partenaire de travail." },
+    'proj-opendidac': { reader:"Plateforme d'évaluation adoptée volontairement par les enseignants, conçue, construite et exploitée seul.", compress:"Plateforme d'évaluation adoptée volontairement par les enseignants, prise en charge seul de bout en bout.", precision:"Plateforme d'évaluation (Next.js, PostgreSQL, Docker) adoptée volontairement par les enseignants, conçue, construite et exploitée seul, en production depuis quatre ans.", positioning:"Adoptée volontairement par les enseignants et toujours en service après quatre ans : une plateforme d'évaluation conçue, construite et exploitée seul.", engineering:"Une plateforme d'évaluation conçue pour des examens en salle : construite, exploitée et soutenue seul, adoptée volontairement par les enseignants.", narrative:"Née d'un besoin d'examens numériques, adoptée par les enseignants sans y être obligés, exploitée seul depuis quatre ans." },
+    'proj-ciip': { reader:"Plateforme de la Conférence intercantonale de l'instruction publique, 43 000+ comptes et 565 établissements, en équipe agile avec backlog et sprints sur Jira.", compress:"Plateforme CIIP, 43 000+ comptes, 565 établissements, Romandie et Tessin.", precision:"Plateforme de la Conférence intercantonale de l'instruction publique, 43 000+ comptes et 565 établissements, Romandie et Tessin. Travail estimé, planifié et suivi dans Jira.", positioning:"Un portail public de 43 000+ comptes et 565 établissements en Romandie et au Tessin, développé en équipe agile.", engineering:"43 000+ comptes et 565 établissements en production : chaque évolution estimée, planifiée dans Jira et livrée sans interruption.", narrative:"Une plateforme qui sert 43 000 comptes et 565 établissements, à faire évoluer sans jamais l'arrêter." },
+    'proj-roster': { reader:"Remplaçant de GitHub Classroom en React et TypeScript, première utilisation en production un mois après le premier commit.", compress:"Remplaçant de GitHub Classroom, en production un mois après le premier commit.", precision:"Remplaçant de GitHub Classroom (React, TypeScript, Tailwind, Radix), première utilisation en production un mois après le premier commit.", positioning:"Un mois du premier commit à la première utilisation en production : le remplaçant de GitHub Classroom.", engineering:"Un remplaçant de GitHub Classroom livré en un mois, parce que la première utilisation réelle était la date de fin.", narrative:"Un mois entre le premier commit et la première classe qui l'utilise : le remplaçant de GitHub Classroom." },
+    'proj-dds': { reader:"Intégration par API REST de Fitbit, GitHub et SurveyMonkey dans une plateforme d'enquêtes.", compress:"Intégration de trois sources de données par API REST dans une plateforme d'enquêtes.", precision:"Intégration de sources de données multiples (Fitbit, GitHub, SurveyMonkey) par API REST et OAuth dans une plateforme d'enquêtes en React et Python.", positioning:"Trois sources de données externes intégrées par API REST dans une plateforme d'enquêtes de recherche.", engineering:"Trois API externes aux formats différents ramenées à un modèle commun pour une plateforme d'enquêtes.", narrative:"Fitbit, GitHub et SurveyMonkey réunis dans une plateforme d'enquêtes, par API REST." },
+  };
+  const ENTRIES = { heig: ['exp-b1', 'exp-b2', 'exp-b3', 'exp-b4'] };
+  const SUGGEST = { summary:'positioning', 'exp-b3':'reader', 'proj-ciip':'precision' };
+
+  // ───────────── Tool templates: each returns { html, verb, ready, scope } ─────────────
+  const SELECT = (fn) => `<select class="fnsel ${fn ? '' : 'empty'}" aria-label="Way of saying it" onchange="pickFn(this.value)"><option value="" ${fn ? '' : 'selected'} disabled>Choose a way of saying it…</option>${FUNCS.map(x => `<option value="${x.key}" ${x.key === fn ? 'selected' : ''}>${x.name}</option>`).join('')}</select>`;
+  function diff(a, b) {
+    const A = a.split(/\s+/), B = b.split(/\s+/), n = A.length, m = B.length;
+    const L = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    const out = [], old = []; let i = 0, j = 0;
+    while (i < n && j < m) { if (A[i] === B[j]) { out.push(B[j]); old.push(A[i]); i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) { old.push('<s>' + A[i] + '</s>'); i++; } else { out.push('<ins>' + B[j] + '</ins>'); j++; } }
+    while (i < n) old.push('<s>' + A[i++] + '</s>'); while (j < m) out.push('<ins>' + B[j++] + '</ins>');
+    return { current: old.join(' ').replace(/<\/s> <s>/g, ' '), after: out.join(' ').replace(/<\/ins> <ins>/g, ' ') };
+  }
+  const textOf = r => { const el = byName(r); const pt = el.querySelector('.pt'); return (pt ? pt : el).textContent.trim(); };
+
+  const T = {
+    rework: () => {
+      const lines = cur.scope === 'entry' ? ENTRIES[cur.entry] : [cur.region];
+      const fn = cur.fn, f = FUNCS.find(x => x.key === fn);
+      const one = r => { const now = textOf(r); const aft = fn ? (REWRITE[r] || {})[fn] : null; return { now, aft, d: aft ? diff(now, aft) : null }; };
+      const multi = lines.length > 1;
+      const cells = lines.map(one);
+      const current = multi ? `<ul>${cells.map(c => `<li>${c.d ? c.d.current : c.now}</li>`).join('')}</ul>` : `<div class="t">${cells[0].d ? cells[0].d.current : cells[0].now}</div>`;
+      const after = fn ? (multi ? `<ul>${cells.map(c => `<li>${c.aft ? c.d.after : '<i>not written in this mockup</i>'}</li>`).join('')}</ul>` : `<div class="t">${cells[0].aft ? cells[0].d.after : '<i>not written in this mockup for this line</i>'}</div>`)
+                       : (multi ? `<ul>${lines.map((r, k) => `<li>${k === 0 ? 'Choose a way of saying it, or tell me what you want below.' : '…'}</li>`).join('')}</ul>` : `<div class="t">Choose a way of saying it, or tell me what you want below.</div>`);
+      return { html: `<div class="pair"><div class="side current"><div class="h"><b>Current</b><span class="fnname">Clarity</span></div>${current}</div><div class="side after ${fn ? '' : 'empty'}"><div class="h"><b>After</b>${SELECT(fn)}${fn && fn === (SUGGEST[cur.region] || 'reader') ? '<span class="rec">Recommended</span>' : ''}</div>${after}${f?.lock && lines.includes('exp-b3') ? `<div class="lock">🔒 ${f.lock}</div>` : ''}${cur.note ? `<div class="note"><b>With your note:</b> ${cur.note}</div>` : ''}</div></div>`, verb: 'Apply', ready: !!fn, scope: cur.entry ? ['line', 'entry'] : null };
+    },
+    sameway: () => {
+      const fn = cur.fn, f = FUNCS.find(x => x.key === fn);
+      const parts = Object.keys(REWRITE).filter(r => !cur.doneParts.includes(r));
+      const rows = parts.map(r => { const now = textOf(r), aft = (REWRITE[r] || {})[fn]; const d = aft ? diff(now, aft) : null; return `<div class="sw-row" data-part="${r}"><div class="top"><span class="lbl">${REGION_NAME[r]}</span><input type="checkbox" checked class="sw" onchange="this.closest('.sw-row').classList.toggle('off', !this.checked)"></div><details><summary>Current against After</summary><div class="pair"><div class="side current"><div class="h"><b>Current</b></div><div class="t">${d ? d.current : now}</div></div><div class="side after"><div class="h"><b>After</b></div><div class="t">${d ? d.after : '<i>not written in this mockup</i>'}</div></div></div></details></div>`; }).join('');
+      return { verb: `Apply to ${parts.length} parts`, ready: true, html: `<div class="sw-head"><span>Say the rest the same way:</span>${SELECT(fn)}${fn === (SUGGEST[cur.region] || 'reader') ? '<span class="rec">Recommended</span>' : ''}</div>${rows}<div class="sw-note">Not touched: the profile block, the skills lists, dates and languages. Untick a part to leave it as it is. One change, one undo.</div>` };
+    },
+    list: () => ({ verb:'Apply', ready:true, html:`<p class="lead">The offer names headless components and atomic design. Both are true of you. Bold what it names, add the one item it would search for.</p>
+      <div class="opts"><label class="opt"><span class="lbl"><b>Composants headless (Radix)</b><small>bold: the offer names it</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="lbl">Atomic design (shadcn/ui, composants réutilisables)<small>add: from Roster and Charrette in your profile</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt muted"><span class="lbl">Vite<small>drop: not asked, space</small></span><span class="ctl"><input type="checkbox"></span></label></div>` }),
+    header: () => ({ verb:'Apply', ready:true, html:`<p class="lead">The offer asks for two to five years. You have about fifteen. A number three times the bar reads as overqualified before the first line is read.</p>
+      <div class="opts"><div class="opt"><span class="lbl">Title<small>mirrors the offer</small></span><span class="ctl seg small"><button aria-pressed="true" onclick="pickFacet(this)">Développeur Full-Stack JavaScript</button><button onclick="pickFacet(this)">Ingénieur logiciel</button></span></div><div class="opt"><span class="lbl">Year count in title or summary</span><span class="ctl seg small"><button aria-pressed="true" onclick="pickFacet(this)">Hide</button><button onclick="pickFacet(this)">Show</button></span></div><label class="opt"><span class="lbl">Citoyen suisse<small>your profile rule: in the contact block</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="lbl">Photo<small>optional in IT</small></span><span class="ctl"><input type="checkbox"></span></label></div>` }),
+    gap: () => ({ verb:'Apply', ready:false, html:`<p class="lead">Docker and Docker Compose you have. AWS ECS you do not, and I will not add it. Three honest ways to handle it.</p>
+      <div class="alts"><button class="alt" onclick="pickAlt(this)"><b>Show the neighbour <small>· in the CV</small></b>Add "déploiement de conteneurs sur Kubernetes" so the reader sees you run containers in production, on another platform.</button><button class="alt" onclick="pickAlt(this)"><b>Bridge in the letter <small>· one sentence, drafted for you</small></b>The letter says container deployment is daily practice on Kubernetes, and ECS is a platform switch, not a skill gap.</button><button class="alt" onclick="pickAlt(this)"><b>Say nothing <small>· accept it</small></b>ECS is one item in a list of three. The other two are met.</button></div>` }),
+    gap2: () => ({ verb:'Apply', ready:false, html:`<p class="lead">Twig, Lottie, WordPress and Expo are listed as a plus. None is in your profile, and claiming any would be caught at the interview.</p>
+      <div class="alts"><button class="alt" onclick="pickAlt(this)"><b>Say nothing <small>· accept it</small></b>The offer marks them as a plus. The core stack is fully met.</button><button class="alt" onclick="pickAlt(this)"><b>Bridge in the letter <small>· one sentence</small></b>The same family of tools has been learned on demand before, four frameworks in production as the example.</button></div>` }),
+    profile: () => ({ verb:'Apply', ready:false, html:`<h5>Job title on this CV</h5><div class="alts"><button class="alt" onclick="pickAlt(this)"><b>Développeur Full-Stack JavaScript <small>· the offer's own title</small></b></button><button class="alt" onclick="pickAlt(this)"><b>Ingénieur logiciel full-stack <small>· your usual title</small></b></button><button class="alt" onclick="pickAlt(this)"><b>Développeur web <small>· plain words</small></b></button></div>
+      <h5>Shown on this CV</h5><div class="opts"><label class="opt"><span class="lbl">Email<small>stefanteofanovic@hotmail.com</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="lbl">Phone<small>+41 77 966 97 52</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="lbl">Location<small>Montreux, Suisse</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="lbl">Nationality<small>Citoyen suisse</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="lbl">LinkedIn<small>linkedin.com/in/stefan-teofanovic</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt muted"><span class="lbl">Date of birth<small>not in your profile</small></span><span class="ctl"><input type="checkbox"></span></label><div class="opt"><span class="lbl">GitHub or portfolio<small>add a link</small></span><span class="ctl"><button class="btn sm">Add</button></span></div><div class="opt"><span class="lbl">Photo<small>optional in IT, common elsewhere in Switzerland</small></span><span class="ctl"><button class="btn sm">Upload</button></span></div></div>` }),
+    listedit: () => ({ verb:'Apply list', ready:false, html:`<p class="lead">Your skills. Drag to reorder, bold what matters, × to drop.</p>
+      <div class="group-box"><div class="gh"><span class="grip">⋮⋮</span>Front end</div><div class="tokens"><span class="token"><b>HTML5</b><span class="x">×</span></span><span class="token"><b>CSS3</b><span class="x">×</span></span><span class="token"><b>Responsive</b><span class="x">×</span></span><span class="token"><b>Tailwind CSS</b><span class="x">×</span></span><span class="token">Composants headless (Radix)<span class="x">×</span></span><span class="token">shadcn/ui<span class="x">×</span></span><span class="token">Vite<span class="x">×</span></span><span class="token add">+ add</span></div></div>
+      <div class="group-box"><div class="gh"><span class="grip">⋮⋮</span>Build et run</div><div class="tokens"><span class="token"><b>Git</b><span class="x">×</span></span><span class="token"><b>Docker</b><span class="x">×</span></span><span class="token"><b>Docker Compose</b><span class="x">×</span></span><span class="token">Linux Debian<span class="x">×</span></span><span class="token flag" title="a remembered rule applies">Kubernetes ▲<span class="x">×</span></span><span class="token">GitHub Actions<span class="x">×</span></span><span class="token add">+ add</span></div></div>
+      <div class="leftout"><h5>Left out for this offer</h5><div class="opts"><label class="opt"><span class="lbl">Python, FastAPI, Django<small class="why">not asked: the offer is JavaScript</small></span><span class="ctl"><input type="checkbox" class="bring"></span></label><label class="opt"><span class="lbl">Java, Spring Boot<small class="why">not asked</small></span><span class="ctl"><input type="checkbox" class="bring"></span></label><label class="opt"><span class="lbl">Kubernetes, Helm, Prometheus, Grafana<small class="why">not asked: the offer stops at Docker Compose</small></span><span class="ctl"><input type="checkbox" class="bring"></span></label><label class="opt"><span class="lbl">LangChain, Ollama, vLLM, RAG<small class="why">not asked: AI stays one line in the summary</small></span><span class="ctl"><input type="checkbox" class="bring"></span></label><label class="opt muted"><span class="lbl">41 more<small>older tools, domains, methods</small></span><span class="ctl"><button class="btn sm">See them</button></span></label></div></div>` }),
+    entry: () => ({ verb:'Apply', ready:false, html:`<div class="opts"><div class="opt"><span class="lbl">Rework all 4 lines of this experience<small>Current against After, one way of saying it for the whole entry</small></span><span class="ctl"><button class="btn sm" onclick="openTool('rework', {entry:'heig', scope:'entry', region:'exp-b1'})">Rework</button></span></div></div>
+      <h5>Title</h5><div class="alts"><button class="alt" onclick="pickAlt(this)"><b>Collaborateur R&amp;D en génie logiciel <small>· your real title</small></b></button><button class="alt" onclick="pickAlt(this)"><b>Ingénieur logiciel, R&amp;D <small>· shorter</small></b></button></div>
+      <h5>Shown</h5><div class="opts"><label class="opt"><span class="lbl">Employer<small>HEIG-VD, HES-SO Suisse occidentale</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="lbl">Place<small>Yverdon-les-Bains</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="lbl">Work mode<small>hybride</small></span><span class="ctl"><input type="checkbox" checked></span></label><div class="opt"><span class="lbl">Dates</span><span class="ctl seg small"><button aria-pressed="true" onclick="pickFacet(this)">août 2022 – août 2026</button><button onclick="pickFacet(this)">2022 – 2026</button></span></div><label class="opt"><span class="lbl">This entry on the CV<small>4 lines</small></span><span class="ctl"><input type="checkbox" checked></span></label></div>` }),
+    education: () => ({ verb:'Apply', ready:false, html:`<div class="opts"><label class="opt"><span class="lbl">Bachelor HES en génie logiciel<small>HEIG-VD, 2018 – 2022</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="lbl">CFC Informatique<small>École des Arches, Lausanne, 2008</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt muted"><span class="lbl">Formation PMP<small class="why">left out: not asked by the offer</small></span><span class="ctl"><input type="checkbox"></span></label><label class="opt muted"><span class="lbl">Bachelor thesis: SemanticFlow<small class="why">left out: not asked, and space</small></span><span class="ctl"><input type="checkbox"></span></label><div class="opt"><span class="lbl">Dates</span><span class="ctl seg small"><button aria-pressed="true" onclick="pickFacet(this)">2018 – 2022</button><button onclick="pickFacet(this)">2022 only</button></span></div><div class="opt"><span class="lbl">Order</span><span class="ctl seg small"><button aria-pressed="true" onclick="pickFacet(this)">Newest first</button><button onclick="pickFacet(this)">Oldest first</button></span></div></div>` }),
+    languages: () => ({ verb:'Apply', ready:false, html:`<div class="opts"><div class="opt"><span class="lbl">Français<small>the offer asks: langue maternelle</small></span><span class="ctl seg small"><button onclick="pickFacet(this)">C1</button><button onclick="pickFacet(this)">C2</button><button aria-pressed="true" onclick="pickFacet(this)">Maternelle</button></span><span class="ctl"><input type="checkbox" checked aria-label="shown"></span></div><div class="opt"><span class="lbl">Anglais</span><span class="ctl seg small"><button onclick="pickFacet(this)">C1</button><button onclick="pickFacet(this)">C2</button><button aria-pressed="true" onclick="pickFacet(this)">Maternelle</button></span><span class="ctl"><input type="checkbox" checked aria-label="shown"></span></div><div class="opt muted"><span class="lbl">Serbe<small class="why">left out: not asked by the offer</small></span><span class="ctl seg small"><button aria-pressed="true">Maternelle</button></span><span class="ctl"><input type="checkbox" aria-label="shown"></span></div><div class="opt"><span class="lbl">Add a language</span><span class="ctl"><button class="btn sm">Add</button></span></div></div>` }),
+    section: () => ({ verb:'Apply', ready:false, html:`<p class="lead">The sections of this CV. Drag to reorder, untick to hide.</p><div class="opts"><label class="opt"><span class="grip">⋮⋮</span><span class="lbl">Profil</span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="grip">⋮⋮</span><span class="lbl">Expérience<small>2 entries</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="grip">⋮⋮</span><span class="lbl">Projets<small>4</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="grip">⋮⋮</span><span class="lbl">Compétences<small>2 groups</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="grip">⋮⋮</span><span class="lbl">Formation</span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="grip">⋮⋮</span><span class="lbl">Langues</span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt muted"><span class="grip">⋮⋮</span><span class="lbl">Publications<small class="why">1, left out: not asked</small></span><span class="ctl"><input type="checkbox"></span></label><div class="opt"><span class="lbl">Add a section<small>Bénévolat, Références, Centres d'intérêt</small></span><span class="ctl"><button class="btn sm">Add</button></span></div></div>` }),
+    projects: () => ({ verb:'Apply', ready:false, html:`<p class="lead">Four projects are shown, the rest were left out to keep the focus on this offer. Bring one back if you want.</p>
+      <div class="opts"><label class="opt"><span class="grip">⋮⋮</span><span class="lbl">Opendidac<small>shown · sole ownership, the offer asks for autonomy</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="grip">⋮⋮</span><span class="lbl">CIIP<small>shown · Vue, Nuxt, agile team</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="grip">⋮⋮</span><span class="lbl">Roster<small>shown · React, TypeScript, Tailwind</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="grip">⋮⋮</span><span class="lbl">Data-Driven Surveys<small>shown · REST API integrations</small></span><span class="ctl"><input type="checkbox" checked></span></label></div>
+      <div class="leftout"><h5>Left out for this offer</h5><div class="opts"><label class="opt"><span class="lbl">Planair AI Assistant<small class="why">not asked: AI and Python, the offer is JavaScript front end</small></span><span class="ctl"><input type="checkbox" class="bring"></span></label><label class="opt"><span class="lbl">SECTOR, self-hosted AI coding tools<small class="why">not asked: infrastructure and GPUs</small></span><span class="ctl"><input type="checkbox" class="bring"></span></label><label class="opt"><span class="lbl">Apertus Swiss LLM hosting<small class="why">not asked: infrastructure</small></span><span class="ctl"><input type="checkbox" class="bring"></span></label><label class="opt"><span class="lbl">DVC Sync S3 API<small class="why">not asked: Python back end</small></span><span class="ctl"><input type="checkbox" class="bring"></span></label><label class="opt muted"><span class="lbl">20 more from before 2017<small>older than the offer's window</small></span><span class="ctl"><button class="btn sm">See them</button></span></label></div></div>` }),
+    experiences: () => ({ verb:'Apply', ready:false, html:`<p class="lead">Two entries are shown, six were left out to keep the focus. Bring one back if you want.</p>
+      <div class="opts"><label class="opt"><span class="grip">⋮⋮</span><span class="lbl">HEIG-VD, 2022 – 2026<small>shown in full · the work this offer buys</small></span><span class="ctl"><input type="checkbox" checked></span></label><label class="opt"><span class="grip">⋮⋮</span><span class="lbl">Nestlé, 2011 – 2015<small>shown short · seniority and structure</small></span><span class="ctl"><input type="checkbox" checked></span></label></div>
+      <div class="leftout"><h5>Left out for this offer</h5><div class="opts"><label class="opt"><span class="lbl">AgenceWeb SA, 2007 – 2011<small class="why">web developer, close to this offer but older than fifteen years</small></span><span class="ctl"><input type="checkbox" class="bring"></span></label><label class="opt"><span class="lbl">Freelance, 2016 – 2017<small class="why">PHP, not asked</small></span><span class="ctl"><input type="checkbox" class="bring"></span></label><label class="opt"><span class="lbl">High-Creek, 2015 – 2016<small class="why">e-commerce consulting, not asked</small></span><span class="ctl"><input type="checkbox" class="bring"></span></label><label class="opt muted"><span class="lbl">Redcats, eegoes, Lab4Tech, 2011<small>short posts, older than the offer's window</small></span><span class="ctl"><button class="btn sm">See them</button></span></label></div></div>` }),
+    makeroom: () => ({ verb:'Apply', ready:false, goal:3, html:`<p class="lead">Page two is three lines over. Tick what you accept until the bar is full.</p>
+      <div class="goal"><div class="bar"><i id="room-bar"></i></div><b id="room-count">0 of 3 lines</b></div>
+      <div class="opts"><label class="opt room-opt"><span class="lbl">Shorten every project line a little<small>the four lines lose their second clause, the figures stay</small></span><span class="ctl"><span class="free">3 lines</span><input type="checkbox" value="3"></span></label><label class="opt room-opt"><span class="lbl">Drop the tools lines under all projects<small>all four or none, the tools stay in Compétences</small></span><span class="ctl"><span class="free">4 lines</span><input type="checkbox" value="4"></span></label><label class="opt room-opt"><span class="lbl">Tighten the summary by one sentence<small>the UX sentence folds into the first</small></span><span class="ctl"><span class="free">1 line</span><input type="checkbox" value="1"></span></label><label class="opt room-opt"><span class="lbl">Earlier experience as one line each<small>every post before 2022: title, employer, years</small></span><span class="ctl"><span class="free">2 lines</span><input type="checkbox" value="2"></span></label><label class="opt room-opt"><span class="lbl">Hide a section<small>Langues folds into the contact line</small></span><span class="ctl"><span class="free">3 lines</span><input type="checkbox" value="3"></span></label><label class="opt room-opt"><span class="lbl">Tighter spacing<small>one step less air everywhere, still readable</small></span><span class="ctl"><span class="free">5 lines</span><input type="checkbox" value="5"></span></label></div>` }),
+    whole: () => ({ verb:'Rewrite 9 elements', ready:true, html:`<p class="lead">The Compression way, everywhere prose is written. Lists and dates stay. One change, one undo.</p><div class="opts"><div class="opt"><span class="lbl">Profil</span><span class="ctl" style="color:var(--muted-foreground)">rewritten</span></div><div class="opt"><span class="lbl">Expérience, 4 lines</span><span class="ctl" style="color:var(--muted-foreground)">rewritten</span></div><div class="opt"><span class="lbl">Projets, 4</span><span class="ctl" style="color:var(--muted-foreground)">rewritten</span></div><div class="opt muted"><span class="lbl">Compétences, Formation, Langues</span><span class="ctl">unchanged</span></div></div><div class="check warn">▲ <span>Every rewritten sentence is checked against your profile and your rules before it lands.</span></div>` }),
+    credits: () => ({ verb:'Rewrite 9 elements', ready:false, html:`<div class="check warn">▲ <span>Rewriting 9 elements costs about CHF 0.45 and your balance is CHF 0.30.</span><button class="btn sm">Add credits</button></div>` }),
+    error: () => ({ verb:'Try again', ready:true, html:`<div class="check danger">■ <span>The rewrite could not be produced. Nothing was charged, your choice is kept.</span></div>` }),
+    conflict: () => ({ verb:'Apply', ready:true, html:`<p class="lead">My first proposal said "administration de clusters Kubernetes". That crosses the rule you gave me today, so I dropped it.</p><div class="pair"><div class="side current"><div class="h"><b>Current</b><span class="fnname">Clarity</span></div><div class="t">Git, Docker, Docker Compose, Linux Debian, <s>Kubernetes</s>, GitHub Actions</div></div><div class="side after"><div class="h"><b>After</b><span class="fnname" style="font-weight:600">Rule respected</span></div><div class="t">Git, Docker, Docker Compose, Linux Debian, <ins>déploiement et exploitation de services sur Kubernetes</ins>, GitHub Actions</div><div class="note"><b>You told me:</b> Kubernetes as service manager of the workloads, never cluster administrator. (today)</div></div></div>` }),
+  };
+
+
+
+  const CAPTIONS = [["The text tool", [["rework", "Rework", "Current against After for any prose part, the way of saying it as a dropdown, scope This line / This experience. Interactive version: the Rework mockup (doc 85)."]]], ["AI-driven, opened from a finding", [["list", "List", "The offer names items. Bold, add or drop, one decision per row."], ["header", "Profile block (AI)", "What to show or withhold, here the years rule against a 2 to 5 years bar."], ["gap", "Gap, with a neighbour", "Nothing to rewrite: three honest handlings as blocks, none preselected."], ["gap2", "Gap, a plus only", "Two handlings, none preselected."], ["conflict", "Conflict with a rule", "The AI crossed a remembered rule, says so, and shows the honest version as Current against After."]]], ["Component editors, opened by clicking the part", [["profile", "Profile block", "Titles as blocks, then show/hide rows, links and photo as rows with a button."], ["listedit", "Skills", "Groups and tokens, then what was left out for this offer."], ["entry", "Experience entry", "First row: rework all its lines. Then title blocks and the heading fields as rows."], ["education", "Education", "One row per diploma with the reason when left out, dates and order as segments."], ["languages", "Languages", "One row per language: level segment and a shown tick."], ["section", "Sections", "One row per section with a grip and a tick."]]], ["Focus: left out, and make room", [["projects", "Projects section", "What is shown and what was left out for this offer, each with its reason and a tick to bring it back."], ["experiences", "Experience section", "Shown in full, shown short, left out. Reasons name the offer, not the person."], ["makeroom", "Make room", "Opened from the overflow warning on the CV. Document-wide solutions with the lines each frees, a goal bar."]]], ["Scope and states", [["whole", "Whole document", "The batch preview: what is rewritten, what is untouched, one undo."], ["credits", "Insufficient credits", "The verb stays visible and disabled, with the smaller option beside it."], ["error", "Error", "What happened, what was not charged, one retry."]]]];
+  // the templates read the current tool state; give them a neutral one
+  let cur = { key:null, region:'exp-b3', entry:'heig', scope:'line', fn:null, note:null };
+  const byName = () => null;
+  const root = document.getElementById('sheets');
+  CAPTIONS.forEach(([group, items]) => {
+    const sec = document.createElement('section'); sec.className = 'block'; sec.id = group.toLowerCase().replace(/[^a-z]+/g, '-');
+    sec.innerHTML = `<h2>${group}</h2><div class="grid"></div>`;
+    const grid = sec.querySelector('.grid');
+    items.forEach(([key, name, cap]) => {
+      const d = document.createElement('div'); d.className = 'demo'; d.id = 'tool-' + key;
+      let body, verb = 'Send', ready = false, scope = '';
+      if (key === 'rework') { body = `<div class="rw">Current against After, side by side, with the way of saying it as a dropdown in the After header. See the interactive Rework mockup.</div>`; scope = `<span class="seg"><button aria-pressed="true">This line</button><button>This experience · 4 lines</button></span>`; }
+      else { const t = T[key](); body = t.html; verb = t.verb; ready = t.ready; }
+      d.innerHTML = `<div class="cap"><b>${name}</b><code>${key}</code><br>${cap}</div>
+        <div class="dockdemo"><div class="tool"><div class="thead">${scope}</div><div class="tbody">${body}</div></div>
+        <div class="box"><span class="prefix on"><span class="what">${name} <small>· the part it works on</small></span><button aria-label="Cancel the tool">×</button></span><span>Tell me what you want, or use the tool above</span><button class="btn primary sm" ${ready ? '' : 'disabled'}>${ready ? verb : 'Send'}</button></div></div>`;
+      grid.appendChild(d);
+    });
+    root.appendChild(sec);
+  });
+  document.querySelectorAll('.alt').forEach(b => b.addEventListener('click', () => b.parentElement.querySelectorAll('.alt').forEach(x => x.setAttribute('aria-pressed', x === b))));
+  document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b))));
+  function pickAlt(b) { b.parentElement.querySelectorAll('.alt').forEach(x => x.setAttribute('aria-pressed', x === b)); }
+  function pickFacet(b) { b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); }
+  function openTool() {} function pickFn() {}
+
+</script>
+</body>
+</html>
