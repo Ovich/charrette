@@ -87,6 +87,23 @@ tags = project + design.
 - **Native look:** every region should be recognisably one of the project's components
   (annotate with `data-component="Pill"` etc. so the handoff maps 1:1). Real copy in
   the product's voice, never lorem. Real-looking data (names, counts, dates).
+- **Declaring a component:** a region you may want in another mockup carries
+  `data-component="Name"` and styles itself under that selector
+  (`[data-component="Name"]` and descendants), never through element or `body` rules.
+- **Bindable means static:** a bindable component is markup in the file, never the
+  output of the file's script. It carries no `id` and no inline handler, because it may
+  be placed more than once and into pages that do not define the handler. Parts a
+  script must reach are marked `data-part="name"` and found inside the bound element.
+- **Binding:** to reuse a component from another mockup of the same project, place
+  `<div data-bind="file#Name"></div>` where it goes (`file` is the sibling's bare file
+  name). aiview replaces the placeholder with the component, no wrapper, the
+  placeholder's `class` and `style` merged on. Keep behaviour in the source mockup, or
+  write it in the host against the bound markup: bound copies are markup and style.
+  Editing the source reloads every open host.
+- **Decomposition is proposed, never done:** when a region is drawn in two files, or a
+  mockup grows a second screen's worth of components, propose splitting in one line
+  ("the tools could live in their own mockup and be bound here, want that?") and wait.
+  Never split a mockup on your own.
 - **States:** default, empty, loading, error, and any permission/role state the screen
   has, as separate sections or a small state switcher in the mockup. Responsive at the
   aiview presets (mobile 390 · tablet 820 · laptop 1280).
@@ -94,7 +111,8 @@ tags = project + design.
   kind `mockup` (from the filename), tags = project + feature, and when the mockup
   belongs to a brainstorm's piece of work, the board's group, so they share a
   container. Tell the user the URL it prints. aiview renders `.html` in a sandboxed
-  iframe with viewport presets and live reload.
+  iframe with viewport presets and live reload, and its Composition view outlines
+  every bound region with its source, so a person sees what comes from elsewhere.
 
 ## Copy is design material
 

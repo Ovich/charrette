@@ -239,6 +239,13 @@ mermaid for Markdown, sandboxed iframe with viewport presets for HTML mockups, t
 browser's PDF viewer for PDFs), live-reloading on save — and, above the content, a card
 per unit of work the document is still waiting on, appearing and disappearing live.
 
+An HTML mockup can bind components from sibling mockups (`data-bind="file#Name"`, see
+the `frontend-design` skill); aiview composes them at serve time and reloads the host
+when a source is saved. Beside the viewport presets a view toggle offers **Rendered**
+(the page) and **Composition** (every bound region outlined with its source and
+component, a legend of sources and errors, a click on a label opening the source at
+that component). Nothing is written to disk: the file stays the author's.
+
 ## Contract for calling skills
 
 A skill that produces viewable documents says: *"Register and serve via the `aiview`
@@ -289,3 +296,4 @@ instruction:
 | "I'm in `C:\CIIP\portail`, so the project is `portail`" | That was the old derived behaviour and the bug this replaced. `cwdProject` says CIIP. |
 | "I'll add `--path` pointing at where the documents are" | `paths` covers **working directories**. Documents always live in `<docs>/<slug>/`. |
 | "Switch project, then open the document" | `open` already switches. One call. |
+| "I'll copy the component into the other mockup" | Bind it: `data-bind="file#Name"`. A copy drifts; a binding follows the source. |
