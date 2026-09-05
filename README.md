@@ -25,9 +25,9 @@ The board is a Markdown file opened at the first question and edited through the
 
 ## Iterate the loop
 
-One pass of the loop covers a piece of work that can be built and verified end to end, a feature or a bounded change. Its plan reaches as far as present knowledge and no further: where what comes later depends on what earlier work will find, the plan says so and stops there. Execute, and when the work changes the picture, return to the board with what was learned rather than patching the plan. The spec grows across passes.
+Charrette is run iteratively. One pass of the loop is one iteration: it brainstorms, specs, plans and builds a single increment, a feature or a bounded change that works and can be verified when the iteration ends. The plan is the iteration's plan, not the project's: it covers the increment and stops where the next one would begin. What the increment teaches feeds the next brainstorm, so the spec grows by increments and each plan is written with the last increment's learning in hand.
 
-An agent loves writing plans, embellished and polished, and they can fall apart at the end. A spec and a plan are sized to what a person can hold in mind, understand and approve in one reading.
+The thing to avoid is big design up front: an agent loves writing plans, embellished and polished, and they can fall apart at the end. A spec and a plan are sized to what a person can hold in mind, understand and approve in one reading.
 
 ## What it looks like
 
