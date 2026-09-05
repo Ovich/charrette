@@ -5,7 +5,9 @@ drawn, argued over, and decided before anything expensive is built.)*
 
 Agent skills that settle what gets built before code is written. They sharpen the engineer's thinking rather than replace it: every design, plan and screen is drawn, argued and approved by a person before an agent acts on it. A design conversation ends in a spec and a plan, a screen in a working mockup, a pull request in an analysis with the decisions only a human can make. Every document renders live in aiview, the companion app. None of it lands in your repository.
 
-The problem it removes: chat scrolls away. A design agreed at message 40 is gone by message 90, a half-run plan cannot be resumed by the next session, and code gets written against states a picture never settled. Charrette puts the record in documents the agent keeps true while it works.
+The method is not new. Drawing the system before building it, writing the spec, recording why a decision was made, planning in phases that can be verified, reviewing at more than one altitude: software engineering had all of it and mostly stopped, because a diagram cost an afternoon, a spec a week, and both were stale by the time the code shipped. An agent draws the diagram in the time it takes to ask for it and keeps it true while the code changes. The overhead that killed the practice is gone. Charrette is the practice, back.
+
+The problem it removes: chat scrolls away. A design agreed at message 40 is gone by message 90, because a session's context is summarised as it grows and a summary rarely keeps a decision's reasoning, and because a decision made in chat has no address a later session or another person can open. A half-run plan cannot be resumed, and code gets written against states a picture never settled. Charrette puts the record in documents the agent keeps true while it works.
 
 Nine skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
 
