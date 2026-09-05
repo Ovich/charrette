@@ -15,12 +15,9 @@ The approved spec, open in the viewer (`aiview` skill, `../aiview/SKILL.md` in t
 collection), its board, and the previous plan's finished steps when this is not the
 first increment.
 
-The project's testing strategy, from `AGENTS.md`: what earns a test at which level
-per layer, what a test may touch, the runner, the command that runs one test. When
-`AGENTS.md` has none, read the test setup (config, existing tests, CI) and write what
-it shows; when the codebase has none either, run the `interview` skill on those four
-decisions before drawing a slice, and propose the result as a capture through the
-`project-conventions` skill (`../project-conventions/SKILL.md` in this collection).
+How the project tests, read before drawing a slice: its scripts, its existing tests,
+its CI. A codebase with no tests yet gets the question in the draft review: at which
+level each layer is tested, and what a test may touch.
 
 ## Slices
 
