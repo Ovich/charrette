@@ -156,43 +156,25 @@ node is overwritten, never appended to.
 
 ### Mockups that compose
 
-A component is drawn once, in one mockup, under a name:
+Everything here is done by the agent. You look at the viewer and say what you want
+changed.
 
-```html
-<div data-component="CartLine">…</div>
-```
+A component is drawn once, in one mockup. Other mockups of the project use it. When the
+agent changes the drawing, every page that uses it reloads with the change. Nothing is
+copied between files.
 
-Any other mockup of the project uses it with a placeholder:
-
-```html
-<div data-bind="2026-09-05-shop-parts.mockup.html#CartLine"></div>
-```
-
-The viewer shows the component in the placeholder's place. Save the source and every
-page that uses it reloads. The files on disk do not change.
-
-The demo is a shop: a parts sheet that offers the cart line, the stepper, the promo
-field, the checkout button, the badge and the empty state, and a cart page that uses
-them eleven times.
+The demo is a shop: a parts sheet with the cart line, the stepper, the promo field, the
+checkout button, the badge and the empty state, and a cart page that uses them eleven
+times.
 
 ![aiview: the Arbor cart page, the variant toolbar above the frame with "promo applied" selected](assets/aiview-mockup-variants.png)
 
-A screen has variants: empty, a promo applied, an item out of stock. The mockup
-declares them as buttons, and the viewer puts them in its toolbar. The chosen variant
-stays through every save.
+A screen has variants: empty, a promo applied, an item out of stock. They sit in the
+toolbar above the frame. The one you choose stays through every change the agent makes.
 
-```html
-<div data-component="MockupBar">
-  <button data-aiview-variant="three" aria-pressed="true">three items</button>
-  <button data-aiview-variant="empty">empty</button>
-  <button data-aiview-variant="promo">promo applied</button>
-  <button data-aiview-action="reset">reset</button>
-</div>
-```
-
-The **Composition** view outlines what a page pulls from other mockups, in indigo, and
-what it offers to them, in green. The label names the source and the component. A click
-on a pulled region opens its source.
+The **Composition** view shows where the screen comes from: what it takes from other
+mockups, outlined in indigo, and what it offers to them, in green. A click on an
+outlined region opens the mockup it comes from.
 
 ![aiview: the cart page in Composition view, pulled regions outlined in indigo, the hovered cart line labelled "shop-parts · CartLine · pulled", the order summary outlined in green as offered](assets/aiview-mockup-composition.png)
 
@@ -200,9 +182,8 @@ The parts sheet in the same view, each offered component outlined:
 
 ![aiview: the parts sheet in Composition view, the product card outlined in green and labelled "ProductCard · offered"](assets/aiview-mockup-parts.png)
 
-For the agent: `aiview components <file>` lists what a mockup offers and pulls,
-`aiview check <file>` says whether a page's placeholders resolve. The rules for a
-component are in [frontend-design](skills/frontend-design/SKILL.md).
+The agent reads the same facts from the command line, without a browser, and follows
+the rules in [frontend-design](skills/frontend-design/SKILL.md) when it draws.
 
 | Tool | What it does |
 |---|---|
