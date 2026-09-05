@@ -39,8 +39,8 @@ layer's jurisdiction: its row of the layer table, plus any seam assigned to it; 
 facts you have already established, given as facts; the output contract.
 
 The third slot is what saves the most time, and it is the one most often left empty.
-Anything two layers would otherwise derive independently: the merge-base, which branch
-the sibling repos are on, whether a 300-line fixture diff is two real lines under an
+Anything two layers would otherwise derive independently: the scope script's output
+(base, head, file list), which branch the sibling repos are on, whether a 300-line fixture diff is two real lines under an
 encoding rewrite: **you establish once and hand over as a stated fact.** A
 normalize-and-diff that costs you twenty seconds costs an agent minutes, and with five
 agents you would be paying for it five times.

@@ -16,13 +16,16 @@ reads diffs and repo docs, not framework knowledge.
 
 ## Scope (explicit, refused when broken)
 
-- `/pr-review <PR#>` → `gh pr diff` / `gh pr view` (description, linked issues, comments).
-- `/pr-review <branch|ref>` → three-dot diff from the merge-base: `git diff <ref>...HEAD`.
+- `/pr-review <PR#>` → `node scripts/scope.mjs pr <PR#> --layers --json`
+- `/pr-review <branch|ref>` → `node scripts/scope.mjs branch <ref> --layers --json`
 - `/pr-review` with neither → ask for the fixed point rather than guessing.
 
-Check the ref resolves and the diff is non-empty **before** doing anything else.
-Three-dot from the merge-base means uncommitted work is invisible: say so if the
-working tree is dirty. Skip vendored, generated, build, and lockfile paths.
+The script (path relative to this skill) resolves the merge-base, lists the files
+with the vendored, generated, build and lockfile paths already skipped, carries the
+stated intent (description, linked issues, commit messages), and says which of L3 and
+L5 have material with the evidence. Run it before doing anything else: exit 1 is an
+empty scope, exit 2 a ref that does not resolve, and either stops the review. A
+three-dot diff makes uncommitted work invisible: say so if the working tree is dirty.
 
 **Resolve the diff and the search base to the same revision.** Reviewing by PR number
 needs no checkout, so the working tree stays on whatever branch it was on, and every
@@ -160,8 +163,10 @@ Who owns a question when altitudes touch (the seam table), what the four slots o
 brief are, and what a return contains: read `references/layers.md` before dispatch.
 No two agents in a review ever hold the same question.
 
-Triage first, in this session: read the diff, decide which of L3–L5 have material,
-settle every seam the review will meet, and establish the shared facts. Then publish
+Triage first, in this session: L3 and L5 come from the script's `layers` (a layer it
+calls material is dispatched, one it calls nothing is recorded as not run), L4 is
+your call from the diff. Settle every seam the review will meet and establish the
+shared facts. Then publish
 both documents, the reader gets the change described and drawn without waiting, with
 one `aiview pending` card per dispatched layer, closed as each return lands.
 

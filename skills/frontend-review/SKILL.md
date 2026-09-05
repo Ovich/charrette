@@ -12,14 +12,17 @@ wrongness today.
 
 ## Scope (default = the diff, cheap)
 
-- `/frontend-review` → the working diff: `git diff HEAD` (fall back to `git diff @{upstream}...HEAD`).
-- `/frontend-review all` → the app's React source: the folder `AGENTS.md` or the
-  workspace names, else the package that depends on `react`.
-- `/frontend-review <path>` → that file or folder.
+The file list comes from the review scope script of the `pr-review` skill
+(`../pr-review/scripts/scope.mjs` in this collection), always with
+`--ext ts,tsx,js,jsx --json`:
+
+- `/frontend-review` → `diff` (the working tree, else upstream...HEAD).
+- `/frontend-review all` → `path <folder>`, the app's React source: the folder
+  `AGENTS.md` or the workspace names, else the package that depends on `react`.
+- `/frontend-review <path>` → `path <path>`.
 - Add `--fix` to apply the safe findings after reporting. Add one lens name to run just that lens.
 
-Only `.tsx`, `.ts`, `.jsx` and `.js` files are in scope, vendored, generated and build
-paths skipped. If the scope has none, say so and stop.
+Exit 1 is an empty scope: say so and stop.
 
 ## The four lenses
 

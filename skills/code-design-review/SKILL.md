@@ -13,10 +13,11 @@ A design finding is about *cost of change*, not wrongness today.
 
 ## Scope
 
-Point it at whatever the user named (a PR, the working diff, a path, or the whole
-codebase) and resolve the file list yourself (`gh pr diff`, `git diff`, or walking
-the source tree). Skip vendored, generated, build, and lockfile paths. If the scope
-has no source files, say so and stop.
+Point it at whatever the user named and resolve the file list with the review
+scope script of the `pr-review` skill (`../pr-review/scripts/scope.mjs` in this
+collection): `diff`, `pr <n>`, `branch <ref>`, `path <p>` or `all`, with `--json`.
+It skips vendored, generated, build and lockfile paths. Exit 1 is an empty scope:
+say so and stop.
 
 On a diff, review the changed code **plus the design context it lands in**: a hunk
 can be locally fine and still push a module past one responsibility.
