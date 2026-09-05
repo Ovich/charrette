@@ -43,6 +43,11 @@ it's approved.
 4. **Render and iterate**: write the file, register + serve it with aiview, tell the
    user the URL, edit the same file as they react. Check every state and the three
    viewport presets before calling it done.
+   A mockup is a working prototype, not a picture: the behaviour is mocked in the file
+   so the flow can be walked through. When the ask is purely visual, or once the visual
+   pass is approved, ask one question about the flow ("what happens when they press
+   Apply?", "what does the empty state lead to?") and mock it. A prototype that works
+   settles the states and transitions the code would otherwise guess at.
 5. **Handoff**: an implementation note at the bottom of the mockup file (HTML comment) or
    in the mockup's sibling `.md`: which existing components each region maps to
    (`ui/…`, `custom/…`), which new named components are needed and where they live,
