@@ -7,10 +7,33 @@ design language is then decided, not extracted, and this is how.
 Adapted from Anthropic's `frontend-design` skill
 (`github.com/anthropics/skills`, Apache 2.0), which is written for exactly this case.
 
+## Ask before drawing
+
+Five questions at most, one message each, multiple choice where the options are
+knowable. Their answers are the first lines of the design language, so they are asked
+before any token is chosen and never guessed. Not deeper than this: the plan below is
+where the design is argued, not the questionnaire.
+
+1. **The stack and the UI library.** What the screens will be built with, and which
+   component library or design system, if any: shadcn, Radix, spartan, MUI, Angular
+   Material, Bootstrap, Tailwind alone, a house system, or none yet. The library's
+   primitives are the vocabulary every mockup will speak, so this answer shapes all of
+   them. "None yet" is an answer, and then the mockup's own components become the
+   proposal.
+2. **The subject and the people.** What the product is, who uses it, in what setting,
+   with what they already read every day.
+3. **The first screen's job.** The one thing it must make obvious, and its primary
+   action.
+4. **Constraints already fixed.** A logo, brand colours, a typeface, an existing site
+   or app it must sit beside, a platform (desktop, mobile first, both), a language.
+5. **The reference point.** One or two products whose feel is right, and one whose feel
+   is wrong. Not to copy, but to place the direction.
+
+Anything else is decided in the plan and shown, not asked.
+
 ## The brief before the plan
 
-Identify the subject, the audience and the screen's primary job before drawing, and
-confirm them with the person in one message. The subject's world is where distinctive
+The answers above are the brief. The subject's world is where distinctive
 choices come from: its materials, its vernacular, what its people already read every
 day. A roster for nurses and a dashboard for traders share nothing but the browser.
 

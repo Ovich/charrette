@@ -55,7 +55,8 @@ default any app would get.
    token and UI files, read it and skip to 2. Otherwise extract it now, write it,
    register it in aiview (kind `reference`), and ask the user to skim it in one message:
    "does this match how you see the product?". No codebase, or a codebase with no
-   language of its own yet: `references/greenfield.md`.
+   language of its own yet: `references/greenfield.md`, which opens on the few
+   questions to ask first, the stack and its UI library above all.
 2. **Frame the screen**: one question at a time, only what changes the layout: who uses
    it, the primary action, the data it shows, the states it must handle, where it sits in
    navigation. Reuse names from `nomenclature`/`AGENTS.md`; never invent product
