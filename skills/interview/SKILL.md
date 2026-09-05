@@ -9,25 +9,22 @@ The object is a tree of decisions, and each decision is answered by one of two
 things: what can be read, or the person. The interview finds out which, for every
 decision, in the order the tree imposes.
 
-**Read first.** Whatever the code, the history, the existing documents or, for a
-library or a standard, its official documentation settle is settled. State each such
-decision in chat as it is found, one line with the answer and its source, grouped
-since they need no reply, so the caller records them like the asked ones. Shipped
-code counts as a decision made. Where the object says one thing and the code
-another, the person decides which holds.
-
-**Then ask, one decision at a time.** Start at the root, and ask about a branch once
-its parent is agreed. Each message holds one question and your recommended answer
-with the reason, so the person decides rather than works: the decision named with
-what it depends on, the question in one sentence, the recommended option first and
-marked, each option carrying the trade-off that decides it, and a closing line that
-takes a number or a rejection of the frame. Keep asking until every decision is
-agreed or deferred. Thoroughness is the point: a decision left unasked is one the
-implementation makes silently.
+**One decision per message, in tree order.** Start at the root, and take a branch
+once its parent is agreed. Before each, read: the code, the history, the existing
+documents and, for a library or a standard, its official documentation. When that
+settles the decision, the message states the answer with its source and the person
+confirms. Shipped code counts as a decision made, and where the object says one
+thing and the code another, the person chooses which holds. When reading leaves it
+open, the message asks, with your recommended answer and the reason, so the person
+decides rather than works: the decision named with what it depends on, the question
+in one sentence, the recommended option first and marked, each option carrying the
+trade-off that decides it, and a closing line that takes a number or a rejection of
+the frame. Keep going until every decision is agreed or deferred. Thoroughness is
+the point: a decision left unasked is one the implementation makes silently.
 
 **"Not now" is an answer.** The person may defer a decision; it is recorded as
 deferred with an owner and a reason.
 
 **Close in chat.** When every decision is agreed or deferred, say so and list them
-all, read and asked alike, with their status and source. The caller, a skill or the person, decides where that
+with their status and source. The caller, a skill or the person, decides where that
 goes.
