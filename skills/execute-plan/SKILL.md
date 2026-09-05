@@ -26,32 +26,37 @@ back and finish the plan. A plan whose diagram
 describes a state the repository has moved past is a deviation, not a starting
 condition: reconcile it first, and say what you found.
 
-## Two questions, asked once
+## The pace, asked once
 
-Before the first step of a run, ask the person two multiple-choice questions in chat,
-one message each, the recommended answer listed first and marked so.
-
-**The pace**, how the slice boundaries are handled:
+Before the first step of a run, one multiple-choice question in chat, the recommended
+answer first and marked so:
 
 1. **Run through** (recommended): at each slice boundary, report what happened and
    what is next, then continue. Stop only for the three pauses below and at a slice
    marked `👤`.
 2. **Stop at each slice**: finish the slice, report, name what is next, and wait.
 
-**The mode**, where the work runs:
+Record it in the plan's state node (`pace: run through | stop at each slice`) so a
+session that resumes the plan reads it and asks again nothing. Under either pace a
+slice whose findings change the next slice is the first pause below, and a slice
+marked `👤 decision` or `👤 design review` stops before it starts, whatever the pace.
 
-1. **Subagent-driven** (recommended): each step is delegated to a fresh subagent with
-   a brief, while this session keeps the tracker, verifies each return against the
-   step's done-when, and merges. This session's context stays the plan, not the diffs.
-2. **Inline**: this session does the steps itself.
+## Subagents do the steps
 
-Record both in the plan's state node (`pace: run through | stop at each slice`,
-`mode: subagent-driven | inline`) so a session that resumes the plan reads them and
-asks neither again. Under either pace a slice whose findings change the next slice is
-the first pause below, and a slice marked `👤 decision` or `👤 design review` in the
-tracker stops before it starts, whatever the pace: the mark says what the person
-gives. In subagent mode, read `references/subagents.md` before the
-first dispatch: the brief, the single writer, and the fork.
+This session is the orchestrator: it keeps the tracker, reads the dependency graph,
+briefs, verifies and merges, and its context stays the plan, never the diffs. Every
+step is delegated to a fresh subagent. Steps the graph shows as independent, the
+forks the plan draws, run at once: one subagent per branch, one `aiview pending` card
+per branch on the plan, each ticked as its return lands, the join verified by this
+session.
+
+A brief has four slots, in this order: where the plan is (its aiview path, the step's
+node id); the step's jurisdiction, its node text and done-when, and nothing beyond it;
+the facts this session has already established, given as facts (the branch, the
+commands that verify, what an earlier step found); the return contract: what changed,
+where, the test's failing run before the change and its passing run after, and
+anything found that the plan did not predict. A subagent never edits the tracker.
+This session is its single writer.
 
 ## The three pauses
 

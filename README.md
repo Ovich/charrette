@@ -44,7 +44,7 @@ What `brainstorm` and `write-plan` leave behind for one feature: the board, the 
 
 ### The same plan, mid-execution
 
-The plan's phasing diagram is its tracker: one node per step with a status glyph, gates that record the branch taken, and a state node with branch, commit, next step, blocked, parked, pace and mode, which is what a later session resumes from.
+The plan's phasing diagram is its tracker: one node per step with a status glyph, gates that record the branch taken, and a state node with branch, commit, next step, blocked, parked and pace, which is what a later session resumes from.
 
 ![aiview: the pr-review redesign plan at its gate, trial steps done with evidence, release in progress, the untaken branch marked not needed](assets/aiview-pr-review-plan.png)
 
