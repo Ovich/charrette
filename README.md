@@ -141,24 +141,28 @@ state node is overwritten, never appended to.
 
 ![aiview in dark mode: the pr-review redesign plan at its gate, the trial steps done with evidence, the release step in progress, the untaken branch marked not needed](assets/aiview-pr-review-plan.png)
 
-### Mockups that compose and work
+### Mockups that work
 
 A mockup is where you and the agent settle how a screen looks and behaves before it is
 coded. It is a working prototype, not a picture: a flow can be walked through, with the
 behaviour mocked in the file, so a stepper counts, a promo code applies, a questionnaire
 advances. The agent draws what it is told: describe the flow, not only the screen, and
-the prototype works instead of only looking right. Mockups compose: a component is drawn once, in one mockup, and bound by every
-screen of the project that needs it.
+the prototype works instead of only looking right.
 
-The demo is a shop: a parts sheet that exposes the cart line, the stepper, the promo
-field, the checkout button, the badge and the empty state, and a cart page that binds
-them eleven times.
+The demo below is a shop's cart page.
 
 ![aiview: the Arbor cart page, the variant toolbar above the frame with "promo applied" selected](assets/aiview-mockup-variants.png)
 
 A screen has states: empty, promo applied, an item out of stock. The mockup declares
 them as variants, the viewer exposes them in its toolbar, and the chosen one persists
 across reloads.
+
+### Mockups that compose
+
+A component is drawn once, in one mockup, and bound by every screen of the project that
+needs it. The cart page binds its parts from a parts sheet, the cart line, the stepper,
+the promo field, the checkout button, the badge and the empty state, eleven times in
+all.
 
 The **Composition** view outlines what the screen binds from other mockups, in indigo,
 and what it exposes to them, in green. The label names source and component. A click on
