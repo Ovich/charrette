@@ -147,7 +147,10 @@ A mockup is where you and the agent settle how a screen looks and behaves before
 coded. It is a working prototype, not a picture: a flow can be walked through, with the
 behaviour mocked in the file, so a stepper counts, a promo code applies, a questionnaire
 advances. The agent draws what it is told: describe the flow, not only the screen, and
-the prototype works instead of only looking right.
+the prototype works instead of only looking right. That is what makes the code that
+follows precise: a picture leaves every state, transition and edge case to be guessed
+at implementation time, a working prototype has already settled them, and the agent
+codes against decisions instead of assumptions.
 
 The demo below is a shop's cart page.
 
