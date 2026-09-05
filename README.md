@@ -50,6 +50,8 @@ The plan's phasing diagram is its tracker: one node per step with a status glyph
 
 ### Mockups that work
 
+A screen is judged by human eyes, so the person stays in the loop for it. In the near future the main user of software will probably be an agent; until then there is a person at the screen, and the mockup is where they look before anything is built.
+
 A mockup is a working prototype, not a picture: a stepper counts, a promo code applies, a questionnaire advances, the behaviour mocked in the file. Describe the flow, not only the screen, and every state, transition and edge case is settled before implementation. The demo below is a shop's cart page.
 
 ![aiview: the Arbor cart page, the variant toolbar above the frame with "promo applied" selected](assets/aiview-mockup-variants.png)
