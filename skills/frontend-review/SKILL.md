@@ -55,7 +55,7 @@ Each maps to a section of `checklist.md` (**read that section, don't review from
 Diagrams: use the `write-diagrams` skill (`../write-diagrams/SKILL.md` in
 this collection). Pick from its catalog by the open question, follow its discipline. Review-specific guidance:
 per-finding prose stays prose; a diagram appears only in a file report, and only in
-these shapes:
+these shapes; a trivial scope earns none, and the report says so:
 
 - **Scope map** (one, at the top): the component tree of the reviewed scope, finding
   counts marked on the hot nodes, the map the findings hang off, and compressed

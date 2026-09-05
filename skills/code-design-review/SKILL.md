@@ -75,7 +75,7 @@ tags = project + review.
 Diagrams: use the `write-diagrams` skill (`../write-diagrams/SKILL.md` in this
 collection). Pick from its catalog by the open question, follow its discipline. Per
 finding the prose stays prose; a diagram appears only in a file report, and in these
-shapes, one per lens where the findings call for it:
+shapes, one per lens where the findings call for it. A trivial scope earns none: say so.
 
 - **Scope map** (one, at the top): the modules of the reviewed scope with the finding
   counts on the hot nodes. The map the findings hang off, and compressed context for
