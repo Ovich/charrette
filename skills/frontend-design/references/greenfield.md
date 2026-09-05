@@ -4,8 +4,11 @@ Read when there is no codebase to extract a design language from, or when the co
 has no language of its own yet (a scaffold, a template, defaults never chosen). The
 design language is then decided, not extracted, and this is how.
 
-Adapted from Anthropic's `frontend-design` skill
-(`github.com/anthropics/skills`, Apache 2.0), which is written for exactly this case.
+Adapted from the `frontend-design` skill in `github.com/anthropics/skills`, copyright
+Anthropic, licensed under the Apache License 2.0 (a copy: `LICENSE-Apache-2.0.txt`,
+beside this file). Changed here: rewritten in this collection's voice, shortened to the
+greenfield case, the tells kept, a questions section added, the process folded into the
+skill's own flow.
 
 ## Ask before drawing
 
