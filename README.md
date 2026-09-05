@@ -156,12 +156,14 @@ node is overwritten, never appended to.
 
 ### Mockups that compose
 
-Everything here is done by the agent. You look at the viewer and say what you want
-changed.
+The viewer is where you and the agent agree on what will be built: the design is
+discussed there, the spec and the plan are written there, and a screen is drawn there
+before it is coded. A mockup is that agreement for one screen. You look, you say what
+you want changed, the agent changes it.
 
-A component is drawn once, in one mockup. Other mockups of the project use it. When the
-agent changes the drawing, every page that uses it reloads with the change. Nothing is
-copied between files.
+A component is drawn once, in one mockup, and every other mockup of the project uses
+that drawing. When the agent changes it, every screen that uses it reloads with the
+change, so what was agreed on one screen holds on all of them.
 
 The demo is a shop: a parts sheet with the cart line, the stepper, the promo field, the
 checkout button, the badge and the empty state, and a cart page that uses them eleven
@@ -183,7 +185,8 @@ The parts sheet in the same view, each offered component outlined:
 ![aiview: the parts sheet in Composition view, the product card outlined in green and labelled "ProductCard · offered"](assets/aiview-mockup-parts.png)
 
 The agent reads the same facts from the command line, without a browser, and follows
-the rules in [frontend-design](skills/frontend-design/SKILL.md) when it draws.
+[frontend-design](skills/frontend-design/SKILL.md) when it draws: the design language is
+extracted once, every screen is a mockup approved in the viewer, and code comes after.
 
 | Tool | What it does |
 |---|---|
