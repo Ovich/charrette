@@ -31,8 +31,9 @@ A step whose first half can finish while the second waits on someone else is two
 steps; drawn as one, it guarantees a hole in the tracker the day it happens.
 
 Steps that are independent may be drawn as parallel branches: two or more leaving one
-node and joining at a later one (`S03 --> S04a`, `S03 --> S04b`, both `--> S05`). The
-test is disjointness: the branches touch different files or areas, and neither needs
+node and joining at a later one (`S03 -->|api| S04a`, `S03 -->|ui| S04b`, both
+`--> S05`), each arrow out of the fork labeled with its branch's area. The test is
+disjointness: the branches touch different files or areas, and neither needs
 the other's result before the join. Two steps that touch one file are one branch. The
 join node's done-when covers what the branches produced together. Insert
 numbers, never renumber: a step discovered between 0.2 and 0.3 is `0.2b`, since specs,

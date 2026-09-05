@@ -21,6 +21,7 @@ import { projectForCwd } from "../core/projects.ts";
 import { adoptLegacyIndex, DATA_ROOT, docsDirFor, DOCS_ROOT, ensureHome } from "../core/home.ts";
 import { readServerStatus, PORT_FILE, type ServerStatus } from "../core/serverstate.ts";
 import { parseArgs } from "./args.ts";
+import { disciplineWarnings } from "../mermaid/discipline.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
@@ -43,7 +44,7 @@ const USAGE = [
   "  path <filename> [--project <slug>]       # where this document belongs, joined for this OS",
   "  components <file|#id>                    # what this mockup offers to siblings, and what it pulls",
   "  check <file|#id>                         # do this mockup's bindings resolve? errors as text, exit 1 if any",
-  "  mermaid-check <file|#id>                 # parse every mermaid block of a document; exit 1 if one fails",
+  "  mermaid-check <file|#id>                 # parse every mermaid block; warn on a missing caption or an unlabeled fork; exit 1 if one fails",
   "  init                                     # create the data home; report where everything lives",
 ].join("\n");
 
@@ -284,13 +285,22 @@ async function cmdMermaidCheck(): Promise<void> {
   }
   const { blocksOf, checkBlocks } = (await import(pathToFileURL(bundle).href)) as typeof import("../mermaid/check.ts");
   const content = fs.readFileSync(abs, "utf8").replace(/\r\n/g, "\n");
-  const blocks = blocksOf(content, /\.(md|markdown)$/i.test(abs));
-  const results = await checkBlocks(blocks);
+  const markdown = /\.(md|markdown)$/i.test(abs);
+  const lines = content.split("\n");
+  const blocks = blocksOf(content, markdown);
+  const results = (await checkBlocks(blocks)).map((r, i) => ({
+    ...r,
+    warnings: r.ok ? disciplineWarnings(lines, r.line, blocks[i].text, markdown) : [],
+  }));
   const failed = results.filter((r) => !r.ok).length;
-  emit({ file: path.basename(abs), blocks: results.length, failed, results }, () => {
+  const warned = results.reduce((n, r) => n + r.warnings.length, 0);
+  emit({ file: path.basename(abs), blocks: results.length, failed, warnings: warned, results }, () => {
     if (!results.length) return console.log("no mermaid block in this document");
-    for (const r of results) console.log(r.ok ? `ok     line ${r.line}  ${r.type}` : `FAIL   line ${r.line}  ${r.error}`);
-    console.log(`${results.length} block${results.length === 1 ? "" : "s"}, ${failed} failed`);
+    for (const r of results) {
+      console.log(r.ok ? `ok     line ${r.line}  ${r.type}` : `FAIL   line ${r.line}  ${r.error}`);
+      for (const w of r.warnings) console.log(`warn   line ${r.line}  ${w}`);
+    }
+    console.log(`${results.length} block${results.length === 1 ? "" : "s"}, ${failed} failed, ${warned} warning${warned === 1 ? "" : "s"}`);
   });
   if (failed) process.exit(1);
 }

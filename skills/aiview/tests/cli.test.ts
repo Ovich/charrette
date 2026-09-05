@@ -367,3 +367,16 @@ test("mermaid-check: every block of a document parsed, failures with their line,
   assert.match(run("mermaid-check", bare).stdout, /ok\s+line 1\s+classDiagram/);
   assert.match(run("mermaid-check", write("docs/JOBS/none.md", "# nothing\n")).stdout, /no mermaid block/);
 });
+
+test("mermaid-check: discipline warnings do not fail the run", () => {
+  const md = write("docs/JOBS/warn.plan.md", "# Plan\n\n```mermaid\nflowchart TB\n  A --> B\n  A --> C\n```\n\nPhasing: what ships first.\n\n```mermaid\nflowchart TB\n  A -->|x| B\n  A -->|y| C\n```\n");
+  const r = run("mermaid-check", md);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /warn\s+line 3\s+no caption above the fence/);
+  assert.match(r.stdout, /warn\s+line 3\s+A branches \(2 arrows\) and none carries a label/);
+  assert.doesNotMatch(r.stdout, /warn\s+line 11/);
+  assert.match(r.stdout, /2 blocks, 0 failed, 2 warnings/);
+  const j = JSON.parse(run("mermaid-check", md, "--json").stdout);
+  assert.equal(j.warnings, 2);
+  assert.equal(j.results[1].warnings.length, 0);
+});

@@ -65,8 +65,9 @@ or a word, so it survives grayscale, dark mode and a colour-blind reader.
 
 **Parse the block, don't eyeball it.** Mermaid fails quietly, and a diagram nobody can read
 is a diagram nobody updates. `aiview mermaid-check <file>` parses every block of a document
-the way the viewer will and names the line of each failure; run it after every edit to a
-diagram.
+the way the viewer will, names the line of each failure, and warns on a fence with no
+caption above it and on a branching node with an unlabeled arrow; run it after every
+edit to a diagram.
 
 ## Red flags
 
