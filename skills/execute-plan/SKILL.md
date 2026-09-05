@@ -103,13 +103,16 @@ in the same step, the step was mis-scoped.
 ## Keeping the tracker while you work
 
 - **Tick as you go, never in a batch.** A node turns ✅ only when its own done-when is
-  met, and the evidence goes into the step: what was observed, not "worked".
+  met, and the evidence goes into the step: what was observed, not "worked", and for
+  a step that serves a user story, its acceptance criterion observed.
 - **Update it before every handoff**: a question, an approval request, the end of a
   turn. Whatever the tracker does not say by then is lost if the session ends.
 - **Deviations are drawn, not narrated.** Work the plan does not list becomes a node
   *before* it is done. An unforeseen dependency becomes an arc, and if it waits on
   someone else, a ⏸ node naming what was asked for and when. A step that dissolves is ✖
-  with the reason, never deleted. An answered gate shows which branch was taken.
+  with the reason, never deleted. An answered gate shows which branch was taken. A
+  deviation that decides a module, an interface, a schema, a contract or an
+  architecture adds a row to the plan's implementation decisions register.
 - **A step you paused inside was too coarse.** Split it where the pause fell.
 - **Finished steps are rewritten as what happened**: past tense, what was done, what it
   found, what that changed. Keep the values, versions, commands and wrong turns worth

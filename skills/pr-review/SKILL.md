@@ -54,7 +54,7 @@ difference between *not checked* and *checked and clean*.
 | **L2 Code Structure** | how code is organised | directories, modules, files; placement and naming; cohesion and coupling; test file placement | **always** |
 | **L3 Data** | the data model | schema, ORM mappings, tables, migration files as artifacts | schema, ORM or migration files are in the diff |
 | **L4 Integration** | how the change lands | blast radius: callers, consumers, contracts, other repos, config, deploy needs, migration execution order | the diff changes a surface something else consumes |
-| **L5 Delivery & Intent** | why the change exists | stated intent vs the diff, feature completeness, scope creep, documentation, coverage of the stated behaviour | the PR states an intent: description, linked issue, commit messages |
+| **L5 Delivery & Intent** | why the change exists | stated intent vs the diff, feature completeness, scope creep, documentation, coverage of the stated behaviour | the PR states an intent: description, linked issue, commit messages, or a linked spec whose user stories are then the intent, checked one by one |
 
 A PR with no stated intent skips L5 entirely: *"L5: not run, no stated intent."*
 Never infer an intent so the layer has something to check against; the layer would

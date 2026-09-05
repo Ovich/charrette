@@ -85,7 +85,12 @@ Write `YYYY-MM-DD-<topic>.spec.md` beside the board, register it with aiview as 
 container), and note the spec path at the top of the board. Contents:
 
 **Problem**: what's wrong today, who feels it · **Goals / non-goals**: the non-goals
-are the valuable half · **Design**: prose plus the diagrams that earned their place ·
+are the valuable half · **User stories**: as many as the change needs, each with an
+id (`US3`), the role, what they want, why, and acceptance criteria written as
+something observed; the interview's answers on purpose, what the first user sees and
+what is out of scope are where they come from, and the plan's phases, the tracker's
+evidence and a review's L5 all cite them · **Design**: prose plus the diagrams that
+earned their place ·
 **Data**: shapes, ownership, migrations · **Failure modes**: what breaks, what the
 user sees · **Testing**: what proves this works · **Open questions**: with a named
 owner, or none at all.

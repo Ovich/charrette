@@ -20,9 +20,12 @@ steps say what was learned, and this plan is written with that in hand.
 ## Phases
 
 Each phase independently verifiable: a phase whose completion you can't check isn't a
-phase. Per phase: what changes, which files, how it's verified with something observed
-rather than "implemented", and what it unblocks. Order by dependency, and put the
-riskiest unknown first: that's where the plan will change.
+phase. Per phase: what changes, which files, the spec's user stories it serves in
+full or in part (`US3`), how it's verified with something observed rather than
+"implemented", and what it unblocks. Order by dependency, and put the riskiest
+unknown first: that's where the plan will change. Stories never shape a phase: cut
+phases by what changes together, and a story served by several phases is verified
+where they meet, the join's done-when being that story's acceptance criteria.
 
 Once the phases are drafted, look for the ones that can run at the same time: phases
 that touch disjoint files and need nothing from each other before a later phase joins
@@ -30,6 +33,17 @@ them. Name them to the person in chat, one message ("phases 2 and 3 touch differ
 areas and could run in parallel, draw them as branches?"), and draw the fork only on a
 yes. `execute-plan` runs branches at once, one subagent per branch, and a fork drawn
 over a shared file is the merge conflict it would have had to resolve.
+
+## Implementation decisions
+
+The plan carries a register, one row per decision the implementation rests on: id
+(`ID4`), kind, the decision, its source, and the phase or story it binds. Six kinds:
+a module created or updated, an interface that changes, an architectural choice, a
+schema change, an API contract, a technical clarification the person gave. The
+source is the person with the interview entry (`Q7`), the code, or the docs. Fill it
+from the spec and the hardening interview; the spec states a contract, the register
+records what was decided about it and where it lands. `execute-plan` adds rows as
+the work decides things the plan did not.
 
 ## Diagrams
 
