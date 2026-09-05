@@ -5,7 +5,8 @@ guess differently. A rule may be deviated from at a specific site with a comment
 beginning `AGENTS EXCEPTION (rule N):` and the reason; without one, deviation is a
 review finding. When a decision made during a session would pass the five filters of
 the `project-conventions` skill (contested, recurring, consequential, checkable, not
-tool-enforceable), run that skill to capture it here before the session ends.
+tool-enforceable), say so in chat before the session ends and propose the rule, in
+that skill's shape; it is written here only on the person's yes.
 
 ## Architecture (context you must not break)
 

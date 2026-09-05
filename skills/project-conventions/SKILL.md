@@ -99,9 +99,10 @@ genuinely unreasonable at a specific site may be deviated from with a comment be
 `AGENTS EXCEPTION (rule N):` plus short reasoning; without one, deviation is a review
 finding, and so is a marker whose reasoning doesn't hold up. A convention doc with no
 escape hatch produces either lies or bad code. And the capture clause: when a decision
-made during a session would pass the five filters, run this skill to capture it before
-the session ends. The convention document is the one file every agent reads, so the
-trigger for growing it lives there, not in the skills that happen to make decisions.
+made during a session would pass the five filters, say so in chat before the session
+ends and propose the rule, written here only on the person's yes. The convention
+document is the one file every agent reads, so the trigger for growing it lives there,
+not in the skills that happen to make decisions.
 
 ## Never propose
 
