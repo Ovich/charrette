@@ -25,7 +25,12 @@ simple. A simple project's spec is three paragraphs, but it exists and it's appr
    collection) on the board's decisions table, which is its tree. The first rows are
    purpose, constraints, success criteria, and what is explicitly out of scope. The
    interview runs in chat; every decision it settles goes into the table as it lands,
-   and the exchange itself goes into the board's interview log (below).
+   and the exchange itself goes into the board's interview log (below). When the
+   table has no open row, ask one more question before moving on: is there anything
+   else this should cover? Point at directions the loop did not reach, chosen from
+   the design in hand (what happens when the new part fails, who else reads or
+   writes this data, what is deliberately left out, how it is undone, what the first
+   user sees), and take a new row for each one the person picks up.
 4. **Approaches**: propose 2–3 with real trade-offs. Lead with your recommendation and
    why. YAGNI every one of them before presenting.
 5. **Design, in sections**: scale each section to its complexity. Ask after each one
