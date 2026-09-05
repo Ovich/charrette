@@ -24,7 +24,8 @@ simple. A simple project's spec is three paragraphs, but it exists and it's appr
 3. **Question loop**: run the `interview` skill (`../interview/SKILL.md` in this
    collection) on the board's decisions table, which is its tree. The first rows are
    purpose, constraints, success criteria, and what is explicitly out of scope. The
-   interview runs in chat; every decision it settles goes into the table as it lands.
+   interview runs in chat; every decision it settles goes into the table as it lands,
+   and the exchange itself goes into the board's interview log (below).
 4. **Approaches**: propose 2–3 with real trade-offs. Lead with your recommendation and
    why. YAGNI every one of them before presenting.
 5. **Design, in sections**: scale each section to its complexity. Ask after each one
@@ -42,7 +43,12 @@ the context is read, and keep every decision, open question, considered option,
 diagram, and research note in it: the chat is transient, the board is the record.
 Structure:
 decisions table (status: agreed / proposed / open / deferred), context being built on,
-design sections, diagrams, research notes.
+design sections, diagrams, research notes, and last the **interview log**: one entry
+per question in the order asked, appended as each answer lands, verbatim, the
+question with its options and recommendation, then the answer as given. The
+decisions table row cites its entry (`Q7`). The table says what was decided; the log
+says what else was on offer and why it lost, which is what a later session or the
+spec's alternatives need.
 
 Open the board via the `aiview` skill (`../aiview/SKILL.md` in this collection)
 the moment you create it: kind `brainstorm` (from the filename), tags = project + topic,

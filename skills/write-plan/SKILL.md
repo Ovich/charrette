@@ -77,7 +77,10 @@ an earlier phase could find that would break it, and whether its done-when is
 observed. Check against the codebase what can be checked now. A phase whose
 assumption cannot be verified before it runs is cut to "planned after phase N runs".
 Hardening removes assumptions; it does not add detail. The interview runs in chat:
-write what it settles into the phases it concerns, and record the answer to the
+write what it settles into the phases it concerns, and the exchange itself into an
+**interview log** at the end of the plan, one entry per question in the order asked,
+appended as each answer lands, verbatim, the question with its options and
+recommendation, then the answer as given. Record the answer to the hardening
 question in the plan's header (`hardened: yes` or `no`).
 
 Then stop and ask the person to approve the plan. Running it is `execute-plan`'s job.
