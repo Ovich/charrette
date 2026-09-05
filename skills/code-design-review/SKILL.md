@@ -68,8 +68,27 @@ is a good report.
 A diff review is answered in chat. A path or whole-codebase review is a document
 someone reads later: write `YYYY-MM-DD-<scope>.report.md` in the data home and open
 it via the `aiview` skill (`../aiview/SKILL.md` in this collection), kind `report`,
-tags = project + review; diagrams per the `write-diagrams` skill, a dependency graph
-with the forbidden edges drawn where the findings are about coupling.
+tags = project + review.
+
+## Diagrams (file reports only)
+
+Diagrams: use the `write-diagrams` skill (`../write-diagrams/SKILL.md` in this
+collection). Pick from its catalog by the open question, follow its discipline. Per
+finding the prose stays prose; a diagram appears only in a file report, and in these
+shapes, one per lens where the findings call for it:
+
+- **Scope map** (one, at the top): the modules of the reviewed scope with the finding
+  counts on the hot nodes. The map the findings hang off, and compressed context for
+  the next session touching this code.
+- **Dependency graph** (dependencies): the modules and what imports what, the
+  forbidden edges drawn red: policy importing a mechanism, an inner layer naming an
+  outer one, a cycle. One graph instead of N prose findings about individual imports.
+- **Before and after** (responsibility, extension): when the fix is a reshape, an
+  extraction or a split, two small trees side by side with the deciding trade-off
+  stated under them in one line.
+- **Option comparison** (simplicity): when the finding is over-application, the
+  indirection as it stands against the inlined version, so "delete this abstraction"
+  is seen, not argued.
 
 With `--fix`, apply only the safe findings afterward (nothing that changes behavior
 or reaches outside the scope), then re-run whatever typecheck/lint/test command the
