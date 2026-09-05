@@ -45,7 +45,8 @@ marked `👤 decision` or `👤 design review` stops before it starts, whatever 
 
 This session is the orchestrator: it keeps the tracker, reads the dependency graph,
 briefs, verifies and merges, and its context stays the plan, never the diffs. Every
-step is delegated to a fresh subagent. Steps the graph shows as independent, the
+step is delegated to a fresh subagent, unless the person asked for inline work when
+they requested the run; then this session does the steps itself and the rest holds. Steps the graph shows as independent, the
 forks the plan draws, run at once: one subagent per branch, one `aiview pending` card
 per branch on the plan, each ticked as its return lands, the join verified by this
 session.
