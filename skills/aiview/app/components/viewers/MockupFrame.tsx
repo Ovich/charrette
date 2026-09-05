@@ -32,11 +32,13 @@ export interface MockupFrameProps {
   bindings?: BindingsSummary;
   /** A component to scroll to and flash once loaded, when this document was opened from a label. */
   target?: string;
+  /** This document's bare file name, so Composition can show the placeholder that binds a component offered here. */
+  file?: string;
   /** A label in Composition mode was clicked: open `file` at `component`. */
   onOpenSource?: (file: string, component: string) => void;
 }
 
-export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFrameProps) {
+export function MockupFrame({ html, bindings, target, file, onOpenSource }: MockupFrameProps) {
   const [viewport, setViewport] = useState(() => stored("aiview.viewport", "full"));
   const [mode, setMode] = useState<MockupMode>(() =>
     stored("aiview.mockupMode", "rendered") === "composition" ? "composition" : "rendered",
@@ -68,7 +70,7 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
     return () => window.removeEventListener("message", onMessage);
   }, [onOpenSource]);
 
-  const served = mode === "composition" ? withOverlay(html, { bindings, target }) : html;
+  const served = mode === "composition" ? withOverlay(html, { bindings, target, file }) : html;
   const bound = bindings?.sources.length ?? 0;
 
   return (

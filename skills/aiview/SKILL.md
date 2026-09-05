@@ -243,11 +243,13 @@ An HTML mockup can bind components from sibling mockups (`data-bind="file#Name"`
 the `frontend-design` skill); aiview composes them at serve time and reloads the host
 when a source is saved. Beside the viewport presets a view toggle offers **Rendered**
 (the page) and **Composition** (every bound region outlined with its source and
-component, a legend listing every bound component per source, hidden ones marked, a
-click on a region or a legend row opening a preview of that component rendered by the
-page's own styles, and from the label or the preview the source opens at that
-component). In Composition the mockup is looked at, not operated: the layer takes the
-mouse. Nothing is written to disk: the file stays the author's.
+component, "pulled"; every component this mockup offers outlined in green and marked
+"offered"; a legend listing pulled components per source and offered ones, hidden ones
+marked; a click on a region or a legend row opening a preview of that component
+rendered by the page's own styles, a pulled one with the way to its source, an offered
+one with the placeholder a sibling writes to bind it). In Composition the mockup is
+looked at, not operated: the layer takes the mouse. Nothing is written to disk: the file
+stays the author's.
 
 ## Contract for calling skills
 

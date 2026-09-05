@@ -12,6 +12,11 @@
 // the legend, and a click on a row or on an outlined region opens a preview: the element
 // cloned into a panel of the layer, rendered by the page's own styles, with the way to
 // its source.
+//
+// The mode also shows what this mockup offers: its own declared components (a
+// data-component that is not bound and sits in no bound element), drawn dotted, listed
+// under "Offered", their preview carrying the placeholder a sibling would write. Labels say
+// "pulled" or "offered".
 import type { BindingsSummary } from "./api.ts";
 
 export const OVERLAY_MARK = "data-aiview-overlay";
@@ -20,6 +25,8 @@ export interface OverlayOptions {
   bindings?: BindingsSummary;
   /** A component name to scroll to and flash once the page has loaded (B12). */
   target?: string;
+  /** This mockup's own file name, bare: what a sibling would write in a placeholder to bind a component declared here. */
+  file?: string;
 }
 
 /** Drop the date prefix of a mockup file name for the label: `2026-09-03-dock-tools.mockup.html` -> `dock-tools`. */
@@ -33,6 +40,9 @@ const CSS = `
 #__aiview svg{position:absolute;inset:0;width:100%;height:100%}
 #__aiview .box{position:absolute;outline:2px dashed #4f46e5;outline-offset:1px;border-radius:3px;pointer-events:auto;cursor:pointer}
 #__aiview .box.err{outline-color:#dc2626;pointer-events:none;cursor:default}
+#__aiview .box.decl{outline:1.5px dotted #15803d}
+#__aiview .box.decl .lbl{background:#15803d}
+#__aiview .box.decl:hover{background:rgba(21,128,61,.05)}
 #__aiview .box:hover{background:rgba(79,70,229,.06)}
 #__aiview .box.flash{animation:__aiview-flash 1.2s ease-out 1}
 @keyframes __aiview-flash{0%{background:rgba(79,70,229,.35)}100%{background:transparent}}
@@ -55,6 +65,7 @@ const CSS = `
 #__aiview .pvh{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #e5e7eb;background:#f8fafc;${UI_FONT}}
 #__aiview .pvh b{font-weight:600;font-size:13px}
 #__aiview .pvh em{font-style:normal;color:#6b7280}
+#__aiview .pvh code{font:12px ui-monospace,Consolas,monospace;background:#eef2ff;color:#1e3a8a;padding:2px 6px;border-radius:4px;user-select:all}
 #__aiview .pvh button{margin-left:auto;padding:3px 9px;border:1px solid #d1d5db;border-radius:5px;background:#fff;cursor:pointer;font:inherit}
 #__aiview .pvh button+button{margin-left:0}
 #__aiview .pvh button.x{font-size:14px;line-height:1;padding:2px 8px}
@@ -70,6 +81,7 @@ const SCRIPT = `
   var layer=document.getElementById('__aiview'); if(!layer) return;
   var summary=JSON.parse(layer.getAttribute('data-summary')||'{"sources":[],"errors":[],"warnings":[]}');
   var target=layer.getAttribute('data-target')||'';
+  var ownFile=layer.getAttribute('data-file')||'';
   var short=function(f){return f.replace(/^\\d{4}-\\d{2}-\\d{2}-/,'').replace(/\\.mockup\\.html$/,'').replace(/\\.html$/,'')};
   var esc=function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')};
   var svgNS='http://www.w3.org/2000/svg';
@@ -89,7 +101,7 @@ const SCRIPT = `
       var i=ref.indexOf('#'); var file=i<0?ref:ref.slice(0,i); var name=i<0?'':ref.slice(i+1);
       var box=document.createElement('div'); box.className='box'+(isErr?' err':'');
       var lbl=document.createElement('span'); lbl.className='lbl';
-      lbl.textContent=isErr?(el.textContent||ref):(short(file)+' \\u00b7 '+name);
+      lbl.textContent=isErr?(el.textContent||ref):(short(file)+' \\u00b7 '+name+' \\u00b7 pulled');
       var idx=entries.length;
       if(!isErr) lbl.addEventListener('click',function(ev){ev.stopPropagation();parent.postMessage({type:'aiview:open',file:file,component:name},'*')});
       if(!isErr) box.addEventListener('click',function(ev){ev.stopPropagation();preview(idx)});
@@ -97,14 +109,31 @@ const SCRIPT = `
       entries.push({el:el,box:box,file:file,name:name,err:isErr,visible:false});
       if(!isErr){ (byFile[file]=byFile[file]||[]).push(idx); }
     });
+    var declared=[];
+    document.querySelectorAll('[data-component]').forEach(function(el){
+      if(el.hasAttribute('data-bound')||el.hasAttribute('data-bound-error')||el.closest('[data-bound]')||layer.contains(el)) return;
+      var name=el.getAttribute('data-component');
+      var box=document.createElement('div'); box.className='box decl';
+      var lbl=document.createElement('span'); lbl.className='lbl'; lbl.textContent=name+' \\u00b7 offered';
+      var idx=entries.length;
+      box.addEventListener('click',function(ev){ev.stopPropagation();preview(idx)});
+      box.appendChild(lbl); layer.appendChild(box);
+      entries.push({el:el,box:box,file:ownFile,name:name,err:false,decl:true,visible:false});
+      declared.push(idx);
+    });
     place();
     var html='';
     Object.keys(byFile).forEach(function(f){
-      html+='<details open><summary><b>'+esc(short(f))+'</b> \\u00b7 '+byFile[f].length+' bound</summary>';
+      html+='<details open><summary>Pulled from <b>'+esc(short(f))+'</b> \\u00b7 '+byFile[f].length+'</summary>';
       byFile[f].forEach(function(idx){ var e=entries[idx]; html+='<div class="row" data-i="'+idx+'">'+esc(e.name)+(e.visible?'':'<em>hidden</em>')+'</div>'; });
       html+='</details>';
     });
     if(!Object.keys(byFile).length&&!summary.errors.length) html+='<div>No bindings in this mockup</div>';
+    if(declared.length){
+      html+='<details><summary><b>Offered</b> by this mockup \\u00b7 '+declared.length+'</summary>';
+      declared.forEach(function(idx){ var e=entries[idx]; html+='<div class="row" data-i="'+idx+'">'+esc(e.name)+(e.visible?'':'<em>hidden</em>')+'</div>'; });
+      html+='</details>';
+    }
     summary.errors.forEach(function(e){html+='<div class="err">'+esc(e.ref)+': '+esc(e.message)+'</div>'});
     summary.warnings.forEach(function(w){html+='<div class="warn">'+esc(w.ref)+': '+esc(w.message)+'</div>'});
     legend.innerHTML=html;
@@ -116,7 +145,7 @@ const SCRIPT = `
       b.visible=!!(r.width||r.height);
       b.box.style.left=r.left+'px'; b.box.style.top=r.top+'px'; b.box.style.width=r.width+'px'; b.box.style.height=r.height+'px';
       b.box.style.display=b.visible?'block':'none';
-      if(b.err||!b.visible) return;
+      if(b.err||b.decl||!b.visible) return;
       var hole=document.createElementNS(svgNS,'rect');
       hole.setAttribute('x',r.left); hole.setAttribute('y',r.top); hole.setAttribute('width',r.width); hole.setAttribute('height',r.height); hole.setAttribute('fill','black');
       mask.appendChild(hole);
@@ -134,7 +163,10 @@ const SCRIPT = `
   function preview(idx){
     var e=entries[idx]; if(!e||e.err) return; closePreview();
     pv=document.createElement('div'); pv.className='pv';
-    pv.innerHTML='<div class="pvh"><b>'+esc(short(e.file))+' \\u00b7 '+esc(e.name)+'</b>'+(e.visible?'':'<em>hidden in this mockup</em>')+'<button data-act="open">Open source</button><button class="x" data-act="close" aria-label="Close">\\u00d7</button></div><div class="pvb"><div class="__wrap"></div></div>';
+    var head=e.decl
+      ?'<b>'+esc(e.name)+'</b><em>offered by this mockup</em>'+(ownFile?'<code>&lt;div data-bind="'+esc(ownFile)+'#'+esc(e.name)+'"&gt;&lt;/div&gt;</code>':'')+(e.visible?'':'<em>hidden</em>')
+      :'<b>'+esc(e.name)+'</b><em>pulled from '+esc(short(e.file))+'</em>'+(e.visible?'':'<em>hidden in this mockup</em>')+'<button data-act="open">Open source</button>';
+    pv.innerHTML='<div class="pvh">'+head+'<button class="x" data-act="close" aria-label="Close">\\u00d7</button></div><div class="pvb"><div class="__wrap"></div></div>';
     var clone=e.el.cloneNode(true); clone.removeAttribute('hidden'); clone.style.display='';
     pv.querySelector('.__wrap').appendChild(clone);
     pv.addEventListener('click',function(ev){ var b=ev.target.closest('[data-act]'); ev.stopPropagation(); if(!b) return;
@@ -162,11 +194,11 @@ const SCRIPT = `
 const attr = (s: string): string => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 /** The served html with the composition layer appended. Idempotent on the marker. */
-export function withOverlay(html: string, { bindings, target }: OverlayOptions = {}): string {
+export function withOverlay(html: string, { bindings, target, file }: OverlayOptions = {}): string {
   const summary = JSON.stringify(bindings ?? { sources: [], errors: [], warnings: [] });
   const snippet =
     `<style ${OVERLAY_MARK}>${CSS}</style>` +
-    `<div id="__aiview" ${OVERLAY_MARK} data-summary="${attr(summary)}"${target ? ` data-target="${attr(target)}"` : ""}></div>` +
+    `<div id="__aiview" ${OVERLAY_MARK} data-summary="${attr(summary)}"${target ? ` data-target="${attr(target)}"` : ""}${file ? ` data-file="${attr(file)}"` : ""}></div>` +
     `<script ${OVERLAY_MARK}>${SCRIPT}</script>`;
   const i = html.lastIndexOf("</body>");
   return i < 0 ? html + snippet : html.slice(0, i) + snippet + html.slice(i);

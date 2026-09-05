@@ -170,6 +170,7 @@ export function App() {
                 <MockupFrame
                   html={response!.content}
                   bindings={response!.bindings}
+                  file={baseOf(doc.abs_path)}
                   target={sourceTarget?.id === doc.id ? sourceTarget.component : undefined}
                   onOpenSource={openSource}
                 />

@@ -311,6 +311,9 @@ describe("composition overlay", () => {
     expect(out).toMatch(/#__aiview\{[^}]*pointer-events:auto/);
     expect(out).toMatch(/#__aiview \.box\{[^}]*pointer-events:auto;cursor:pointer/);
     expect(out).toMatch(/#__aiview \.box\.err\{[^}]*pointer-events:none/);
+    // offered components get their own colour, and the host's file name rides along for the binding snippet
+    expect(out).toMatch(/#__aiview \.box\.decl\{[^}]*#15803d/);
+    expect(withOverlay("<body></body>", { file: "2026-09-03-assistant.mockup.html" })).toContain('data-file="2026-09-03-assistant.mockup.html"');
     expect(out).toMatch(/#__aiview \.lbl\{[^}]*pointer-events:auto/);
     expect(shortName("2026-09-03-dock-tools.mockup.html")).toBe("dock-tools");
   });
