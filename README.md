@@ -156,10 +156,9 @@ node is overwritten, never appended to.
 
 ### Mockups that compose
 
-The viewer is where you and the agent agree on what will be built: the design is
-discussed there, the spec and the plan are written there, and a screen is drawn there
-before it is coded. A mockup is that agreement for one screen. You look, you say what
-you want changed, the agent changes it.
+A mockup is where you and the agent agree on how a screen looks. You look, you say what
+you want changed, the agent changes it, and the screen is coded only once you are
+satisfied.
 
 A component is drawn once, in one mockup, and every other mockup of the project uses
 that drawing. When the agent changes it, every screen that uses it reloads with the
