@@ -86,16 +86,17 @@ With the plan drafted, ask one multiple-choice question in chat: harden the plan
 through an interview (recommended when a phase touches code nobody in the
 conversation has read, or when there are more than three phases), or approve it as
 drafted. On yes, run the `interview` skill (`../interview/SKILL.md` in this
-collection) with the phases as the tree: for each, the assumption it rests on, what
-an earlier phase could find that would break it, and whether its done-when is
-observed. Check against the codebase what can be checked now. A phase whose
-assumption cannot be verified before it runs is cut to "planned after phase N runs".
-Hardening removes assumptions; it does not add detail. The interview runs in chat:
-write what it settles into the phases it concerns, and the exchange itself into an
-**interview log** at the end of the plan, one entry per question in the order asked,
-appended as each answer lands, verbatim, the question with its options and
-recommendation, then the answer as given. Record the answer to the hardening
-question in the plan's header (`hardened: yes` or `no`).
+collection) with the implementation decisions register as the tree, phase by phase:
+the modules, interfaces, architecture, schema, contracts and clarifications each
+phase rests on, the rows already filled confirmed from the code, the missing ones
+resolved with the person. A decision a phase needs that cannot be made before an
+earlier phase runs cuts that phase to "planned after phase N runs". Hardening fills
+the register and removes assumptions; it does not add detail. The interview runs in
+chat: write what it settles into the register and the phases it concerns, and the
+exchange itself into an **interview log** at the end of the plan, one entry per
+question in the order asked, appended as each answer lands, verbatim, the question
+with its options and recommendation, then the answer as given. Record the answer to
+the hardening question in the plan's header (`hardened: yes` or `no`).
 
 Then stop and ask the person to approve the plan. Running it is `execute-plan`'s job.
 
