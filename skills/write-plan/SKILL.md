@@ -76,8 +76,9 @@ collection) with the phases as the tree: for each, the assumption it rests on, w
 an earlier phase could find that would break it, and whether its done-when is
 observed. Check against the codebase what can be checked now. A phase whose
 assumption cannot be verified before it runs is cut to "planned after phase N runs".
-Hardening removes assumptions; it does not add detail. Record the answer in the
-plan's header (`hardened: yes` or `no`).
+Hardening removes assumptions; it does not add detail. The interview runs in chat:
+write what it settles into the phases it concerns, and record the answer to the
+question in the plan's header (`hardened: yes` or `no`).
 
 Then stop and ask the person to approve the plan. Running it is `execute-plan`'s job.
 

@@ -23,7 +23,8 @@ simple. A simple project's spec is three paragraphs, but it exists and it's appr
    needs splitting first.
 3. **Question loop**: run the `interview` skill (`../interview/SKILL.md` in this
    collection) on the board's decisions table, which is its tree. The first rows are
-   purpose, constraints, success criteria, and what is explicitly out of scope.
+   purpose, constraints, success criteria, and what is explicitly out of scope. The
+   interview runs in chat; every decision it settles goes into the table as it lands.
 4. **Approaches**: propose 2–3 with real trade-offs. Lead with your recommendation and
    why. YAGNI every one of them before presenting.
 5. **Design, in sections**: scale each section to its complexity. Ask after each one
