@@ -31,14 +31,14 @@ const UI_FONT = "font:12px/1.35 ui-sans-serif,system-ui,sans-serif";
 const CSS = `
 #__aiview{position:fixed;inset:0;z-index:2147483647;pointer-events:auto;cursor:default}
 #__aiview svg{position:absolute;inset:0;width:100%;height:100%}
-#__aiview .box{position:absolute;outline:2px dashed #4f46e5;outline-offset:1px;border-radius:3px;pointer-events:none}
-#__aiview .box.err{outline-color:#dc2626}
-#__aiview .box.hover{background:rgba(79,70,229,.06)}
+#__aiview .box{position:absolute;outline:2px dashed #4f46e5;outline-offset:1px;border-radius:3px;pointer-events:auto;cursor:pointer}
+#__aiview .box.err{outline-color:#dc2626;pointer-events:none;cursor:default}
+#__aiview .box:hover{background:rgba(79,70,229,.06)}
 #__aiview .box.flash{animation:__aiview-flash 1.2s ease-out 1}
 @keyframes __aiview-flash{0%{background:rgba(79,70,229,.35)}100%{background:transparent}}
 #__aiview .lbl{position:absolute;left:-2px;top:-22px;display:none;pointer-events:auto;cursor:pointer;white-space:nowrap;padding:2px 7px;border-radius:4px;background:#4f46e5;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);${UI_FONT}}
 #__aiview .box.err .lbl{display:block;background:#dc2626;cursor:default}
-#__aiview .box.hover .lbl{display:block}
+#__aiview .box:hover .lbl{display:block}
 #__aiview .legend{position:absolute;top:8px;right:8px;pointer-events:auto;max-width:380px;max-height:60vh;overflow:auto;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,.96);color:#1a1a1a;box-shadow:0 1px 4px rgba(0,0,0,.25);${UI_FONT}}
 #__aiview .legend b{font-weight:600}
 #__aiview .legend .err{color:#dc2626}
@@ -78,9 +78,9 @@ const SCRIPT = `
   layer.appendChild(svg);
   var mask=svg.querySelector('mask');
   var legend=document.createElement('div'); legend.className='legend'; layer.appendChild(legend);
-  var entries=[]; var hovered=-1; var pv=null;
+  var entries=[]; var pv=null;
   function build(){
-    entries.forEach(function(b){b.box.remove()}); entries=[]; hovered=-1;
+    entries.forEach(function(b){b.box.remove()}); entries=[];
     var els=document.querySelectorAll('[data-bound],[data-bound-error]');
     var byFile={};
     els.forEach(function(el){
@@ -92,6 +92,7 @@ const SCRIPT = `
       lbl.textContent=isErr?(el.textContent||ref):(short(file)+' \\u00b7 '+name);
       var idx=entries.length;
       if(!isErr) lbl.addEventListener('click',function(ev){ev.stopPropagation();parent.postMessage({type:'aiview:open',file:file,component:name},'*')});
+      if(!isErr) box.addEventListener('click',function(ev){ev.stopPropagation();preview(idx)});
       box.appendChild(lbl); layer.appendChild(box);
       entries.push({el:el,box:box,file:file,name:name,err:isErr,visible:false});
       if(!isErr){ (byFile[file]=byFile[file]||[]).push(idx); }
@@ -128,17 +129,6 @@ const SCRIPT = `
   new MutationObserver(function(muts){
     for(var i=0;i<muts.length;i++){ if(layer.contains(muts[i].target)) continue; rebuild(); return; }
   }).observe(document.body,{subtree:true,childList:true,attributes:true,characterData:true});
-  document.addEventListener('mousemove',function(ev){
-    if(pv&&pv.contains(ev.target)) return;
-    var x=ev.clientX,y=ev.clientY; hovered=-1;
-    entries.forEach(function(b,i){
-      if(!b.visible){ b.box.classList.remove('hover'); return; }
-      var r=b.el.getBoundingClientRect();
-      var inside=x>=r.left&&x<=r.right&&y>=r.top-22&&y<=r.bottom;
-      if(inside) hovered=i;
-      b.box.classList.toggle('hover',inside);
-    });
-  },true);
   // the preview: the element cloned into a panel of the layer, rendered by the page's own styles
   function closePreview(){ if(pv){pv.remove();pv=null;} }
   function preview(idx){
@@ -156,8 +146,7 @@ const SCRIPT = `
     var row=ev.target.closest('.legend .row'); if(row){ preview(+row.getAttribute('data-i')); return; }
     if(ev.target.closest('.legend')) return;
     if(pv&&pv.contains(ev.target)) return;
-    if(pv){ closePreview(); return; }
-    if(hovered>=0) preview(hovered);
+    if(pv) closePreview();
   });
   document.addEventListener('keydown',function(ev){ if(ev.key==='Escape') closePreview(); },true);
   build();

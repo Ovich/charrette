@@ -309,7 +309,8 @@ describe("composition overlay", () => {
     expect(withOverlay("<p>no body</p>")).toContain(OVERLAY_MARK);
     // the layer takes the mouse: the mockup is looked at, not operated, in Composition
     expect(out).toMatch(/#__aiview\{[^}]*pointer-events:auto/);
-    expect(out).toMatch(/#__aiview \.box\{[^}]*pointer-events:none/);
+    expect(out).toMatch(/#__aiview \.box\{[^}]*pointer-events:auto;cursor:pointer/);
+    expect(out).toMatch(/#__aiview \.box\.err\{[^}]*pointer-events:none/);
     expect(out).toMatch(/#__aiview \.lbl\{[^}]*pointer-events:auto/);
     expect(shortName("2026-09-03-dock-tools.mockup.html")).toBe("dock-tools");
   });
