@@ -86,7 +86,7 @@ const SCRIPT = `
   var esc=function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')};
   var svgNS='http://www.w3.org/2000/svg';
   var svg=document.createElementNS(svgNS,'svg');
-  svg.innerHTML='<defs><mask id="__aiview-mask"><rect width="100%" height="100%" fill="white"/></mask></defs><rect width="100%" height="100%" fill="rgba(255,255,255,.45)" mask="url(#__aiview-mask)"/>';
+  svg.innerHTML='<defs><mask id="__aiview-mask"><rect width="100%" height="100%" fill="white"/></mask></defs><rect width="100%" height="100%" fill="rgba(255,255,255,.4)" mask="url(#__aiview-mask)"/>';
   layer.appendChild(svg);
   var mask=svg.querySelector('mask');
   var legend=document.createElement('div'); legend.className='legend'; layer.appendChild(legend);
@@ -145,7 +145,7 @@ const SCRIPT = `
       b.visible=!!(r.width||r.height);
       b.box.style.left=r.left+'px'; b.box.style.top=r.top+'px'; b.box.style.width=r.width+'px'; b.box.style.height=r.height+'px';
       b.box.style.display=b.visible?'block':'none';
-      if(b.err||b.decl||!b.visible) return;
+      if(b.err||!b.visible) return; // pulled and offered alike render at full strength under their outline
       var hole=document.createElementNS(svgNS,'rect');
       hole.setAttribute('x',r.left); hole.setAttribute('y',r.top); hole.setAttribute('width',r.width); hole.setAttribute('height',r.height); hole.setAttribute('fill','black');
       mask.appendChild(hole);
