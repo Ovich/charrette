@@ -1,7 +1,7 @@
 {
   "name": "charrette",
   "description": "Agent skills for the drawing-board loop: brainstorm, diagram, spec, plan, review. Every document rendered live in the bundled aiview viewer, outside your repositories.",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "author": {
     "name": "Stefan Teofanovic"
   },
