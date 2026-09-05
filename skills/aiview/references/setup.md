@@ -1,0 +1,19 @@
+# Setup: first clone, new machine
+
+Read when the tool is not yet usable on this machine: a fresh clone, a data home that
+does not exist, or a verb that prints a build command.
+
+```sh
+cd <skill-dir> && npm install && npm run build && node aiview.mjs init
+```
+
+`init` creates the data home, adopts an index left behind by an older install, and
+prints the three paths: home, docs, sqlite. `status` prints them any time; `status
+--json` exposes them as `home`, `docs`, `sqlite`, `tool`. Read `docs` from there rather
+than assuming it, since `CHARRETTE_HOME` may be set.
+
+The built UI (`dist/`) and the CLI bundles (`dist-cli/cli.mjs`, `dist-cli/mermaid-check.mjs`)
+are versioned, so an installed copy never needs a build. Every verb prints the build
+command if a bundle is missing, and `open` and `serve` rebuild the UI themselves when
+only `dist/` is missing. Changing aiview's own source means `npm install && npm run
+build` in `<skill-dir>` and committing what it produces.
