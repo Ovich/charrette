@@ -43,11 +43,28 @@ it fails; only then the implementation, and the last step runs the test and reco
 that it passes. A screen's behaviour is tested the same way; its look is the
 `👤 design review`. A slice drawn without the failing-test step is not a slice.
 
+## Modules
+
+Deep modules: a small interface over much functionality. A module whose interface is
+as large as what it hides is shallow, and is folded into its caller or its callee
+instead of created. The interface is the testing boundary. Every module a slice
+touches is a register row (below) with one of these states:
+
+| State | Meaning | Tested |
+|---|---|---|
+| new | A new module; the slice states what it exposes and what it hides | At the interface, unit |
+| deepened | Functionality added behind an unchanged interface | Interface tests extended |
+| interface change | What it exposes changes; the slice lists the callers | At the interface, every caller re-run |
+| wiring | Thin glue between modules: a route, a registration, a config line, a call added; no logic | Through the modules it connects, never on its own |
+| ui | A screen or component changed | Behaviour tested, look reviewed (`👤 design review`) |
+| schema | Columns or a migration, for this slice only | Through the module that owns the data |
+
 ## Implementation decisions
 
 A register in the plan: id (`ID4`), kind, decision, status (agreed, open, deferred),
-source, slice. Kinds: module created or updated, interface change, architecture,
-schema, API contract, technical clarification from the person. Sources: `board D3`,
+source, slice. Kinds: module (with its state from the table above, and the interface
+for new and interface change), architecture, API contract, technical clarification
+from the person. Sources: `board D3`,
 `board Q7`, `plan Q2`, the code, the docs. The spec states a contract; the register
 records what was decided about it. Rows ordered by slice. `execute-plan` adds rows as
 the work decides things.
