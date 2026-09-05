@@ -34,8 +34,8 @@ simple. A simple project's spec is three paragraphs, but it exists and it's appr
 ## The board (live document)
 
 The design lives in one Markdown file from the first question, not in chat. Create
-`YYYY-MM-DD-<topic>.brainstorm.md` in the data home , ask the `aiview` skill for the
-path rather than composing one, and never write inside the project repo , as soon as
+`YYYY-MM-DD-<topic>.brainstorm.md` in the data home (ask the `aiview` skill for the
+path rather than composing one, and never write inside the project repo) as soon as
 the context is read, and keep every decision, open question, considered option,
 diagram, and research note in it: the chat is transient, the board is the record.
 Structure:
@@ -129,4 +129,4 @@ it is that skill's job, and it refuses a plan without a tracker. Run
 | "The user knows what they want" | They know the outcome. The boundaries are what you're for. |
 | "Let me scaffold while we talk" | Files created before approval get defended instead of discarded. |
 | "I'll add a checklist at the top as well" | Two trackers drift, and then the reader has to work out which one is lying. The diagram, and nothing else. |
-| "The plan didn't predict this, so the plan was wrong" | Plans are hypotheses. The tracker is where reality is recorded , a diagram that never changed is one nobody was using. |
+| "The plan didn't predict this, so the plan was wrong" | Plans are hypotheses. The tracker is where reality is recorded: a diagram that never changed is one nobody was using. |
