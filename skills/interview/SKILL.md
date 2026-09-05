@@ -27,5 +27,8 @@ implementation makes silently.
 can do without is deferred with an owner and a reason.
 
 **Close in chat.** When every decision is agreed or deferred, say so and list them
-with their status and source. The caller, a skill or the person, decides where that
-goes.
+with their status and source. A calling skill writes them where its document keeps
+decisions. When the person called the interview directly, propose the object's own
+document as the place (a quick idea with no document yet gets one, through the
+`aiview` skill, `../aiview/SKILL.md` in this collection) and write the list there on
+their yes.
