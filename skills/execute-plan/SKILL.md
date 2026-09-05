@@ -39,20 +39,21 @@ past, is a deviation, not a starting condition. Reconcile it first, and say what
 ## Two questions, asked once
 
 Before the first step of a run, ask the person two multiple-choice questions in chat,
-one message each.
+one message each. Each has a recommended answer, listed first and marked so.
 
 **The pace**, how the phase boundaries are handled:
 
-1. **Run through**: at each phase boundary, report what happened and what is next, then
-   continue. Stop only for the three pauses below.
+1. **Run through** (recommended): at each phase boundary, report what happened and
+   what is next, then continue. Stop only for the three pauses below.
 2. **Stop at each phase**: finish the phase, report, name what is next, and wait.
 
 **The mode**, where the work runs:
 
-1. **Inline**: this session does the steps itself.
-2. **Subagent-driven**: each step is delegated to a fresh subagent with a brief, while
-   this session keeps the tracker, verifies each return against the step's done-when,
-   and merges. The person follows the work in the tracker rather than in the chat.
+1. **Subagent-driven** (recommended): each step is delegated to a fresh subagent with
+   a brief, while this session keeps the tracker, verifies each return against the
+   step's done-when, and merges. The person follows the work in the tracker rather
+   than in the chat, and this session's context stays the plan, not the diffs.
+2. **Inline**: this session does the steps itself.
 
 Record both in the plan's state node (`pace: run through | stop at phases`, `mode:
 inline | subagents`) so a session that resumes the plan reads them and asks neither
