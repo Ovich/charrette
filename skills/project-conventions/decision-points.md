@@ -106,9 +106,12 @@ handle them not at all.
 *Tell:* a function that both throws and returns `null` for failure; a stack trace
 reaching the client.
 
-**15. What gets tested, at what level, and where do tests live? `[later]`**
-Not "write tests": *which* things earn one, and what a test is allowed to touch
-(a real database? the network?). The unanswered version is a suite nobody trusts.
+**15. What gets tested, at what level, and where do tests live? `[day one]`**
+Not "write tests": *which* things earn one, at which level (unit, integration, end to
+end) per layer, what a test is allowed to touch (a real database? the network?), the
+runner, and the command that runs one test and shows it failing. Day one because
+every slice of a plan opens on a failing test (`write-plan`), which needs a place to
+put it and a way to run it. The unanswered version is a suite nobody trusts.
 *Tell:* a test file next to nothing that's tested; tests that fail when run in a
 different order.
 
