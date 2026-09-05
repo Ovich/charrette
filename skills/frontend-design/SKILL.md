@@ -43,6 +43,10 @@ it's approved.
 4. **Render and iterate**: write the file, register + serve it with aiview, tell the
    user the URL, edit the same file as they react. Check every state and the three
    viewport presets before calling it done.
+   Hand it over as something to change, not something finished: with the URL, say the
+   mockup is live and ask what they would change, spacing, wording, order, a region
+   that feels off. Every answer is an edit to the same file, visible on save. The person
+   must never have to wonder whether asking for a change is allowed.
    A mockup is a working prototype, not a picture: the behaviour is mocked in the file
    so the flow can be walked through. When the ask is purely visual, or once the visual
    pass is approved, ask one question about the flow ("what happens when they press
