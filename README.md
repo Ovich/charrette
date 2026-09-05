@@ -1,12 +1,13 @@
 # Charrette
 
+*(French, from architecture studios: the intense working session where a design is
+drawn, argued over, and decided before anything expensive is built.)*
+
 Agent skills that settle what gets built before code is written. A design conversation ends in a spec and a plan, a screen in a working mockup, a pull request in an analysis with the decisions only a human can make. Every document renders live in aiview, the companion app. None of it lands in your repository.
 
 The problem it removes: chat scrolls away. A design agreed at message 40 is gone by message 90, a half-run plan cannot be resumed by the next session, and code gets written against states a picture never settled. Charrette puts the record in documents the agent keeps true while it works.
 
 Nine skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
-
-(The name is French, from architecture studios: the session where a design is drawn, argued over and decided before anything expensive is built.)
 
 ## The loop
 
