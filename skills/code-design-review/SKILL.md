@@ -9,7 +9,7 @@ Applies ten program design principles to a PR or a codebase and reports where th
 design will cost someone later. Grounded in a sourced `checklist.md`: one section
 per lens. Reports findings; only edits with `--fix`.
 
-Not a bug hunt. A design finding is about *cost of change*, not wrongness today.
+A design finding is about *cost of change*, not wrongness today.
 
 ## Scope
 
@@ -64,6 +64,12 @@ fix. Grouped by lens, ranked by cost, no code restated, no preamble.
 End with a one-line verdict, e.g. `9 findings: 3 dependencies, 4 responsibility,
 2 simplicity (1 blocking)`. Clean code gets "clean" and nothing more. A short report
 is a good report.
+
+A diff review is answered in chat. A path or whole-codebase review is a document
+someone reads later: write `YYYY-MM-DD-<scope>.report.md` in the data home and open
+it via the `aiview` skill (`../aiview/SKILL.md` in this collection), kind `report`,
+tags = project + review; diagrams per the `write-diagrams` skill, a dependency graph
+with the forbidden edges drawn where the findings are about coupling.
 
 With `--fix`, apply only the safe findings afterward (nothing that changes behavior
 or reaches outside the scope), then re-run whatever typecheck/lint/test command the

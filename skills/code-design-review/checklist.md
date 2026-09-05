@@ -1,8 +1,8 @@
 # Code design checklist
 
-The sourced rule set behind `code-design-review`, one section per lens. Each rule is
-a **checkable assertion**, a one-line *smell* a reviewer can spot in the code,
-followed by its `source`. Language-agnostic: "class" means class, module, struct,
+The sourced rule set behind `code-design-review`, one section per lens. Each principle
+opens with its source and lists **checkable smells**, one line each, that a reviewer
+can spot in the code, then its counterweight. Language-agnostic: "class" means class, module, struct,
 package, or file, whichever the language has.
 
 Three standing rules for every lens:
@@ -22,9 +22,7 @@ Three standing rules for every lens:
 
 ### DRY: Don't Repeat Yourself
 
-The rule is about *knowledge*, not characters: "every piece of system knowledge
-should have one authoritative, unambiguous representation."
-`https://www.artima.com/intv/dry.html`
+Source: `https://www.artima.com/intv/dry.html`
 
 - **One rule, one home.** A business rule, magic constant, validation, status string,
   or format expressed in 2+ places. Smell: the same threshold / regex / enum-ish
@@ -50,9 +48,7 @@ Report that, and say to inline it back.
 
 ### KISS: Keep It Simple
 
-Kent Beck's rules of simple design, in priority order: passes the tests, reveals
-intention, no duplication, **fewest elements**. Anything that doesn't serve the first
-three should go. `https://martinfowler.com/bliki/BeckDesignRules.html`
+Source: `https://martinfowler.com/bliki/BeckDesignRules.html`
 
 - **The code doesn't reveal its intention**: you must simulate it line by line to
   learn what it does. Smell: deep nesting, a boolean parameter that flips the meaning
@@ -73,9 +69,7 @@ function to cut line count.
 
 ### YAGNI: You Aren't Gonna Need It
 
-"Building presumptive features costs the work itself, delays the features that pay
-now, and adds complexity that slows everything else."
-`https://martinfowler.com/bliki/Yagni.html`
+Source: `https://martinfowler.com/bliki/Yagni.html`
 
 - **Generality with exactly one caller and no second one in sight**: a config system,
   strategy registry, or plugin point built for a variation that does not exist.
@@ -98,9 +92,7 @@ concrete, already-scheduled requirement needs. `https://martinfowler.com/bliki/Y
 
 ### SRP: Single Responsibility
 
-"Each software module should have one and only one reason to change", and reasons to
-change are *people*: different stakeholders asking for different things.
-`https://blog.cleancoder.com/uncle-bob/2014/05/08/SingleReponsibilityPrinciple.html`
+Source: `https://blog.cleancoder.com/uncle-bob/2014/05/08/SingleReponsibilityPrinciple.html`
 
 - **Two stakeholders can force a change to the same class.** Smell: business rules and
   persistence, or policy and transport, edited in one file. The DBA's change and the
@@ -120,9 +112,7 @@ change are *people*: different stakeholders asking for different things.
 
 ### High Cohesion
 
-Cohesion is how closely a module's data and methods relate to each other. Test: is
-everything in it directly described by its name?
-`https://learn.microsoft.com/en-us/archive/msdn-magazine/2008/october/patterns-in-practice-cohesion-and-coupling`
+Source: `https://learn.microsoft.com/en-us/archive/msdn-magazine/2008/october/patterns-in-practice-cohesion-and-coupling`
 
 - **A subset of methods and fields that only talk to each other** and never to the
   rest: that subset is a class trying to be born. Extract it.
@@ -146,9 +136,7 @@ while looking like progress.
 
 ### OCP: Open/Closed
 
-"You should be able to extend the behavior of a system without having to modify that
-system."
-`https://blog.cleancoder.com/uncle-bob/2014/05/12/TheOpenClosedPrinciple.html`
+Source: `https://blog.cleancoder.com/uncle-bob/2014/05/12/TheOpenClosedPrinciple.html`
 
 - **Adding a variant means editing existing, working code**: a `switch`/`if-else` on
   a type tag, kind, or role that must be found and extended in several places for one
@@ -167,10 +155,7 @@ architecture; only make the seam once the second and third variants are real.
 
 ### LSP: Liskov Substitution
 
-"Let φ(x) be a property provable about objects x of type T. Then φ(y) should be true
-for objects y of type S where S is a subtype of T." Substituting a subtype must not
-break a caller written against the supertype.
-`https://www.cs.cmu.edu/~wing/publications/LiskovWing94.pdf`
+Source: `https://www.cs.cmu.edu/~wing/publications/LiskovWing94.pdf`
 
 - **An override that throws, no-ops, or returns a sentinel** for part of the contract:
   `ReadOnlyList.add()` raising `Unsupported`. The subtype is announcing it isn't one.
@@ -186,9 +171,7 @@ break a caller written against the supertype.
 
 ### ISP: Interface Segregation
 
-"Keep interfaces small so that users don't end up depending on things they don't need."
-`https://blog.cleancoder.com/uncle-bob/2020/10/18/Solid-Relevance.html`
-Original: `https://www.cs.utexas.edu/~fares/papers/ISP.pdf`
+Source: `https://blog.cleancoder.com/uncle-bob/2020/10/18/Solid-Relevance.html` · `https://www.cs.utexas.edu/~fares/papers/ISP.pdf`
 
 - **Implementors forced to supply methods they have no meaning for**: the stubs and
   `NotImplemented`s are the evidence.
@@ -211,9 +194,7 @@ consumer uses most of it, it's already right-sized.
 
 ### DIP: Dependency Inversion
 
-"Depend in the direction of abstraction. High level modules should not depend upon low
-level details." `https://blog.cleancoder.com/uncle-bob/2020/10/18/Solid-Relevance.html`
-Original: `https://www.cs.utexas.edu/~downing/papers/DIP-1996.pdf`
+Source: `https://blog.cleancoder.com/uncle-bob/2020/10/18/Solid-Relevance.html` · `https://www.cs.utexas.edu/~downing/papers/DIP-1996.pdf`
 
 - **Policy importing a mechanism**: domain or business logic importing the SQL client,
   HTTP library, cloud SDK, or file system directly. Swapping the mechanism edits the
@@ -238,8 +219,7 @@ defend), say to collapse it.
 
 ### Low Coupling
 
-Coupling is how much modules must know about each other's internals; the cost is that
-changes ripple. `https://martinfowler.com/ieeeSoftware/coupling.pdf`
+Source: `https://martinfowler.com/ieeeSoftware/coupling.pdf`
 
 - **Reaching into another module's internals**: private-by-convention fields,
   `_internal` attributes, a class's data manipulated from outside instead of asking it
@@ -262,9 +242,7 @@ changes ripple. `https://martinfowler.com/ieeeSoftware/coupling.pdf`
 
 ### Law of Demeter
 
-Only talk to your immediate friends: a method should call methods on its own object,
-its parameters, objects it creates, and its direct components, not on objects those
-hand back. `https://www2.ccs.neu.edu/research/demeter/papers/law-of-demeter/oopsla88-law-of-demeter.pdf`
+Source: `https://www2.ccs.neu.edu/research/demeter/papers/law-of-demeter/oopsla88-law-of-demeter.pdf`
 
 - **Reaching through an intermediate to get work done**:
   `repository.innerService.findClaims(customer)`, `order.getCustomer().getAddress().getZip()`.
