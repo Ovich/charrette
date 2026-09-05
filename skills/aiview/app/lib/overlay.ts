@@ -2,6 +2,10 @@
 // which regions were bound from elsewhere. Everything drawn lives in one fixed layer
 // appended to <body>, positioned from measured rectangles: nothing is inserted into the
 // host's flow, so the host's layout is exactly what Rendered mode shows.
+//
+// The layer takes every pointer event. In Composition the mockup is looked at, not
+// operated: its hover states and clicks stay quiet, and only the labels and the legend
+// answer the mouse. Wheel scrolling still reaches the document.
 import type { BindingsSummary } from "./api.ts";
 
 export const OVERLAY_MARK = "data-aiview-overlay";
@@ -17,9 +21,9 @@ export const shortName = (file: string): string =>
   file.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/\.mockup\.html$/, "").replace(/\.html$/, "");
 
 const CSS = `
-#__aiview{position:fixed;inset:0;z-index:2147483647;pointer-events:none;font:11px/1.3 ui-sans-serif,system-ui,sans-serif}
+#__aiview{position:fixed;inset:0;z-index:2147483647;pointer-events:auto;cursor:default;font:11px/1.3 ui-sans-serif,system-ui,sans-serif}
 #__aiview svg{position:absolute;inset:0;width:100%;height:100%}
-#__aiview .box{position:absolute;outline:2px dashed #4f46e5;outline-offset:1px;border-radius:3px}
+#__aiview .box{position:absolute;outline:2px dashed #4f46e5;outline-offset:1px;border-radius:3px;pointer-events:none}
 #__aiview .box.err{outline-color:#dc2626}
 #__aiview .box.flash{animation:__aiview-flash 1.2s ease-out 1}
 @keyframes __aiview-flash{0%{background:rgba(79,70,229,.35)}100%{background:transparent}}
