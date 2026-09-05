@@ -115,7 +115,7 @@ In the order work usually happens:
 | The data home, `$CHARRETTE_HOME` or `charrette_appdata` in your OS home directory | `docs/<project>/*.md, *.html, *.pdf`, and `aiview.sqlite`, the index and the active project | Never in a project repo. May be its own git repo, to sync between machines |
 | Your project repository | `AGENTS.md`, grown by project-conventions. README and architecture docs, written by technical-writing | Yes, by you |
 
-Charrette keeps its documents outside the repository to avoid doc rot: a board, spec, plan, mockup or PR analysis is obsolete when the PR merges, and left in the tree it goes stale and keeps steering agents that read it. So by default none is versioned and none lives in a project repository. The exception is allowed and deliberate: a document meant to outlive the work, an architecture doc, an ADR, a spec a team keeps current, can live in the repo, and aiview serves it from where it is since the index only points at files. What lives in the tree is what the team commits to keeping true.
+Charrette stores its documents outside the repository to avoid doc rot: outdated documents influence the agent badly. Boards, specs, plans, mockups and PR analyses are obsolete when the PR merges, so by default none is versioned and none lives in a project repository. For some types of documents, an architecture doc, an ADR, a spec the team keeps current, the codebase can be considered, and it is allowed: the index only points at files, and aiview serves a document from where it is.
 
 
 ## Updating
