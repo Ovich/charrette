@@ -12,9 +12,17 @@ agent hold the same design and the document says so.
 ## The tree
 
 Before the first question, lay out the decisions the object holds as a table in its
-document: decision, status (agreed, proposed, open, deferred), what it depends on.
+document: decision, status, what it depends on. A row is a choice a competent
+engineer could have made differently and that the object rests on, one row per
+choice, not per sentence. When the object or its board already carries such a table,
+that table is the tree: cite its rows by their ids and add to it, never copy it.
 Everything asked or found from here on is written there, never left in chat. A
 question that uncovers a decision the table did not have adds a row.
+
+Statuses: **agreed**, the person said yes or a source settles it; **proposed**, your
+recommendation is on the table and unanswered; **open**, no recommendation yet;
+**deferred**, the current increment's verification does not need it, with a named
+owner.
 
 ## The order
 
@@ -26,8 +34,11 @@ have to be revisited.
 
 A question the codebase, the git history, the conventions file or the existing
 documents can answer is answered by reading them, and the table records the answer
-with its source. The person is asked only what nobody can read: purpose, priority,
-appetite, what is out of scope, which of two defensible options they want.
+with its source. What has shipped is agreed by that fact. When the object and the
+codebase disagree, the row records both and becomes a question for the person, which
+one holds, never a judgment of yours. The person is asked only what nobody can read:
+purpose, priority, appetite, what is out of scope, which of two defensible options
+they want.
 
 ## Every question carries a recommendation
 
