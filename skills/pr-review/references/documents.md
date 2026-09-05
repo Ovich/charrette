@@ -37,8 +37,7 @@ understanding the change; the cure is a sharper Abstract, not a smaller font.
    Approve with comments; clean on every layer that ran, with no open decisions →
    Approve.
 
-**Voice.** Write it with the `technical-writing` skill
-(`../technical-writing/SKILL.md` in this collection), in **Fred Brooks's register**:
+**Voice.** Fred Brooks's register:
 
 - **Separate essence from accident.** Brooks's central move, and it fits review
   exactly: the difficulty inherent in what the change is doing, versus the difficulty
