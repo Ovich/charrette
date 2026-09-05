@@ -17,7 +17,9 @@ simple. A simple project's spec is three paragraphs, but it exists and it's appr
 ## Flow
 
 1. **Read the context**: existing code, `AGENTS.md`/`CLAUDE.md`, recent commits, the
-   conventions already in force. Design that fights the house rules is wasted design.
+   conventions already in force, and when the topic has a group in aiview, its board
+   and the last plan's finished steps. Design that fights the house rules is wasted
+   design.
 2. **Scope check**: if the request is several independent systems, say so now and help
    decompose it. Each piece gets its own spec. Don't refine details of a project that
    needs splitting first.
@@ -47,7 +49,8 @@ path rather than composing one, and never write inside the project repo) as soon
 the context is read, and keep every decision, open question, considered option,
 diagram, and research note in it: the chat is transient, the board is the record.
 Structure:
-decisions table (status: agreed / proposed / open / deferred), context being built on,
+decisions table (id `D3`, decision, depends on, status agreed / open / deferred, log
+entry `Q7`), context being built on,
 design sections, diagrams, research notes, and last the **interview log**: one entry
 per question in the order asked, appended as each answer lands, verbatim, the
 question with its options and recommendation, then the answer as given. The
@@ -88,7 +91,7 @@ container), and note the spec path at the top of the board. Contents:
 are the valuable half · **User stories**: as many as the change needs, each with an
 id (`US3`), the role, what they want, why, and acceptance criteria written as
 something observed; the interview's answers on purpose, what the first user sees and
-what is out of scope are where they come from, and the plan's phases, the tracker's
+what is out of scope are where they come from, and the plan's slices, the tracker's
 evidence and a review's L5 all cite them · **Design**: prose plus the diagrams that
 earned their place ·
 **Data**: shapes, ownership, migrations · **Failure modes**: what breaks, what the
@@ -98,7 +101,7 @@ owner, or none at all.
 Then self-review with fresh eyes and fix inline: any TBD or placeholder left? Do two
 sections contradict each other? Does every diagram match the prose beside it? Could a
 requirement be read two ways? If so, pick one and write it plainly. Is this one
-implementation plan's worth of work, or does it still need splitting?
+increment's plan's worth of work, or does it still need splitting?
 
 Then stop and ask the user to review the file. The plan comes after approval, from
 `write-plan`.

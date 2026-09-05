@@ -1,6 +1,6 @@
 ---
 name: execute-plan
-description: Use when carrying out an implementation plan the person has already approved, whether starting it or resuming it in a later session. Runs the steps, keeps the plan's phasing diagram true as the tracker, and pauses only where the person is needed. Not for producing the plan (brainstorm) and not for reviewing the result.
+description: Use when carrying out an implementation plan the person has already approved, whether starting it or resuming it in a later session, and the tracker in it has to stay true while the work happens. Not for producing the plan (write-plan) and not for reviewing the result.
 ---
 
 # Execute a plan
@@ -30,11 +30,12 @@ condition: reconcile it first, and say what you found.
 Before the first step of a run, ask the person two multiple-choice questions in chat,
 one message each, the recommended answer listed first and marked so.
 
-**The pace**, how the phase boundaries are handled:
+**The pace**, how the slice boundaries are handled:
 
-1. **Run through** (recommended): at each phase boundary, report what happened and
-   what is next, then continue. Stop only for the three pauses below.
-2. **Stop at each phase**: finish the phase, report, name what is next, and wait.
+1. **Run through** (recommended): at each slice boundary, report what happened and
+   what is next, then continue. Stop only for the three pauses below and at a slice
+   marked `👤`.
+2. **Stop at each slice**: finish the slice, report, name what is next, and wait.
 
 **The mode**, where the work runs:
 
@@ -43,26 +44,13 @@ one message each, the recommended answer listed first and marked so.
    step's done-when, and merges. This session's context stays the plan, not the diffs.
 2. **Inline**: this session does the steps itself.
 
-Record both in the plan's state node (`pace`, `mode`) so a session that resumes the
-plan reads them and asks neither again. Under either pace a phase whose findings change
-the next phase is the first pause below.
-
-## The brief, in subagent mode
-
-A brief has four slots, in this order: where the plan is (its aiview path, the step's
-node id); the step's jurisdiction, its node text and done-when, and nothing beyond it;
-the facts this session has already established, given as facts (the branch, the
-commands that verify, what an earlier step found); the return contract: what changed,
-where, the evidence the done-when is met, and anything found that the plan did not
-predict. A subagent never edits the tracker. This session is its single writer.
-
-## Parallel branches
-
-Where the plan draws a fork (`references/tracker.md` says when one may be drawn), in
-subagent mode dispatch one subagent per branch, each with its own brief, and put one
-`aiview pending` card per branch on the plan document. Tick each branch as its return
-lands, close its card, and run the join node's verification yourself. Inline, propose
-the same at the fork in one message, and on a no run the branches in the order drawn.
+Record both in the plan's state node (`pace: run through | stop at each slice`,
+`mode: subagent-driven | inline`) so a session that resumes the plan reads them and
+asks neither again. Under either pace a slice whose findings change the next slice is
+the first pause below, and a slice marked `👤 decision` or `👤 design review` in the
+tracker stops before it starts, whatever the pace: the mark says what the person
+gives. In subagent mode, read `references/subagents.md` before the
+first dispatch: the brief, the single writer, and the fork.
 
 ## The three pauses
 
@@ -122,7 +110,7 @@ in the same step, the step was mis-scoped.
 
 | Thought | Reality |
 |---|---|
-| "I'll check with them before starting the next step" | The plan was the approval. Report at the phase boundary, and stop there only if the pace says so. |
+| "I'll check with them before starting the next step" | The plan was the approval. Report at the slice boundary, and stop there only if the pace or a `👤` mark says so. |
 | "The subagent can update the tracker when it is done" | It cannot see the other branches. One writer, this session; the return is evidence, the tick is yours. |
 | "These two steps look independent, I'll run them in parallel" | Only if the plan draws the fork. Two steps that touch one file are one branch, whatever they look like. |
 | "It's a small deviation, I'll mention it at the end" | Draw it, then do it. A session that dies mid-way leaves a plan that does not know the work exists. |

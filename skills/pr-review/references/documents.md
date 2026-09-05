@@ -62,7 +62,8 @@ Sections, in reading order:
 1. **Provenance**: refs compared, merge-base, commit count, file count, evidence base,
    and anything the environment could not reach.
 2. **Intent**: what the PR claims, from its description, linked issue and commit
-   messages. Quote, do not paraphrase. No stated intent → say "no stated intent", never
+   messages, and when a spec was named, one line per user story: met, partial or not
+   met, with the evidence. Quote, do not paraphrase. No stated intent → say "no stated intent", never
    infer one and present it as theirs.
 3. **What actually changed**: prose per area (not per file), sized to the change; a
    files-touched table when it adds orientation. **And the triage record**: which

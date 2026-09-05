@@ -18,7 +18,7 @@ flowchart LR
   I["idea"] --> B["brainstorm<br/>board + spec"]
   B --> P["write-plan<br/>one increment, hardened on request"]
   P --> E["execute-plan<br/>the plan's diagram is the tracker"]
-  E --> R["review<br/>pr-analysis, findings"]
+  E --> R["pr-review<br/>analysis, findings"]
   R --> M["merge"]
   D["write-diagrams"] -.->|draws for| B & P & R
   Q["interview"] -.->|resolves decisions for| B & P
@@ -44,7 +44,7 @@ What `brainstorm` and `write-plan` leave behind for one feature: the board, the 
 
 ### The same plan, mid-execution
 
-The plan's phasing diagram is its tracker: one node per step with a status glyph, gates that record the branch taken, and a state node with branch, commit, next step, blocked and parked, which is what a later session resumes from.
+The plan's phasing diagram is its tracker: one node per step with a status glyph, gates that record the branch taken, and a state node with branch, commit, next step, blocked, parked, pace and mode, which is what a later session resumes from.
 
 ![aiview: the pr-review redesign plan at its gate, trial steps done with evidence, release in progress, the untaken branch marked not needed](assets/aiview-pr-review-plan.png)
 
@@ -92,7 +92,7 @@ In the order work usually happens:
 |---|---|---|
 | [brainstorm](skills/brainstorm/SKILL.md) | Something non-trivial is about to be built and the design conversation hasn't happened | *"Run brainstorm: I want per-user rate limiting on the API."* One question at a time, no code until the spec is approved. |
 | [interview](skills/interview/SKILL.md) | A design object has decisions nobody has resolved, or you want to be questioned about one until it is understood the same way | *"Interview me about this spec."* Decisions walked in dependency order, the codebase read before you are asked, a recommendation on every question. |
-| [write-plan](skills/write-plan/SKILL.md) | The spec is approved and the next increment needs its plan | *"Write the plan for the rate-limiting spec."* One increment, phases that verify, the tracker drawn, hardened through an interview when you say so. |
+| [write-plan](skills/write-plan/SKILL.md) | The spec is approved and the next increment needs its plan | *"Write the plan for the rate-limiting spec."* One increment cut into thin vertical slices, each verified end to end, the tracker drawn, hardened through an interview when you say so. |
 | [execute-plan](skills/execute-plan/SKILL.md) | An approved plan is ready, or was left mid-way by an earlier session | *"Execute the rate-limiting plan."* Pauses only for your decisions, your checks, or an action that does not undo. Refuses a plan with no tracker. |
 | [write-diagrams](skills/write-diagrams/SKILL.md) | A design question would settle faster drawn than argued | *"Draw today's login flow: I need to see where the redirect happens."* |
 | [frontend-design](skills/frontend-design/SKILL.md) | A screen is about to be built or visually reworked | *"Before we code the settings page, propose a mockup."* Design language extracted once, every screen approved in the viewer, code after. |
@@ -103,7 +103,7 @@ In the order work usually happens:
 | [frontend-review](skills/frontend-review/SKILL.md) | React/TSX quality | *"Run frontend-review on src/features/checkout."* Findings in chat for a diff, an aiview report for a whole scope. |
 | [aiview](skills/aiview/SKILL.md) | The companion app: a viewer at `localhost:4321` and an index, driven by the agent from a CLI. Called by the other skills; directly, to show a document or query the index | *"Open docs/notes/cache-idea.md in aiview, tagged payments."* |
 
-`write-diagrams` and the companion app are the shared layer the others delegate to. House rules in `AGENTS.md` win over general principles wherever the two disagree.
+`write-diagrams`, `interview`, the tracker protocol in `execute-plan` and the companion app are the shared layer the others delegate to. House rules in `AGENTS.md` win over general principles wherever the two disagree.
 
 ## Where things live
 

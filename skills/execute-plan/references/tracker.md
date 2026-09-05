@@ -5,14 +5,21 @@ kept elsewhere.
 
 A plan is read twice: once to agree on it, then by whoever resumes the work, often a
 later session with none of the conversation in context. The second reader needs state,
-and phases alone do not carry it. So the phasing diagram does double duty: it is the
+and slices alone do not carry it. So the phasing diagram does double duty: it is the
 tracker, the single place that says where the work stands.
 
-## Steps
+## Slices and steps
 
-Every step is a node, at the granularity someone would pause at, with the dependency
-edges and decision gates that belong in a phasing diagram. Each label opens with its
-status:
+A slice is a `subgraph`, its title carrying the stories it serves and its `👤` mark
+when it needs a person (`Slice 2 · US3 · 👤 decision`). Its steps are the nodes
+inside it, and the slice's done-when is the done-when of its last node, or of the
+join where its branches meet. Every step is a node, at the granularity someone would
+pause at, with the dependency edges and decision gates that belong in a phasing
+diagram. Node ids are `S<slice>.<step>` (`S2.3`); a step discovered between `S2.3`
+and `S2.4` is `S2.3b`: insert, never renumber, since specs, boards and commit
+messages cite the old ids. A node whose done-when is a story's acceptance criterion
+carries the story's id in its label, and the observed criterion is written there
+when it is met. Each label opens with its status:
 
 | Glyph | Means |
 |---|---|
@@ -31,13 +38,11 @@ A step whose first half can finish while the second waits on someone else is two
 steps; drawn as one, it guarantees a hole in the tracker the day it happens.
 
 Steps that are independent may be drawn as parallel branches: two or more leaving one
-node and joining at a later one (`S03 -->|api| S04a`, `S03 -->|ui| S04b`, both
-`--> S05`), each arrow out of the fork labeled with its branch's area. The test is
+node and joining at a later one (`S2.1 -->|api| S2.2a`, `S2.1 -->|ui| S2.2b`, both
+`--> S2.3`), each arrow out of the fork labeled with its branch's area. The test is
 disjointness: the branches touch different files or areas, and neither needs
 the other's result before the join. Two steps that touch one file are one branch. The
-join node's done-when covers what the branches produced together. Insert
-numbers, never renumber: a step discovered between 0.2 and 0.3 is `0.2b`, since specs,
-boards and commit messages cite the old numbers.
+join node's done-when covers what the branches produced together.
 
 ## The state node
 
@@ -52,8 +57,8 @@ deployed <where and which version>
 next     <the one step to start on>
 blocked  <what and on whom, or nothing>
 parked   <side work, stashes, environments left behind, or nothing>
-pace     <run through | stop at phases, as the person answered when the run began>
-mode     <inline | subagents, as the person answered when the run began>
+pace     <run through | stop at each slice, as the person answered when the run began>
+mode     <subagent-driven | inline, as the person answered when the run began>
 ```
 
 Add a field only when a resumer would act on it, such as a fact the work has earned
@@ -70,7 +75,7 @@ TB`, steps chained linearly, only the gates and the parallel branches sideways. 
 things widen it:
 
 - The state node is connected to nothing, so the layout parks it beside the flow. Pin
-  it above with an invisible edge, `ST ~~~ S01`, and the column starts at the top.
+  it above with an invisible edge, `ST ~~~ S1.1`, and the column starts at the top.
 - Long labels set node width. Keep every `<br/>` line short; the state node is the
   usual offender.
 - `direction` inside a subgraph that is itself an edge endpoint fights the outer
