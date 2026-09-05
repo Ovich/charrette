@@ -143,9 +143,11 @@ state node is overwritten, never appended to.
 
 ### Mockups that compose
 
-A mockup is where you and the agent settle how a screen looks before it is coded.
-Mockups compose: a component is drawn once, in one mockup, and bound by every screen of
-the project that needs it.
+A mockup is where you and the agent settle how a screen looks and behaves before it is
+coded. It is a working prototype, not a picture: a flow can be walked through, with the
+behaviour mocked in the file, so a stepper counts, a promo code applies, a questionnaire
+advances. Mockups compose: a component is drawn once, in one mockup, and bound by every
+screen of the project that needs it.
 
 The demo is a shop: a parts sheet that exposes the cart line, the stepper, the promo
 field, the checkout button, the badge and the empty state, and a cart page that binds
