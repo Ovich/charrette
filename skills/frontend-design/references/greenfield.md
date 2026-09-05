@@ -5,10 +5,9 @@ has no language of its own yet (a scaffold, a template, defaults never chosen). 
 design language is then decided, not extracted, and this is how.
 
 Adapted from the `frontend-design` skill in `github.com/anthropics/skills`, copyright
-Anthropic, licensed under the Apache License 2.0 (a copy: `LICENSE-Apache-2.0.txt`,
-beside this file). Changed here: rewritten in this collection's voice, shortened to the
-greenfield case, the tells kept, a questions section added, the process folded into the
-skill's own flow.
+Anthropic, Apache License 2.0 (copy: `licenses/APACHE-2.0-anthropic-skills.txt` at the
+repository root). Changed here: rewritten, shortened to the greenfield case, a questions
+section added.
 
 ## Ask before drawing
 

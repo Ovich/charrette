@@ -238,4 +238,4 @@ without touching the installed copy, which is why both commands are here.
 
 ## License
 
-MIT: see [LICENSE](LICENSE).
+MIT: see [LICENSE](LICENSE). One reference of the frontend-design skill adapts material from Anthropic's skills repository under the Apache License 2.0; its notice is in that file and the licence in `licenses/`.
