@@ -160,9 +160,8 @@ A mockup is where you and the agent agree on how a screen looks. You look, you s
 you want changed, the agent changes it, and the screen is coded only once you are
 satisfied.
 
-A component is drawn once, in one mockup, and every other mockup of the project uses
-that drawing. When the agent changes it, every screen that uses it reloads with the
-change, so what was agreed on one screen holds on all of them.
+Mockups compose: a component is drawn once and reused by every screen of the project
+that needs it.
 
 The demo is a shop: a parts sheet with the cart line, the stepper, the promo field, the
 checkout button, the badge and the empty state, and a cart page that uses them eleven
