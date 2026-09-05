@@ -141,7 +141,7 @@ state node is overwritten, never appended to.
 
 ![aiview in dark mode: the pr-review redesign plan at its gate, the trial steps done with evidence, the release step in progress, the untaken branch marked not needed](assets/aiview-pr-review-plan.png)
 
-### Mockups that compose
+### Mockups that compose and work
 
 A mockup is where you and the agent settle how a screen looks and behaves before it is
 coded. It is a working prototype, not a picture: a flow can be walked through, with the
