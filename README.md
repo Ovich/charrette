@@ -154,6 +154,69 @@ node is overwritten, never appended to.
 
 ![aiview in dark mode: the pr-review redesign plan at its gate, the trial steps done with evidence, the release step in progress, the untaken branch marked not needed](assets/aiview-pr-review-plan.png)
 
+### Mockups that compose
+
+You know the moment. The cart line is drawn in the cart page. Then the checkout page
+needs it, so it gets copied. Then the order confirmation. Three weeks in, the three
+copies disagree on the padding, and nobody remembers which one the developers built
+from. A mockup was supposed to settle the design, and instead it has three opinions.
+
+aiview ends the copying. A component is drawn once, in one mockup, under a name:
+
+```html
+<div data-component="CartLine">…</div>
+```
+
+Any sibling mockup pulls it with a placeholder, and nothing else:
+
+```html
+<div data-bind="2026-09-05-shop-parts.mockup.html#CartLine"></div>
+```
+
+The placeholder is replaced at serve time, in the viewer, by the component as it stands
+in its source, styles included. The files on disk never change. Save the parts sheet and
+every open page that pulls from it reloads, already updated. One drawing, as many
+places as the design needs, and every one of them the same because they are the same.
+
+The demo below is a shop: a **parts sheet** that offers the cart line, the stepper, the
+promo field, the checkout button, the badge and the empty state, and a **cart page**
+that pulls them, eleven times in all. Here is the cart page as the viewer shows it:
+
+![aiview: the Arbor cart page rendered, the variant toolbar above the frame with "promo applied" selected, the page showing the code applied and the total reduced](assets/aiview-mockup-variants.png)
+
+Notice the toolbar above the frame. A screen is never one picture: it has an empty
+state, a promo applied, an item out of stock. The mockup declares those **variants** as
+plain buttons, and the viewer lifts them into its own toolbar, so you switch a variant
+without touching the page, and the one you chose stays chosen through every save:
+
+```html
+<div data-component="MockupBar">
+  <button data-aiview-variant="three" aria-pressed="true">three items</button>
+  <button data-aiview-variant="empty">empty</button>
+  <button data-aiview-variant="promo">promo applied</button>
+  <button data-aiview-action="reset">reset</button>
+</div>
+```
+
+Now the same page in **Composition** view. Every pulled region is outlined, its label
+names the source and the component, a click on it opens that source at that component.
+What the page offers to others is outlined in green. Everything that is neither
+recedes. This is the picture a reviewer asks for and never had: what on this screen is
+shared, and where it comes from.
+
+![aiview: the cart page in Composition view, every pulled region outlined in indigo, the hovered cart line labelled "shop-parts · CartLine · pulled", the order summary outlined in green as offered, the rest of the page faded](assets/aiview-mockup-composition.png)
+
+And the parts sheet, the source, in the same view: what it offers, one component per
+green outline, ready to be pulled by any sibling.
+
+![aiview: the parts sheet in Composition view, the product card outlined in green and labelled "ProductCard · offered"](assets/aiview-mockup-parts.png)
+
+An agent gets the same picture without a browser. `aiview components <file>` lists what
+a mockup offers and pulls, with any id or inline handler that would break a component
+once bound. `aiview check <file>` resolves a host exactly as the viewer does and prints
+each missing file or component as a line of text. The rules a component follows, and
+when to propose splitting a screen, are in [frontend-design](skills/frontend-design/SKILL.md).
+
 | Tool | What it does |
 |---|---|
 | [aiview](skills/aiview/SKILL.md) | Local document viewer + index in one npm package: React/TypeScript/Tailwind UI, small plain-Node server, agent-facing CLI. Renders Markdown (GFM + mermaid), HTML mockups and PDFs at `localhost:4321` with live reload; related documents grouped in collapsible containers; every doc header shows its absolute path (click-to-copy). Documents are filed per project (CIIP, JOBS, …); one active project scopes the sidebar and is shared between you and the agent — either can switch it, and every open tab follows. A document published before the work behind it has finished carries **pending cards** at its head, one per unit of work still running, so a reader knows what is missing before reading to the end. An HTML mockup can bind components from sibling mockups (`data-bind="file#Name"`): aiview composes them at serve time, reloads the host when a source is saved, and its **Composition** view outlines every bound region with its source. CLI: `open` (idempotent register + detached server + URL), `add`, `update`, `list`, `remove`, `move`, `project`, `use`, `path` (where a document belongs, joined for your OS), `components` and `check` (what a mockup offers and pulls, and whether a host's bindings resolve), `pending`, `serve --detach`, `status`, `init`, all with `--json`. Node ≥ 22.5 and nothing else — the built UI (`dist/`) and CLI bundle (`dist-cli/cli.mjs`, no runtime dependencies) are versioned, so an install is never a build. One-time `node aiview.mjs init` in `skills/aiview/` creates the data home. Changing aiview's own source means `npm install && npm run build` there, and committing what it produces. Its `SKILL.md` is the contract every skill follows (kinds, tags, groups, start time). |
