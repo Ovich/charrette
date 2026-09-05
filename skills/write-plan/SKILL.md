@@ -18,8 +18,11 @@ first increment.
 ## Slices
 
 Cut the spec into thin vertical slices, each through every integration layer the
-change touches, schema to screen, each verifiable end to end when it lands. Never cut
-by layer: schema then API then screens verifies nothing until the last one.
+change touches, schema to screen, each verifiable end to end when it lands. A slice
+takes from each layer only what it needs: the two columns, not the whole schema; the
+one endpoint, not the whole service; the one screen state. The rest of a layer waits
+for the slice that needs it. Never cut by layer: schema then API then screens
+verifies nothing until the last one.
 
 Per slice: the stories it serves (`US3`), what changes, which files, the done-when as
 something observed, what it unblocks, and a mark when it needs a person:
