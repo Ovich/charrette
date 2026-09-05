@@ -45,10 +45,11 @@ that it passes. A screen's behaviour is tested the same way; its look is the
 
 ## Modules
 
-Deep modules: a small interface over much functionality. A module whose interface is
-as large as what it hides is shallow, and is folded into its caller or its callee
-instead of created. The interface is the testing boundary. Every module a slice
-touches is a register row (below) with one of these states:
+The interface is designed in the plan and implemented in the slice, the way the test
+is written before the code. Deep modules: a small interface over much functionality.
+A module whose interface is as large as what it hides is shallow, and is folded into
+its caller or its callee instead of created. The interface is the testing boundary.
+Every module a slice touches is a register row (below) with one of these states:
 
 | State | Meaning | Tested |
 |---|---|---|
@@ -102,7 +103,10 @@ assumptions; it adds no detail. Write what it settles into the register and the
 slices, and the exchange into an interview log at the end of the plan, in the board's
 log format (`brainstorm` skill), entries `Q1`, `Q2`.
 
-Then stop and ask the person to approve the plan. Running it is `execute-plan`'s job.
+Then stop and ask the person to approve the plan, and remind them in the same message
+that the plan carries the interfaces of the new and changed modules, worth a look
+before the run, since the tests are written against them. Running it is
+`execute-plan`'s job.
 
 ## Red flags
 
