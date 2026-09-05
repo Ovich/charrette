@@ -13,7 +13,8 @@ context while it is built. Both jobs end when the PR merges, so by default **non
 them are versioned and none live in a project repository.** They go to a data home
 outside your repos (`charrette_appdata` in your OS home directory, `$CHARRETTE_HOME` to
 move it). The index only points at files, so a document you want in a repo can live
-there: ask the agent, and aiview serves it from where it is.
+there: ask the agent, and aiview serves it from where it is. The data home itself can
+be a git repository of its own, to carry the documents between machines.
 What outlives the work is distilled into places that are versioned: durable rules into
 `AGENTS.md` via [project-conventions](skills/project-conventions/SKILL.md), the story of
 the change into the PR description. [technical-writing](skills/technical-writing/SKILL.md)
