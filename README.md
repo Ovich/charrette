@@ -162,11 +162,14 @@ across reloads.
 A component is drawn once, in one mockup, and bound by every screen of the project that
 needs it. The cart page binds its parts from a parts sheet, the cart line, the stepper,
 the promo field, the checkout button, the badge and the empty state, eleven times in
-all.
+all. The agent gets the facts from the CLI, `aiview components` for what a mockup
+exposes and binds, `aiview check` for whether a page's bindings resolve.
 
-The **Composition** view outlines what the screen binds from other mockups, in indigo,
-and what it exposes to them, in green. The label names source and component. A click on
-a bound region opens its source.
+### The Composition view
+
+The Composition view outlines what a screen binds from other mockups, in indigo, and
+what it exposes to them, in green. The label names source and component. A click on a
+bound region opens its source.
 
 ![aiview: the cart page in Composition view, bound regions outlined in indigo, the hovered cart line labelled "shop-parts · CartLine · pulled", the order summary outlined in green as offered](assets/aiview-mockup-composition.png)
 
@@ -174,9 +177,8 @@ The parts sheet in the same view, one outline per exposed component:
 
 ![aiview: the parts sheet in Composition view, the product card outlined in green and labelled "ProductCard · offered"](assets/aiview-mockup-parts.png)
 
-The agent gets the same facts from the CLI, `aiview components` and `aiview check`, and
-draws by the rules in [frontend-design](skills/frontend-design/SKILL.md): design language
-extracted once, every screen approved in the viewer, code after.
+The rules the agent draws by are in [frontend-design](skills/frontend-design/SKILL.md):
+design language extracted once, every screen approved in the viewer, code after.
 
 | Tool | What it does |
 |---|---|
