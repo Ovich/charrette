@@ -42,6 +42,7 @@ the old viewer.** Run the build before tagging, every time, and commit what it p
 ```bash
 cd skills/aiview && npm install && npm run build && npm test && cd ../..   # refresh dist/ + dist-cli/
 node --test skills/pr-review/scripts/scope.test.mjs           # the review scope script
+node --test skills/project-conventions/scripts/rules.test.mjs # the conventions rules script
 # bump "version" to the SAME value in both:
 #   .claude-plugin/plugin.json
 #   .claude-plugin/marketplace.json

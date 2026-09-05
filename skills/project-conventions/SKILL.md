@@ -91,8 +91,12 @@ This is the common case: the document grows one decision at a time.
 
 Numbering is **append-only**. A new rule takes the next free number and existing rules
 are never renumbered, because `AGENTS EXCEPTION (rule 11)` markers in the code point at
-numbers. Group rules under the headings the document already uses; add a heading only
-when a third rule needs it.
+numbers. `node scripts/rules.mjs` (path relative to this skill, run in the repository)
+prints the rules with their sections, the next free number, and every marker in the
+tree with the rule it cites, exit 1 on a marker citing a rule that does not exist or
+on a duplicate number: run it before writing a rule and before saying a marker holds.
+Group rules under the headings the document already uses; add a heading only when a
+third rule needs it.
 
 Every document gets two clauses, once, near the top. The escape hatch: a rule that is
 genuinely unreasonable at a specific site may be deviated from with a comment beginning
