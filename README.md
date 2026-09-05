@@ -23,6 +23,12 @@ flowchart LR
 
 The board is a Markdown file opened at the first question and edited through the whole conversation. The plan is the same kind of document for the build: its phasing diagram is the tracker, and a later session with none of the conversation in context resumes from it.
 
+## Iterate the loop
+
+One pass of the loop covers a piece of work that can be built and verified end to end, a feature or a bounded change. Its plan reaches as far as present knowledge and no further: where what comes later depends on what earlier work will find, the plan says so and stops there. Execute, and when the work changes the picture, return to the board with what was learned rather than patching the plan. The spec grows across passes.
+
+An agent loves writing plans, embellished and polished, and they can fall apart at the end. A spec and a plan are sized to what a person can hold in mind, understand and approve in one reading.
+
 ## What it looks like
 
 The first two are from one real piece of work: the redesign of this collection's own `pr-review` skill into layers. The viewer follows the OS theme.

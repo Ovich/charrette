@@ -69,7 +69,8 @@ the same at the fork in one message, and on a no run the branches in the order d
 **A deviation that needs a decision.** Stop when the *choice* is the human's: a step
 that cannot be done as written, a finding that invalidates a decision the plan rests
 on, a failure whose repair has real options, work that is plainly out of the plan's
-scope. The rest you absorb and draw (below).
+scope. The rest you absorb and draw (below). A finding that sends the work back to
+the board is the loop working, not the plan failing: say what was learned and stop.
 
 **Verification you cannot perform.** A browser flow, a real sign-in, an approval from
 another team, anything needing eyes or a click. Do everything mechanical first, probe

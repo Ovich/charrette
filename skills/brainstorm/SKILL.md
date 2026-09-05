@@ -89,7 +89,11 @@ Then stop and ask the user to review the file before you write the plan.
 Only after the spec is approved. Phases, each one independently verifiable: a phase
 whose completion you can't check isn't a phase. Per phase: what changes, which files,
 how it's verified, and what it unblocks. Order by dependency, and put the riskiest
-unknown first: that's where the plan will change.
+unknown first: that's where the plan will change. Plan to the horizon of what is known
+and name where planning stops: where a later phase depends on what an earlier one
+will find, the plan says so and ends there, and the rest is planned after that phase
+runs. A spec and a plan are sized to what the person can hold in mind and approve in
+one reading.
 
 Once the phases are drafted, look for the ones that can run at the same time: phases
 that touch disjoint files and need nothing from each other before a later phase joins
