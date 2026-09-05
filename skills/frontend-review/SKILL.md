@@ -1,24 +1,25 @@
 ---
 name: frontend-review
-description: Use when reviewing the QUALITY of React/frontend code in this project (apps/www) (readability, organization, naming, component structure, rendering, and performance) on the current diff or across the codebase. Not for correctness bug-hunting (use code-review) or answering questions about code (use code-qa).
+description: Use when reviewing the quality of React code, readability, organisation, naming, component structure, rendering and performance, on a diff, a path or a whole codebase. Not for correctness bug-hunting, and not for design principles across languages (code-design-review).
 ---
 
 # Frontend review
 
-Opinionated quality review for the roster React SPA (`apps/www`): is the code
-well-organized, well-named, readable, and optimized? Grounded in a sourced
-`checklist.md`. Reports findings; only edits with `--fix`.
-
-Not a bug hunt. That's `code-review`. This is readability, structure, and waste.
+Opinionated quality review of React code: is it well-organised, well-named, readable,
+and free of waste? Grounded in a sourced `checklist.md`. Reports findings; only edits
+with `--fix`. A finding is about readability, structure and waste, never about
+wrongness today.
 
 ## Scope (default = the diff, cheap)
 
 - `/frontend-review` → the working diff: `git diff HEAD` (fall back to `git diff @{upstream}...HEAD`).
-- `/frontend-review all` → all of `apps/www/app`.
+- `/frontend-review all` → the app's React source: the folder `AGENTS.md` or the
+  workspace names, else the package that depends on `react`.
 - `/frontend-review <path>` → that file or folder.
 - Add `--fix` to apply the safe findings after reporting. Add one lens name to run just that lens.
 
-Only `.tsx`/`.ts` under `apps/www` are in scope. If the scope has none, say so and stop.
+Only `.tsx`, `.ts`, `.jsx` and `.js` files are in scope, vendored, generated and build
+paths skipped. If the scope has none, say so and stop.
 
 ## The four lenses
 
@@ -36,14 +37,14 @@ Each maps to a section of `checklist.md` (**read that section, don't review from
    - *Diff or one folder:* one agent per lens over the scope.
    - *`all` / many folders:* one agent per feature folder, each running all four lenses over that folder (bounds cost to the folder count).
    Give each agent: the file list, its lens section from `checklist.md`, and the output contract below. Tight prompts, compact returns.
-3. **Merge:** dedup findings on the same line/mechanism, drop anything biome or lint already flags, rank most-impactful first.
+3. **Merge:** dedup findings on the same line/mechanism, drop anything the project's linter already flags, rank most-impactful first.
 4. **Report** grouped by lens. *Diff scope:* in chat, terse, no diagrams. *`all` / folder scope:*
    write `YYYY-MM-DD-<scope>.report.md` in the data home (ask the `aiview` skill for the
    path; never in the repo under review) and open it via the `aiview` skill
    (`../aiview/SKILL.md` in this collection). Mermaid renders there, not in the
    terminal.
-   Kind `report` (from the filename), tags = roster + review.
-5. With `--fix`, apply only the safe ones (skip anything that changes behavior or reaches outside the scope), then re-verify with `pnpm typecheck` + `pnpm run biome`.
+   Kind `report` (from the filename), tags = project + review.
+5. With `--fix`, apply only the safe ones (skip anything that changes behavior or reaches outside the scope), then re-verify with the typecheck and lint commands the project defines (its `package.json` scripts, or `AGENTS.md`). Name the commands you ran.
 
 ## Output contract (per finding)
 

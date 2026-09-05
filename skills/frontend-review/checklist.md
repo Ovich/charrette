@@ -5,8 +5,8 @@ a **checkable assertion**, a one-line *smell* a reviewer spots, `source`.
 
 Two standing rules for every lens:
 
-- **Don't re-report what biome / `eslint-plugin-react-hooks` / `react/jsx-key`
-  already catch** (hooks-in-conditionals, missing `key`, unused vars). The value
+- **Don't re-report what the project's linter and `eslint-plugin-react-hooks` /
+  `react/jsx-key` already catch** (hooks-in-conditionals, missing `key`, unused vars). The value
   here is the *semantic* rules those tools can't see. Mention a lint-catchable
   issue only if it's slipping through.
 - **Flag over-application, not just under.** Gratuitous memoization, a premature
@@ -160,8 +160,9 @@ the **effects** rules heaviest: "a `useEffect` whose body is essentially a
   brackets for genuinely one-off cases. `https://tailwindcss.com/docs/styling-with-utility-classes`
 
 **TypeScript**
-- **Prefer inferred types over hand-modeled**: let Hono RPC (`InferResponseType`) and
-  Drizzle models flow through rather than re-declaring shapes that then drift.
+- **Prefer inferred types over hand-modeled**: let the API client's and the ORM's
+  inferred types flow through (`InferResponseType`, `$inferSelect`, or the stack's
+  equivalent) rather than re-declaring shapes that then drift.
 - **`children: React.ReactNode`; avoid `React.FC`; no `any`/`{}`/`object` props; typed
   event handlers; union types for enumerable props** (`variant: "primary" | "secondary"`,
   not `string`). `https://react-typescript-cheatsheet.netlify.app/docs/basic/getting-started/basic_type_example`
