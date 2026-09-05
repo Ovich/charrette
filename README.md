@@ -9,9 +9,11 @@ settled in documents, boards, specs, plans, mockups, PR analyses, rendered live 
 bundled viewer ([aiview](skills/aiview/SKILL.md)), with diagrams as thinking tools.
 
 These documents make it unambiguous what is being built, and they are the agent's
-context while it is built. Both jobs end when the PR merges, so **none of them are
-versioned and none live in a project repository.** They go to a data home outside your
-repos (`charrette_appdata` in your OS home directory, `$CHARRETTE_HOME` to move it).
+context while it is built. Both jobs end when the PR merges, so by default **none of
+them are versioned and none live in a project repository.** They go to a data home
+outside your repos (`charrette_appdata` in your OS home directory, `$CHARRETTE_HOME` to
+move it). The index only points at files, so a document you want in a repo can live
+there: ask the agent, and aiview serves it from where it is.
 What outlives the work is distilled into places that are versioned: durable rules into
 `AGENTS.md` via [project-conventions](skills/project-conventions/SKILL.md), the story of
 the change into the PR description. [technical-writing](skills/technical-writing/SKILL.md)
