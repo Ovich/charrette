@@ -156,38 +156,30 @@ node is overwritten, never appended to.
 
 ### Mockups that compose
 
-You know the moment. The cart line is drawn in the cart page. Then the checkout page
-needs it, so it gets copied. Then the order confirmation. Three weeks in, the three
-copies disagree on the padding, and nobody remembers which one the developers built
-from. A mockup was supposed to settle the design, and instead it has three opinions.
-
-aiview ends the copying. A component is drawn once, in one mockup, under a name:
+A component is drawn once, in one mockup, under a name:
 
 ```html
 <div data-component="CartLine">…</div>
 ```
 
-Any sibling mockup pulls it with a placeholder, and nothing else:
+Any other mockup of the project uses it with a placeholder:
 
 ```html
 <div data-bind="2026-09-05-shop-parts.mockup.html#CartLine"></div>
 ```
 
-The placeholder is replaced at serve time, in the viewer, by the component as it stands
-in its source, styles included. The files on disk never change. Save the parts sheet and
-every open page that pulls from it reloads, already updated. One drawing, as many
-places as the design needs, and every one of them the same because they are the same.
+The viewer shows the component in the placeholder's place. Save the source and every
+page that uses it reloads. The files on disk do not change.
 
-The demo below is a shop: a **parts sheet** that offers the cart line, the stepper, the
-promo field, the checkout button, the badge and the empty state, and a **cart page**
-that pulls them, eleven times in all. Here is the cart page as the viewer shows it:
+The demo is a shop: a parts sheet that offers the cart line, the stepper, the promo
+field, the checkout button, the badge and the empty state, and a cart page that uses
+them eleven times.
 
-![aiview: the Arbor cart page rendered, the variant toolbar above the frame with "promo applied" selected, the page showing the code applied and the total reduced](assets/aiview-mockup-variants.png)
+![aiview: the Arbor cart page, the variant toolbar above the frame with "promo applied" selected](assets/aiview-mockup-variants.png)
 
-Notice the toolbar above the frame. A screen is never one picture: it has an empty
-state, a promo applied, an item out of stock. The mockup declares those **variants** as
-plain buttons, and the viewer lifts them into its own toolbar, so you switch a variant
-without touching the page, and the one you chose stays chosen through every save:
+A screen has variants: empty, a promo applied, an item out of stock. The mockup
+declares them as buttons, and the viewer puts them in its toolbar. The chosen variant
+stays through every save.
 
 ```html
 <div data-component="MockupBar">
@@ -198,24 +190,19 @@ without touching the page, and the one you chose stays chosen through every save
 </div>
 ```
 
-Now the same page in **Composition** view. Every pulled region is outlined, its label
-names the source and the component, a click on it opens that source at that component.
-What the page offers to others is outlined in green. Everything that is neither
-recedes. This is the picture a reviewer asks for and never had: what on this screen is
-shared, and where it comes from.
+The **Composition** view outlines what a page pulls from other mockups, in indigo, and
+what it offers to them, in green. The label names the source and the component. A click
+on a pulled region opens its source.
 
-![aiview: the cart page in Composition view, every pulled region outlined in indigo, the hovered cart line labelled "shop-parts · CartLine · pulled", the order summary outlined in green as offered, the rest of the page faded](assets/aiview-mockup-composition.png)
+![aiview: the cart page in Composition view, pulled regions outlined in indigo, the hovered cart line labelled "shop-parts · CartLine · pulled", the order summary outlined in green as offered](assets/aiview-mockup-composition.png)
 
-And the parts sheet, the source, in the same view: what it offers, one component per
-green outline, ready to be pulled by any sibling.
+The parts sheet in the same view, each offered component outlined:
 
 ![aiview: the parts sheet in Composition view, the product card outlined in green and labelled "ProductCard · offered"](assets/aiview-mockup-parts.png)
 
-An agent gets the same picture without a browser. `aiview components <file>` lists what
-a mockup offers and pulls, with any id or inline handler that would break a component
-once bound. `aiview check <file>` resolves a host exactly as the viewer does and prints
-each missing file or component as a line of text. The rules a component follows, and
-when to propose splitting a screen, are in [frontend-design](skills/frontend-design/SKILL.md).
+For the agent: `aiview components <file>` lists what a mockup offers and pulls,
+`aiview check <file>` says whether a page's placeholders resolve. The rules for a
+component are in [frontend-design](skills/frontend-design/SKILL.md).
 
 | Tool | What it does |
 |---|---|
