@@ -36,20 +36,50 @@ nothing says when a step is finished.
 Being handed a plan that is stale, its diagram describing a state the repository has moved
 past, is a deviation, not a starting condition. Reconcile it first, and say what you found.
 
-## The pace, asked once
+## Two questions, asked once
 
-Before the first step of a run, ask the person how they want the phase boundaries
-handled, as one multiple-choice question in chat:
+Before the first step of a run, ask the person two multiple-choice questions in chat,
+one message each.
+
+**The pace**, how the phase boundaries are handled:
 
 1. **Run through**: at each phase boundary, report what happened and what is next, then
    continue. Stop only for the three pauses below.
 2. **Stop at each phase**: finish the phase, report, name what is next, and wait.
 
-Record the answer in the plan's state node (`pace: run through` or `pace: stop at
-phases`) so a session that resumes the plan does not ask again; it reads the node and
-follows it. Phases exist because their ends are the moments worth re-deciding at, and
-under either pace a phase whose findings change the next phase is the second pause
-below, whatever was chosen.
+**The mode**, where the work runs:
+
+1. **Inline**: this session does the steps itself.
+2. **Subagent-driven**: each step is delegated to a fresh subagent with a brief, while
+   this session keeps the tracker, verifies each return against the step's done-when,
+   and merges. The person follows the work in the tracker rather than in the chat.
+
+Record both in the plan's state node (`pace: run through | stop at phases`, `mode:
+inline | subagents`) so a session that resumes the plan reads them and asks neither
+again. Under either pace a phase whose findings change the next phase is the second
+pause below.
+
+## The brief, in subagent mode
+
+A brief has four slots, in this order: where the plan is (its aiview path, the step's
+node id); the step's jurisdiction, its node text and done-when, and nothing beyond it;
+the facts this session has already established, given as facts (the branch, the
+commands that verify, what an earlier step found); the return contract: what changed,
+where, the evidence the done-when is met, and anything found that the plan did not
+predict. A subagent never edits the tracker. This session is its single writer.
+
+## Parallel branches
+
+A plan may fork where steps are independent: two or more branches leaving one node and
+joining at a later one, drawn by the plan's author only when the branches touch
+disjoint files or areas (`references/tracker.md`). At the fork, in subagent mode,
+dispatch one subagent per branch, each with its own brief, and put one `aiview
+pending` card per branch on the plan document, so the person watches the branches run
+from the viewer. Tick each branch as its return lands, close its card, and run the join
+node's verification yourself. Inline, propose the same at the fork, in one message:
+the branches are the one place a subagent buys time without splitting the tracker's
+writer, and on a no they run in the order drawn. One ▶ per branch is the rule while
+they run; a branch that stalls on someone else becomes ⏸ and the others continue.
 
 ## The three pauses
 
@@ -120,6 +150,8 @@ is `references/tracker.md`, read before the first edit to it. Running the plan i
 | Thought | Reality |
 |---|---|
 | "I'll check with them before starting the next step" | The plan was the approval. Report at the phase boundary, and stop there only if the pace says so. |
+| "The subagent can update the tracker when it is done" | It cannot see the other branches. One writer, this session; the return is evidence, the tick is yours. |
+| "These two steps look independent, I'll run them in parallel" | Only if the plan draws the fork. Two steps that touch one file are one branch, whatever they look like. |
 | "It's a small deviation, I'll mention it at the end" | Draw it, then do it. A session that dies mid-way leaves a plan that does not know the work exists. |
 | "This failed, I'll try another approach", twice | Two unrelated failures in one step means the step was misunderstood. Stop and report both. |
 | "They said yes to deploying yesterday" | Outward-facing actions are approved once each, not once forever. |

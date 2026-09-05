@@ -91,6 +91,13 @@ whose completion you can't check isn't a phase. Per phase: what changes, which f
 how it's verified, and what it unblocks. Order by dependency, and put the riskiest
 unknown first: that's where the plan will change.
 
+Once the phases are drafted, look for the ones that can run at the same time: phases
+that touch disjoint files and need nothing from each other before a later phase joins
+them. Name them to the developer in chat, one message ("phases 2 and 3 touch different
+areas and could run in parallel, draw them as branches?"), and draw the fork only on a
+yes. `execute-plan` runs branches at once, one subagent per branch, and a fork drawn
+over a shared file is the merge conflict it would have had to resolve.
+
 **The plan carries diagrams** (`write-diagrams` skill): they are the implementer's
 mental model and durable context for every later AI session that reads the plan:
 

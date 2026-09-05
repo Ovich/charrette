@@ -22,12 +22,19 @@ status:
 | ⬜ | Not started |
 | ✖ | Failed or abandoned: the step says what happened and what changed because of it |
 
-One ▶ at a time, or the diagram stops answering "where am I". ⏸ keeps that rule honest:
+One ▶ at a time, or the diagram stops answering "where am I"; where the plan forks into
+parallel branches, one ▶ per branch. ⏸ keeps that rule honest:
 a step that stalls on something outside your control becomes ⏸ and the frontier moves
 to whatever can proceed. A step parked as ▶ for days claims attention it is not getting.
 
 A step whose first half can finish while the second waits on someone else is two
-steps; drawn as one, it guarantees a hole in the tracker the day it happens. Insert
+steps; drawn as one, it guarantees a hole in the tracker the day it happens.
+
+Steps that are independent may be drawn as parallel branches: two or more leaving one
+node and joining at a later one (`S03 --> S04a`, `S03 --> S04b`, both `--> S05`). The
+test is disjointness: the branches touch different files or areas, and neither needs
+the other's result before the join. Two steps that touch one file are one branch. The
+join node's done-when covers what the branches produced together. Insert
 numbers, never renumber: a step discovered between 0.2 and 0.3 is `0.2b`, since specs,
 boards and commit messages cite the old numbers.
 
@@ -45,6 +52,7 @@ next     <the one step to start on>
 blocked  <what and on whom, or nothing>
 parked   <side work, stashes, environments left behind, or nothing>
 pace     <run through | stop at phases, as the person answered when the run began>
+mode     <inline | subagents, as the person answered when the run began>
 ```
 
 Add a field only when a resumer would act on it, such as a fact the work has earned
@@ -57,7 +65,8 @@ which lines are still true.
 ## Keeping it readable
 
 One column. A tracker is scanned, not studied, and width ruins the scan. `flowchart
-TB`, steps chained linearly, only the gates branching sideways. Three things widen it:
+TB`, steps chained linearly, only the gates and the parallel branches sideways. Three
+things widen it:
 
 - The state node is connected to nothing, so the layout parks it beside the flow. Pin
   it above with an invisible edge, `ST ~~~ S01`, and the column starts at the top.
