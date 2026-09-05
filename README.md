@@ -146,7 +146,8 @@ state node is overwritten, never appended to.
 A mockup is where you and the agent settle how a screen looks and behaves before it is
 coded. It is a working prototype, not a picture: a flow can be walked through, with the
 behaviour mocked in the file, so a stepper counts, a promo code applies, a questionnaire
-advances. Mockups compose: a component is drawn once, in one mockup, and bound by every
+advances. The agent draws what it is told: describe the flow, not only the screen, and
+the prototype works instead of only looking right. Mockups compose: a component is drawn once, in one mockup, and bound by every
 screen of the project that needs it.
 
 The demo is a shop: a parts sheet that exposes the cart line, the stepper, the promo
