@@ -25,8 +25,8 @@ where the design is argued, not the questionnaire.
    proposal.
 2. **The subject and the people.** What the product is, who uses it, in what setting,
    with what they already read every day.
-3. **The first screen's job.** The one thing it must make obvious, and its primary
-   action.
+3. **What is being designed.** The screen, flow or component the person has in
+   mind, and the one thing it must make obvious. Not assumed to be the entry page.
 4. **Constraints already fixed.** A logo, brand colours, a typeface, an existing site
    or app it must sit beside, a platform (desktop, mobile first, both), a language.
 5. **The reference point.** One or two products whose feel is right, and one whose feel
