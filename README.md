@@ -156,35 +156,33 @@ node is overwritten, never appended to.
 
 ### Mockups that compose
 
-A mockup is where you and the agent agree on how a screen looks. You look, you say what
-you want changed, the agent changes it, and the screen is coded only once you are
-satisfied.
+A mockup is where you and the agent settle how a screen looks before it is coded.
+Mockups compose: a component is drawn once, in one mockup, and bound by every screen of
+the project that needs it.
 
-Mockups compose: a component is drawn once and reused by every screen of the project
-that needs it.
-
-The demo is a shop: a parts sheet with the cart line, the stepper, the promo field, the
-checkout button, the badge and the empty state, and a cart page that uses them eleven
-times.
+The demo is a shop: a parts sheet that exposes the cart line, the stepper, the promo
+field, the checkout button, the badge and the empty state, and a cart page that binds
+them eleven times.
 
 ![aiview: the Arbor cart page, the variant toolbar above the frame with "promo applied" selected](assets/aiview-mockup-variants.png)
 
-A screen has variants: empty, a promo applied, an item out of stock. They sit in the
-toolbar above the frame. The one you choose stays through every change the agent makes.
+A screen has states: empty, promo applied, an item out of stock. The mockup declares
+them as variants, the viewer exposes them in its toolbar, and the chosen one persists
+across reloads.
 
-The **Composition** view shows where the screen comes from: what it takes from other
-mockups, outlined in indigo, and what it offers to them, in green. A click on an
-outlined region opens the mockup it comes from.
+The **Composition** view outlines what the screen binds from other mockups, in indigo,
+and what it exposes to them, in green. The label names source and component. A click on
+a bound region opens its source.
 
-![aiview: the cart page in Composition view, pulled regions outlined in indigo, the hovered cart line labelled "shop-parts · CartLine · pulled", the order summary outlined in green as offered](assets/aiview-mockup-composition.png)
+![aiview: the cart page in Composition view, bound regions outlined in indigo, the hovered cart line labelled "shop-parts · CartLine · pulled", the order summary outlined in green as offered](assets/aiview-mockup-composition.png)
 
-The parts sheet in the same view, each offered component outlined:
+The parts sheet in the same view, one outline per exposed component:
 
 ![aiview: the parts sheet in Composition view, the product card outlined in green and labelled "ProductCard · offered"](assets/aiview-mockup-parts.png)
 
-The agent reads the same facts from the command line, without a browser, and follows
-[frontend-design](skills/frontend-design/SKILL.md) when it draws: the design language is
-extracted once, every screen is a mockup approved in the viewer, and code comes after.
+The agent gets the same facts from the CLI, `aiview components` and `aiview check`, and
+draws by the rules in [frontend-design](skills/frontend-design/SKILL.md): design language
+extracted once, every screen approved in the viewer, code after.
 
 | Tool | What it does |
 |---|---|
