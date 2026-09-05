@@ -35,9 +35,7 @@ What `brainstorm` leaves behind for one feature: the board, the spec and the pla
 
 ### The same plan, mid-execution
 
-Every step is a node with a status. Done steps are ✅ with their evidence, the gate asks whether the trials were clean, the ▶ step is the release in progress, the untaken branch is ✖ with its reason. Out of frame, a state node holds branch and commit, what is deployed, the next step, what is blocked and parked: that node makes the plan resumable.
-
-`execute-plan` runs it without per-step sign-off: a node turns ✅ only when its done-when is met, the tracker is updated before every handoff, deviations are drawn before they are done, the state node is overwritten, never appended to.
+The plan's phasing diagram is its tracker: one node per step with a status glyph, gates that record the branch taken, and a state node with branch, commit, next step, blocked and parked, which is what a later session resumes from.
 
 ![aiview: the pr-review redesign plan at its gate, trial steps done with evidence, release in progress, the untaken branch marked not needed](assets/aiview-pr-review-plan.png)
 
