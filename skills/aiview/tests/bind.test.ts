@@ -144,3 +144,23 @@ for (const f of fs.existsSync(fixtures) ? fs.readdirSync(fixtures).filter((n) =>
     assert.equal(norm(output).length > norm(input).length * 0.98, true, "nothing substantial dropped");
   });
 }
+
+test("listComponents: what a file offers and pulls, with the rule violations", async () => {
+  const { listComponents } = await import("../src/core/bind.ts");
+  const r = listComponents(toolsSheet);
+  assert.deepEqual(r.offers.map((o) => o.name), ["ToolPrefix", "ToolMakeroom", "Twice", "Twice", "WithId", "Nesting"]);
+  assert.equal(r.offers[0].tag, "span");
+  assert.deepEqual(r.offers[3].warnings, ["declared 2 times, the first is used"]);
+  assert.deepEqual(r.offers[4].warnings, ['root carries id="tool"', "root carries inline handler onclick"]);
+  assert.deepEqual(r.pulls, [{ ref: `${TOOLS}#ToolPrefix`, file: TOOLS, name: "ToolPrefix" }]);
+  const nested = listComponents(`<div data-component="Outer"><p><span data-component="Inner"><b id="x">i</b></span></p></div>`);
+  assert.equal(nested.offers[1].within, "Outer");
+  assert.equal(nested.offers[0].within, undefined);
+  assert.deepEqual(nested.offers[0].warnings, ['<b> carries id="x"'], "an id anywhere inside counts, it travels with the markup");
+});
+
+test("resolveBindings counts what it bound", () => {
+  const r = resolveBindings(host(`<div data-bind="${TOOLS}#ToolPrefix"></div><div data-bind="${TOOLS}#Nope"></div>`), reader({ [TOOLS]: toolsSheet }));
+  assert.equal(r.bound, 1);
+  assert.equal(resolveBindings("<p>x</p>", reader({})).bound, 0);
+});

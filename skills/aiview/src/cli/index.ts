@@ -14,6 +14,8 @@ import {
   type RegisterOptions,
   type UpdatePatch,
 } from "../core/db.ts";
+import { listComponents, resolveBindings } from "../core/bind.ts";
+import { isHtml, readDoc } from "../core/paths.ts";
 import { projectForCwd } from "../core/projects.ts";
 import { adoptLegacyIndex, DATA_ROOT, docsDirFor, DOCS_ROOT, ensureHome } from "../core/home.ts";
 import { readServerStatus, PORT_FILE, type ServerStatus } from "../core/serverstate.ts";
@@ -38,6 +40,8 @@ const USAGE = [
   "  pending list [<file|#id>] | clear <file|#id>",
   "  status",
   "  path <filename> [--project <slug>]       # where this document belongs, joined for this OS",
+  "  components <file|#id>                    # what this mockup offers to siblings, and what it pulls",
+  "  check <file|#id>                         # do this mockup's bindings resolve? errors as text, exit 1 if any",
   "  init                                     # create the data home; report where everything lives",
 ].join("\n");
 
@@ -201,6 +205,60 @@ function cmdPath(): void {
   fs.mkdirSync(dir, { recursive: true });
   const full = path.join(dir, path.basename(name)); // basename: a name, not a path
   emit({ path: full, dir, project: slug }, full);
+}
+
+/** An html mockup by registered ref or by path, for the binding verbs. */
+function mockupArg(usage: string): string {
+  const ref = args.positional[0];
+  if (!ref) {
+    console.error(usage);
+    process.exit(1);
+  }
+  const abs = resolveRef(ref)?.abs_path ?? path.resolve(ref);
+  if (!fs.existsSync(abs)) {
+    console.error(`no such file: ${abs}`);
+    process.exit(1);
+  }
+  if (!isHtml(abs)) {
+    console.error(`not an html mockup: ${abs}`);
+    process.exit(1);
+  }
+  return abs;
+}
+
+/** What a mockup offers to its siblings and what it pulls from them, so an agent never
+ *  greps a 90 KB file for data-component before writing a placeholder. */
+function cmdComponents(): void {
+  const abs = mockupArg("usage: aiview components <file|#id>");
+  const r = listComponents(readDoc(abs));
+  emit({ file: path.basename(abs), ...r }, () => {
+    if (!r.offers.length) console.log("offers   nothing: no data-component in this file");
+    for (const o of r.offers)
+      console.log(
+        `offers   ${o.name}  <${o.tag}>${o.within ? `  within ${o.within}` : ""}${o.warnings.length ? `  !! ${o.warnings.join(", ")}` : ""}`,
+      );
+    for (const x of r.pulls) console.log(`pulls    ${x.name || x.ref}  from ${x.file || "(invalid ref)"}`);
+    if (!r.pulls.length) console.log("pulls    nothing: no data-bind in this file");
+  });
+}
+
+/** Resolve a host the way the server does and say what went wrong, as text. Exit 1 on errors. */
+function cmdCheck(): void {
+  const abs = mockupArg("usage: aiview check <file|#id>");
+  const dir = path.dirname(abs);
+  const reader = (name: string): string | undefined => {
+    if (/[\\/]/.test(name) || name.includes("..")) return undefined;
+    const f = path.join(dir, name);
+    return fs.existsSync(f) && fs.statSync(f).isFile() ? readDoc(f) : undefined;
+  };
+  const r = resolveBindings(readDoc(abs), reader);
+  emit({ file: path.basename(abs), bound: r.bound, sources: r.sources, errors: r.errors, warnings: r.warnings }, () => {
+    console.log(`${r.bound} bound from ${r.sources.length} source${r.sources.length === 1 ? "" : "s"}${r.sources.length ? `: ${r.sources.join(", ")}` : ""}`);
+    for (const e of r.errors) console.log(`error    ${e.ref}: ${e.message}`);
+    for (const w of r.warnings) console.log(`warning  ${w.ref}: ${w.message}`);
+    if (!r.errors.length && !r.warnings.length) console.log("ok");
+  });
+  if (r.errors.length) process.exit(1);
 }
 
 /** First clone / new machine: make the data home exist and say what lives where. */
@@ -563,6 +621,12 @@ switch (args.verb) {
     break;
   case "init":
     cmdInit();
+    break;
+  case "components":
+    cmdComponents();
+    break;
+  case "check":
+    cmdCheck();
     break;
   case "add":
     cmdAdd();

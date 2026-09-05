@@ -313,3 +313,34 @@ test("path refuses when there is nothing to resolve against", () => {
   assert.notEqual(ghost.status, 0);
   assert.match(ghost.stderr, /no such project: Ghost/);
 });
+
+test("components: what a mockup offers and pulls; check: whether a host resolves", () => {
+  const tools = write(
+    "docs/JOBS/tools.mockup.html",
+    `<html><body><div data-component="Pill" onclick="x()">p</div><span data-component="Dot">.</span><div data-bind="other.html#Thing"></div></body></html>`,
+  );
+  const r = run("components", tools, "--json");
+  assert.equal(r.status, 0, r.stderr);
+  const c = JSON.parse(r.stdout);
+  assert.deepEqual(c.offers.map((o: { name: string }) => o.name), ["Pill", "Dot"]);
+  assert.deepEqual(c.offers[0].warnings, ["root carries inline handler onclick"]);
+  assert.deepEqual(c.pulls, [{ ref: "other.html#Thing", file: "other.html", name: "Thing" }]);
+  const text = run("components", tools).stdout;
+  assert.match(text, /offers\s+Pill\s+<div>\s+!! root carries inline handler onclick/);
+  assert.match(text, /pulls\s+Thing\s+from other\.html/);
+
+  const good = write("docs/JOBS/host.mockup.html", `<html><body><div data-bind="tools.mockup.html#Dot"></div></body></html>`);
+  const ok = run("check", good, "--json");
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.deepEqual(JSON.parse(ok.stdout), { file: "host.mockup.html", bound: 1, sources: ["tools.mockup.html"], errors: [], warnings: [] });
+  assert.match(run("check", good).stdout, /1 bound from 1 source: tools\.mockup\.html\s+ok/);
+
+  const bad = write("docs/JOBS/bad.mockup.html", `<html><body><div data-bind="tools.mockup.html#Nope"></div><div data-bind="missing.html#A"></div></body></html>`);
+  const fail = run("check", bad);
+  assert.equal(fail.status, 1);
+  assert.match(fail.stdout, /error\s+tools\.mockup\.html#Nope: Component Nope not in tools\.mockup\.html/);
+  assert.match(fail.stdout, /error\s+missing\.html#A: Not found: missing\.html/);
+
+  assert.equal(run("check", path.join(toolRoot, "nope.html")).status, 1);
+  assert.equal(run("components", write("docs/x.md", "# md")).status, 1);
+});

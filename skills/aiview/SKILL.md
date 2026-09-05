@@ -125,6 +125,8 @@ wants, this skill maps it to a verb and runs it:
 | "we're working on CIIP now" | `use` |
 | "what projects exist / add one / drop one" | `project list \| add \| rm` |
 | "where does this document go?" | `path <filename>` |
+| "what does this mockup offer to siblings, what does it pull?" | `components <file\|#id>` |
+| "do this mockup's bindings resolve?" | `check <file\|#id>` |
 | "which project am I in? is the viewer running?" | `status --json` |
 | "start / restart the viewer" | `serve --detach` |
 
@@ -180,6 +182,8 @@ $A serve  [file] [--port 4321] [--open] [--detach]
 $A project <add|list|rm> [slug] [--title T] [--path P]...
 $A use    <slug|*>                               # set the active project ('*' = All projects)
 $A path   <filename> [--project <slug>]          # where it belongs, joined for this OS
+$A components <file|#id>                         # what a mockup offers (name, tag, rule violations) and pulls
+$A check      <file|#id>                         # resolve a host as the server does; errors as text, exit 1 if any
 $A pending add  <file|#id> --label L [--note N]   # work the reader is still waiting on
 $A pending done <#pendingId>                     # it landed; the card disappears
 $A pending list [<file|#id>] | clear <file|#id>
@@ -241,7 +245,12 @@ per unit of work the document is still waiting on, appearing and disappearing li
 
 An HTML mockup can bind components from sibling mockups (`data-bind="file#Name"`, see
 the `frontend-design` skill); aiview composes them at serve time and reloads the host
-when a source is saved. Beside the viewport presets a view toggle offers **Rendered**
+when a source is saved. The agent works with bindings through two verbs, never by
+reading a sibling's file: `components <file|#id>` says what a mockup offers (every
+`data-component`, with the ids and inline handlers that would break it once bound) and
+what it pulls. `check <file|#id>` resolves a host exactly as the server does and prints
+each missing file or component as text, exit code 1 when any. A bound mockup is seen
+through aiview: opened as a plain file it shows a notice, never the page. Beside the viewport presets a view toggle offers **Rendered**
 (the page) and **Composition** (every bound region outlined in indigo with its source
 and component on hover, "pulled", a click opening the source at that component; every
 component this mockup offers outlined in green, "offered" on hover; the rest of the page

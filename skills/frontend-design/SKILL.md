@@ -104,6 +104,17 @@ tags = project + design.
   mockup grows a second screen's worth of components, propose splitting in one line
   ("the tools could live in their own mockup and be bound here, want that?") and wait.
   Never split a mockup on your own.
+- **Binding, for the agent:** before writing a placeholder, ask the sibling what it
+  offers (`aiview components <file>`: names, tags, and the ids or inline handlers that
+  would break a component once bound); after writing one, run `aiview check <host>`
+  and read the errors as text. Never grep a sibling for `data-component`.
+- **Components a host shows by script:** keep their placeholders in a hidden container
+  of the host and let the host's script clone the bound node's inner html when it
+  needs it. Inside a bound element, reach parts through `data-part`; wire clicks by
+  delegation on `data-action`, never inline. A source that shows the same components
+  in place moves them out of its library at load, so the file stays static markup.
+- **A bound mockup is seen through aiview.** Opened as a plain file it shows a notice,
+  not the page. Never hand one over as standalone HTML.
 - **States:** default, empty, loading, error, and any permission/role state the screen
   has, as separate sections or a small state switcher in the mockup. Responsive at the
   aiview presets (mobile 390 · tablet 820 · laptop 1280).
@@ -111,8 +122,8 @@ tags = project + design.
   kind `mockup` (from the filename), tags = project + feature, and when the mockup
   belongs to a brainstorm's piece of work, the board's group, so they share a
   container. Tell the user the URL it prints. aiview renders `.html` in a sandboxed
-  iframe with viewport presets and live reload, and its Composition view outlines
-  every bound region with its source, so a person sees what comes from elsewhere.
+  iframe with viewport presets and live reload. Its Composition view is the person's
+  way of seeing what a mockup pulls and offers. The agent's is `components` and `check`.
 
 ## Copy is design material
 

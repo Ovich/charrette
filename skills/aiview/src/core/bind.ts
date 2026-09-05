@@ -23,6 +23,8 @@ export interface BindingIssue {
 
 export interface BindResult {
   html: string;
+  /** How many placeholders were replaced by a component. */
+  bound: number;
   /** Every source file the host refers to, found or not, so a source created later still refreshes the host. */
   sources: string[];
   errors: BindingIssue[];
@@ -158,7 +160,7 @@ function injectStyles(doc: T.Document, used: Map<string, Source>): void {
 }
 
 export function resolveBindings(html: string, readSource: SourceReader): BindResult {
-  const none: BindResult = { html, sources: [], errors: [], warnings: [] };
+  const none: BindResult = { html, bound: 0, sources: [], errors: [], warnings: [] };
   // A mockup without bindings is returned as written: no parse, no serialisation drift.
   if (!html.includes(BIND)) return none;
 
@@ -171,6 +173,7 @@ export function resolveBindings(html: string, readSource: SourceReader): BindRes
   const sources: string[] = [];
   const loaded = new Map<string, Source | undefined>();
   const used = new Map<string, Source>();
+  let bound = 0;
 
   for (const ph of placeholders) {
     const ref = attr(ph, BIND) ?? "";
@@ -205,8 +208,72 @@ export function resolveBindings(html: string, readSource: SourceReader): BindRes
     mergeAttributes(ph, placed, ref);
     refuseNested(placed, errors);
     replace(ph, placed);
+    bound += 1;
   }
 
   injectStyles(doc, used);
-  return { html: serialize(doc), sources, errors, warnings };
+  return { html: serialize(doc), bound, sources, errors, warnings };
+}
+
+export interface OfferedComponent {
+  name: string;
+  tag: string;
+  /** The nearest enclosing component, when this one sits inside another. */
+  within?: string;
+  /** Rule violations that would make the component misbehave once bound: ids, inline handlers, duplicates. */
+  warnings: string[];
+}
+
+export interface PulledRef {
+  ref: string;
+  file: string;
+  name: string;
+}
+
+export interface ComponentsReport {
+  /** Every data-component declared in the file, in document order. */
+  offers: OfferedComponent[];
+  /** Every data-bind placeholder in the file. */
+  pulls: PulledRef[];
+}
+
+function enclosingComponent(el: El): string | undefined {
+  for (let p = ta.getParentNode(el); p; p = ta.getParentNode(p as El)) {
+    if (!ta.isElementNode(p)) return undefined;
+    const name = attr(p, COMPONENT);
+    if (name !== undefined) return name;
+  }
+  return undefined;
+}
+
+/** What a mockup offers to its siblings and what it pulls from them, read from the file alone. */
+export function listComponents(html: string): ComponentsReport {
+  const doc = parse(html);
+  const offers: OfferedComponent[] = [];
+  const pulls: PulledRef[] = [];
+  const seen = new Map<string, number>();
+  for (const el of elements(doc)) {
+    const bind = attr(el, BIND);
+    if (bind !== undefined) {
+      const p = parseRef(bind);
+      pulls.push({ ref: bind, file: p?.file ?? "", name: p?.name ?? "" });
+      continue;
+    }
+    const name = attr(el, COMPONENT);
+    if (name === undefined) continue;
+    const warnings: string[] = [];
+    const n = (seen.get(name) ?? 0) + 1;
+    seen.set(name, n);
+    if (n > 1) warnings.push(`declared ${n} times, the first is used`);
+    for (const x of [el, ...elements(el)]) {
+      const where = x === el ? "root" : `<${ta.getTagName(x)}>`;
+      for (const a of x.attrs) {
+        if (a.name === "id") warnings.push(`${where} carries id="${a.value}"`);
+        else if (a.name.startsWith("on")) warnings.push(`${where} carries inline handler ${a.name}`);
+      }
+    }
+    const within = enclosingComponent(el);
+    offers.push(within ? { name, tag: ta.getTagName(el), within, warnings } : { name, tag: ta.getTagName(el), warnings });
+  }
+  return { offers, pulls };
 }
