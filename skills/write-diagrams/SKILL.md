@@ -65,7 +65,9 @@ dark page. Where the styling carries meaning, put that meaning in the label too 
 a word — so it survives grayscale, dark mode and a colour-blind reader.
 
 **Parse the block, don't eyeball it.** Mermaid fails quietly, and a diagram nobody can read
-is a diagram nobody updates.
+is a diagram nobody updates. `aiview mermaid-check <file>` parses every block of a document
+the way the viewer will and names the line of each failure; run it after every edit to a
+diagram.
 
 ## Contract for calling skills
 

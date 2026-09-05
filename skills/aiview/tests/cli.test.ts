@@ -344,3 +344,26 @@ test("components: what a mockup offers and pulls; check: whether a host resolves
   assert.equal(run("check", path.join(toolRoot, "nope.html")).status, 1);
   assert.equal(run("components", write("docs/x.md", "# md")).status, 1);
 });
+
+test("mermaid-check: every block of a document parsed, failures with their line, exit 1", () => {
+  const md = write(
+    "docs/JOBS/plan.plan.md",
+    "# Plan\n\n```mermaid\nflowchart TB\n  A --> B\n```\n\ntext\n\n```mermaid\nsequenceDiagram\n  A->>B: hi\n```\n\n```mermaid\nflowchart TB\n  A --->> B[[\n```\n",
+  );
+  const r = run("mermaid-check", md);
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stdout, /ok\s+line 3\s+flowchart-v2/);
+  assert.match(r.stdout, /ok\s+line 10\s+sequence/);
+  assert.match(r.stdout, /FAIL\s+line 15\s+Parse error/);
+  assert.match(r.stdout, /3 blocks, 1 failed/);
+  const j = JSON.parse(run("mermaid-check", md, "--json").stdout);
+  assert.equal(j.blocks, 3);
+  assert.equal(j.failed, 1);
+  assert.deepEqual(j.results.map((x: { ok: boolean }) => x.ok), [true, true, false]);
+
+  const good = write("docs/JOBS/ok.spec.md", "```mermaid\nstateDiagram-v2\n  [*] --> S\n```\n");
+  assert.equal(run("mermaid-check", good).status, 0);
+  const bare = write("docs/JOBS/d.mmd", "classDiagram\n  A <|-- B\n");
+  assert.match(run("mermaid-check", bare).stdout, /ok\s+line 1\s+classDiagram/);
+  assert.match(run("mermaid-check", write("docs/JOBS/none.md", "# nothing\n")).stdout, /no mermaid block/);
+});

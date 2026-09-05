@@ -79,10 +79,9 @@ Users with background marketplace refresh still need the second command and the 
 
 ## Notes
 
-- `skills/aiview/mmdcheck.mjs` imports `jsdom` and `mermaid` as bare specifiers, so it
-  needs `node_modules` and does not work from an installed plugin. Nothing references
-  it; it is a maintainer's tool. Bundle it into `dist-cli/` before putting it on any
-  user-facing path.
+- `aiview mermaid-check` is its own bundle, `dist-cli/mermaid-check.mjs`, about 3.5 MB,
+  built by `npm run build` with the CLI. It is versioned like the CLI bundle, for the
+  same reason.
 - The data home (`$CHARRETTE_HOME`, or `charrette_appdata` in the OS home) is never
   touched by an update. Documents and the index survive every release.
 - Dropping `version` from both manifests is the alternative delivery model: git sources

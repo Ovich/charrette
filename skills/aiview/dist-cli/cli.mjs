@@ -9089,6 +9089,7 @@ init_serverstate();
 import { spawn as spawn2, spawnSync } from "node:child_process";
 import fs7 from "node:fs";
 import path8 from "node:path";
+import { fileURLToPath as fileURLToPath2, pathToFileURL } from "node:url";
 
 // src/cli/args.ts
 var VALUE_FLAGS = /* @__PURE__ */ new Set([
@@ -9139,6 +9140,7 @@ var USAGE = [
   "  path <filename> [--project <slug>]       # where this document belongs, joined for this OS",
   "  components <file|#id>                    # what this mockup offers to siblings, and what it pulls",
   "  check <file|#id>                         # do this mockup's bindings resolve? errors as text, exit 1 if any",
+  "  mermaid-check <file|#id>                 # parse every mermaid block of a document; exit 1 if one fails",
   "  init                                     # create the data home; report where everything lives"
 ].join("\n");
 var registerOpts = () => ({
@@ -9321,6 +9323,35 @@ function cmdCheck() {
     if (!r.errors.length && !r.warnings.length) console.log("ok");
   });
   if (r.errors.length) process.exit(1);
+}
+async function cmdMermaidCheck() {
+  const ref = args.positional[0];
+  if (!ref) {
+    console.error("usage: aiview mermaid-check <file|#id>");
+    process.exit(1);
+  }
+  const abs = resolveRef(ref)?.abs_path ?? path8.resolve(ref);
+  if (!fs7.existsSync(abs)) {
+    console.error(`no such file: ${abs}`);
+    process.exit(1);
+  }
+  const here = path8.dirname(fileURLToPath2(import.meta.url));
+  const bundle = [path8.join(here, "mermaid-check.mjs"), path8.join(here, "..", "..", "dist-cli", "mermaid-check.mjs")].find((f) => fs7.existsSync(f));
+  if (!bundle) {
+    console.error(`aiview: the mermaid checker is not built. Run: npm install && npm run build  (in ${TOOL_ROOT})`);
+    process.exit(1);
+  }
+  const { blocksOf, checkBlocks } = await import(pathToFileURL(bundle).href);
+  const content = fs7.readFileSync(abs, "utf8").replace(/\r\n/g, "\n");
+  const blocks = blocksOf(content, /\.(md|markdown)$/i.test(abs));
+  const results = await checkBlocks(blocks);
+  const failed = results.filter((r) => !r.ok).length;
+  emit({ file: path8.basename(abs), blocks: results.length, failed, results }, () => {
+    if (!results.length) return console.log("no mermaid block in this document");
+    for (const r of results) console.log(r.ok ? `ok     line ${r.line}  ${r.type}` : `FAIL   line ${r.line}  ${r.error}`);
+    console.log(`${results.length} block${results.length === 1 ? "" : "s"}, ${failed} failed`);
+  });
+  if (failed) process.exit(1);
 }
 function cmdInit() {
   ensureHome();
@@ -9657,6 +9688,9 @@ switch (args.verb) {
     break;
   case "check":
     cmdCheck();
+    break;
+  case "mermaid-check":
+    await cmdMermaidCheck();
     break;
   case "add":
     cmdAdd();

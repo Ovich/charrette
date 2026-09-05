@@ -4,6 +4,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   ALL_PROJECTS,
   openIndex,
@@ -42,6 +43,7 @@ const USAGE = [
   "  path <filename> [--project <slug>]       # where this document belongs, joined for this OS",
   "  components <file|#id>                    # what this mockup offers to siblings, and what it pulls",
   "  check <file|#id>                         # do this mockup's bindings resolve? errors as text, exit 1 if any",
+  "  mermaid-check <file|#id>                 # parse every mermaid block of a document; exit 1 if one fails",
   "  init                                     # create the data home; report where everything lives",
 ].join("\n");
 
@@ -259,6 +261,38 @@ function cmdCheck(): void {
     if (!r.errors.length && !r.warnings.length) console.log("ok");
   });
   if (r.errors.length) process.exit(1);
+}
+
+/** Parse every mermaid block of a document, the way the viewer will. The checker is a
+ *  separate bundle next to the CLI bundle, loaded only here. */
+async function cmdMermaidCheck(): Promise<void> {
+  const ref = args.positional[0];
+  if (!ref) {
+    console.error("usage: aiview mermaid-check <file|#id>");
+    process.exit(1);
+  }
+  const abs = resolveRef(ref)?.abs_path ?? path.resolve(ref);
+  if (!fs.existsSync(abs)) {
+    console.error(`no such file: ${abs}`);
+    process.exit(1);
+  }
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const bundle = [path.join(here, "mermaid-check.mjs"), path.join(here, "..", "..", "dist-cli", "mermaid-check.mjs")].find((f) => fs.existsSync(f));
+  if (!bundle) {
+    console.error(`aiview: the mermaid checker is not built. Run: npm install && npm run build  (in ${TOOL_ROOT})`);
+    process.exit(1);
+  }
+  const { blocksOf, checkBlocks } = (await import(pathToFileURL(bundle).href)) as typeof import("../mermaid/check.ts");
+  const content = fs.readFileSync(abs, "utf8").replace(/\r\n/g, "\n");
+  const blocks = blocksOf(content, /\.(md|markdown)$/i.test(abs));
+  const results = await checkBlocks(blocks);
+  const failed = results.filter((r) => !r.ok).length;
+  emit({ file: path.basename(abs), blocks: results.length, failed, results }, () => {
+    if (!results.length) return console.log("no mermaid block in this document");
+    for (const r of results) console.log(r.ok ? `ok     line ${r.line}  ${r.type}` : `FAIL   line ${r.line}  ${r.error}`);
+    console.log(`${results.length} block${results.length === 1 ? "" : "s"}, ${failed} failed`);
+  });
+  if (failed) process.exit(1);
 }
 
 /** First clone / new machine: make the data home exist and say what lives where. */
@@ -627,6 +661,9 @@ switch (args.verb) {
     break;
   case "check":
     cmdCheck();
+    break;
+  case "mermaid-check":
+    await cmdMermaidCheck();
     break;
   case "add":
     cmdAdd();

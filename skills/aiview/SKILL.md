@@ -128,6 +128,7 @@ wants, this skill maps it to a verb and runs it:
 | "where does this document go?" | `path <filename>` |
 | "what does this mockup offer to siblings, what does it pull?" | `components <file\|#id>` |
 | "do this mockup's bindings resolve?" | `check <file\|#id>` |
+| "do this document's diagrams parse?" | `mermaid-check <file\|#id>` |
 | "which project am I in? is the viewer running?" | `status --json` |
 | "start / restart the viewer" | `serve --detach` |
 
@@ -151,6 +152,7 @@ $A use    <slug|*>                               # set the active project ('*' =
 $A path   <filename> [--project <slug>]          # where it belongs, joined for this OS
 $A components <file|#id>                         # what a mockup offers (name, tag, rule violations) and pulls
 $A check      <file|#id>                         # resolve a host as the server does; errors as text, exit 1 if any
+$A mermaid-check <file|#id>                      # parse every mermaid block as the viewer will; failures with their line, exit 1 if any
 $A pending add  <file|#id> --label L [--note N]   # work the reader is still waiting on
 $A pending done <#pendingId>                     # it landed; the card disappears
 $A pending list [<file|#id>] | clear <file|#id>

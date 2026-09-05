@@ -185,7 +185,7 @@ design language extracted once, every screen approved in the viewer, code after.
 
 | Tool | What it does |
 |---|---|
-| [aiview](skills/aiview/SKILL.md) | The viewer and its index, one npm package, Node and nothing else. It renders Markdown with mermaid, HTML mockups and PDFs at `localhost:4321`, reloads on save, groups the documents of one piece of work, and files everything per project. The agent drives it from the CLI: `open` a document, `list`, `update`, `move`, `path` to ask where one belongs, `components` and `check` for mockups, `pending` for work still running, every verb with `--json`. Its `SKILL.md` is the contract the other skills follow. |
+| [aiview](skills/aiview/SKILL.md) | The viewer and its index, one npm package, Node and nothing else. It renders Markdown with mermaid, HTML mockups and PDFs at `localhost:4321`, reloads on save, groups the documents of one piece of work, and files everything per project. The agent drives it from the CLI: `open` a document, `list`, `update`, `move`, `path` to ask where one belongs, `components` and `check` for mockups, `mermaid-check` for diagrams, `pending` for work still running, every verb with `--json`. Its `SKILL.md` is the contract the other skills follow. |
 
 aiview keeps its index, its server files and every document in the **data home**,
 `$CHARRETTE_HOME` or `charrette_appdata` in your OS home directory, never in this

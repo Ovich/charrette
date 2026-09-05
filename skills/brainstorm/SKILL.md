@@ -188,8 +188,9 @@ classDef todo stroke-dasharray:4 3
 classDef state stroke:#8a8a8a,stroke-width:1px,fill:#7f7f7f12
 ```
 
-**Parse the diagram, do not eyeball it.** Mermaid fails quietly — a broken `classDef` still
-renders, just wrong — and a tracker nobody can read is a tracker nobody updates.
+**Parse the diagram, do not eyeball it.** Mermaid fails quietly, a broken `classDef` still
+renders, just wrong, and a tracker nobody can read is a tracker nobody updates. Run
+`aiview mermaid-check <plan>` after every edit to the tracker.
 
 ## Red flags
 
