@@ -1,6 +1,6 @@
 ---
 name: write-diagrams
-description: Use whenever a document you are producing could carry a diagram (a brainstorm board, spec, implementation plan, review report, analysis) or when a design question might be settled faster shown than said. Maps each kind of open question to the diagram that answers it, and holds the discipline that keeps diagrams from becoming soup. Mermaid-based, renders in aiview and on any git host.
+description: Use when a document produced in this collection (board, spec, plan, report, analysis, durable doc) could carry a diagram, or when a design question would settle faster shown than said. Picks the diagram that answers the open question and holds the discipline that keeps a diagram readable. Not for decoration: no open question, no diagram.
 ---
 
 # Write diagrams
@@ -11,8 +11,7 @@ keep twice: once in the argument it settles, and again as **compressed context**
 a later session (human or AI) reading the board, spec, or plan gets the structure in
 one glance instead of re-deriving it from prose. This skill owns two things: **which
 diagram answers which question** (`diagrams.md`, the catalog) and **the discipline**
-below. Any skill that produces documents (brainstorm boards, specs,
-plans, reports) instructs its use rather than restating the rules.
+below.
 
 ## Pick by the question, not by ritual
 
@@ -57,27 +56,17 @@ person / system / external): Mermaid's native `C4Context` blocks render inconsis
 
 Two mechanics that bite every styled diagram. **Colours as eight-digit hex, never
 `rgba(...)`**: a `classDef`'s properties are comma-separated, so the commas inside an
-`rgba()` split the colour into fragments and the definition fails — usually silently, the
+`rgba()` split the colour into fragments and the definition fails, usually silently, the
 diagram still rendering, just wrong. And **translucent over opaque** (`#7f7f7f1a`), because
 a page is read in whatever theme the reader has: a translucent fill darkens a light
 background and lightens a dark one, where an opaque light fill burns a white slab into a
-dark page. Where the styling carries meaning, put that meaning in the label too — a glyph,
-a word — so it survives grayscale, dark mode and a colour-blind reader.
+dark page. Where the styling carries meaning, put that meaning in the label too, a glyph
+or a word, so it survives grayscale, dark mode and a colour-blind reader.
 
 **Parse the block, don't eyeball it.** Mermaid fails quietly, and a diagram nobody can read
 is a diagram nobody updates. `aiview mermaid-check <file>` parses every block of a document
 the way the viewer will and names the line of each failure; run it after every edit to a
 diagram.
-
-## Contract for calling skills
-
-A skill that wants diagrams says: *"Diagrams: use the `write-diagrams` skill
-(`../write-diagrams/SKILL.md` in this collection). Pick from its catalog by
-the open question, follow its discipline."* Name plus a path relative to the calling
-skill's own file — every skill is a sibling, so it is always `../<name>/SKILL.md` —
-never an absolute path, so the reference works from any checkout with any harness. Plus at most one line of skill-specific guidance (e.g. how many
-are expected, or which catalog entries its documents most often need). It does not
-restate the rules.
 
 ## Red flags
 
@@ -85,7 +74,7 @@ restate the rules.
 |---|---|
 | "One more diagram would help" | Would it answer an open question? If not, it's soup. |
 | "I'll draw the diagram after" | Then it's documentation, not design. Its value was in the argument you skipped. |
-| "The prose already covers the boundary" | If the artifact answering "what may import what" is a prose bullet, the instructed form was a dependency graph. Two questions ≠ one artifact. |
+| "The prose already covers the boundary" | A boundary described in a bullet is a boundary nobody checked. "What may import what" is a dependency graph, not a sentence. |
 | "The diagram from the board still matches" | The design changed in review. Update it in the same edit or it will be believed wrongly. |
 | "I'll invent a hybrid diagram" | The catalog's forms exist because each answers one question. Pick one; two questions get two diagrams. |
 | "I'll label the arrows to be safe" | On a straight unbranched chain of one arrow type, labels are noise. Count the branches before reaching for them. |
