@@ -6,8 +6,8 @@ A brief has four slots, in this order: where the plan is (its aiview path, the s
 node id); the step's jurisdiction, its node text and done-when, and nothing beyond it;
 the facts this session has already established, given as facts (the branch, the
 commands that verify, what an earlier step found); the return contract: what changed,
-where, the evidence the done-when is met, and anything found that the plan did not
-predict. A subagent never edits the tracker. This session is its single writer.
+where, the test's failing run before the change and its passing run after, and
+anything found that the plan did not predict. A subagent never edits the tracker. This session is its single writer.
 
 ## Parallel branches
 

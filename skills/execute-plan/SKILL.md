@@ -20,8 +20,9 @@ and renders, and its protocol (glyphs, state node, branches, layout) is
 (`../aiview/SKILL.md`)**, in every session that picks the plan up. Tell the person the
 URL it prints, so they watch the tracker move while the work happens.
 
-**If the plan has no tracker, or steps without a done-when, do not start.** Say so, and
-either add what is missing or go back and finish the plan. A plan whose diagram
+**If the plan has no tracker, steps without a done-when, or a slice that does not
+open on a failing test, do not start.** Say so, and either add what is missing or go
+back and finish the plan. A plan whose diagram
 describes a state the repository has moved past is a deviation, not a starting
 condition: reconcile it first, and say what you found.
 
@@ -91,8 +92,11 @@ in the same step, the step was mis-scoped.
 ## Keeping the tracker while you work
 
 - **Tick as you go, never in a batch.** A node turns ✅ only when its own done-when is
-  met, and the evidence goes into the step: what was observed, not "worked", and for
-  a step that serves a user story, its acceptance criterion observed.
+  met, and the evidence goes into the step: what was observed, not "worked". Test
+  first, always: the test is written and run before the implementation, the step
+  records the failing run, the implementation is written to pass it, and the step
+  records the passing run. A test that never failed proves nothing. For a step that
+  serves a user story, its acceptance criterion observed.
 - **Update it before every handoff**: a question, an approval request, the end of a
   turn. Whatever the tracker does not say by then is lost if the session ends.
 - **Deviations are drawn, not narrated.** Work the plan does not list becomes a node
@@ -117,4 +121,5 @@ in the same step, the step was mis-scoped.
 | "They said yes to deploying yesterday" | Outward-facing actions are approved once each, not once forever. |
 | "I'll ask what they want to do" | Bring the options and a recommendation. An open question hands the work back rather than the decision. |
 | "The step is done, I'll write it up later" | Later is after the context is gone. The evidence goes in when it is observed. |
+| "I'll write the implementation, then the test" | The test comes first and is seen failing. A test written after the code fits the code, not the done-when. |
 | "I'll add a line to the state node" | You overwrite its fields. A node you append to becomes a log, and a log of states is not a state. |

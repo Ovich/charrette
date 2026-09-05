@@ -25,11 +25,19 @@ for the slice that needs it. Never cut by layer: schema then API then screens
 verifies nothing until the last one.
 
 Per slice: the stories it serves (`US3`), what changes, which files, the done-when as
-something observed, what it unblocks, and a mark when it needs a person:
+a test, what it unblocks, and a mark when it needs a person:
 `👤 decision` (architecture, contract), `👤 design review` (a screen, a mockup), or
 none. Order riskiest unknown first. Slices that touch disjoint files and need nothing
 from each other before a join may fork; propose the fork in one message, draw it on
 a yes.
+
+## Test first
+
+Every slice is built test first, and its steps say so: the first step writes the test
+that proves the done-when, named with its file; the second runs it and records that
+it fails; only then the implementation, and the last step runs the test and records
+that it passes. A screen's behaviour is tested the same way; its look is the
+`👤 design review`. A slice drawn without the failing-test step is not a slice.
 
 ## Implementation decisions
 
@@ -81,4 +89,5 @@ Then stop and ask the person to approve the plan. Running it is `execute-plan`'s
 |---|---|
 | "I'll plan the whole feature while I have the context" | Plan the increment. The next plan is written with this one's learning in hand, which you do not have yet. |
 | "Schema first, then the API, then the screens" | Nothing is verifiable until the last slice. One story end to end, then the next. |
+| "The test can come once the code works" | Then the test is written to fit the code. The test comes first, is seen failing, and the code is written to pass it. |
 | "The hardening made the plan longer" | Then it added detail instead of removing assumptions. A slice that cannot be decided now becomes a line saying when it will be planned. |
