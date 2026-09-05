@@ -1,12 +1,12 @@
 ---
 name: brainstorm
-description: Use before building anything non-trivial (a new feature, service, integration, or system) to turn an idea into an approved spec and an implementation plan, with architecture diagrams. Covers the design conversation itself: requirements, approaches, boundaries, data flow. Not for bug fixes or mechanical edits.
+description: Use before building anything non-trivial (a new feature, service, integration, or system) to turn an idea into an approved spec with its architecture diagrams, through a design conversation on a live board: requirements, approaches, boundaries, data flow. Produces the board and the spec; the plan is write-plan's. Not for bug fixes or mechanical edits.
 ---
 
 # Brainstorm
 
-Turns an idea into a design, a written spec, and a plan (through questions, not
-assumptions) and **draws the design while discussing it.**
+Turns an idea into a design and a written spec (through questions, not assumptions)
+and **draws the design while discussing it.**
 
 <HARD-GATE>
 No implementation, no scaffolding, no code, no file creation for the thing being
@@ -21,15 +21,16 @@ simple. A simple project's spec is three paragraphs, but it exists and it's appr
 2. **Scope check**: if the request is several independent systems, say so now and help
    decompose it. Each piece gets its own spec. Don't refine details of a project that
    needs splitting first.
-3. **Question loop**: one question per message. Multiple choice where the options are
-   knowable; open-ended where they aren't. Understand purpose, constraints, success
-   criteria, and what's explicitly out of scope.
+3. **Question loop**: run the `interview` skill (`../interview/SKILL.md` in this
+   collection) on the board's decisions table, which is its tree. The first rows are
+   purpose, constraints, success criteria, and what is explicitly out of scope.
 4. **Approaches**: propose 2–3 with real trade-offs. Lead with your recommendation and
    why. YAGNI every one of them before presenting.
 5. **Design, in sections**: scale each section to its complexity. Ask after each one
    whether it holds before moving on.
 6. **Write the spec** → self-review → user reviews it.
-7. **Write the plan**: phased, each phase independently verifiable.
+7. **Hand off**: the plan is the `write-plan` skill's (`../write-plan/SKILL.md` in
+   this collection), written once the spec is approved.
 
 ## The board (live document)
 
@@ -82,55 +83,8 @@ sections contradict each other? Does every diagram match the prose beside it? Co
 requirement be read two ways? If so, pick one and write it plainly. Is this one
 implementation plan's worth of work, or does it still need splitting?
 
-Then stop and ask the user to review the file before you write the plan.
-
-## The plan
-
-Only after the spec is approved. Phases, each one independently verifiable: a phase
-whose completion you can't check isn't a phase. Per phase: what changes, which files,
-how it's verified, and what it unblocks. Order by dependency, and put the riskiest
-unknown first: that's where the plan will change. The plan is the iteration's plan,
-not the project's: it covers one increment, a change that works and can be verified
-when it lands, and stops where the next increment would begin. No big design up
-front: a spec and a plan are sized to what the person can hold in mind and approve in
-one reading.
-
-Once the phases are drafted, look for the ones that can run at the same time: phases
-that touch disjoint files and need nothing from each other before a later phase joins
-them. Name them to the developer in chat, one message ("phases 2 and 3 touch different
-areas and could run in parallel, draw them as branches?"), and draw the fork only on a
-yes. `execute-plan` runs branches at once, one subagent per branch, and a fork drawn
-over a shared file is the merge conflict it would have had to resolve.
-
-**The plan carries diagrams** (`write-diagrams` skill): they are the implementer's
-mental model and durable context for every later AI session that reads the plan:
-
-- A **phasing diagram always**, even for a plain chain: it is the tracker (below), and it
-  is the plan's **opening section**, first after the title and links, so a resumer meets
-  where the work stands before any prose and a stale one is caught the moment the file
-  opens.
-- The **boundary diagram the implementation must hold** (usually the dependency
-  graph, forbidden edges drawn) comes right after the tracker, before phase 1: every
-  extraction or refactor phase is checked against it.
-- A phase whose behavior is an **ordering with failure branches** (a daemon
-  handshake, a retry flow, a migration) gets its sequence or state diagram inside
-  the phase, drawn before the phase is executed.
-- Carry the relevant spec/board diagram into the phase that implements it; if the
-  board produced no diagram for a boundary the plan depends on, draw it now: its
-  absence is a review finding, not a pass.
-
-Write `YYYY-MM-DD-<topic>.plan.md` beside the board and spec, and register it with
-aiview as kind `plan`, carrying the board's tags and `--group`.
-
-### The tracker
-
-The phasing diagram is the plan's tracker, the record of where the work stands, kept by
-the `execute-plan` skill from the first step on. Draw it to its protocol,
-`../execute-plan/references/tracker.md`: one node per step at the granularity someone
-would pause at, a status glyph opening every label, one ▶ at a time, a state node
-connected to nothing that holds the resume state, one column. Author it there; running
-it is that skill's job, and it refuses a plan without a tracker. Run
-`aiview mermaid-check <plan>` after drawing it.
+Then stop and ask the user to review the file. The plan comes after approval, from
+`write-plan`.
 
 ## Red flags
 
@@ -139,5 +93,3 @@ it is that skill's job, and it refuses a plan without a tracker. Run
 | "This is simple, I'll just build it" | The gate applies to every project. Simple ones are where wrong assumptions hide. |
 | "The user knows what they want" | They know the outcome. The boundaries are what you're for. |
 | "Let me scaffold while we talk" | Files created before approval get defended instead of discarded. |
-| "I'll add a checklist at the top as well" | Two trackers drift, and then the reader has to work out which one is lying. The diagram, and nothing else. |
-| "The plan didn't predict this, so the plan was wrong" | Plans are hypotheses. The tracker is where reality is recorded: a diagram that never changed is one nobody was using. |

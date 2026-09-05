@@ -25,7 +25,7 @@ live in the data home, never here.
 
 3. **MUST write a description as the trigger and nothing else: what activates the skill, what it produces, what it excludes.** Method, mechanics and instructions to a loaded agent belong in the body, and the body carries no "when to use" section of its own. The router reads only the description; the agent reads the body only after.
 
-4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute-plan/references/tracker.md`; diagram discipline is `skills/write-diagrams/`; the index contract is `skills/aiview/`.
+4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute-plan/references/tracker.md`; diagram discipline is `skills/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/aiview/`.
 
 ## aiview
 

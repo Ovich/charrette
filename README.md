@@ -7,18 +7,21 @@ Agent skills that settle what gets built before code is written. They sharpen th
 
 Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Charrette brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
 
-Nine skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
+Eleven skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
 
 ## The loop
 
+Phasing: what a piece of work passes through, from idea to merge, and which skills serve every stage.
+
 ```mermaid
 flowchart LR
-  I["idea"] --> B["brainstorm<br/>board + spec + plan"]
-  B --> E["execute-plan<br/>the plan's diagram is the tracker"]
+  I["idea"] --> B["brainstorm<br/>board + spec"]
+  B --> P["write-plan<br/>one increment, hardened on request"]
+  P --> E["execute-plan<br/>the plan's diagram is the tracker"]
   E --> R["review<br/>pr-analysis, findings"]
   R --> M["merge"]
-  D["write-diagrams"] -.-> B
-  D -.-> R
+  D["write-diagrams"] -.->|draws for| B & P & R
+  Q["interview"] -.->|resolves decisions for| B & P
 ```
 
 The board is a Markdown file opened at the first question and edited through the whole conversation. The plan is the same kind of document for the build: its phasing diagram is the tracker, and a later session with none of the conversation in context resumes from it.
@@ -35,7 +38,7 @@ The first two are from one real piece of work: the redesign of this collection's
 
 ### A spec, with the work it belongs to
 
-What `brainstorm` leaves behind for one feature: the board, the spec and the plan, grouped in the sidebar. The spec's diagrams render inline, here the five layers and the orchestrator that dispatches them. The header shows the absolute path, click to copy.
+What `brainstorm` and `write-plan` leave behind for one feature: the board, the spec and the plan, grouped in the sidebar. The spec's diagrams render inline, here the five layers and the orchestrator that dispatches them. The header shows the absolute path, click to copy.
 
 ![aiview: the pr-review redesign spec, its layer table and orchestrator diagram rendered, the board and plan grouped beside it](assets/aiview-pr-review-spec.png)
 
@@ -87,7 +90,9 @@ In the order work usually happens:
 
 | Skill | Use case | Example ask |
 |---|---|---|
-| [brainstorm](skills/brainstorm/SKILL.md) | Something non-trivial is about to be built and the design conversation hasn't happened | *"Run brainstorm: I want per-user rate limiting on the API."* One question at a time, no code until the spec and plan are approved. |
+| [brainstorm](skills/brainstorm/SKILL.md) | Something non-trivial is about to be built and the design conversation hasn't happened | *"Run brainstorm: I want per-user rate limiting on the API."* One question at a time, no code until the spec is approved. |
+| [interview](skills/interview/SKILL.md) | A design object has decisions nobody has resolved, or you want to be questioned about one until it is understood the same way | *"Interview me about this spec."* Decisions walked in dependency order, the codebase read before you are asked, a recommendation on every question. |
+| [write-plan](skills/write-plan/SKILL.md) | The spec is approved and the next increment needs its plan | *"Write the plan for the rate-limiting spec."* One increment, phases that verify, the tracker drawn, hardened through an interview when you say so. |
 | [execute-plan](skills/execute-plan/SKILL.md) | An approved plan is ready, or was left mid-way by an earlier session | *"Execute the rate-limiting plan."* Pauses only for your decisions, your checks, or an action that does not undo. Refuses a plan with no tracker. |
 | [write-diagrams](skills/write-diagrams/SKILL.md) | A design question would settle faster drawn than argued | *"Draw today's login flow: I need to see where the redirect happens."* |
 | [frontend-design](skills/frontend-design/SKILL.md) | A screen is about to be built or visually reworked | *"Before we code the settings page, propose a mockup."* Design language extracted once, every screen approved in the viewer, code after. |

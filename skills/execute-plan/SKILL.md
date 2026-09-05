@@ -12,7 +12,7 @@ adds something.
 ## What this skill takes as input
 
 **A plan document whose diagram is the tracker**, every step with a done-when that can
-be checked. The `brainstorm` skill produces it, the `aiview` skill is where it lives
+be checked. The `write-plan` skill produces it, the `aiview` skill is where it lives
 and renders, and its protocol (glyphs, state node, branches, layout) is
 `references/tracker.md`: read it before the first edit to the plan.
 
