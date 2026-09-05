@@ -311,13 +311,14 @@ describe("composition overlay", () => {
     expect(out).toMatch(/#__aiview\{[^}]*pointer-events:auto/);
     expect(out).toMatch(/#__aiview \.av-box\{[^}]*pointer-events:auto;cursor:pointer/);
     expect(out).toMatch(/#__aiview \.av-box\.av-err\{[^}]*pointer-events:none/);
-    // offered components get their own colour, and the host's file name rides along for the binding snippet
+    // offered components get their own colour
     expect(out).toMatch(/#__aiview \.av-box\.av-decl\{[^}]*#15803d/);
-    expect(withOverlay("<body></body>", { file: "2026-09-03-assistant.mockup.html" })).toContain('data-file="2026-09-03-assistant.mockup.html"');
     expect(out).toMatch(/#__aiview \.av-lbl\{[^}]*pointer-events:auto/);
     // every class the layer uses is namespaced: a mockup's own .box or .row rule must never style the layer
     const layerCss = out.slice(out.indexOf("<style " + OVERLAY_MARK), out.indexOf("</style>", out.indexOf("<style " + OVERLAY_MARK)));
     expect(layerCss).not.toMatch(/#__aiview \.(box|lbl|legend|row|pv|pvh|pvb)\b/);
+    // no legend, no preview panel: the mode is outlines, labels and the veil
+    expect(layerCss).not.toMatch(/av-legend|av-pv/);
     expect(shortName("2026-09-03-dock-tools.mockup.html")).toBe("dock-tools");
   });
 
