@@ -1,6 +1,6 @@
 ---
 name: frontend-design
-description: Use before building or changing any screen (a new page, dialog, panel, or a visual rework) to design it first as a mockup or prototype in the project's own design language. Extracts the design language from the codebase (tokens, UI libraries, components, layouts, wording), writes it down once, then proposes mockups the user reacts to in the viewer. Not for implementing the screen (that comes after approval) and not for reviewing code quality (frontend-review).
+description: Use before building or changing any screen (a new page, dialog, panel, or a visual rework), to design it first as a mockup or prototype in the project's own design language, which the skill extracts from the codebase and writes down once. Not for implementing the screen and not for reviewing code quality (frontend-review).
 ---
 
 # Frontend design
