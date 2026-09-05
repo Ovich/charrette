@@ -1,9 +1,5 @@
 # Binding: components shared between mockups
 
-Read when a region drawn in one mockup is needed in another, when a mockup declares
-variants, or before splitting a screen into parts. The first mockup of a project needs
-none of this.
-
 ## Declaring a component
 
 A region another mockup may want carries `data-component="Name"` and styles itself

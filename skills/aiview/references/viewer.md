@@ -1,8 +1,5 @@
 # What the person sees
 
-Read when you describe the viewer to the person, or explain what a mode or a toolbar
-does.
-
 **Left, the sidebar.** Documents newest-activity first: a search field, kind chips (one
 colour per kind, click to filter), tag chips (multi-select), grouped documents inside
 collapsible containers (display title and member count, members in reading order),

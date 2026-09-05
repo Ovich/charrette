@@ -1,8 +1,5 @@
 # Setup: first clone, new machine
 
-Read when the tool is not yet usable on this machine: a fresh clone, a data home that
-does not exist, or a verb that prints a build command.
-
 ```sh
 cd <skill-dir> && npm install && npm run build && node aiview.mjs init
 ```

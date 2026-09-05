@@ -20,8 +20,8 @@ skill's directory as the harness states it. Node 22.5 or later, nothing else.
 | The data home, `$CHARRETTE_HOME` or `charrette_appdata` in the OS home directory | `aiview.sqlite`, the server's pid and port files, every document under `docs/<project>/` | never in a project repo; it may be its own repo, to sync between machines |
 
 A document is working material between a person and an agent, obsolete once the PR
-merges. Never write one inside a project repository. First clone or new machine:
-`references/setup.md`.
+merges. Never write one inside a project repository. On a fresh clone, a new machine,
+or when a verb prints a build command: `references/setup.md`.
 
 ## Where a document goes
 
@@ -43,8 +43,8 @@ creates the folder if needed, and prints the path to write to verbatim; `--json`
 `{path, dir, project}`. The date in the name is when the work started, not when the
 file was created. A location the user states explicitly wins over all of this. Tag
 with the project slug as well as the topic: tags filter within a project, and keep a
-document findable in All-projects mode. Declaring projects, their working directories
-per machine, and the active project shared with the open tabs: `references/projects.md`.
+document findable in All-projects mode. To declare a project, on a new machine, or when
+`status --json` reports no `cwdProject` for your directory: `references/projects.md`.
 
 ## Invocation
 
@@ -150,8 +150,8 @@ caller's whole instruction, as an example:
 > (from the filename), tags = project + topic, group = the topic (titled), started
 > honestly. Tell the user the URL it prints.
 
-What the person sees in the viewer, including Composition and the variant toolbar,
-when you have to describe it: `references/viewer.md`.
+When you describe the viewer to the person, or explain a mode or a toolbar:
+`references/viewer.md`.
 
 ## Red flags
 

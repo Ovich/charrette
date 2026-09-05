@@ -1,8 +1,6 @@
 # No design language yet
 
-Read when there is no codebase to extract a design language from, or when the codebase
-has no language of its own yet (a scaffold, a template, defaults never chosen). The
-design language is then decided, not extracted, and this is how.
+The design language is decided here, not extracted.
 
 Adapted from the `frontend-design` skill in `github.com/anthropics/skills`, copyright
 Anthropic, Apache License 2.0 (copy: `licenses/APACHE-2.0-anthropic-skills.txt` at the

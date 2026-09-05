@@ -1,8 +1,7 @@
 # The tracker
 
-Read before drawing a plan's phasing diagram (the `brainstorm` skill, at the plan) and
-before editing one (this skill). The diagram is the record of where the work stands,
-not an illustration of a record kept elsewhere.
+The diagram is the record of where the work stands, not an illustration of a record
+kept elsewhere.
 
 A plan is read twice: once to agree on it, then by whoever resumes the work, often a
 later session with none of the conversation in context. The second reader needs state,

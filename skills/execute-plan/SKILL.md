@@ -92,7 +92,7 @@ arrives in the same step, that is the step telling you it was mis-scoped.
 ## Keeping the tracker while you work
 
 The plan's diagram is the tracker; its protocol, the glyphs, the state node, one column,
-is `references/tracker.md`. Running the plan is what keeps it true:
+is `references/tracker.md`, read before the first edit to it. Running the plan is what keeps it true:
 
 - **Tick as you go, never in a batch.** A node turns ✅ only when its own done-when is met,
   and the evidence goes into the step: what was observed, not "worked". A tracker updated

@@ -1,8 +1,5 @@
 # Projects
 
-Read when a project must be declared, when a machine is new, or when `status --json`
-reports no `cwdProject` for the directory you work in.
-
 A project is a declared record, never a value guessed from a path:
 
 | Field | Meaning |

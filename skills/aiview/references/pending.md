@@ -1,8 +1,5 @@
 # Pending work: publish early, say what is missing
 
-Read when a document is written before the work behind it has finished, above all when
-subagents are dispatched to fill its sections.
-
 A card sits at the head of the document, above the title where the reader meets it
 before the content, for each unit of work still running: its label, one line on what
 it is doing, and how long it has been going. "This is incomplete, and here is what is
