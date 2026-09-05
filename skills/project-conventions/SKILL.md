@@ -94,11 +94,14 @@ are never renumbered, because `AGENTS EXCEPTION (rule 11)` markers in the code p
 numbers. Group rules under the headings the document already uses; add a heading only
 when a third rule needs it.
 
-Every document gets the escape hatch, once, near the top: a rule that is genuinely
-unreasonable at a specific site may be deviated from with a comment beginning
-`AGENTS EXCEPTION (rule N):` plus short reasoning. Without one, deviation is a review
+Every document gets two clauses, once, near the top. The escape hatch: a rule that is
+genuinely unreasonable at a specific site may be deviated from with a comment beginning
+`AGENTS EXCEPTION (rule N):` plus short reasoning; without one, deviation is a review
 finding, and so is a marker whose reasoning doesn't hold up. A convention doc with no
-escape hatch produces either lies or bad code.
+escape hatch produces either lies or bad code. And the capture clause: when a decision
+made during a session would pass the five filters, run this skill to capture it before
+the session ends. The convention document is the one file every agent reads, so the
+trigger for growing it lives there, not in the skills that happen to make decisions.
 
 ## Never propose
 

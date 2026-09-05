@@ -3,7 +3,9 @@
 Conventions of the charrette repository: the decisions a fresh agent would otherwise
 guess differently. A rule may be deviated from at a specific site with a comment
 beginning `AGENTS EXCEPTION (rule N):` and the reason; without one, deviation is a
-review finding.
+review finding. When a decision made during a session would pass the five filters of
+the `project-conventions` skill (contested, recurring, consequential, checkable, not
+tool-enforceable), run that skill to capture it here before the session ends.
 
 ## Architecture (context you must not break)
 
