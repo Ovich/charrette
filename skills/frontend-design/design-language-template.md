@@ -22,6 +22,11 @@ _Extracted <YYYY-MM-DD> from the codebase; every claim cites its source file. Re
 - Spacing steps actually used (4/8/12/16/24/32…): …
 - Content width: …  · gutters: …
 
+## UI libraries (cite `package.json` or the stack's equivalent)
+| Library | Version | Role in the app | Primitives the mockup must reuse |
+|---|---|---|---|
+| shadcn/ui, spartan, MUI, Angular Material, Bootstrap, Tailwind, a design-system package | … | the kit, the utility layer, the icon set | Button, Dialog, Badge, Card, Table, their sizes and variants |
+
 ## Component vocabulary (cite each)
 | Name | Purpose | Defined in | Variants / states |
 |---|---|---|---|

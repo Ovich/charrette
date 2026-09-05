@@ -1,12 +1,12 @@
 ---
 name: frontend-design
-description: Use before building or changing any screen (a new page, dialog, panel, or a visual rework) to design it first as an HTML mockup that follows the project's existing design language. Extracts the design language from the codebase (tokens, components, layouts, wording), writes it down once, then proposes mockups rendered live in aiview for the user to react to. Not for implementing the React code (that comes after approval) and not for reviewing code quality (frontend-review).
+description: Use before building or changing any screen (a new page, dialog, panel, or a visual rework) to design it first as a mockup or prototype in the project's own design language. Extracts the design language from the codebase (tokens, UI libraries, components, layouts, wording), writes it down once, then proposes mockups the user reacts to in the viewer. Not for implementing the screen (that comes after approval) and not for reviewing code quality (frontend-review).
 ---
 
 # Frontend design
 
-The controller for visual work: **learn the project's design language → propose mockups
-in that language → iterate live → hand off to implementation.** A mockup is a thinking
+The controller for visual work: **learn the project's design language, propose mockups
+in that language, iterate live, hand off to implementation.** A mockup is a thinking
 tool the user can look at and argue with cheaply, the same way a diagram is in
 `brainstorm`. It is not the implementation.
 
@@ -17,163 +17,119 @@ gets a tiny mockup (a cropped HTML fragment of the affected region), but it exis
 it's approved.
 </HARD-GATE>
 
+## Mindset
+
+Approach the screen as a design lead with a point of view: every choice, palette,
+type, layout, wording, is specific to this product and the people who use it, never the
+default any app would get.
+
+- **Native when a language exists.** The product's own tokens, primitives and words.
+  Distinctiveness was decided when the design language was; a mockup inherits it and
+  does not reopen it. Distinctive-for-the-web is the wrong target here.
+- **Grounded in the subject.** Who uses the screen, what it is for, what those people
+  already read every day. A nurse's roster and a trader's dashboard share nothing but
+  the browser.
+- **Pattern-match before inventing.** A sibling screen that solves the same problem, a
+  list with actions, a form in a dialog, gives the shape. Deviate only with a stated
+  reason.
+- **Density and hierarchy over decoration.** Screens are operated, not read: the summary
+  before the detail, state encoded in form (a chip, an opacity, a stripe) and not only in
+  text, semantic colour apart from the accent.
+- **Spend boldness in one place.** One element is the memorable thing, the rest quiet.
+  Before calling a mockup done, remove one thing: decoration that does not serve the job.
+- **The quality floor is built in, never announced.** Responsive to the mobile preset,
+  visible keyboard focus, `prefers-reduced-motion` respected, contrast legible in both
+  themes, touch targets no smaller than the codebase's own buttons.
+- **Copy is design content.** Written from the person's side: things named by what
+  people control and recognise (a teacher manages *graders*, not *lab_graders rows*),
+  a control saying exactly what happens, the same name through the whole flow, empty
+  states inviting the next action, errors saying what went wrong and how to fix it, no
+  apology. Sentence case, plain verbs, the product's language. Each element does one job.
+- **Don't design the framework in.** The mockup describes the look; it does not
+  prescribe Tailwind classes or React structure. The handoff maps to named components.
+
 ## Flow
 
-1. **Load or build the design language** (§ below). If the project's
+1. **Load or build the design language** (below). If the project's
    `design-language.reference.md` exists and is younger than the last change to the
-   token/UI files, read it and skip to 2. Otherwise extract it now, write it, register
-   it in aiview (kind `reference`), and ask the user to skim it: one message, "does
-   this match how you see the product?".
+   token and UI files, read it and skip to 2. Otherwise extract it now, write it,
+   register it in aiview (kind `reference`), and ask the user to skim it in one message:
+   "does this match how you see the product?". No codebase, or a codebase with no
+   language of its own yet: `references/greenfield.md`.
 2. **Frame the screen**: one question at a time, only what changes the layout: who uses
-   it, the primary action, the data it shows, the states it must handle (empty, loading,
-   error, permission-denied), where it sits in navigation. Reuse names from
-   `nomenclature`/`AGENTS.md`; never invent product vocabulary.
-3. **Plan, then critique, then build** (two passes, mostly in your head). First a
-   compact plan: which existing screen this pattern-matches, the layout as a one-sentence
-   description plus an ASCII wireframe, the components it will be made of, the one thing
-   the screen must make obvious. Then read the plan against the brief and the design
-   language: anything that could have come from *any* app rather than this one, or that
-   introduces a token/pattern the codebase doesn't have, gets revised. Say what changed.
-   Only then write the HTML. Show the ASCII wireframe to the user when a layout question
-   is genuinely open ("actions in a header bar or per row?"); it settles that in one
-   exchange, cheaper than a full mockup.
-   One direction by default. Offer 2–3 *directions* only when the user asks or the
-   screen is new territory (no sibling to pattern-match), and then draw them small and
-   side-by-side, not three full pages.
-4. **Render and iterate**: write the file, register + serve it with aiview, tell the
-   user the URL, edit the same file as they react. Check every state and the three
-   viewport presets before calling it done.
-   Hand it over as something to change, not something finished: with the URL, say the
-   mockup is live and ask what they would change, spacing, wording, order, a region
-   that feels off. Every answer is an edit to the same file, visible on save. The person
-   must never have to wonder whether asking for a change is allowed.
-   A mockup is a working prototype, not a picture: the behaviour is mocked in the file
-   so the flow can be walked through. When the ask is purely visual, or once the visual
-   pass is approved, ask one question about the flow ("what happens when they press
-   Apply?", "what does the empty state lead to?") and mock it. A prototype that works
-   settles the states and transitions the code would otherwise guess at.
-5. **Handoff**: an implementation note at the bottom of the mockup file (HTML comment) or
-   in the mockup's sibling `.md`: which existing components each region maps to
-   (`ui/…`, `custom/…`), which new named components are needed and where they live,
-   copy strings, and the acceptance list (states × viewports). Then stop; implementation
-   is a separate step the user starts.
+   it, the primary action, the data it shows, the states it must handle, where it sits in
+   navigation. Reuse names from `nomenclature`/`AGENTS.md`; never invent product
+   vocabulary.
+3. **Plan, then critique, then build.** First a compact plan: which existing screen this
+   pattern-matches, the layout in one sentence plus an ASCII wireframe, the components it
+   is made of, the one thing the screen must make obvious. Then read the plan against the
+   brief and the design language: anything that could have come from any app, or that
+   introduces a token or pattern the codebase lacks, is revised, and the change is said.
+   Only then write the HTML. Show the wireframe when a layout question is genuinely open
+   ("actions in a header bar or per row?"); it settles that in one exchange. One
+   direction by default; two or three only when asked or when the screen has no sibling
+   to pattern-match, drawn small and side by side.
+4. **Render and iterate**: write the file, register and serve it via the `aiview` skill,
+   tell the user the URL, edit the same file as they react. Hand it over as something
+   to change, not something finished: say the mockup is live and ask what they would
+   change, spacing, wording, order, a region that feels off. Every answer is an edit to
+   the same file, visible on save. A mockup is a working prototype, not a picture: the
+   behaviour is mocked in the file so the flow can be walked through. When the ask is
+   purely visual, or once the visual pass is approved, ask one question about the flow
+   ("what happens when they press Apply?", "what does the empty state lead to?") and
+   mock it. Check every variant and the three viewport presets before calling it done.
+5. **Handoff**: an implementation note at the bottom of the mockup file (HTML comment):
+   which existing components each region maps to, which new named components are needed
+   and where they live, copy strings, and the acceptance list (variants times viewports).
+   Then stop; implementation is a separate step the user starts.
 
 ## The design language (`design-language.reference.md`)
 
 It lives in the project's folder in the data home like everything else, but it is the
-one document here that does **not** retire when a PR merges: every future mockup builds
-on it. It is a cache of what the codebase already says, so when the token or UI files
-have moved on, re-extract rather than patch.
+one document here that does not retire when a PR merges: every future mockup builds on
+it. It is a cache of what the codebase already says, so when the token or UI files have
+moved on, re-extract rather than patch.
 
 Extract, don't guess. Read in this order and cite the file for every claim:
 
 | Look at | To learn |
 |---|---|
-| Global CSS / theme file (`app.css`, `globals.css`, `theme.css`), Tailwind config | color tokens (both themes), radii, shadows, font stacks, type scale, spacing rhythm |
-| Generated UI kit folder (`components/ui/`) | which primitives exist (Button, Dialog, Badge, Card, Table…) and their variants |
-| Custom/wrapped components (`components/custom/`, `layout/`, `typography/`, `shell/`) | the project's *named vocabulary*: layout primitives, chips, pills, hints, state chips, dialogs, the words the codebase already uses for visual things |
-| 2–3 representative existing screens (pages/routes) | page skeleton (shell, header, content width, section spacing), density, how lists/cards/tables are used, empty and loading states, where actions sit |
-| Copy in those screens, `nomenclature.md`, `AGENTS.md` | tone, capitalization, button verbs, how errors are phrased |
+| `package.json` (or the stack's equivalent): the UI libraries and their versions (shadcn, Radix, spartan, MUI, Angular Material, Bootstrap, Tailwind, a design system package) | which primitives the app already speaks, their sizes, radii, variants and names; the mockup uses those, never a look-alike of its own |
+| Global CSS / theme file (`app.css`, `globals.css`, `theme.css`), Tailwind config | colour tokens (both themes), radii, shadows, font stacks, type scale, spacing rhythm |
+| Generated UI kit folder (`components/ui/`) | which primitives exist (Button, Dialog, Badge, Card, Table) and their variants |
+| Custom/wrapped components (`components/custom/`, `layout/`, `typography/`, `shell/`) | the project's named vocabulary: layout primitives, chips, pills, hints, state chips, dialogs, the words the codebase already uses for visual things |
+| 2 to 3 representative existing screens (pages/routes) | page skeleton (shell, header, content width, section spacing), density, how lists, cards and tables are used, empty and loading states, where actions sit |
+| Copy in those screens, `nomenclature.md`, `AGENTS.md` | tone, capitalisation, button verbs, how errors are phrased |
 | Existing mockups for this project (`aiview list --kind mockup --tag <project>`) | what has already been proposed and accepted or rejected |
 
 Write it as the template in `design-language-template.md`: tokens (as CSS custom
-properties, light + dark), type scale, spacing/radius/shadow, component vocabulary (name
-→ purpose → where defined), layout patterns, states & feedback, voice, and an explicit
-**"don't"** list (things the codebase avoids). Keep it to what a designer needs to draw
-a new screen that looks native. Register it via the `aiview` skill: kind `reference`,
-tags = project + design.
+properties, light and dark), type scale, spacing, radius and shadow, the UI libraries
+with versions, component vocabulary (name, purpose, where defined), layout patterns,
+states and feedback, voice, and an explicit "don't" list. Keep it to what a designer
+needs to draw a new screen that looks native. Register it via the `aiview` skill: kind
+`reference`, tags = project + design.
 
 ## Mockups
 
-- **File:** `YYYY-MM-DD-<screen>.mockup.html` in the data home (ask the `aiview`
-  skill for the path). One screen per file. Its variants (states, steps, alternatives
-  of that screen) live inside the file, declared as below, never as sibling files.
+- **File:** `YYYY-MM-DD-<screen>.mockup.html` in the data home (ask the `aiview` skill
+  for the path). One screen per file. Its variants (states, steps, alternatives of that
+  screen) live inside the file, never as sibling files.
 - **Self-contained:** inline `<style>` and, if needed, inline `<script>`; no CDN, no
-  build. Start the `<style>` with the design-language tokens as `:root` custom properties
-  (light) plus the dark overrides under `@media (prefers-color-scheme: dark)`, and use
-  only those tokens. A new token is allowed only if flagged in the handoff note as
-  "new token: needs a name in the theme".
-- **Native look:** every region should be recognisably one of the project's components
-  (annotate with `data-component="Pill"` etc. so the handoff maps 1:1). Real copy in
-  the product's voice, never lorem. Real-looking data (names, counts, dates).
-- **Declaring a component:** a region you may want in another mockup carries
-  `data-component="Name"` and styles itself under that selector
-  (`[data-component="Name"]` and descendants), never through element or `body` rules.
-- **Bindable means static:** a bindable component is markup in the file, never the
-  output of the file's script. It carries no `id` and no inline handler, because it may
-  be placed more than once and into pages that do not define the handler. Parts a
-  script must reach are marked `data-part="name"` and found inside the bound element.
-- **Binding:** to reuse a component from another mockup of the same project, place
-  `<div data-bind="file#Name"></div>` where it goes (`file` is the sibling's bare file
-  name). aiview replaces the placeholder with the component, no wrapper, the
-  placeholder's `class` and `style` merged on. Keep behaviour in the source mockup, or
-  write it in the host against the bound markup: bound copies are markup and style.
-  Editing the source reloads every open host.
-- **Decomposition is proposed, never done:** when a region is drawn in two files, or a
-  mockup grows a second screen's worth of components, propose splitting in one line
-  ("the tools could live in their own mockup and be bound here, want that?") and wait.
-  Never split a mockup on your own.
-- **Binding, for the agent:** before writing a placeholder, ask the sibling what it
-  offers (`aiview components <file>`: names, tags, and the ids or inline handlers that
-  would break a component once bound); after writing one, run `aiview check <host>`
-  and read the errors as text. Never grep a sibling for `data-component`.
-- **Components a host shows by script:** keep their placeholders in a hidden container
-  of the host and let the host's script clone the bound node's inner html when it
-  needs it. Inside a bound element, reach parts through `data-part`; wire clicks by
-  delegation on `data-action`, never inline. A source that shows the same components
-  in place moves them out of its library at load, so the file stays static markup.
-- **A bound mockup is seen through aiview.** Opened as a plain file it shows a notice,
-  not the page. Never hand one over as standalone HTML.
-- **Variants:** default, empty, loading, error, any permission/role state, the steps
-  of a flow, the alternatives of a layout. Declare them as **static** buttons in one
-  `<div data-component="MockupBar">`, `data-aiview-variant="name"` on each, `aria-pressed`
-  on the one shown first; the mockup's script switches on a click of that button. A
-  plain button the person may press (reset, toggle a warning) carries
-  `data-aiview-action="name"` instead. aiview hides the bar and mirrors both in its own
-  toolbar above the frame, which is what makes a variant reachable in Composition and
-  keeps the chosen one across live reloads. Buttons a script adds later are invisible to
-  the viewer, by design. Responsive at the aiview presets (mobile 390 · tablet 820 ·
-  laptop 1280).
-- **Register + serve** via the `aiview` skill (`../aiview/SKILL.md` in this collection):
-  kind `mockup` (from the filename), tags = project + feature, and when the mockup
-  belongs to a brainstorm's piece of work, the board's group, so they share a
-  container. Tell the user the URL it prints. aiview renders `.html` in a sandboxed
-  iframe with viewport presets and live reload. Its Composition view is the person's
-  way of seeing what a mockup pulls and offers. The agent's is `components` and `check`.
-
-## Copy is design material
-
-Write from the user's side of the screen: name things by what people control and
-recognise, not by how the system is built (a teacher manages *graders*, not
-*lab_graders rows*). Active voice; a control says exactly what happens ("Run graders",
-then a toast "Graders queued"); an action keeps the same name through the whole flow.
-Empty states invite the next action; errors say what went wrong and how to fix it, no
-apology, no vagueness. Sentence case, plain verbs, the product's language(s). Every
-element does one job: a label labels, an example demonstrates.
-
-## Quality floor (built in, not announced)
-
-Responsive down to the mobile preset; visible keyboard focus; `prefers-reduced-motion`
-respected; contrast legible in both themes; touch targets not smaller than the
-codebase's own buttons. Before calling a mockup done, look at it once more and remove
-one thing: decoration that doesn't serve the job goes.
-
-## Judgment calls
-
-- **Pattern-match before inventing.** If a sibling screen already solves the same
-  problem (a list of things with actions, a form in a dialog), the mockup uses that
-  shape. Deviate only with a stated reason.
-- **Density and hierarchy over decoration.** The product's screens are operated, not
-  read: surface the summary before the detail, encode state in form (chip, opacity,
-  stripe) not only in text. Semantic color (ok / warning / danger) stays separate from the
-  accent.
-- **Don't design the framework in.** The mockup describes the look; it does not
-  prescribe Tailwind classes or React structure. The handoff note maps to *named*
-  components, and rule "if you must read an element's classes to know what it is, it
-  needs a name" applies to what gets built afterwards.
-- **One question per message** while framing; **one mockup, then react** while
-  iterating. Files created before approval get defended instead of discarded. Keep the
-  mockup cheap to throw away.
+  build. Start the `<style>` with the design-language tokens as `:root` custom
+  properties (light) plus the dark overrides under `@media (prefers-color-scheme: dark)`,
+  and use only those tokens. A new token is allowed only if flagged in the handoff note
+  as "new token: needs a name in the theme".
+- **Native look:** every region is recognisably one of the project's components,
+  annotated `data-component="Pill"` so the handoff maps one to one. Real copy in the
+  product's voice, never lorem. Real-looking data.
+- **Shared between mockups:** a component drawn once is bound by every other mockup
+  that needs it, and a screen's variants are declared as buttons the viewer mirrors.
+  How to declare, bind, keep a component bindable, and when to propose splitting a
+  screen: `references/binding.md`. The first mockup of a project needs none of it.
+- **Register and serve** via the `aiview` skill (`../aiview/SKILL.md` in this
+  collection): kind `mockup` (from the filename), tags = project + feature, and when the
+  mockup belongs to a brainstorm's piece of work, the board's group. Tell the user the
+  URL it prints.
 
 ## Red flags
 
@@ -184,5 +140,6 @@ one thing: decoration that doesn't serve the job goes.
 | "This screen is too small for a mockup" | A cropped fragment takes five minutes and catches the wrong pattern before it's coded. |
 | "Let me add a nicer color/font here" | New tokens are design-system changes; flag them, don't smuggle them. |
 | "The user said 'make it pretty'" | Ask what job the screen does; prettiness follows from hierarchy in the existing language. |
-| "A cream background and a serif display would look distinctive" | Distinctive-for-the-web is wrong here: the target is *native to this product*. Distinctiveness was decided when the design language was; a mockup inherits it. |
+| "A cream background and a serif display would look distinctive" | Distinctive-for-the-web is wrong here: the target is native to this product. And with no language yet, that look is the first tell in `references/greenfield.md`. |
 | "I'll skip the plan and just draw" | The plan is where "could be any app" gets caught. Sixty seconds of thinking, then draw. |
+| "It looks right, we're done" | A picture leaves every state and transition to be guessed at coding time. Ask about the flow and mock it. |
