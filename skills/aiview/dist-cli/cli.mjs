@@ -378,56 +378,6 @@ var init_db = __esm({
   }
 });
 
-// src/core/serverstate.ts
-import fs4 from "node:fs";
-import path5 from "node:path";
-function writeServerFiles(port) {
-  ensureHome();
-  fs4.writeFileSync(PID_FILE, String(process.pid));
-  fs4.writeFileSync(PORT_FILE, String(port));
-}
-function clearServerFiles() {
-  if (readInt(PID_FILE) === process.pid) {
-    try {
-      fs4.rmSync(PID_FILE, { force: true });
-      fs4.rmSync(PORT_FILE, { force: true });
-    } catch {
-    }
-  }
-}
-function readServerStatus() {
-  const pid = readInt(PID_FILE);
-  const port = readInt(PORT_FILE);
-  if (pid === null || port === null) return { running: false, pid: null, port: null, stale: pid !== null || port !== null };
-  if (!alive(pid)) return { running: false, pid, port, stale: true };
-  return { running: true, pid, port, stale: false };
-}
-var PID_FILE, PORT_FILE, readInt, alive;
-var init_serverstate = __esm({
-  "src/core/serverstate.ts"() {
-    "use strict";
-    init_home();
-    PID_FILE = path5.join(DATA_ROOT, "aiview.pid");
-    PORT_FILE = path5.join(DATA_ROOT, "aiview.port");
-    readInt = (f) => {
-      try {
-        const n = Number(fs4.readFileSync(f, "utf8").trim());
-        return Number.isInteger(n) && n > 0 ? n : null;
-      } catch {
-        return null;
-      }
-    };
-    alive = (pid) => {
-      try {
-        process.kill(pid, 0);
-        return true;
-      } catch {
-        return false;
-      }
-    };
-  }
-});
-
 // node_modules/parse5/dist/common/unicode.js
 function isSurrogate(cp) {
   return cp >= 55296 && cp <= 57343;
@@ -8676,7 +8626,7 @@ function injectStyles(doc, used) {
   }
 }
 function resolveBindings(html, readSource) {
-  const none = { html, sources: [], errors: [], warnings: [] };
+  const none = { html, bound: 0, sources: [], errors: [], warnings: [] };
   if (!html.includes(BIND)) return none;
   const doc = parse(html);
   const placeholders = [...elements(doc)].filter((el) => attr(el, BIND) !== void 0);
@@ -8686,6 +8636,7 @@ function resolveBindings(html, readSource) {
   const sources = [];
   const loaded = /* @__PURE__ */ new Map();
   const used = /* @__PURE__ */ new Map();
+  let bound = 0;
   for (const ph of placeholders) {
     const ref = attr(ph, BIND) ?? "";
     const parsed = parseRef(ref);
@@ -8719,9 +8670,48 @@ function resolveBindings(html, readSource) {
     mergeAttributes(ph, placed, ref);
     refuseNested(placed, errors);
     replace(ph, placed);
+    bound += 1;
   }
   injectStyles(doc, used);
-  return { html: serialize(doc), sources, errors, warnings };
+  return { html: serialize(doc), bound, sources, errors, warnings };
+}
+function enclosingComponent(el) {
+  for (let p = defaultTreeAdapter.getParentNode(el); p; p = defaultTreeAdapter.getParentNode(p)) {
+    if (!defaultTreeAdapter.isElementNode(p)) return void 0;
+    const name = attr(p, COMPONENT);
+    if (name !== void 0) return name;
+  }
+  return void 0;
+}
+function listComponents(html) {
+  const doc = parse(html);
+  const offers = [];
+  const pulls = [];
+  const seen = /* @__PURE__ */ new Map();
+  for (const el of elements(doc)) {
+    const bind = attr(el, BIND);
+    if (bind !== void 0) {
+      const p = parseRef(bind);
+      pulls.push({ ref: bind, file: p?.file ?? "", name: p?.name ?? "" });
+      continue;
+    }
+    const name = attr(el, COMPONENT);
+    if (name === void 0) continue;
+    const warnings = [];
+    const n = (seen.get(name) ?? 0) + 1;
+    seen.set(name, n);
+    if (n > 1) warnings.push(`declared ${n} times, the first is used`);
+    for (const x of [el, ...elements(el)]) {
+      const where = x === el ? "root" : `<${defaultTreeAdapter.getTagName(x)}>`;
+      for (const a of x.attrs) {
+        if (a.name === "id") warnings.push(`${where} carries id="${a.value}"`);
+        else if (a.name.startsWith("on")) warnings.push(`${where} carries inline handler ${a.name}`);
+      }
+    }
+    const within = enclosingComponent(el);
+    offers.push(within ? { name, tag: defaultTreeAdapter.getTagName(el), within, warnings } : { name, tag: defaultTreeAdapter.getTagName(el), warnings });
+  }
+  return { offers, pulls };
 }
 var BIND, COMPONENT, BOUND, BOUND_ERROR, BOUND_STYLE, attr;
 var init_bind = __esm({
@@ -8734,6 +8724,56 @@ var init_bind = __esm({
     BOUND_ERROR = "data-bound-error";
     BOUND_STYLE = "data-bound-style";
     attr = (el, name) => el.attrs.find((a) => a.name === name)?.value;
+  }
+});
+
+// src/core/serverstate.ts
+import fs4 from "node:fs";
+import path5 from "node:path";
+function writeServerFiles(port) {
+  ensureHome();
+  fs4.writeFileSync(PID_FILE, String(process.pid));
+  fs4.writeFileSync(PORT_FILE, String(port));
+}
+function clearServerFiles() {
+  if (readInt(PID_FILE) === process.pid) {
+    try {
+      fs4.rmSync(PID_FILE, { force: true });
+      fs4.rmSync(PORT_FILE, { force: true });
+    } catch {
+    }
+  }
+}
+function readServerStatus() {
+  const pid = readInt(PID_FILE);
+  const port = readInt(PORT_FILE);
+  if (pid === null || port === null) return { running: false, pid: null, port: null, stale: pid !== null || port !== null };
+  if (!alive(pid)) return { running: false, pid, port, stale: true };
+  return { running: true, pid, port, stale: false };
+}
+var PID_FILE, PORT_FILE, readInt, alive;
+var init_serverstate = __esm({
+  "src/core/serverstate.ts"() {
+    "use strict";
+    init_home();
+    PID_FILE = path5.join(DATA_ROOT, "aiview.pid");
+    PORT_FILE = path5.join(DATA_ROOT, "aiview.port");
+    readInt = (f) => {
+      try {
+        const n = Number(fs4.readFileSync(f, "utf8").trim());
+        return Number.isInteger(n) && n > 0 ? n : null;
+      } catch {
+        return null;
+      }
+    };
+    alive = (pid) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
   }
 });
 
@@ -9041,6 +9081,8 @@ var init_server = __esm({
 
 // src/cli/index.ts
 await init_db();
+init_bind();
+init_paths();
 init_projects();
 init_home();
 init_serverstate();
@@ -9095,6 +9137,8 @@ var USAGE = [
   "  pending list [<file|#id>] | clear <file|#id>",
   "  status",
   "  path <filename> [--project <slug>]       # where this document belongs, joined for this OS",
+  "  components <file|#id>                    # what this mockup offers to siblings, and what it pulls",
+  "  check <file|#id>                         # do this mockup's bindings resolve? errors as text, exit 1 if any",
   "  init                                     # create the data home; report where everything lives"
 ].join("\n");
 var registerOpts = () => ({
@@ -9230,6 +9274,53 @@ known: ${known.join(", ")}` : ""}`);
   fs7.mkdirSync(dir, { recursive: true });
   const full = path8.join(dir, path8.basename(name));
   emit({ path: full, dir, project: slug }, full);
+}
+function mockupArg(usage) {
+  const ref = args.positional[0];
+  if (!ref) {
+    console.error(usage);
+    process.exit(1);
+  }
+  const abs = resolveRef(ref)?.abs_path ?? path8.resolve(ref);
+  if (!fs7.existsSync(abs)) {
+    console.error(`no such file: ${abs}`);
+    process.exit(1);
+  }
+  if (!isHtml(abs)) {
+    console.error(`not an html mockup: ${abs}`);
+    process.exit(1);
+  }
+  return abs;
+}
+function cmdComponents() {
+  const abs = mockupArg("usage: aiview components <file|#id>");
+  const r = listComponents(readDoc(abs));
+  emit({ file: path8.basename(abs), ...r }, () => {
+    if (!r.offers.length) console.log("offers   nothing: no data-component in this file");
+    for (const o of r.offers)
+      console.log(
+        `offers   ${o.name}  <${o.tag}>${o.within ? `  within ${o.within}` : ""}${o.warnings.length ? `  !! ${o.warnings.join(", ")}` : ""}`
+      );
+    for (const x of r.pulls) console.log(`pulls    ${x.name || x.ref}  from ${x.file || "(invalid ref)"}`);
+    if (!r.pulls.length) console.log("pulls    nothing: no data-bind in this file");
+  });
+}
+function cmdCheck() {
+  const abs = mockupArg("usage: aiview check <file|#id>");
+  const dir = path8.dirname(abs);
+  const reader = (name) => {
+    if (/[\\/]/.test(name) || name.includes("..")) return void 0;
+    const f = path8.join(dir, name);
+    return fs7.existsSync(f) && fs7.statSync(f).isFile() ? readDoc(f) : void 0;
+  };
+  const r = resolveBindings(readDoc(abs), reader);
+  emit({ file: path8.basename(abs), bound: r.bound, sources: r.sources, errors: r.errors, warnings: r.warnings }, () => {
+    console.log(`${r.bound} bound from ${r.sources.length} source${r.sources.length === 1 ? "" : "s"}${r.sources.length ? `: ${r.sources.join(", ")}` : ""}`);
+    for (const e of r.errors) console.log(`error    ${e.ref}: ${e.message}`);
+    for (const w of r.warnings) console.log(`warning  ${w.ref}: ${w.message}`);
+    if (!r.errors.length && !r.warnings.length) console.log("ok");
+  });
+  if (r.errors.length) process.exit(1);
 }
 function cmdInit() {
   ensureHome();
@@ -9560,6 +9651,12 @@ switch (args.verb) {
     break;
   case "init":
     cmdInit();
+    break;
+  case "components":
+    cmdComponents();
+    break;
+  case "check":
+    cmdCheck();
     break;
   case "add":
     cmdAdd();
