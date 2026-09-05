@@ -11,7 +11,7 @@
       "name": "charrette",
       "version": "1.7.0",
       "source": "./",
-      "description": "Agent skills for the drawing-board loop: brainstorm, diagram, spec, plan, review, with a live local document viewer."
+      "description": "Agent skills for the drawing-board loop: brainstorm, diagram, spec, plan, review, with aiview, the companion app that renders every document live."
     }
   ]
 }
