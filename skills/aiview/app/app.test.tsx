@@ -368,3 +368,47 @@ describe("MockupFrame modes", () => {
     expect(onOpenSource).toHaveBeenCalledWith("tools.mockup.html", "ToolPrefix");
   });
 });
+
+describe("mockup variants", () => {
+  const page = `<html><body><p>screen</p><div class="mockup-bar" data-component="MockupBar"><button data-aiview-variant="documents" aria-pressed="true">documents</button><button data-aiview-variant="profile">your profile</button><button data-aiview-action="reset">reset</button></div></body></html>`;
+
+  test("mockupControls reads variants, the pressed one, and actions from static markup", async () => {
+    const { mockupControls, withBridge, BRIDGE_MARK } = await import("./lib/bridge.ts");
+    const c = mockupControls(page);
+    expect(c.variants).toEqual([{ name: "documents", label: "documents" }, { name: "profile", label: "your profile" }]);
+    expect(c.initial).toBe("documents");
+    expect(c.actions).toEqual([{ name: "reset", label: "reset" }]);
+    expect(mockupControls("<p>plain</p>")).toEqual({ variants: [], initial: null, actions: [] });
+    const out = withBridge(page);
+    expect(out).toContain(BRIDGE_MARK);
+    expect(out).toContain('[data-component="MockupBar"]{display:none !important}');
+    expect(withBridge("<p>plain</p>")).not.toContain(BRIDGE_MARK);
+  });
+
+  test("the frame mirrors the variants, drives the page by message, and keeps the choice across a reload", async () => {
+    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    render(<MockupFrame html={page} />);
+    const frame = document.querySelector("iframe")!;
+    const posted: unknown[] = [];
+    vi.spyOn(frame.contentWindow!, "postMessage").mockImplementation((msg: unknown) => { posted.push(msg); });
+    expect(screen.getByText("your profile")).toBeTruthy();
+    fireEvent.click(screen.getByText("your profile"));
+    expect(posted).toEqual([{ type: "aiview:variant", name: "profile" }]);
+    fireEvent.click(screen.getByText("reset"));
+    expect(posted[1]).toEqual({ type: "aiview:action", name: "reset" });
+    // the page reloads (a save on disk): the chosen variant is posted again, the default one is not
+    fireEvent.load(frame);
+    expect(posted[2]).toEqual({ type: "aiview:variant", name: "profile" });
+    fireEvent.click(screen.getByText("documents"));
+    posted.length = 0;
+    fireEvent.load(frame);
+    expect(posted).toEqual([]);
+  });
+
+  test("a mockup without controls shows no variant toolbar", async () => {
+    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    render(<MockupFrame html="<html><body><p>h</p></body></html>" />);
+    expect(document.querySelector('[data-component="VariantToggle"]')).toBeNull();
+    expect(document.querySelector('[data-component="MockupActions"]')).toBeNull();
+  });
+});

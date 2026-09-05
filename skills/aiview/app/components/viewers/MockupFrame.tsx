@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.tsx";
+import { Button } from "../ui/button.tsx";
 import type { BindingsSummary } from "../../lib/api.ts";
 import { withOverlay } from "../../lib/overlay.ts";
+import { mockupControls, withBridge } from "../../lib/bridge.ts";
 
 const VIEWPORTS: Array<[string, number]> = [
   ["mobile", 390],
@@ -54,6 +56,22 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
     store("aiview.mockupMode", v);
   };
 
+  // The mockup's declared variants and actions, mirrored above the frame. The chosen
+  // variant is the viewer's, so it survives a reload of the page (a save on disk, a
+  // switch of mode) and can be switched in Composition, where the page takes no mouse.
+  const controls = useMemo(() => mockupControls(html), [html]);
+  const [variant, setVariant] = useState<string | null>(null);
+  const chosen = variant && controls.variants.some((v) => v.name === variant) ? variant : controls.initial;
+  const post = (msg: { type: string; name: string }) => frame.current?.contentWindow?.postMessage(msg, "*");
+  const selectVariant = (v: string) => {
+    if (!v) return;
+    setVariant(v);
+    post({ type: "aiview:variant", name: v });
+  };
+  const onLoad = () => {
+    if (chosen && chosen !== controls.initial) post({ type: "aiview:variant", name: chosen });
+  };
+
   // The sandboxed frame has an opaque origin, so postMessage is the only way up. Only
   // messages from this frame's own window are honoured.
   useEffect(() => {
@@ -68,12 +86,12 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
     return () => window.removeEventListener("message", onMessage);
   }, [onOpenSource]);
 
-  const served = mode === "composition" ? withOverlay(html, { bindings, target }) : html;
+  const served = withBridge(mode === "composition" ? withOverlay(html, { bindings, target }) : html);
   const bound = bindings?.sources.length ?? 0;
 
   return (
     <div data-component="MockupFrame">
-      <div className="mb-2.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+      <div className="mb-2.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
         <span>viewport</span>
         <ToggleGroup type="single" value={viewport} onValueChange={selectViewport}>
           {VIEWPORTS.map(([n]) => (
@@ -96,6 +114,27 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
             {bound} source{bound > 1 ? "s" : ""}
           </span>
         )}
+        {controls.variants.length > 0 && (
+          <>
+            <span className="ml-3">variant</span>
+            <ToggleGroup type="single" value={chosen ?? ""} onValueChange={selectVariant} data-component="VariantToggle">
+              {controls.variants.map((v) => (
+                <ToggleGroupItem key={v.name} value={v.name}>
+                  {v.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </>
+        )}
+        {controls.actions.length > 0 && (
+          <span className="ml-3 inline-flex items-center gap-1" data-component="MockupActions">
+            {controls.actions.map((a) => (
+              <Button key={a.name} variant="outline" size="sm" className="h-auto px-2 py-0.5 text-[11px]" onClick={() => post({ type: "aiview:action", name: a.name })}>
+                {a.label}
+              </Button>
+            ))}
+          </span>
+        )}
       </div>
       <div className="flex justify-center">
         {/* sandboxed: the mockup's scripts run, but it cannot touch the viewer, storage, or navigate the top window */}
@@ -104,6 +143,7 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
           title="mockup"
           sandbox="allow-scripts allow-forms allow-modals allow-popups"
           srcDoc={served}
+          onLoad={onLoad}
           className="h-[calc(100vh-10rem)] w-full max-w-full rounded-[10px] border border-border bg-white shadow-lg transition-[width]"
           style={width ? { width } : undefined}
         />

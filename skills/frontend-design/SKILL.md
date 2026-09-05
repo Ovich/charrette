@@ -77,8 +77,8 @@ tags = project + design.
 ## Mockups
 
 - **File:** `YYYY-MM-DD-<screen>.mockup.html` in the data home (ask the `aiview`
-  skill for the path). One screen per file; variants as
-  `…-<screen>-b.mockup.html`.
+  skill for the path). One screen per file. Its variants (states, steps, alternatives
+  of that screen) live inside the file, declared as below, never as sibling files.
 - **Self-contained:** inline `<style>` and, if needed, inline `<script>`; no CDN, no
   build. Start the `<style>` with the design-language tokens as `:root` custom properties
   (light) plus the dark overrides under `@media (prefers-color-scheme: dark)`, and use
@@ -115,9 +115,16 @@ tags = project + design.
   in place moves them out of its library at load, so the file stays static markup.
 - **A bound mockup is seen through aiview.** Opened as a plain file it shows a notice,
   not the page. Never hand one over as standalone HTML.
-- **States:** default, empty, loading, error, and any permission/role state the screen
-  has, as separate sections or a small state switcher in the mockup. Responsive at the
-  aiview presets (mobile 390 · tablet 820 · laptop 1280).
+- **Variants:** default, empty, loading, error, any permission/role state, the steps
+  of a flow, the alternatives of a layout. Declare them as **static** buttons in one
+  `<div data-component="MockupBar">`, `data-aiview-variant="name"` on each, `aria-pressed`
+  on the one shown first; the mockup's script switches on a click of that button. A
+  plain button the person may press (reset, toggle a warning) carries
+  `data-aiview-action="name"` instead. aiview hides the bar and mirrors both in its own
+  toolbar above the frame, which is what makes a variant reachable in Composition and
+  keeps the chosen one across live reloads. Buttons a script adds later are invisible to
+  the viewer, by design. Responsive at the aiview presets (mobile 390 · tablet 820 ·
+  laptop 1280).
 - **Register + serve** via the `aiview` skill (`../aiview/SKILL.md` in this collection):
   kind `mockup` (from the filename), tags = project + feature, and when the mockup
   belongs to a brainstorm's piece of work, the board's group, so they share a

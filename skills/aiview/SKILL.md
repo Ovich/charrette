@@ -255,7 +255,11 @@ through aiview: opened as a plain file it shows a notice, never the page. Beside
 and component on hover, "pulled", a click opening the source at that component; every
 component this mockup offers outlined in green, "offered" on hover; the rest of the page
 recedes under a veil). In Composition the mockup is looked at, not operated: the layer
-takes the mouse. Nothing is written to disk: the file stays the author's.
+takes the mouse. A mockup's declared variants and actions (static buttons in its
+`MockupBar`, see the `frontend-design` skill) appear as a third toolbar, "variant",
+beside viewport and view; the in-page bar is hidden, the viewer drives the page, and
+the chosen variant survives a live reload. Nothing is written to disk: the file stays
+the author's.
 
 ## Contract for calling skills
 
