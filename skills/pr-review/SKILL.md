@@ -117,48 +117,12 @@ knowable before any layer returns, so publish them immediately and carry one
 developer has open while they wait. The cards sit above the content and vanish as each
 layer lands, replaced by the section it produced.
 
-The sections of each document in reading order, and the report's register: read
-`references/documents.md` before writing either.
-
-**Stamp what an agent produced.** A section written from a subagent's return carries a
-one-line attribution under its heading, naming the layer and what you did to its output
-before believing it:
-
-> *From L4 Integration. Merged, deduplicated, and every citation re-read before
-> inclusion.*
-
-Two reasons, and the second is the one that bites. It tells a later reader which prose
-is your own synthesis and which came from an unattended worker: the card that
-announced it is gone by then, and nothing else records it. And it forces you to state
-the treatment, which is the difference between *an agent said this* and *I checked
-this*: layers in this very skill have raised confident, well-argued findings that
-another layer then refuted. Attribution is provenance, never endorsement. Sections you
-wrote yourself carry no stamp; absence is the default and means exactly that.
-
-## Diagrams
-
-Diagrams: use the `write-diagrams` skill (`../write-diagrams/SKILL.md` in
-this collection): pick from its catalog by the reviewer's question, follow its
-discipline. PR-specific guidance: draw the **delta**, not the whole system:
-
-- **Change map** (almost always): the components the PR touches and their edges:
-  new edges and nodes marked, removed ones dashed. A reviewer orients on this in
-  seconds; the diff alone never shows it.
-- **Behavior change**: when the PR changes an ordering (a flow, a handshake, a
-  retry), a sequence diagram of the *new* behavior, failure branches included;
-  before/after as two small diagrams only when the contrast is the point.
-- **Schema change**: ER diagram of the touched entities, changed
-  relations marked.
-- **Lifecycle change**: state machine when the PR adds or removes legal states.
-
-**Which document gets which.** The **change map is the report's**: it is the fastest
-orientation a reviewer will get, and it belongs where they are looking. Every other
-diagram supports a specific finding and belongs in the **analysis**, next to what it
-explains. A diagram in the report must earn a screen it is competing for.
-
-One diagram per question a reviewer would actually ask; a big PR usually earns 2–3
-across both documents, a small one often only the change map, and a trivial one none
-(then say so).
+The sections of each document in reading order, the report's register, the stamp a
+section from a subagent carries, and which diagrams go where: read
+`references/documents.md` before writing either. Every section written from a
+subagent's return is stamped with the layer and the treatment. Diagrams draw the
+delta, never the whole system; the change map is the report's, the rest support a
+finding in the analysis.
 
 ## Running the layers
 
