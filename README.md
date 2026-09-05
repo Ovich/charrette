@@ -7,8 +7,6 @@ Agent skills that settle what gets built before code is written. They sharpen th
 
 Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Charrette brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
 
-The problem it removes: chat scrolls away. A design agreed at message 40 is gone by message 90, because a session's context is summarised as it grows and a summary rarely keeps a decision's reasoning, and because a decision made in chat has no address a later session or another person can open. A half-run plan cannot be resumed, and code gets written against states a picture never settled. Charrette puts the record in documents the agent keeps true while it works.
-
 Nine skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
 
 ## The loop
