@@ -46,10 +46,18 @@ that it passes. A screen's behaviour is tested the same way; its look is the
 ## Modules
 
 The interface is designed in the plan and implemented in the slice, the way the test
-is written before the code. Deep modules: a small interface over much functionality.
-A module whose interface is as large as what it hides is shallow, and is folded into
-its caller or its callee instead of created. The interface is the testing boundary.
-Every module a slice touches is a register row (below) with one of these states:
+is written before the code. An interface is everything a caller must know to use the
+module correctly: the signature, the invariants, the ordering, the error modes, the
+required configuration. Deep modules: a small interface over much functionality. A
+module whose interface is as large as what it hides is shallow, and is folded into
+its caller or its callee instead of created; the deletion test decides: complexity
+that vanishes when the module is deleted was passing through, complexity that
+resurfaces across its callers earned the module. Callers and tests cross the same
+seam: wanting to test past the interface means the module is the wrong shape. No
+seam without variation: one adapter signals possibility, two signal necessity. Inside
+a module: accept dependencies rather than create them, return results rather than
+produce side effects, keep the surface small. Every module a slice touches is a
+register row (below) with one of these states:
 
 | State | Meaning | Tested |
 |---|---|---|
