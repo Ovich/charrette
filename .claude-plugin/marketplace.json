@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "charrette",
-      "version": "1.9.0",
+      "version": "1.10.0",
       "source": "./",
       "description": "Agent skills for the drawing-board loop: brainstorm, interview, diagram, spec, plan, review, with aiview, the companion app that renders every document live."
     }
