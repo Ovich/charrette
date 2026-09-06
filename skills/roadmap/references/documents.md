@@ -15,9 +15,12 @@ is lost and nothing is designed early.
 
 **`foundation.reference.md`**, kind `reference`, undated, never retires: the
 technology decisions, one row each, decided / open / deferred with an owner, and the
-slot that will force each open one. Rows: the repository (which provider, GitHub or
-another, its name and visibility, the conventions file it opens with), runtime and
-language, frontend framework
+slot that will force each open one. Rows: the product's name and branding (the name
+the code, the repository and the domain carry, the wordmark, the placeholder until
+the name is chosen), the domain (registered where, DNS served by whom, the
+environments' addresses), the repository (which provider, GitHub or another, its
+name and visibility, the conventions file it opens with), runtime and language,
+frontend framework
 and UI library (pointing at the design language, never repeating it), backend
 framework, API style, database and ORM, typing strategy, auth, hosting and
 operations, testing and CI, the AI engine's place in the architecture when the

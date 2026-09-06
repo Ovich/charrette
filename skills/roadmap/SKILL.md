@@ -14,8 +14,9 @@ pieces of work under a slot. A slot is done when the feature is delivered and
 working, never when its last plan finished. An iteration groups the slots delivered
 together. The first iteration of a project from scratch is usually one slot, the
 foundation: the smallest deployable system the features build on, whatever shape the
-project gives it, its first piece of work the repository itself, created at the
-provider the foundation names with its conventions file, before any code.
+project gives it, reachable at the product's own domain, its first piece of work the
+repository itself, created at the provider the foundation names with its conventions
+file, before any code.
 
 **No big design up front.** The next iteration has its slots named precisely. Later
 iterations carry a title, the outcome and at most a rough list. A slot is split into
@@ -29,11 +30,13 @@ the life of the project, and `foundation.reference.md`, kind `reference`, undate
 never retiring: the technology decisions, one row each. Their contents and rows:
 `references/documents.md`, read before drafting or redrawing either. Both live in the
 data home, registered and served via the `aiview` skill (`../aiview/SKILL.md` in
-this collection), no group, the roadmap started when the declaration began. The
-roadmap is found by its kind and carries the project tag only, since aiview drops a
-tag equal to the kind. The foundation carries the project tag and `roadmap`. A
-project's folder may hold documents that are not the product's (another piece of
-work of the same person): the roadmap links them apart, as not its slots.
+this collection) in the product's group, the one its product-level boards and
+mockups share, created and titled after the product when none exists, the roadmap
+started when the declaration began. The roadmap is found by its kind and carries the
+project tag only, since aiview drops a tag equal to the kind. The foundation carries
+the project tag and `roadmap`. A project's folder may hold documents that are not
+the product's (another piece of work of the same person): the roadmap links them
+apart, as not its slots.
 
 ## Slots and their state
 
@@ -45,13 +48,17 @@ delivered and working, with the evidence: a URL, a deployment, a customer). In t
 tracker only in progress is ▶ and only landed is ✅: in design, drawn and planned
 stay ⬜ with the state written in the slot row. A slot marked landed on the strength
 of a finished plan is the tracker lying about the one thing the roadmap exists to
-say. At declaration no document carries a slug yet: the draft derives each state
-from the reading, and the tags, with the slot line at the top of each board, are
-applied when the interview confirms which slot a document serves.
+say. The tag is the one record of which slot a document serves. At declaration no
+document carries a slug yet: the draft derives each state from the reading, and the
+tags are applied when the interview confirms which slot a document serves.
 
-A board names at its top the slot it serves, or the roadmap itself when the idea is
-product-level. The roadmap resolves its own decisions through the `interview` skill
-(`../interview/SKILL.md` in this collection), not through a board of its own.
+A board serves a slot, or the roadmap itself when the idea is product-level, and its
+tag says which. The roadmap resolves its own decisions through the `interview` skill
+(`../interview/SKILL.md` in this collection), not through a board of its own, and
+keeps the exchange in its interview log in the board's shape (the `brainstorm`
+skill, `../brainstorm/SKILL.md` in this collection, owns it): the question with its
+options and recommendation, then the answer as given. A log of answers alone loses
+what was on offer and why it lost, which the next redraw needs when it deviates.
 
 ## Declare
 
@@ -68,7 +75,10 @@ product-level. The roadmap resolves its own decisions through the `interview` sk
 4. **Interview on the draft.** The tree: the order of iterations, which slot each
    existing piece belongs to, the foundation rows the first slot needs. Rows a later
    slot needs stay open with that slot named. Every answer lands in the documents as
-   it is given.
+   it is given. For the name and domain rows, take the person's suggestions and run
+   `scripts/domains.mjs <name>... --tld <the TLDs the product needs>` before asking:
+   each option carries its domains as available, registered or unknown, and a name
+   whose domain is taken is never the recommended one.
 5. **Close.** The state node names the first slot and its next step. Say so in chat.
 
 ## Redraw
