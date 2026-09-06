@@ -6,23 +6,21 @@ description: Use when a project has to be declared above its pieces of work, fro
 # Roadmap
 
 The roadmap is the one document above the pieces of work: what is delivered in what
-order, what already exists for each piece, and what must be decided before the next
-one starts.
+order, what exists for each piece, what must be decided before the next one starts.
 
 **The slot rule.** A slot is something the customer can use or a system that can be
 deployed. Nothing smaller is a slot: a screen, a service, a migration, a board are
 pieces of work under a slot. A slot is done when the feature is delivered and
 working, never when its last plan finished. An iteration groups the slots delivered
-together; the first iteration of a project from scratch is usually one slot, the
+together. The first iteration of a project from scratch is usually one slot, the
 foundation: the smallest deployable system the features build on, whatever shape the
-project gives it. Its first piece of work is the repository itself, created at the
-provider the foundation names, with its conventions file, pushed, before any code.
+project gives it, its first piece of work the repository itself, created at the
+provider the foundation names with its conventions file, before any code.
 
 **No big design up front.** The next iteration has its slots named precisely. Later
 iterations carry a title, the outcome and at most a rough list. A slot is split into
 its pieces of work, or a new piece opened for a brainstorm, when the work reaches it.
-A roadmap drawn to the end at declaration is wrong by the second slot and defended
-instead of redrawn.
+A roadmap drawn to the end at declaration is wrong by the second slot and defended.
 
 ## The two documents
 
@@ -31,8 +29,11 @@ the life of the project, and `foundation.reference.md`, kind `reference`, undate
 never retiring: the technology decisions, one row each. Their contents and rows:
 `references/documents.md`, read before drafting or redrawing either. Both live in the
 data home, registered and served via the `aiview` skill (`../aiview/SKILL.md` in
-this collection): tags = project + `roadmap`, no group, the roadmap started when the
-declaration began.
+this collection), no group, the roadmap started when the declaration began. The
+roadmap is found by its kind and carries the project tag only, since aiview drops a
+tag equal to the kind. The foundation carries the project tag and `roadmap`. A
+project's folder may hold documents that are not the product's (another piece of
+work of the same person): the roadmap links them apart, as not its slots.
 
 ## Slots and their state
 
@@ -40,33 +41,35 @@ Every document of a slot carries the slot's slug as a tag, whatever group it sit
 in. The state is derived from what the tag finds, never typed: **empty** (nothing),
 **in design** (a board or a spec), **drawn** (mockups), **planned** (a plan), **in
 progress** (a plan's tracker has a ▶), **landed** (the person confirmed the feature
-delivered and working, with the evidence: a URL, a deployment, a customer). A slot
-marked landed on the strength of a finished plan is the tracker lying about the one
-thing the roadmap exists to say.
+delivered and working, with the evidence: a URL, a deployment, a customer). In the
+tracker only in progress is ▶ and only landed is ✅: in design, drawn and planned
+stay ⬜ with the state written in the slot row. A slot marked landed on the strength
+of a finished plan is the tracker lying about the one thing the roadmap exists to
+say. At declaration no document carries a slug yet: the draft derives each state
+from the reading, and the tags, with the slot line at the top of each board, are
+applied when the interview confirms which slot a document serves.
 
-A board names at its top the slot it serves. A board may serve the roadmap itself
-when the idea is product-level, and the redraw reads it, but the roadmap resolves its
-own decisions through the `interview` skill (`../interview/SKILL.md` in this
-collection), which is the better tool for a document that is a tree of decisions.
+A board names at its top the slot it serves, or the roadmap itself when the idea is
+product-level. The roadmap resolves its own decisions through the `interview` skill
+(`../interview/SKILL.md` in this collection), not through a board of its own.
 
 ## Declare
 
-1. **Read everything.** The project's documents through aiview (`list`), every
+1. **Read everything.** The project's documents through aiview (`list`): every
    board's decisions table and diagrams, the mockups, the reports, the code and its
-   conventions file when there is code, and any register the person names (gaps,
-   market notes). A declaration that ignores an approved board redesigns it.
+   conventions file when there is code, any register the person names. A declaration
+   that ignores an approved board redesigns it.
 2. **Name what is missing.** Slots no document covers (accounts and login, billing,
    the foundation itself are the usual absences), foundation rows no decision covers,
    dependencies between slots that nothing states.
 3. **Draft both documents whole**, with a recommendation in every open place and its
-   reason, and open them in the viewer. The draft is the agent's reading of the
-   project, so it is handed over as something to correct.
+   reason, register and serve them, and tell the person the URLs. The draft is the
+   agent's reading of the project, so it is handed over as something to correct.
 4. **Interview on the draft.** The tree: the order of iterations, which slot each
    existing piece belongs to, the foundation rows the first slot needs. Rows a later
    slot needs stay open with that slot named. Every answer lands in the documents as
    it is given.
-5. **Close.** The state node names the first slot and its next step, usually a
-   brainstorm. Say so in chat.
+5. **Close.** The state node names the first slot and its next step. Say so in chat.
 
 ## Redraw
 
@@ -74,15 +77,15 @@ Run when a slot lands, a plan finishes, a board opens for a slot, or the person 
 the picture changed. Derive every state again. Mark landed only with the person's
 evidence. Split the slot the work has reached into its pieces of work, each a group.
 Ask the foundation rows the next slot needs and refuse to start it while one is open:
-a slot built on an open row is a decision taken silently, inside a spec where the
-next slot's brainstorm will not look. Deviate from the earlier drawing when the last
-slot taught something, and write what changed and why in the redraw log. Retire the
-landed slot's groups as the aiview contract asks.
+a slot built on an open row is decided silently, inside a spec the next slot's
+brainstorm will not read. Deviate from the earlier drawing when the last slot taught
+something, and write what changed and why in the redraw log. Retire the landed
+slot's groups as the aiview contract asks.
 
 ## Status
 
 Read-only, in chat: the iteration, the slot in progress, what blocks, the foundation
-rows still open for the slot ahead, and the pieces of work the next slot still lacks.
+rows still open for the slot ahead, the pieces of work the next slot still lacks.
 
 ## The diagram
 
@@ -90,7 +93,8 @@ The roadmap opens on its tracker, drawn to the tracker protocol of the `execute-
 skill (`../execute-plan/references/tracker.md` in this collection, read its slots
 paragraph): one subgraph per iteration, one node per slot with the glyph of its
 derived state, dependency edges, the state node with the iteration, the slot in
-progress, next, blocked and the open rows. Parse it after every edit with
+progress, next, blocked and the open rows. The coarse iterations share one subgraph,
+"later", their order carried by the edges alone. Parse it after every edit with
 `aiview mermaid-check`.
 
 ## Red flags
