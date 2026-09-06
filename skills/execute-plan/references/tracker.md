@@ -44,6 +44,18 @@ disjointness: the branches touch different files or areas, and neither needs
 the other's result before the join. Two steps that touch one file are one branch. The
 join node's done-when covers what the branches produced together.
 
+## Slots, when the tracker is a roadmap's
+
+The `roadmap` skill (`../roadmap/SKILL.md` in this collection) draws its
+tracker to this protocol with one difference: the nodes are slots, one subgraph per
+iteration, and a slot's glyph is derived from the documents that carry its tag,
+never from evidence observed in a step. ⬜ empty or in design, ▶ the slot whose
+pieces of work are being drawn, planned or run (one per iteration, as one ▶ per
+branch here), ⏸ blocked on a foundation row or on another slot, ✅ landed on the
+person's evidence that the feature is delivered and working, ✖ dropped with the
+reason. The state node's fields are the iteration, the slot in progress, next,
+blocked, and the foundation rows still open for the slot ahead.
+
 ## The state node
 
 One node carries the resume state, drawn apart from the flow and connected to nothing.

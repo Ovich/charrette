@@ -39,7 +39,10 @@ simple. A simple project's spec is three paragraphs, but it exists and it's appr
    whether it holds before moving on.
 6. **Write the spec** → self-review → user reviews it.
 7. **Hand off**: the plan is the `write-plan` skill's (`../write-plan/SKILL.md` in
-   this collection), written once the spec is approved.
+   this collection), written once the spec is approved. When the project has a
+   roadmap (`../roadmap/SKILL.md` in this collection), the board names at its top
+   the slot it serves and carries the slot's slug as a tag, and the close says the
+   roadmap may need a redraw.
 
 ## The board (live document)
 

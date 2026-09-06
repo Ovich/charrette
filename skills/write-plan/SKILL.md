@@ -92,7 +92,9 @@ or state diagram. `aiview mermaid-check <plan>` after every edit.
 `YYYY-MM-DD-<topic>.plan.md` beside the spec (path from the `aiview` skill), opened
 as kind `plan` with the spec's tags and `--group`. Opening lines: title, the spec's
 and the board's paths, the stories this increment delivers, `hardened: yes | no`.
-Note the plan's path at the top of the spec and the board.
+Note the plan's path at the top of the spec and the board. When the project has a
+roadmap (`../roadmap/SKILL.md` in this collection), the plan carries the slot's slug
+as a tag, and a finished plan is one of the moments the roadmap is redrawn.
 
 ## Draft review, then hardening on request
 

@@ -104,7 +104,8 @@ server runs and where; a stale pidfile is reported, and `open` replaces it.
 - **File name**: `YYYY-MM-DD-<topic>.<kind>.md`, flat in the project's folder, no
   subfolders: kind chips and groups do that job in the sidebar.
 - **Kind** is mandatory, from the filename or `--kind`. Kinds in use: `brainstorm`,
-  `spec`, `plan`, `reference`, `mockup`, `pr-analysis`, `report`, `pdf`. A new kind is a
+  `spec`, `plan`, `reference`, `mockup`, `pr-analysis`, `report`, `pdf`, `roadmap`
+  (one per project, above the groups). A new kind is a
   new colour chip everyone sees: it names a type of document, never a topic. Topics
   are tags.
 - **Group** the documents of one piece of work, a board with its spec and plan, a CV

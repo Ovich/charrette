@@ -7,7 +7,7 @@ Agent skills that settle what gets built before code is written. They sharpen th
 
 Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Charrette brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
 
-Eleven skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
+Twelve skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
 
 ## The loop
 
@@ -16,6 +16,7 @@ Phasing: what a piece of work passes through, from idea to merge, and which skil
 ```mermaid
 flowchart LR
   I["idea"] --> B["brainstorm<br/>board + spec"]
+  RM["roadmap<br/>iterations of slots, the foundation"] -.->|names the next slot| B
   B --> P["write-plan<br/>one increment, hardened on request"]
   P --> E["execute-plan<br/>the plan's diagram is the tracker"]
   E --> R["pr-review<br/>analysis, findings"]
@@ -31,6 +32,8 @@ The board is a Markdown file opened at the first question and edited through the
 Charrette is run iteratively. One pass of the loop is one iteration: it brainstorms, specs, plans and builds a single increment, a feature or a bounded change that works and can be verified when the iteration ends. The plan is the iteration's plan, not the project's: it covers the increment and stops where the next one would begin, think of an agile approach. What the increment teaches feeds the next brainstorm, so the spec grows by increments and each plan is written with the last increment's learning in hand.
 
 The thing to avoid is big design up front: an agent loves writing plans, embellished and polished, and they can fall apart at the end. A spec and a plan are sized to what a person can hold in mind, understand and approve in one reading.
+
+Above the iterations sits the roadmap, one document per project kept by the `roadmap` skill: the iterations in order, each made of slots, a slot being something the customer can use or a system that can be deployed. Each slot points at the boards, specs, mockups and plans that exist for it, its state derived from them, and the foundation reference beside it records the technology decisions, closed no later than the first slot that needs them. Only the next iteration is drawn precisely: a slot is split when the work reaches it, and the roadmap is redrawn when a slot lands.
 
 ## What it looks like
 

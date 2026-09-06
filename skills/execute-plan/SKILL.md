@@ -115,6 +115,10 @@ in the same step, the step was mis-scoped.
 - **Finished steps are rewritten as what happened**: past tense, what was done, what it
   found, what that changed. Keep the values, versions, commands and wrong turns worth
   learning from; drop the framing that only mattered while the step was ahead.
+- **The last step done says so upward.** When the project has a roadmap
+  (`../roadmap/SKILL.md` in this collection), the run's close says the plan finished
+  and the roadmap may need a redraw. The plan finishing is not the slot landing: that
+  the person confirms there, with evidence.
 
 ## Red flags
 
