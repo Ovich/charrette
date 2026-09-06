@@ -95,6 +95,7 @@ In the order work usually happens:
 
 | Skill | Use case | Example ask |
 |---|---|---|
+| [roadmap](skills/roadmap/SKILL.md) | A project has to be declared above its pieces of work, from nothing or from the boards and mockups already made, or a slot has landed and the picture must be redrawn | *"Declare the roadmap for this project."* Everything that exists read first, the missing slots named (accounts, the repository, the foundation), iterations of deliverable slots drafted with a recommendation in every open place, then an interview on the draft. The foundation reference beside it holds the stack, the database, the API, the hosting, each row closed no later than the first slot that needs it. |
 | [brainstorm](skills/brainstorm/SKILL.md) | Something non-trivial is about to be built and the design conversation hasn't happened | *"Run brainstorm: I want per-user rate limiting on the API."* One question at a time, no code until the spec is approved. |
 | [interview](skills/interview/SKILL.md) | A design object has decisions nobody has resolved, or you want to be questioned about one until it is understood the same way | *"Interview me about this spec."* Decisions walked in dependency order, the codebase read before you are asked, a recommendation on every question. |
 | [write-plan](skills/write-plan/SKILL.md) | The spec is approved and the next increment needs its plan | *"Write the plan for the rate-limiting spec."* One increment cut into thin vertical slices, each verified end to end, the tracker drawn, hardened through an interview when you say so. |
@@ -108,14 +109,14 @@ In the order work usually happens:
 | [frontend-review](skills/frontend-review/SKILL.md) | React/TSX quality | *"Run frontend-review on src/features/checkout."* Findings in chat for a diff, an aiview report for a whole scope. |
 | [aiview](skills/aiview/SKILL.md) | The companion app: a viewer at `localhost:4321` and an index, driven by the agent from a CLI. Called by the other skills; directly, to show a document or query the index | *"Open docs/notes/cache-idea.md in aiview, tagged payments."* |
 
-`write-diagrams`, `interview`, the tracker protocol in `execute-plan` and the companion app are the shared layer the others delegate to. House rules in `AGENTS.md` win over general principles wherever the two disagree.
+`write-diagrams`, `interview`, the tracker protocol in `execute-plan` and the companion app are the shared layer the others delegate to. `roadmap` sits above the loop: it names the next slot, and a board, a plan or a run finishing tells it to redraw. House rules in `AGENTS.md` win over general principles wherever the two disagree.
 
 ## Where things live
 
 | Root | Holds | Versioned |
 |---|---|---|
 | The checkout, or the plugin cache | `skills/<name>/SKILL.md`, one flat folder per skill, supporting files alongside. `skills/aiview/`: CLI, server and UI | Yes, rebuildable |
-| The data home, `$CHARRETTE_HOME` or `charrette_appdata` in your OS home directory | `docs/<project>/*.md, *.html, *.pdf`, and `aiview.sqlite`, the index and the active project | Never in a project repo. May be its own git repo, to sync between machines |
+| The data home, `$CHARRETTE_HOME` or `charrette_appdata` in your OS home directory | `docs/<project>/*.md, *.html, *.pdf`, among them the project's roadmap and its foundation reference, and `aiview.sqlite`, the index and the active project | Never in a project repo. May be its own git repo, to sync between machines |
 | Your project repository | `AGENTS.md`, grown by project-conventions. README and architecture docs, written by technical-writing | Yes, by you |
 
 Charrette stores its documents outside the repository to avoid doc rot: outdated documents influence the agent badly. Boards, specs, plans, mockups and PR analyses are obsolete when the PR merges, so by default none is versioned and none lives in a project repository. For some types of documents, an architecture doc, an ADR, a spec the team keeps current, the codebase can be considered, and it is allowed: the index only points at files, and aiview serves a document from where it is.
