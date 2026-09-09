@@ -63,8 +63,28 @@ Two kinds of work stay its own under either:
   on what this session observed: the command re-run, the failing output read, the test
   file confirmed unedited by its own commit in the log. It reads evidence, not diffs.
 
-Under `steps: delegated`, each slice goes to a fresh subagent. It reports the step it is
-on and this session ticks. A subagent never edits the tracker.
+Under `steps: delegated`, each slice goes to a fresh subagent. A subagent never edits the
+tracker.
+
+**Watch it while it runs.** A subagent returns once, at the end, so a session that only
+reads the return ticks the whole slice in one batch and leaves the tracker blind for the
+length of the work.
+
+**Probe every 30 seconds, and report only when something changed.** One row per running
+subagent — what it is doing, whether it is still inside its brief, and whether it is on
+track or wants steering — as a table when there is more than one. Move ▶ down the chain as
+it goes. A subagent that has not moved for two minutes is reported too: a stall is news,
+where a repeated poll of the same state is noise.
+
+Read its transcript by digest, never whole — the file is large enough to swamp this
+session. `references/watching.md` has the digest and the cadence. Two rules keep the
+watching honest:
+
+- **A step the subagent says is done is a claim, not a tick.** ▶ marks where the work is;
+  only evidence this session re-ran turns a node ✅. There is no glyph for claimed-and-
+  unverified, so such a step stays ⬜ with the claim written into its label.
+- **Watch, do not supervise.** The digest is for the tracker and for the brief holding.
+  Decisions the slice document leaves to the subagent stay the subagent's.
 
 A brief is the slice document's path, and the workspace, its branch, the branch it
 returns to, and the command that prepares the workspace. Nothing else: the document is
