@@ -70,6 +70,7 @@ next     <the one step to start on>
 blocked  <what and on whom, or nothing>
 parked   <side work, stashes, environments left behind, or nothing>
 pace     <run through | stop at each slice, as the person answered when the run began>
+steps    <delegated | inline, as the person answered when the run began>
 ```
 
 Add a field only when a resumer would act on it, such as a fact the work has earned

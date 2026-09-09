@@ -26,38 +26,70 @@ back and finish the plan. A plan whose diagram
 describes a state the repository has moved past is a deviation, not a starting
 condition: reconcile it first, and say what you found.
 
-## The pace, asked once
+## Two questions, asked once
 
-Before the first step of a run, one multiple-choice question in chat, the recommended
-answer first and marked so:
+Before the first step of a run, ask both in one exchange, the recommended answer first
+and marked so. Record both in the plan's state node, so a session that resumes the plan
+reads them and asks again nothing.
+
+**The pace** (`pace: run through | stop at each slice`):
 
 1. **Run through** (recommended): at each slice boundary, report what happened and
    what is next, then continue. Stop only for the three pauses below and at a slice
    marked `👤`.
 2. **Stop at each slice**: finish the slice, report, name what is next, and wait.
 
-Record it in the plan's state node (`pace: run through | stop at each slice`) so a
-session that resumes the plan reads it and asks again nothing. Under either pace a
-slice whose findings change the next slice is the first pause below, and a slice
-marked `👤 decision` or `👤 design review` stops before it starts, whatever the pace.
+Under either pace a slice whose findings change the next slice is the first pause
+below, and a slice marked `👤 decision` or `👤 design review` stops before it starts.
 
-## Subagents do the steps
+**Who does the steps** (`steps: delegated | inline`):
 
-This session is the orchestrator: it keeps the tracker, reads the dependency graph,
-briefs, verifies and merges, and its context stays the plan, never the diffs. Every
-step is delegated to a fresh subagent, unless the person asked for inline work when
-they requested the run; then this session does the steps itself and the rest holds. Steps the graph shows as independent, the
-forks the plan draws, run at once: one subagent per branch, one `aiview pending` card
-per branch on the plan, each ticked as its return lands, the join verified by this
-session.
+1. **Delegated** (recommended): a fresh subagent per step that writes to the
+   repository, so this session's context stays the plan and the tracker rather than the
+   diffs. The price is the briefing, and a step that has to be told the whole slice
+   costs more to delegate than to do.
+2. **Inline**: this session does the steps itself. Right for a small plan, for steps
+   that are mostly judgment, and when the person wants to watch the work happen.
 
-A brief has four slots, in this order: where the plan is (its aiview path, the step's
-node id); the step's jurisdiction, its node text and done-when, and nothing beyond it;
-the facts this session has already established, given as facts (the branch, the
-commands that verify, what an earlier step found); the return contract: what changed,
-where, the test's failing run before the change and its passing run after, and
-anything found that the plan did not predict. A subagent never edits the tracker.
-This session is its single writer.
+The answer sets the default, not a rule: under either answer the orchestrator keeps the
+steps named below for itself.
+
+## Who does the steps
+
+This session is the orchestrator whichever answer it got: it keeps the tracker, reads
+the dependency graph, briefs, verifies and merges. Three kinds of step are always its
+own, because delegating them costs more than it saves or turns the evidence into
+hearsay:
+
+- **A step that only observes.** Running the suite and recording the failing run,
+  checking a deployed address, reading a page. The orchestrator has to see these
+  anyway to tick the node.
+- **A step whose input is the whole slice.** A README the slice earned, a decision
+  register row, anything needing everything the run has learned in one head.
+- **The verification of every return.** A subagent's report is a claim. The tick rests
+  on what this session observed: the command re-run, the failing output read, the test
+  file confirmed unedited by its own commit in the log.
+
+Under `steps: delegated`, everything that writes to the repository goes to a fresh
+subagent: one node per subagent, never two, since the tracker holds one ▶ at a time.
+Where the plan draws a fork, its branches run at once, one subagent per branch, one
+`aiview pending` card each, ticked as its return lands, the join verified here.
+
+The orchestrator reads evidence, not diffs: it runs commands, reads output, and opens
+the file a return names when the claim needs checking, but it does not review the whole
+change.
+
+A brief has four slots, in this order:
+
+1. **Where the plan is**: its aiview path and the step's node id.
+2. **The step's jurisdiction**: its node text and done-when, and nothing beyond it.
+3. **The facts this session has established**, given as facts: the branch, the commands
+   that verify, what an earlier step found, the conventions file to obey.
+4. **The return contract**: what changed and where, the evidence its own step produces
+   (a test-writing step returns the failing run, an implementing step the passing run),
+   and anything found that the plan did not predict.
+
+A subagent never edits the tracker. This session is its single writer.
 
 ## The three pauses
 
@@ -126,6 +158,7 @@ in the same step, the step was mis-scoped.
 |---|---|
 | "I'll check with them before starting the next step" | The plan was the approval. Report at the slice boundary, and stop there only if the pace or a `👤` mark says so. |
 | "The subagent can update the tracker when it is done" | It cannot see the other branches. One writer, this session; the return is evidence, the tick is yours. |
+| "The step just runs the tests, I'll delegate it like the rest" | A step that only observes is the orchestrator's, whatever the answer to the second question. A tick on a run this session never saw is hearsay. |
 | "These two steps look independent, I'll run them in parallel" | Only if the plan draws the fork. Two steps that touch one file are one branch, whatever they look like. |
 | "It's a small deviation, I'll mention it at the end" | Draw it, then do it. A session that dies mid-way leaves a plan that does not know the work exists. |
 | "They said yes to deploying yesterday" | Outward-facing actions are approved once each, not once forever. |
