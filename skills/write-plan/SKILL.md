@@ -28,20 +28,64 @@ one endpoint, not the whole service; the one screen state. The rest of a layer w
 for the slice that needs it. Never cut by layer: schema then API then screens
 verifies nothing until the last one.
 
-Per slice: the stories it serves (`US3`), what changes, which files, the done-when as
-a test, what it unblocks, and a mark when it needs a person:
+Per slice: the stories it serves (`US3`), what it delivers end to end, the slices that
+block it, the done-when as a test, and a mark when it needs a person:
 `👤 decision` (architecture, contract), `👤 design review` (a screen, a mockup), or
-none. Order riskiest unknown first. Slices that touch disjoint files and need nothing
-from each other before a join may fork; propose the fork in one message, draw it on
-a yes.
+none. Size each slice to one fresh context window: a slice is one agent's work. Order
+riskiest unknown first. Slices that block nothing of each other's may fork, on the terms
+`references/tracker.md` sets. Propose the fork in one message, draw it on a yes.
 
 ## Test first
 
-Every slice is built test first, and its steps say so: the first step writes the test
-that proves the done-when, named with its file; the second runs it and records that
-it fails; only then the implementation, and the last step runs the test and records
-that it passes. A screen's behaviour is tested the same way; its look is the
-`👤 design review`. A slice drawn without the failing-test step is not a slice.
+Every slice's done-when is a test that can be seen failing before the work and passing
+after. A slice with no such done-when is not a slice. A screen's behaviour is tested the
+same way, and its look is the `👤 design review`. How the test is written and run is
+`write-code`'s (`../write-code/SKILL.md` in this collection): the plan draws no
+"write the test" step.
+
+## The slice document
+
+One document per slice: the whole context one agent needs. The plan's table is the
+record of what happened, and the slice document is the only place instructions live. A
+step row that still carries instructions beside a slice document is two copies, and they
+have drifted by the second read.
+
+Write them with the plan, one per slice with work left, and one for any slice drawn
+later, when it is drawn. A finished slice gets none.
+
+Name each `<plan-stem>-<node>.slice.md`, which maps it to its plan. Path from `aiview`
+(`../aiview/SKILL.md` in this collection), opened as kind `slice` with the plan's tags in
+the plan's group. Under each slice's heading, the plan names its document.
+
+<slice-template>
+
+# <node id>: <title>
+
+> **Slice document** of `<plan file>`. Carry it out with the `execute-slice` skill:
+> check the blockers first, and stop if any is unmet.
+
+**What this delivers.** The end-to-end behaviour, from the user's side.
+
+**Blocked by.** The slices this one depends on, named whether or not they are done. It
+is the shape of the work, not a status. "Nothing" only when nothing was ever required.
+
+**Acceptance criteria.** A checklist. A command and its expected exit code wherever one
+exists.
+
+**Context.** What already exists that this work builds on. The interfaces the plan
+designed for it, inlined, since the tests are written against them. Links to the spec
+section, the mockups, the decisions that bind. Document names resolve through `aiview`.
+
+**Watch out.** Only when the slice has a known trap.
+
+</slice-template>
+
+No source file paths: they go stale between writing the slice and running it. Document
+names, commands and interfaces are not paths. A code snippet only when it carries a
+decision prose cannot, a schema, a state machine, a type shape, trimmed to the decision.
+
+What makes two slices one arm, and so not parallel, is for `references/tracker.md` of
+`execute-plan` (`../execute-plan/SKILL.md` in this collection) to say.
 
 ## Modules
 
@@ -92,7 +136,8 @@ branches, its sequence or state diagram. `aiview mermaid-check <plan>` and
 ## The document
 
 `YYYY-MM-DD-<topic>.plan.md` beside the spec (path from the `aiview` skill), opened
-as kind `plan` with the spec's tags and `--group`. Opening lines: title, the spec's
+as kind `plan` with the spec's tags, in the group `aiview` gives a plan
+(`../aiview/SKILL.md` in this collection): its own, shared with its slices. Opening lines: title, the spec's
 and the board's paths, the stories this increment delivers, `hardened: yes | no`.
 Note the plan's path at the top of the spec and the board. When the project has a
 roadmap (`../roadmap/SKILL.md` in this collection), the plan carries the slot's slug

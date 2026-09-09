@@ -62,7 +62,7 @@ spec's alternatives need.
 
 Open the board via the `aiview` skill (`../aiview/SKILL.md` in this collection)
 the moment you create it: kind `brainstorm` (from the filename), tags = project + topic,
-group = the topic (titled: the spec and plan will join it), started honestly. Tell
+group = the topic (titled: the spec will join it, the plan gets its own), started honestly. Tell
 the user the URL it prints. Nothing to babysit: the server is detached; keep editing
 the same file, it reloads on save. Resuming on another machine needs no
 re-registration: list the brainstorm-kind documents and read the relevant board before

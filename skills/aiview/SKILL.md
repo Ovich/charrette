@@ -107,15 +107,17 @@ server runs and where; a stale pidfile is reported, and `open` replaces it.
 - **File name**: `YYYY-MM-DD-<topic>.<kind>.md`, flat in the project's folder, no
   subfolders: kind chips and groups do that job in the sidebar.
 - **Kind** is mandatory, from the filename or `--kind`. Kinds in use: `brainstorm`,
-  `spec`, `plan`, `reference`, `mockup`, `pr-analysis`, `report`, `pdf`, `roadmap`
-  (one per project, above the groups). A new kind is a
+  `spec`, `plan`, `slice`, `reference`, `mockup`, `pr-analysis`, `report`, `pdf`,
+  `roadmap` (one per project, above the groups). A new kind is a
   new colour chip everyone sees: it names a type of document, never a topic. Topics
   are tags.
-- **Group** the documents of one piece of work, a board with its spec and plan, a CV
-  with its letter: the same `--group <slug>`, a title set once with `--group-title`. A
+- **Group** the documents of one piece of work, a board with its spec, a plan with its
+  slices, a CV with its letter: the same `--group <slug>`, a title set once with `--group-title`. A
   document belongs to at most one group. Tags say "same topic", the group says "same
-  work". A spec or plan a board produces takes the board's tags and group, and the
-  board notes their paths at its top.
+  work". A spec a board produces takes the board's tags and group. A **plan** takes
+  those tags but a group of its own, `<topic>-plan`, shared with its slice documents and
+  nothing else: a plan with a dozen slices would otherwise bury the board it came from.
+  The board notes their paths at its top.
 - **Start time**: `--started <ISO>` when the discussion began before the file existed.
 - **One document per subject**: iterate the file, never a v2. A rejected variant is
   removed from the index and usually deleted.

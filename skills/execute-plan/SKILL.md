@@ -12,16 +12,17 @@ adds something.
 ## What this skill takes as input
 
 **A plan document whose diagram is the tracker**, every step with a done-when that can
-be checked. The `write-plan` skill produces it, the `aiview` skill is where it lives
-and renders, and its protocol (glyphs, state node, branches, layout) is
-`references/tracker.md`: read it before the first edit to the plan.
+be checked. `write-plan` (`../write-plan/SKILL.md` in this collection) produces it, `aiview`
+(`../aiview/SKILL.md` in this collection) is where it lives and renders, and its protocol
+(glyphs, state node, forks, layout) is `references/tracker.md`: read it before the first
+edit to the plan.
 
 **Before running a single step, open the plan via the `aiview` skill
 (`../aiview/SKILL.md`)**, in every session that picks the plan up. Tell the person the
 URL it prints, so they watch the tracker move while the work happens.
 
-**If the plan has no tracker, steps without a done-when, or a slice that does not
-open on a failing test, do not start.** Say so, and either add what is missing or go
+**If the plan has no tracker, a slice with no slice document, or a slice whose done-when
+no test can express, do not start.** Say so, and either add what is missing or go
 back and finish the plan. A plan whose diagram
 describes a state the repository has moved past is a deviation, not a starting
 condition: reconcile it first, and say what you found.
@@ -42,54 +43,42 @@ reads them and asks again nothing.
 Under either pace a slice whose findings change the next slice is the first pause
 below, and a slice marked `👤 decision` or `👤 design review` stops before it starts.
 
-**Who does the steps** (`steps: delegated | inline`):
+**Who does the slices** (`steps: delegated | inline`, the field the tracker tool
+checks):
 
-1. **Delegated** (recommended): a fresh subagent per step that writes to the
-   repository, so this session's context stays the plan and the tracker rather than the
-   diffs. The price is the briefing, and a step that has to be told the whole slice
-   costs more to delegate than to do.
-2. **Inline**: this session does the steps itself. Right for a small plan, for steps
-   that are mostly judgment, and when the person wants to watch the work happen.
+1. **Delegated** (recommended): a fresh subagent per slice, running `execute-slice`
+   (`../execute-slice/SKILL.md` in this collection), so this session's context stays
+   the plan and the tracker rather than the diffs.
+2. **Inline**: this session does the work itself. Right for a small plan, for a slice
+   that is mostly judgment, and when the person wants to watch the work happen.
 
-The answer sets the default, not a rule: under either answer the orchestrator keeps the
-steps named below for itself.
+## The orchestrator
 
-## Who does the steps
+This session keeps the tracker, briefs, verifies and merges, whichever answer it got.
+Two kinds of work stay its own under either:
 
-This session is the orchestrator whichever answer it got: it keeps the tracker, reads
-the dependency graph, briefs, verifies and merges. Three kinds of step are always its
-own, because delegating them costs more than it saves or turns the evidence into
-hearsay:
-
-- **A step that only observes.** Running the suite and recording the failing run,
-  checking a deployed address, reading a page. The orchestrator has to see these
-  anyway to tick the node.
-- **A step whose input is the whole slice.** A README the slice earned, a decision
-  register row, anything needing everything the run has learned in one head.
+- **What needs the whole run in one head.** A README the plan earned, a decision
+  register row, the state node.
 - **The verification of every return.** A subagent's report is a claim. The tick rests
   on what this session observed: the command re-run, the failing output read, the test
-  file confirmed unedited by its own commit in the log.
+  file confirmed unedited by its own commit in the log. It reads evidence, not diffs.
 
-Under `steps: delegated`, everything that writes to the repository goes to a fresh
-subagent: one node per subagent, never two, since the tracker holds one ▶ at a time.
-Where the plan draws a fork, its branches run at once, one subagent per branch, one
-`aiview pending` card each, ticked as its return lands, the join verified here.
+Under `steps: delegated`, each slice goes to a fresh subagent. It reports the step it is
+on and this session ticks. A subagent never edits the tracker.
 
-The orchestrator reads evidence, not diffs: it runs commands, reads output, and opens
-the file a return names when the claim needs checking, but it does not review the whole
-change.
+A brief is the slice document's path, and the workspace, its branch, the branch it
+returns to, and the command that prepares the workspace. Nothing else: the document is
+the context, and a fact repeated in the brief is a fact that drifts.
 
-A brief has four slots, in this order:
+A subagent that stops on an unmet blocker has done its job. Fix the plan or the document.
+Do not re-brief it past the gate.
 
-1. **Where the plan is**: its aiview path and the step's node id.
-2. **The step's jurisdiction**: its node text and done-when, and nothing beyond it.
-3. **The facts this session has established**, given as facts: the branch, the commands
-   that verify, what an earlier step found, the conventions file to obey.
-4. **The return contract**: what changed and where, the evidence its own step produces
-   (a test-writing step returns the failing run, an implementing step the passing run),
-   and anything found that the plan did not predict.
+## Branches and workspaces
 
-A subagent never edits the tracker. This session is its single writer.
+The plan has one branch, and the person sees one pull request from it at the end. Each
+slice works on its own branch off the plan's, in its own workspace, and returns to it.
+Slices the plan forks run at once, one subagent each. Read `references/workspaces.md`
+before the first fork: the traps in basing, installing and removing a workspace.
 
 ## The three pauses
 
@@ -130,19 +119,21 @@ in the same step, the step was mis-scoped.
 ## Keeping the tracker while you work
 
 - **Tick as you go, never in a batch.** A node turns ✅ only when its own done-when is
-  met, and the evidence goes into the step: what was observed, not "worked". Test
-  first, always: the test is written and run before the implementation, the step
-  records the failing run, the implementation is written to pass it, and the step
-  records the passing run. A test that never failed proves nothing. For a step that
-  serves a user story, its acceptance criterion observed.
+  met, and the evidence goes into the step: what was observed, not "worked". The
+  failing run and the passing run are the evidence, per `write-code`
+  (`../write-code/SKILL.md` in this collection). For a step that serves a user story,
+  its acceptance criterion observed.
 - **Update it before every handoff**: a question, an approval request, the end of a
   turn. Whatever the tracker does not say by then is lost if the session ends.
 - **Deviations are drawn, not narrated.** Work the plan does not list becomes a node
   *before* it is done. An unforeseen dependency becomes an arc, and if it waits on
   someone else, a ⏸ node naming what was asked for and when. A step that dissolves is ✖
-  with the reason, never deleted. An answered gate shows which branch was taken. A
+  with the reason, never deleted. An answered gate shows which way was taken. A
   deviation that decides a module, an interface, a schema, a contract or an
   architecture adds a row to the plan's implementation decisions register.
+- **A deviation that becomes a slice gets its slice document before it runs**, per
+  `write-plan` (`../write-plan/SKILL.md` in this collection). A slice with no document
+  cannot be delegated.
 - **A step you paused inside was too coarse.** Split it where the pause fell.
 - **Finished steps are rewritten as what happened**: past tense, what was done, what it
   found, what that changed. Keep the values, versions, commands and wrong turns worth
@@ -157,12 +148,11 @@ in the same step, the step was mis-scoped.
 | Thought | Reality |
 |---|---|
 | "I'll check with them before starting the next step" | The plan was the approval. Report at the slice boundary, and stop there only if the pace or a `👤` mark says so. |
-| "The subagent can update the tracker when it is done" | It cannot see the other branches. One writer, this session; the return is evidence, the tick is yours. |
-| "The step just runs the tests, I'll delegate it like the rest" | A step that only observes is the orchestrator's, whatever the answer to the second question. A tick on a run this session never saw is hearsay. |
-| "These two steps look independent, I'll run them in parallel" | Only if the plan draws the fork. Two steps that touch one file are one branch, whatever they look like. |
+| "The subagent can update the tracker when it is done" | It cannot see the other arms. One writer, this session. The return is evidence, the tick is yours. |
+| "The return says the suite passed, that's the tick" | A tick on a run this session never saw is hearsay. Re-run it. |
+| "These two slices look independent, I'll run them in parallel" | Only if the plan draws the fork. What makes two slices one arm is `references/tracker.md`'s to say. |
 | "It's a small deviation, I'll mention it at the end" | Draw it, then do it. A session that dies mid-way leaves a plan that does not know the work exists. |
 | "They said yes to deploying yesterday" | Outward-facing actions are approved once each, not once forever. |
 | "I'll ask what they want to do" | Bring the options and a recommendation. An open question hands the work back rather than the decision. |
 | "The step is done, I'll write it up later" | Later is after the context is gone. The evidence goes in when it is observed. |
-| "I'll write the implementation, then the test" | The test comes first and is seen failing. A test written after the code fits the code, not the done-when. |
 | "I'll add a line to the state node" | You overwrite its fields. A node you append to becomes a log, and a log of states is not a state. |

@@ -19,7 +19,9 @@ flowchart LR
   RM["roadmap<br/>iterations of slots, the foundation"] -.->|names the next slot| B
   B --> P["write-plan<br/>one increment, hardened on request"]
   P --> E["execute-plan<br/>the plan's diagram is the tracker"]
-  E --> R["pr-review<br/>analysis, findings"]
+  E --> S["execute-slice<br/>one agent, one slice document"]
+  S --> R["pr-review<br/>analysis, findings"]
+  W["write-code"] -.->|the practice in| S
   R --> M["merge"]
   D["write-diagrams"] -.->|draws for| B & P & R
   Q["interview"] -.->|resolves decisions for| B & P
@@ -41,7 +43,7 @@ The first two are from one real piece of work: the redesign of this collection's
 
 ### A spec, with the work it belongs to
 
-What `brainstorm` and `write-plan` leave behind for one feature: the board, the spec and the plan, grouped in the sidebar. The spec's diagrams render inline, here the five layers and the orchestrator that dispatches them. The header shows the absolute path, click to copy.
+What `brainstorm` and `write-plan` leave behind for one feature: the board and the spec in one group, the plan with its slice documents in another. The spec's diagrams render inline, here the five layers and the orchestrator that dispatches them. The header shows the absolute path, click to copy.
 
 ![aiview: the pr-review redesign spec, its layer table and orchestrator diagram rendered, the board and plan grouped beside it](assets/aiview-pr-review-spec.png)
 
@@ -99,7 +101,9 @@ In the order work usually happens:
 | [brainstorm](skills/brainstorm/SKILL.md) | Something non-trivial is about to be built and the design conversation hasn't happened | *"Run brainstorm: I want per-user rate limiting on the API."* One question at a time, no code until the spec is approved. |
 | [interview](skills/interview/SKILL.md) | A design object has decisions nobody has resolved, or you want to be questioned about one until it is understood the same way | *"Interview me about this spec."* Decisions walked in dependency order, the codebase read before you are asked, a recommendation on every question. |
 | [write-plan](skills/write-plan/SKILL.md) | The spec is approved and the next increment needs its plan | *"Write the plan for the rate-limiting spec."* One increment cut into thin vertical slices, each verified end to end, the tracker drawn, hardened through an interview when you say so. |
-| [execute-plan](skills/execute-plan/SKILL.md) | An approved plan is ready, or was left mid-way by an earlier session | *"Execute the rate-limiting plan."* Pauses only for your decisions, your checks, or an action that does not undo. Refuses a plan with no tracker. |
+| [execute-plan](skills/execute-plan/SKILL.md) | An approved plan is ready, or was left mid-way by an earlier session | *"Execute the rate-limiting plan."* Delegates each slice to a fresh agent, keeps the tracker, merges. Pauses only for your decisions, your checks, or an action that does not undo. Refuses a plan with no tracker. |
+| [execute-slice](skills/execute-slice/SKILL.md) | One slice document is handed to an agent to carry out | *"Do slice 2."* Checks the blockers first and stops if any is unmet, does the work, returns the branch and the runs as evidence. |
+| [write-code](skills/write-code/SKILL.md) | Code is about to be written or changed, from a slice or a request | The practice in any repository: test first, two commits, the runs as evidence. The repository's `AGENTS.md` carries its own rules. |
 | [write-diagrams](skills/write-diagrams/SKILL.md) | A design question would settle faster drawn than argued | *"Draw today's login flow: I need to see where the redirect happens."* |
 | [frontend-design](skills/frontend-design/SKILL.md) | A screen is about to be built or visually reworked | *"Before we code the settings page, propose a mockup."* Design language extracted once, every screen approved in the viewer, code after. |
 | [technical-writing](skills/technical-writing/SKILL.md) | A document that stays in the repository: a README, an architecture doc, an ADR, a runbook | *"Write an architecture doc of the payments service, audience: new backend hires."* |

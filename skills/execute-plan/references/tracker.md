@@ -32,7 +32,7 @@ class lines yourself.
 A slice is a `subgraph` whose id is `SL<n>`, its title carrying the stories it serves
 and its `👤` mark when it needs a person (`Slice 2 · US3 · 👤 decision`). Its steps are the nodes
 inside it, and the slice's done-when is the done-when of its last node, or of the
-join where its branches meet. Every step is a node, at the granularity someone would
+join where its arms meet. Every step is a node, at the granularity someone would
 pause at, with the dependency edges and decision gates that belong in a phasing
 diagram. Node ids are `S<slice>.<step>` (`S2.3`); a step discovered between `S2.3`
 and `S2.4` is `S2.3b`: insert, never renumber, since specs, boards and commit
@@ -48,20 +48,26 @@ when it is met. Each label opens with its status:
 | ⬜ | Not started |
 | ✖ | Failed or abandoned: the step says what happened and what changed because of it |
 
-One ▶ at a time, or the diagram stops answering "where am I"; where the plan forks into
-parallel branches, one ▶ per branch. ⏸ keeps that rule honest:
+One ▶ at a time, or the diagram stops answering "where am I"; where the plan forks, one
+▶ per fork. ⏸ keeps that rule honest:
 a step that stalls on something outside your control becomes ⏸ and the frontier moves
 to whatever can proceed. A step parked as ▶ for days claims attention it is not getting.
 
 A step whose first half can finish while the second waits on someone else is two
 steps; drawn as one, it guarantees a hole in the tracker the day it happens.
 
-Steps that are independent may be drawn as parallel branches: two or more leaving one
-node and joining at a later one (`S2.1 -->|api| S2.2a`, `S2.1 -->|ui| S2.2b`, both
-`--> S2.3`), each arrow out of the fork labeled with its branch's area. The test is
-disjointness: the branches touch different files or areas, and neither needs
-the other's result before the join. Two steps that touch one file are one branch. The
-join node's done-when covers what the branches produced together.
+Slices that are independent may be drawn as a fork: two or more arrows leaving one node
+and joining at a later one, each labeled with its area. A fork is between slices, never
+inside one: a slice is one agent's work. The test is disjointness: the arms touch
+different files or areas, and neither needs the other's result before the join. Two
+slices that touch one file are one arm. So are two that touch one cloud account, one
+deployed environment, one database or one registry, however disjoint their files: the
+second write wins and neither arm can see the other. The join node's done-when covers
+what the arms produced together.
+
+Reserve *branch* for a git branch. A fork's arms are slices, each on its own branch off
+the plan's. `execute-plan` (`../execute-plan/SKILL.md` in this collection) carries that
+rule.
 
 ## Slots, when the tracker is a roadmap's
 
@@ -70,7 +76,7 @@ tracker to this protocol with one difference: the nodes are slots, one subgraph 
 iteration, and a slot's glyph is derived from the documents that carry its tag,
 never from evidence observed in a step. ⬜ empty or in design, ▶ the slot whose
 pieces of work are being drawn, planned or run (one per iteration, as one ▶ per
-branch here), ⏸ blocked on a foundation row or on another slot, ✅ landed on the
+arm here), ⏸ blocked on a foundation row or on another slot, ✅ landed on the
 person's evidence that the feature is delivered and working, ✖ dropped with the
 reason. The state node's fields are the iteration, the slot in progress, next,
 blocked, and the foundation rows still open for the slot ahead.
@@ -102,7 +108,7 @@ which lines are still true.
 ## Keeping it readable
 
 One column. A tracker is scanned, not studied, and width ruins the scan. `flowchart
-TB`, steps chained linearly, only the gates and the parallel branches sideways. Three
+TB`, steps chained linearly, only the gates and the parallel arms sideways. Three
 things widen it:
 
 - The state node is connected to nothing, so the layout parks it beside the flow. Pin
