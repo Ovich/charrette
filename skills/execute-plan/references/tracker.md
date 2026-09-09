@@ -8,10 +8,29 @@ later session with none of the conversation in context. The second reader needs 
 and slices alone do not carry it. So the phasing diagram does double duty: it is the
 tracker, the single place that says where the work stands.
 
+## The markers a tool can find
+
+A plan holds several diagrams and only one of them is the record, so the tracker names
+itself. Two markers, both ordinary mermaid, both there so the block and its slices can
+be found without guessing:
+
+- **`%% tracker`**, a mermaid comment as the first line inside the fence, under
+  `flowchart TB`. Without it a reader has to infer which block is the tracker from the
+  glyphs in its labels, which is a guess that gets it wrong the day another diagram
+  quotes one.
+- **`SL<n>` as a slice's subgraph id**, matching the `S<n>.<step>` of the steps inside
+  it (`subgraph SL3[...]` holds `S3.1`, `S3.2`). The two say the same thing, so a step
+  pasted into the wrong slice is caught by comparing them.
+
+`aiview tracker check <plan>` reads both and reports every way the diagram disagrees
+with itself; `aiview tracker sync <plan>` rewrites the `class` lines from the glyphs.
+Run `check` after editing a tracker by hand, and `sync` instead of maintaining the
+class lines yourself.
+
 ## Slices and steps
 
-A slice is a `subgraph`, its title carrying the stories it serves and its `👤` mark
-when it needs a person (`Slice 2 · US3 · 👤 decision`). Its steps are the nodes
+A slice is a `subgraph` whose id is `SL<n>`, its title carrying the stories it serves
+and its `👤` mark when it needs a person (`Slice 2 · US3 · 👤 decision`). Its steps are the nodes
 inside it, and the slice's done-when is the done-when of its last node, or of the
 join where its branches meet. Every step is a node, at the granularity someone would
 pause at, with the dependency edges and decision gates that belong in a phasing
@@ -103,5 +122,11 @@ classDef todo stroke-dasharray:4 3
 classDef state stroke:#8a8a8a,stroke-width:1px,fill:#7f7f7f12
 ```
 
+Styling is derived, never maintained: a step's state is the glyph, and `aiview tracker
+sync <plan>` writes the `class` lines from it. Written by hand in two places they
+drift, which is what happened between two sessions on 2026-09-09, one moving a label to
+▶ and leaving the node in `todo`.
+
 Parse the diagram, do not eyeball it. Mermaid fails quietly, a broken `classDef` still
-renders, just wrong. Run `aiview mermaid-check <plan>` after every edit.
+renders, just wrong. Run `aiview mermaid-check <plan>` and `aiview tracker check <plan>`
+after every edit.

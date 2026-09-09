@@ -66,6 +66,8 @@ to a verb:
 | "what does this mockup offer to siblings, what does it pull?" | `components <file\|#id>` |
 | "do this mockup's bindings resolve?" | `check <file\|#id>` |
 | "do this document's diagrams parse?" | `mermaid-check <file\|#id>` |
+| "does this plan's tracker agree with itself?" | `tracker check <file\|#id>` |
+| "its class lines drifted from the glyphs" | `tracker sync <file\|#id>` |
 | "which project am I in? is the viewer running?" | `status --json` |
 | "start / restart the viewer" | `serve --detach` |
 
@@ -89,6 +91,7 @@ $A path   <filename> [--project <slug>]          # where it belongs, joined for 
 $A components <file|#id>                         # what a mockup offers (name, tag, rule violations) and pulls
 $A check      <file|#id>                         # resolve a host as the server does; errors as text, exit 1 if any
 $A mermaid-check <file|#id>                      # parse every mermaid block as the viewer will; failures with their line, exit 1 if any
+$A tracker <check|sync> <file|#id>               # a plan's tracker judged against itself, or its class lines rewritten from the glyphs
 $A pending add  <file|#id> --label L [--note N]   # work the reader is still waiting on
 $A pending done <#pendingId>                     # it landed
 $A pending list [<file|#id>] | clear <file|#id>

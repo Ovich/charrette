@@ -22,6 +22,12 @@ import { adoptLegacyIndex, DATA_ROOT, docsDirFor, DOCS_ROOT, ensureHome } from "
 import { readServerStatus, PORT_FILE, type ServerStatus } from "../core/serverstate.ts";
 import { parseArgs } from "./args.ts";
 import { disciplineWarnings } from "../mermaid/discipline.ts";
+import { check as trackerCheck, findTracker, sync as trackerSync } from "../core/tracker.ts";
+
+/** Line endings, named rather than written inline: a plan on Windows is CRLF and the
+ *  tracker parser works in LF, so the file is normalised in and restored out. */
+const LF = String.fromCharCode(10);
+const CRLF = String.fromCharCode(13, 10);
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
@@ -45,6 +51,8 @@ const USAGE = [
   "  components <file|#id>                    # what this mockup offers to siblings, and what it pulls",
   "  check <file|#id>                         # do this mockup's bindings resolve? errors as text, exit 1 if any",
   "  mermaid-check <file|#id>                 # parse every mermaid block; warn on a missing caption or an unlabeled fork; exit 1 if one fails",
+  "  tracker check <file|#id>                 # a plan's tracker judged against itself; exit 1 if anything disagrees",
+  "  tracker sync <file|#id>                  # rewrite the class lines from the glyphs, the one place a step's state is written twice",
   "  init                                     # create the data home; report where everything lives",
 ].join("\n");
 
@@ -653,6 +661,59 @@ function cmdPending(): void {
   });
 }
 
+function cmdTracker(): void {
+  const mode = args.positional[0] === "sync" ? "sync" : "check";
+  const ref = args.positional[1] ?? (args.positional[0] === "check" || args.positional[0] === "sync" ? undefined : args.positional[0]);
+  if (!ref) {
+    console.error("usage: aiview tracker <check|sync> <file|#id>");
+    process.exit(1);
+  }
+  const abs = resolveRef(ref)?.abs_path ?? path.resolve(ref);
+  if (!fs.existsSync(abs)) {
+    console.error(`no such file: ${abs}`);
+    process.exit(1);
+  }
+  const raw = fs.readFileSync(abs, "utf8");
+  const body = raw.split(CRLF).join(LF);
+  const tracker = findTracker(body);
+  if (!tracker) {
+    console.error(`no tracker in ${path.basename(abs)}: no mermaid block whose nodes open with ✅ ▶ ⏸ ⬜ ✖`);
+    process.exit(1);
+  }
+
+  if (mode === "sync") {
+    // Read and write in one breath, and replace the file rather than truncate it: a
+    // plan is edited by whoever is running it, and a half-written tracker is worse
+    // than a stale one.
+    const crlf = raw.includes(CRLF);
+    const { text, changed } = trackerSync(body, tracker);
+    if (changed) {
+      const tmp = `${abs}.aiview-${process.pid}`;
+      fs.writeFileSync(tmp, crlf ? text.split(LF).join(CRLF) : text, "utf8");
+      fs.renameSync(tmp, abs);
+    }
+    const after = findTracker(text);
+    const left = after ? trackerCheck(after) : [];
+    emit({ file: path.basename(abs), changed, findings: left.length }, () =>
+      console.log(
+        changed
+          ? `synced ${path.basename(abs)}: the class lines now follow the glyphs${left.length ? `, ${left.length} finding(s) remain` : ""}`
+          : `nothing to sync: the class lines already follow the glyphs`,
+      ),
+    );
+    if (left.length) process.exit(1);
+    return;
+  }
+
+  const findings = trackerCheck(tracker);
+  emit({ file: path.basename(abs), nodes: tracker.nodes.length, findings }, () => {
+    if (!findings.length) return console.log(`ok  ${tracker.nodes.length} steps, glyphs and classes agree`);
+    for (const f of findings) console.log(`line ${f.line}  ${f.text}`);
+    console.log(`${findings.length} finding(s) in ${tracker.nodes.length} steps`);
+  });
+  if (findings.length) process.exit(1);
+}
+
 switch (args.verb) {
   case "pending":
     cmdPending();
@@ -674,6 +735,9 @@ switch (args.verb) {
     break;
   case "mermaid-check":
     await cmdMermaidCheck();
+    break;
+  case "tracker":
+    cmdTracker();
     break;
   case "add":
     cmdAdd();

@@ -82,10 +82,12 @@ the work decides things.
 
 The `write-diagrams` skill (`../write-diagrams/SKILL.md` in this collection). The
 tracker first, drawn to `../execute-plan/references/tracker.md` (read before
-drawing): one subgraph per slice, its title carrying the stories and the mark. Then
-the boundary the implementation must hold, usually the dependency graph with
-forbidden edges. Inside a slice with an ordering and failure branches, its sequence
-or state diagram. `aiview mermaid-check <plan>` after every edit.
+drawing): `%% tracker` as its first line so the block names itself, then one subgraph
+per slice, id `SL<n>` matching its steps' `S<n>.<step>`, its title carrying the
+stories and the mark. Then the boundary the implementation must hold, usually the
+dependency graph with forbidden edges. Inside a slice with an ordering and failure
+branches, its sequence or state diagram. `aiview mermaid-check <plan>` and
+`aiview tracker check <plan>` after every edit.
 
 ## The document
 
