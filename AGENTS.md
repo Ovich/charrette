@@ -17,6 +17,14 @@ never builds. What runs for a user is the plugin cache, not this checkout; a cha
 reaches anyone only through a release (`RELEASING.md`). Documents the skills produce
 live in the data home, never here.
 
+**This checkout is the only place this repository is edited.** The plugin cache under
+`<claude home>/plugins/marketplaces/charrette` is a clone of the same remote, with the
+same branches and the same push rights, which is exactly the trap: work committed there
+is real, is pushed, and leaves this checkout silently behind. It happened on 2026-09-10
+— three releases were made in the cache, and this checkout then lacked a skill whose
+file the person was looking for. Refresh the cache with
+`claude plugin marketplace update charrette`; never write to it.
+
 ## Skills
 
 1. **MUST reference another skill by name plus the relative path `../<name>/SKILL.md`, "in this collection".** Every skill is a sibling, so the path is the same from anywhere; an absolute path or a bare `skills/<name>/` breaks on the next checkout and in a plugin cache.
