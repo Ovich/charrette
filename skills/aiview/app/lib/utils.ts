@@ -5,11 +5,51 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Deterministic hue per kind — same hash as the legacy UI so colors carry over. */
-export function kindHue(kind: string): number {
+/**
+ * The colour of a kind chip.
+ *
+ * It used to be a hash of the name, which is deterministic and useless: `plan` 97,
+ * `reference` 107, `architecture` 115 and `roadmap` 116 all landed inside twenty degrees
+ * of the same green, and `spec` 187 and `report` 188 were one degree apart. A person
+ * reading a sidebar of a dozen documents could not tell a plan from a roadmap by colour,
+ * which is the only thing the chip is for.
+ *
+ * These eleven are placed by hand, evenly around the wheel, with the pairs that appear
+ * together pushed as far apart as the wheel allows: a plan sits beside its slices, a
+ * board beside its spec, a roadmap beside its reference, a mockup beside the
+ * architecture. Chroma alternates as well, so two neighbours differ in more than hue and
+ * remain distinct to a colour-blind reader and on a projector.
+ *
+ * A kind not listed here still gets a stable colour from the old hash, moved off the
+ * spokes above so a new kind cannot be born looking like an existing one.
+ */
+const KIND_COLORS: Record<string, { h: number; s: number }> = {
+  roadmap: { h: 0, s: 68 },
+  report: { h: 33, s: 55 },
+  mockup: { h: 65, s: 62 },
+  slice: { h: 98, s: 48 },
+  architecture: { h: 131, s: 58 },
+  spec: { h: 164, s: 46 },
+  plan: { h: 196, s: 66 },
+  reference: { h: 229, s: 50 },
+  pdf: { h: 262, s: 60 },
+  brainstorm: { h: 295, s: 52 },
+  "pr-analysis": { h: 327, s: 64 },
+};
+
+/** Hue and saturation for a kind. Hand-placed where it matters, hashed where it does not. */
+export function kindColor(kind: string): { h: number; s: number } {
+  const named = KIND_COLORS[kind];
+  if (named) return named;
   let h = 0;
   for (const c of kind) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return h % 360;
+  // 16 degrees off every hand-placed spoke, which sit on multiples of about 33.
+  return { h: (((h % 11) * 33 + 16) % 360), s: 44 };
+}
+
+/** The hue alone. Kept because the tests and any older caller ask for a number. */
+export function kindHue(kind: string): number {
+  return kindColor(kind).h;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");

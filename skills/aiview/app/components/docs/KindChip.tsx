@@ -1,6 +1,7 @@
-import { cn, kindHue } from "../../lib/utils.ts";
+import { cn, kindColor } from "../../lib/utils.ts";
 
-/** Colored kind chip — hue is a deterministic hash of the kind, as in the legacy UI.
+/** Colored kind chip — hue and chroma come from the hand-placed palette in `utils.ts`,
+ *  so two kinds a reader sees side by side never look alike.
  *  NOT a Badge: its colors are data-driven. */
 export function KindChip({
   kind,
@@ -12,7 +13,7 @@ export function KindChip({
   dim?: boolean;
   onClick?: () => void;
 }) {
-  const h = kindHue(kind);
+  const { h, s: sat } = kindColor(kind);
   const Tag = onClick ? "button" : "span";
   return (
     <Tag
@@ -26,9 +27,9 @@ export function KindChip({
         dim && "opacity-40",
       )}
       style={{
-        background: `light-dark(hsl(${h} 65% 95%), hsl(${h} 40% 16%))`,
-        color: `light-dark(hsl(${h} 55% 35%), hsl(${h} 70% 75%))`,
-        borderColor: `light-dark(hsl(${h} 45% 86%), hsl(${h} 35% 26%))`,
+        background: `light-dark(hsl(${h} ${sat}% 94%), hsl(${h} ${Math.round(sat * 0.6)}% 17%))`,
+        color: `light-dark(hsl(${h} ${Math.round(sat * 1.1)}% 31%), hsl(${h} ${Math.round(sat * 1.15)}% 78%))`,
+        borderColor: `light-dark(hsl(${h} ${Math.round(sat * 0.8)}% 82%), hsl(${h} ${Math.round(sat * 0.55)}% 28%))`,
       }}
     >
       {kind}
