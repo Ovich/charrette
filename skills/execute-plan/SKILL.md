@@ -104,9 +104,11 @@ wrote down. Fix the plan or the document. Do not re-brief it past what it found.
 
 One branch and one pull request per slice. The branch is cut from `main` when the slice
 starts, the pull request is opened as a draft on the first commit, and the work lands in
-small commits pushed as they happen, so the diff can be read while it grows. At the close
-the pull request is marked ready, reviewed and merged, by the person or by the
-orchestrator as the pace says, and the next slice branches off the merged result.
+small commits pushed as they happen, so the diff can be read while it grows. As soon as it
+exists, the orchestrator opens it in the person's browser (`gh pr view <n> --web`), so
+the diff is in front of them from the first commit. At the close the pull request is
+marked ready, reviewed and merged, by the person or by the orchestrator as the pace
+says, and the next slice branches off the merged result.
 
 A merged slice leaves the deployed environment green: complete end to end, or inert
 where it is not yet complete, and the plan says which. When `main` must not move at all,
