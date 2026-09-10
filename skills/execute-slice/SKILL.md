@@ -23,9 +23,14 @@ Three things end the slice before it is finished. Each is a report, not an impro
 
 ## The work
 
-Follow `write-code` (`../write-code/SKILL.md` in this collection). Stay inside the
-acceptance criteria: anything the document did not ask for is out of scope, and anything
-it asked for that proves impossible is a stop with the reason, not an improvisation.
+**Before the first edit, invoke `write-code`** (`../write-code/SKILL.md` in this
+collection) and work under it: test first, two commits, no test weakened, the runs
+reported. It is not optional and not a reference to skim; it is how every line here is
+written.
+
+Stay inside the acceptance criteria: anything the document did not ask for is out of
+scope, and anything it asked for that proves impossible is a stop with the reason, not
+an improvisation.
 
 Tick each criterion in the slice document as its evidence lands. The document is yours to
 edit. The plan is not.
