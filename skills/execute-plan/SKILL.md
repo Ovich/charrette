@@ -7,7 +7,7 @@ description: Use when carrying out an implementation plan the person has already
 
 An approved plan is a **mandate**. Run it, keep the tracker true, stop only where a person adds something.
 
-## Input
+## Before starting
 
 - A plan whose diagram is the **tracker**. Its protocol is `references/tracker.md`; read it before the first edit.
 - **Open the plan in aiview every session** (`../aiview/SKILL.md` in this collection) and give the person the URL.
@@ -30,17 +30,16 @@ Either way, a slice marked `👤` stops before it starts, and a finding that cha
 1. **Delegated** (recommended): a fresh subagent per slice runs `execute-slice` (`../execute-slice/SKILL.md` in this collection).
 2. **Inline**: this session does the work. For small plans, judgment-heavy slices, or a person who wants to watch.
 
-## The orchestrator
+## What stays in this session
 
-- **Owns the tracker, the briefs, the verification, the merges.** A subagent never edits the tracker.
-- **Writes the README, the register rows and the state node itself.**
+- **The tracker, the briefs, the verification, the merges, the README, the register.** A subagent never edits any of them.
 - **Verifies every return.** A subagent's report is a claim; a tick rests on what this session re-ran: the command, the failing output, the test file unedited since its own commit.
 - **Checks blockers before every dispatch.**
 - **A subagent that stops on a finding is done.** Fix the plan or the slice document; never re-brief it past what it found.
 
 **A brief is**: the slice document's path, the workspace, the branch and its base, the command that prepares the workspace, the pull request to open. Nothing else.
 
-## Watching
+## Watching a subagent
 
 A subagent returns once; watch it while it runs.
 
@@ -64,7 +63,7 @@ A subagent returns once; watch it while it runs.
 
 **Forks run at once**, one subagent each, in their own workspaces. Read `references/workspaces.md` before the first fork.
 
-## Pauses
+## When to pause
 
 Stop for exactly three things:
 
@@ -84,7 +83,7 @@ Stop for exactly three things:
 
 **Stop the line** when one step fails twice for unrelated reasons; report both together. A second surprise inside one step means the step was mis-scoped.
 
-## The tracker
+## Keeping the tracker
 
 - **Tick as you go, never in a batch.** ✅ when the step's own done-when is met, the evidence in the label: what was observed, the red run and the green run, the acceptance criterion seen.
 - **Update before every handoff**: a question, an approval, the end of a turn.
