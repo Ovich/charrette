@@ -8,6 +8,9 @@ description: Use when about to write or change code, as the practice a slice, a 
 The repository's `AGENTS.md` binds. Read it before the first edit: a runner that does not
 inject it never sees it otherwise.
 
+Code here is written test-first, the TDD cycle: a failing test, the code that passes it,
+then the next one.
+
 <rules>
 
 - **Test first.** Write the test that proves the behaviour, run it, watch it fail, then
