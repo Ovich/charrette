@@ -50,8 +50,11 @@ record of what happened, and the slice document is the only place instructions l
 step row that still carries instructions beside a slice document is two copies, and they
 have drifted by the second read.
 
-Write them with the plan, one per slice with work left, and one for any slice drawn
-later, when it is drawn. A finished slice gets none.
+Write them after the draft review and the hardening (below), one per slice with work
+left, and one for any slice drawn later, when it is drawn. A finished slice gets none.
+Never before: a slice document quotes the register and carries the slice's final shape,
+and both move during review and hardening. Written earlier, every row that moves is a
+second copy to rewrite.
 
 Name each `<plan-stem>-<node>.slice.md`, which maps it to its plan. Path from `aiview`
 (`../aiview/SKILL.md` in this collection), opened as kind `slice` with the plan's tags in
@@ -171,13 +174,15 @@ Note the plan's path at the top of the spec and the board. When the project has 
 roadmap (`../roadmap/SKILL.md` in this collection), the plan carries the slot's slug
 as a tag, and a finished plan is one of the moments the roadmap is redrawn.
 
-## Draft review, then hardening on request
+## Draft review, hardening, then the slice documents
 
-With the plan drafted, ask the person, one question per message, with your
+Draft the plan first without its slice documents: the tracker, the register, the
+diagrams. With that draft open, ask the person, one question per message, with your
 recommendation: is the granularity right; does the dependency flow hold; should any
 slice split; are the `👤` marks complete. Redraw on their answers.
 
-Then one multiple-choice question: harden the plan through an interview
+Then, straight after the draft review and before any slice document exists, one
+multiple-choice question: harden the plan through an interview
 (recommended when a slice touches code nobody in the conversation has read, or when
 there are more than three slices), or skip. On yes, run the `interview` skill
 (`../interview/SKILL.md` in this collection) with the register as the tree, slice by
@@ -185,8 +190,10 @@ slice: filled rows confirmed from the code, missing rows resolved with the perso
 decision a slice needs that cannot be made before an earlier slice runs cuts that
 slice to "planned after slice N runs". Hardening fills the register and removes
 assumptions; it adds no detail. Write what it settles into the register and the
-slices, and the exchange into an interview log at the end of the plan, in the board's
+tracker, and the exchange into an interview log at the end of the plan, in the board's
 log format (`brainstorm` skill), entries `Q1`, `Q2`.
+
+Then write the slice documents, from the register as review and hardening left it.
 
 Then stop and ask the person to approve the plan, and remind them in the same message
 that the plan carries the interfaces of the new and changed modules, worth a look
@@ -200,4 +207,5 @@ before the run, since the tests are written against them. Running it is
 | "I'll plan the whole feature while I have the context" | Plan the increment. The next plan is written with this one's learning in hand, which you do not have yet. |
 | "Schema first, then the API, then the screens" | Nothing is verifiable until the last slice. One story end to end, then the next. |
 | "The test can come once the code works" | Then the test is written to fit the code. The test comes first, is seen failing, and the code is written to pass it. |
+| "I'll write the slice documents now and harden after" | Hardening moves register rows, and every slice document quotes them word for word. Harden first and slice second, or rewrite every document that quoted a moved row. |
 | "The hardening made the plan longer" | Then it added detail instead of removing assumptions. A slice that cannot be decided now becomes a line saying when it will be planned. |
