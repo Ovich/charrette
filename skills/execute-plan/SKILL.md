@@ -105,9 +105,9 @@ wrote down. Fix the plan or the document. Do not re-brief it past what it found.
 One branch and one pull request per slice. The branch is cut from `main` when the slice
 starts, the pull request is opened as a draft on the first commit, and the work lands in
 small commits pushed as they happen, so the diff can be read while it grows. As soon as it
-exists, and again on every push, the orchestrator opens it in the person's browser
-(`gh pr view <n> --web`), so the diff is in front of them from the first commit and
-stays current without their asking. At the close the pull request is
+exists, the orchestrator opens its files-changed view in the person's browser, once
+(`gh pr view <n> --json url -q .url`, then open `<url>/files`), so the diff is in front of
+them from the first commit. Not again on later pushes: the tab is theirs to refresh. At the close the pull request is
 marked ready, reviewed and merged, by the person or by the orchestrator as the pace
 says, and the next slice branches off the merged result.
 
