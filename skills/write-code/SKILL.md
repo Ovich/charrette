@@ -11,6 +11,18 @@ inject it never sees it otherwise.
 Code here is written test-first, the TDD cycle: a failing test, the code that passes it,
 then the next one.
 
+The design it aims at, the same four groups `code-design-review` judges by:
+
+| | |
+|---|---|
+| **simplicity** | DRY · KISS · YAGNI |
+| **responsibility** | SRP · High Cohesion |
+| **extension** | OCP · LSP · ISP |
+| **dependencies** | DIP · Low Coupling · Law of Demeter |
+
+When two of them pull against each other, the smaller change wins: an abstraction earns
+its place with the second caller, not the first.
+
 <rules>
 
 - **Test first.** Write the test that proves the behaviour, run it, watch it fail, then
