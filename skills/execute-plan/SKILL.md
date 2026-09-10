@@ -90,8 +90,14 @@ A brief is the slice document's path, and the workspace, its branch, the branch 
 returns to, and the command that prepares the workspace. Nothing else: the document is
 the context, and a fact repeated in the brief is a fact that drifts.
 
-A subagent that stops on an unmet blocker has done its job. Fix the plan or the document.
-Do not re-brief it past the gate.
+**One slice, one agent, one return, and the blockers are checked before the dispatch.**
+That check is yours because the tracker is yours: a subagent has no reason to open the
+plan, and a blocker outside it — a stack deleted from the account, a person's account
+created — has no glyph to read anyway. Dispatch nothing whose blockers are unmet.
+
+A subagent that stops on a finding has done its job: the criteria already passed, the
+document named something that does not exist, or the work turned up a dependency nobody
+wrote down. Fix the plan or the document. Do not re-brief it past what it found.
 
 ## Branches and workspaces
 

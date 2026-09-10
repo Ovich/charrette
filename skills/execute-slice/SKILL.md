@@ -1,30 +1,32 @@
 ---
 name: execute-slice
-description: Use when handed one slice document to carry out, as the agent doing the work rather than the one holding the plan. Checks the slice may start, does it, and returns the evidence and the branch. Not for writing slices (write-plan) and not for running a plan (execute-plan).
+description: Use when handed one slice document to carry out, as the agent doing the work rather than the one holding the plan. Does the work from that document alone and returns the evidence and the branch. Not for writing slices (write-plan) and not for running a plan (execute-plan).
 ---
 
 # Execute a slice
 
-One slice, one agent, one return. The slice document is the context. Of the plan, read
-only the tracker, and only for the gate below.
+The slice document says what to build and what counts as done. Work from it: it was
+written to carry everything the work needs, and its blockers were checked before it
+reached you.
 
 Names of documents in the slice resolve through `aiview` (`../aiview/SKILL.md` in this
 collection). A name is not a path: the data home differs per machine.
 
-## The gate
+## When to stop instead
 
-**Blocked by names the dependency whether or not it is met.** Check each named slice
-against its tracker glyph.
+Three things end the slice before it is finished. Each is a report, not an improvisation.
 
-<gate>
+<stops>
 
-- Every blocker done: proceed.
-- Any blocker not done: stop. Say which, and end. Do not start the parts that look
-  independent.
-- Cannot tell: stop. An unverifiable dependency is an unmet one.
-- The acceptance criteria already pass: stop. Say so.
+- **The acceptance criteria already pass.** Say so and end.
+- **The document names something that does not exist** — a module, a command, a fact the
+  work depends on. A document that cannot be followed is a document to fix, not to guess
+  around.
+- **The work reveals a dependency the document did not name.** Say what it is and where
+  it surfaced. This is the finding the orchestrator most needs, and it never appears in a
+  plan: it appears in the doing.
 
-</gate>
+</stops>
 
 ## The work
 
