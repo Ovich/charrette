@@ -121,7 +121,10 @@ of these is never approval for the next.
 
 The tracker current *before* the pause: a pause is a handoff, and the session may end
 there. Then: what happened, the evidence, the decision that is wanted, the options, and
-a recommendation.
+a recommendation. Then **tell them what to do**: the actions and verifications that are
+theirs alone, numbered in the order they take them, each with the exact command and what
+a good result looks like. Recommend one where there is a choice. A pause that ends
+without a list of what the person does next is a report, not a handoff.
 
 ## What not to pause for
 
