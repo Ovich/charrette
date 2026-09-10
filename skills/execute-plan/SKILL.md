@@ -71,11 +71,15 @@ tracker.
 reads the return ticks the whole slice in one batch and leaves the tracker blind for the
 length of the work.
 
-**Probe every 30 seconds, and report only when something changed.** One row per running
-subagent — what it is doing, whether it is still inside its brief, and whether it is on
-track or wants steering — as a table when there is more than one. Move ▶ down the chain as
-it goes. A subagent that has not moved for two minutes is reported too: a stall is news,
-where a repeated poll of the same state is noise.
+**Probe every 30 seconds, and report only when something changed.** Move ▶ down the chain
+as it goes. A subagent that has not moved for two minutes is reported too: a stall is
+news, where a repeated poll of the same state is noise.
+
+**Report as a table, every time.** One row per subagent, from the first probe:
+
+| Agent | Doing | In brief | Status |
+|---|---|---|---|
+| slice · step | from the digest | yes, or what strayed | on track · steer · stalled |
 
 Read its transcript by digest, never whole — the file is large enough to swamp this
 session. `references/watching.md` has the digest and the cadence. Two rules keep the
@@ -102,19 +106,13 @@ wrote down. Fix the plan or the document. Do not re-brief it past what it found.
 
 ## Branches and pull requests
 
-One branch and one pull request per slice. The branch is cut from `main` when the slice
-starts, the pull request is opened as a draft on the first commit, and the work lands in
-small commits pushed as they happen, so the diff can be read while it grows. As soon as it
-exists, the orchestrator opens its files-changed view in the person's browser, once
-(`gh pr view <n> --json url -q .url`, then open `<url>/files`), so the diff is in front of
-them from the first commit. Not again on later pushes: the tab is theirs to refresh. At the close the pull request is
-marked ready, reviewed and merged, by the person or by the orchestrator as the pace
-says, and the next slice branches off the merged result.
+**One branch, one pull request per slice**, off `main`. Draft on the first commit, small
+commits pushed as they land, reviewed and merged at the close by the person or the
+orchestrator as the pace says. **A merged slice leaves dev green**: complete, or inert
+where it is not yet. A plan branch is the exception, and the plan names it.
 
-A merged slice leaves the deployed environment green: complete end to end, or inert
-where it is not yet complete, and the plan says which. When `main` must not move at all,
-the plan names a plan branch instead and the slices return to it; that is the plan's
-choice, never the run's.
+**On the first push:** open `<pr>/changes` in the browser, write the PR number into the
+state node, post the first table.
 
 Slices the plan forks run at once, one subagent each, in their own workspaces. Read
 `references/workspaces.md` before the first fork: the traps in basing, installing and
@@ -145,6 +143,9 @@ a recommendation. Then **tell them what to do**: the actions and verifications t
 theirs alone, numbered in the order they take them, each with the exact command and what
 a good result looks like. Recommend one where there is a choice. A pause that ends
 without a list of what the person does next is a report, not a handoff.
+
+**A secret goes in the file the pause names.** The pause gives the path and the keys; the
+person fills them there.
 
 ## What not to pause for
 
