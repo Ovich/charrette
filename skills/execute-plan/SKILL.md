@@ -35,10 +35,11 @@ reads them and asks again nothing.
 
 **The pace** (`pace: run through | stop at each slice`):
 
-1. **Run through** (recommended): at each slice boundary, report what happened and
-   what is next, then continue. Stop only for the three pauses below and at a slice
-   marked `👤`.
-2. **Stop at each slice**: finish the slice, report, name what is next, and wait.
+1. **Run through** (recommended): at each slice boundary, review and merge the
+   slice's pull request, report what happened and what is next, then continue. Stop
+   only for the three pauses below and at a slice marked `👤`.
+2. **Stop at each slice**: finish the slice, report, name what is next, and wait. The
+   person reviews and merges the pull request; the next slice starts on their word.
 
 Under either pace a slice whose findings change the next slice is the first pause
 below, and a slice marked `👤 decision` or `👤 design review` stops before it starts.
@@ -86,9 +87,9 @@ watching honest:
 - **Watch, do not supervise.** The digest is for the tracker and for the brief holding.
   Decisions the slice document leaves to the subagent stay the subagent's.
 
-A brief is the slice document's path, and the workspace, its branch, the branch it
-returns to, and the command that prepares the workspace. Nothing else: the document is
-the context, and a fact repeated in the brief is a fact that drifts.
+A brief is the slice document's path, the workspace, its branch and base, the command
+that prepares the workspace, and the pull request it opens (below). Nothing else: the
+document is the context, and a fact repeated in the brief is a fact that drifts.
 
 **One slice, one agent, one return, and the blockers are checked before the dispatch.**
 That check is yours because the tracker is yours: a subagent has no reason to open the
@@ -99,12 +100,22 @@ A subagent that stops on a finding has done its job: the criteria already passed
 document named something that does not exist, or the work turned up a dependency nobody
 wrote down. Fix the plan or the document. Do not re-brief it past what it found.
 
-## Branches and workspaces
+## Branches and pull requests
 
-The plan has one branch, and the person sees one pull request from it at the end. Each
-slice works on its own branch off the plan's, in its own workspace, and returns to it.
-Slices the plan forks run at once, one subagent each. Read `references/workspaces.md`
-before the first fork: the traps in basing, installing and removing a workspace.
+One branch and one pull request per slice. The branch is cut from `main` when the slice
+starts, the pull request is opened as a draft on the first commit, and the work lands in
+small commits pushed as they happen, so the diff can be read while it grows. At the close
+the pull request is marked ready, reviewed and merged, by the person or by the
+orchestrator as the pace says, and the next slice branches off the merged result.
+
+A merged slice leaves the deployed environment green: complete end to end, or inert
+where it is not yet complete, and the plan says which. When `main` must not move at all,
+the plan names a plan branch instead and the slices return to it; that is the plan's
+choice, never the run's.
+
+Slices the plan forks run at once, one subagent each, in their own workspaces. Read
+`references/workspaces.md` before the first fork: the traps in basing, installing and
+removing a workspace.
 
 ## The three pauses
 

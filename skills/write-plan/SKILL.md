@@ -35,6 +35,11 @@ none. Size each slice to one fresh context window: a slice is one agent's work. 
 riskiest unknown first. Slices that block nothing of each other's may fork, on the terms
 `references/tracker.md` sets. Propose the fork in one message, draw it on a yes.
 
+Each slice merges to `main` on its own and deploys with it, so each must leave the
+deployed environment green: complete, or inert where it is not yet complete. When a
+slice cannot be, the plan says so and names what makes it inert (a value optional until
+the slice that supplies it, a route unmounted until its screen exists).
+
 ## Test first
 
 Every slice's done-when is a test that can be seen failing before the work and passing

@@ -32,6 +32,10 @@ Stay inside the acceptance criteria: anything the document did not ask for is ou
 scope, and anything it asked for that proves impossible is a stop with the reason, not
 an improvisation.
 
+Commit small and often and push as you go; open the draft pull request the brief names
+on your first commit, and keep its checklist current. The person reads the diff while it
+grows.
+
 Tick each criterion in the slice document as its evidence lands. The document is yours to
 edit. The plan is not.
 
