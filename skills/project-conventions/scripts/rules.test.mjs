@@ -52,6 +52,24 @@ test("rules, sections, next free number, markers with their rule", () => {
   assert.match(text.out, /BAD\s+rule 9\s+src\/b\.ts:1/);
 });
 
+test("a modal mid-sentence, or missing, still counts as a rule and holds its number", () => {
+  // Rules rarely open with the modal. Requiring it first dropped them silently, and a
+  // dropped rule hands out a number that is already taken.
+  const d = repo(`# AGENTS.md
+
+## Rules
+
+1. **MUST derive row types from the schema.** Copies drift.
+2. **API response shapes MUST stay inferred.** The client gets them free.
+3. **Routes wire, handlers do.** A route holding logic is untestable.
+`, {});
+  const r = run(d, "--json");
+  assert.deepEqual(r.json.rules.map((x) => [x.number, x.level]), [[1, "MUST"], [2, "MUST"], [3, ""]]);
+  assert.equal(r.json.next, 4);
+  assert.deepEqual(r.json.unmodalled, [3]);
+  assert.match(run(d).out, /3 rules, next free number 4, no MUST\/SHOULD in 3/);
+});
+
 test("clean tree exits 0; duplicate numbers exit 1; no file exits 2", () => {
   const d = repo(AGENTS, { "src/a.ts": "// AGENTS EXCEPTION (rule 1): generated at build\n" });
   assert.equal(run(d).status, 0);

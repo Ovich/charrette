@@ -23,9 +23,16 @@ let section = "";
 for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
   const h = line.match(/^##\s+(.*)$/);
   if (h) { section = h[1].trim(); continue; }
-  const m = line.match(/^(\d+)\.\s+\*\*(MUST NOT|MUST|SHOULD NOT|SHOULD)\s+([^*]*)\*\*/);
-  if (m) rules.push({ number: Number(m[1]), section, level: m[2], text: m[3].trim().replace(/\.$/, "") });
+  // Any numbered bold line is a rule. The modal sits anywhere inside the bold span
+  // ("**API response shapes MUST stay inferred.**"), and a rule missing one still holds
+  // its number: dropping it silently hands out a number that is already taken.
+  const m = line.match(/^(\d+)\.\s+\*\*(.+?)\*\*/);
+  if (m) {
+    const lv = m[2].match(/\b(MUST NOT|MUST|SHOULD NOT|SHOULD)\b/);
+    rules.push({ number: Number(m[1]), section, level: lv ? lv[1] : "", text: m[2].trim().replace(/\.$/, "") });
+  }
 }
+const unmodalled = rules.filter((r) => !r.level).map((r) => r.number);
 const numbers = rules.map((r) => r.number);
 const next = numbers.length ? Math.max(...numbers) + 1 : 1;
 const duplicates = numbers.filter((n, i) => numbers.indexOf(n) !== i);
@@ -45,11 +52,11 @@ for (const l of grep.split("\n").filter(Boolean)) {
 }
 const dangling = markers.filter((m) => !m.exists);
 
-const out = { file, rules, next, duplicates, markers, dangling: dangling.length };
+const out = { file, rules, next, duplicates, unmodalled, markers, dangling: dangling.length };
 if (json) console.log(JSON.stringify(out, null, 2));
 else {
-  console.log(`${file}: ${rules.length} rules, next free number ${next}${duplicates.length ? `, DUPLICATE numbers ${[...new Set(duplicates)].join(", ")}` : ""}`);
-  for (const r of rules) console.log(`  ${String(r.number).padStart(3)}  ${r.level.padEnd(10)} ${r.section ? `[${r.section}] ` : ""}${r.text.slice(0, 90)}`);
+  console.log(`${file}: ${rules.length} rules, next free number ${next}${duplicates.length ? `, DUPLICATE numbers ${[...new Set(duplicates)].join(", ")}` : ""}${unmodalled.length ? `, no MUST/SHOULD in ${unmodalled.join(", ")}` : ""}`);
+  for (const r of rules) console.log(`  ${String(r.number).padStart(3)}  ${(r.level || "—").padEnd(10)} ${r.section ? `[${r.section}] ` : ""}${r.text.slice(0, 90)}`);
   console.log(`${markers.length} exception marker${markers.length === 1 ? "" : "s"}${dangling.length ? `, ${dangling.length} citing a rule that does not exist` : ""}`);
   for (const m of markers) console.log(`  ${m.exists ? "ok  " : "BAD "} rule ${m.rule}  ${m.file}:${m.line}  ${m.reason.slice(0, 80)}`);
 }

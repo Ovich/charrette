@@ -1,6 +1,6 @@
 ---
 name: project-conventions
-description: Use when a project's conventions need to be written down or extended: starting a codebase from scratch, capturing a design decision that was just made, or turning unwritten patterns in an existing repo into rules. Produces or grows an AGENTS.md / CLAUDE.md. Any language or stack.
+description: Use when a project's conventions need to be written down or extended: starting a codebase from scratch, settling how one tier uses its framework, capturing a design decision that was just made, or turning unwritten patterns in an existing repo into rules. Produces or grows an AGENTS.md / CLAUDE.md. Any language or stack.
 ---
 
 # Project conventions
@@ -40,41 +40,27 @@ rationalized away.
 `2. **MUST derive DB-row types from Drizzle, never hand-write them.** Use `typeof <table>.$inferSelect`, or the aliases exported from `@roster/db`. Hand-written copies drift from the schema silently.`
 </Good>
 
-<Bad>
-`2. **Types should be consistent.** Avoid duplicating type definitions across the codebase where possible, as this can lead to maintenance burden over time and inconsistencies between different parts of the application...`
-</Bad>
-Vague, unbounded, unfalsifiable, and names nothing.
-
 ## Ground it in the vendor's own docs
 
-Before proposing rules for a stack you haven't already codified, **read what its
-makers recommend.** Every serious framework, ORM, and runtime publishes guidance on
-project structure, data flow, and the mistakes it expects you to make: React's
-"you might not need an effect", Drizzle on inferred types, Django on apps and
-settings, Go's project layout, Rails' conventions.
-
-- One pass per stack component, official domain only (`react.dev`, `orm.drizzle.team`,
-  `docs.djangoproject.com`). Blog posts and aggregators are not sources here.
-- Note the **major version** you read for. This guidance changes between versions,
-  and a rule sourced from v4 docs in a v6 project is worse than no rule.
-- Distill; don't transcribe. The docs yield candidates, and candidates still face the
-  five filters. Most of a framework's guide is teaching, not convention.
-- **Cite the URL in the rule** so a future reader can check whether it still says that.
-- **A rule that departs from official guidance must say so and say why.** "Departs
-  from <X>'s recommended <Y> because <reason>": a deliberate, recorded departure is
-  fine; an accidental one is how a codebase ends up fighting its own framework.
-
-Where official guidance is silent (and it is silent on most of `decision-points.md`,
-because those are *your* decisions), say so and decide on the merits.
+Before proposing rules for a stack or framework not yet codified, read its makers'
+own guidance, official domain only, and note the major version read: a rule sourced
+from an older major is worse than none. Blog posts and aggregators are not sources.
+The docs yield candidates, not rules, and candidates still face the five filters.
+Cite the URL in the rule. A rule that departs from official guidance says so and why:
+an accidental departure is a codebase fighting its framework. Where the docs are
+silent, which they are on most decision points, say so and decide on the merits.
 
 ## Three modes
 
-**bootstrap**: new codebase. Ask what the stack is, read its official guidance (above),
-then work through only the decision points *that stack actually forces* (see
-`decision-points.md`), one question at a time. Write an `## Architecture (context you must not break)` section plus the
-handful of rules those answers produce. Stop there: 5–8 rules is a healthy day one.
-A long document written before the code exists is mostly guesses, and wrong guesses
-are expensive to unwind.
+**bootstrap**: new codebase. Read the stack before asking for it: the foundation
+reference when the project has a roadmap (`../roadmap/SKILL.md` in this collection),
+its boards in aiview, any conventions file already present. Ask only what none of them
+answers. Read the stack's official guidance, then work through only the decision points
+*that stack actually forces* (`decision-points.md`), through the `interview` skill
+(`../interview/SKILL.md` in this collection). Write an `## Architecture (context you
+must not break)` section plus the handful of rules those answers produce. Stop there:
+5–8 rules is a healthy day one. A long document written before the code exists is
+mostly guesses, and wrong guesses are expensive to unwind.
 
 **harvest**: existing codebase. Read the source and recent history for patterns that
 are already followed but unwritten, and for places the codebase contradicts itself.
@@ -87,16 +73,26 @@ you think it is.
 five filters, write it in the shape above, place it in the section it belongs to.
 This is the common case: the document grows one decision at a time.
 
+## One level down: the framework's forks
+
+`decision-points.md` asks what the architecture forces. A framework forces a second
+set inside one tier: where state lives, how a leaf gets its data, which reactive
+primitive is the default. When the stack names a framework with a catalogue at
+`references/framework-<name>.md`, read it after the stack catalogue and treat it the
+same way in all three modes. Run it when that tier is about to get real, not on day
+one for every tier. A framework without one gets a catalogue first. An entry adds to a
+stack entry the official URL, the major version read, and two lines that let someone
+who does not know the framework judge the fork.
+
 ## Placement and numbering
 
 Numbering is **append-only**. A new rule takes the next free number and existing rules
 are never renumbered, because `AGENTS EXCEPTION (rule 11)` markers in the code point at
-numbers. `node scripts/rules.mjs` (path relative to this skill, run in the repository)
-prints the rules with their sections, the next free number, and every marker in the
-tree with the rule it cites, exit 1 on a marker citing a rule that does not exist or
-on a duplicate number: run it before writing a rule and before saying a marker holds.
-Group rules under the headings the document already uses; add a heading only when a
-third rule needs it.
+numbers. `node scripts/rules.mjs` prints the rules with their sections, the next free
+number, and every marker in the tree with the rule it cites, exit 1 on a marker citing
+a rule that does not exist or on a duplicate number: run it before writing a rule and
+before saying a marker holds. Group rules under the headings the document already
+uses; add a heading only when a third rule needs it.
 
 Every document gets two clauses, once, near the top. The escape hatch: a rule that is
 genuinely unreasonable at a specific site may be deviated from with a comment beginning
@@ -104,9 +100,7 @@ genuinely unreasonable at a specific site may be deviated from with a comment be
 finding, and so is a marker whose reasoning doesn't hold up. A convention doc with no
 escape hatch produces either lies or bad code. And the capture clause: when a decision
 made during a session would pass the five filters, say so in chat before the session
-ends and propose the rule, written here only on the person's yes. The convention
-document is the one file every agent reads, so the trigger for growing it lives there,
-not in the skills that happen to make decisions.
+ends and propose the rule, written here only on the person's yes.
 
 ## Never propose
 
