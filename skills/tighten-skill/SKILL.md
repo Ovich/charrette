@@ -23,18 +23,21 @@ A skill is read on every run. Every line it carries costs attention on every run
 - **No history.** No dates, no "this was tried", no story of how the rule came to be. The references and the environment hold facts.
 - **A table where the columns are the instruction**: a report format, a state table.
 
-## The line test
+## What to detect
 
-Ask of every line: **does the agent act on it, and is it said where it acts?**
+Run every line, heading and bullet lead through four signals. One hit is a cut.
 
-- Fails the first: exposition, justification, a description of another skill's job. Cut.
-- Fails the second: a meaning stated here and again where it applies. Keep the one where it applies.
-- **Cut the whole line, never trim it.** A trimmed no-op is a shorter no-op.
+- **Not necessary.** The agent does nothing with it. The tell: it says where something comes from, why a rule exists, or what another skill does. *"`write-plan` produces it."*
+- **Not informative.** It names a shape, a count or a category, not a subject. The tell: a heading you cannot guess the content from, a lead that could head any section. *"Two questions, once."* *"Input."* Rename to what the section is for, or cut.
+- **Said where it acts.** The meaning appears again in the line that uses it. The tell: reading on, you meet it a second time as a rule. Keep the second.
+- **History.** A date, a "was tried", a story of how the rule arrived. The tell: past tense about the document itself.
+
+**Cut the whole line, never trim it.** A trimmed no-op is a shorter no-op. A heading that fails is renamed, not deleted.
 
 ## The passes
 
 1. **Rewrite** in the shape, from the inventory. Check every inventory line is present. Show the person the before and after line count.
-2. **Prune** with the line test, once alone. Then ask the person for one line they doubt, answer what in it is unnecessary, cut it, and repeat until they stop.
+2. **Prune** with the four signals, once alone. Then ask the person for one line they doubt, answer what in it is unnecessary, cut it, and repeat until they stop.
 3. **Headings**: each one named for its purpose.
 4. **Cross-references**: every pointer into the skill from a sibling still resolves.
 
