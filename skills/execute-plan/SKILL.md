@@ -14,7 +14,7 @@ An approved plan is a **mandate**. Run it, keep the tracker true, stop only wher
 - **Do not start** if the plan has no tracker, a slice has no slice document, or a done-when no test can express. Say so and finish the plan first.
 - **Reconcile a tracker the repository has moved past** before starting; say what you found.
 
-## Two questions, once
+## Pace and steps
 
 Ask both in one message, recommended answer first. Write the answers into the state node; a resumed session does not ask again.
 
