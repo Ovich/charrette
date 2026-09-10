@@ -5,14 +5,7 @@ description: Use when handed one slice document to carry out, as the agent doing
 
 # Execute a slice
 
-The slice document says what to build and what counts as done. Work from it: it was
-written to carry everything the work needs, and its blockers were checked before it
-reached you.
-
-Names of documents in the slice resolve through `aiview` (`../aiview/SKILL.md` in this
-collection). A name is not a path: the data home differs per machine.
-
-## When to stop instead
+## When to stop
 
 Three things end the slice before it is finished. Each is a report, not an improvisation.
 
