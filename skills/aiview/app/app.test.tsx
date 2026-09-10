@@ -369,6 +369,58 @@ describe("MockupFrame modes", () => {
   });
 });
 
+describe("mockup theme", () => {
+  afterEach(() => localStorage.clear());
+
+  const themed = `<html><head><style>:root{--bg:#fff}@media (prefers-color-scheme: dark){:root{--bg:#000}}@media (prefers-color-scheme: light){:root{--bg:#eee}}</style></head><body><p>screen</p></body></html>`;
+
+  test("withTheme rewrites the media condition, never the rules inside it", async () => {
+    const { withTheme, THEME_MARK } = await import("./lib/theme.ts");
+
+    // system is a true no-op: a mockup behaves exactly as it does on disk
+    expect(withTheme(themed, "system")).toBe(themed);
+
+    const dark = withTheme(themed, "dark");
+    expect(dark).toContain("@media (min-width: 0px){:root{--bg:#000}}");
+    expect(dark).toContain("@media (max-width: 0px){:root{--bg:#eee}}");
+    expect(dark).toContain(THEME_MARK);
+    expect(dark).toContain('setAttribute("data-theme","dark")');
+
+    const light = withTheme(themed, "light");
+    expect(light).toContain("@media (max-width: 0px){:root{--bg:#000}}");
+    expect(light).toContain("@media (min-width: 0px){:root{--bg:#eee}}");
+
+    // the declarations themselves are untouched, whichever way it went
+    expect(dark).toContain("--bg:#000");
+    expect(light).toContain("--bg:#000");
+  });
+
+  test("spacing and case in the media query do not matter, and a file with no body still gets the script", async () => {
+    const { withTheme, THEME_MARK } = await import("./lib/theme.ts");
+    const odd = `<style>@media (PREFERS-COLOR-SCHEME : dark){b{color:red}}</style>`;
+    const out = withTheme(odd, "dark");
+    expect(out).toContain("@media (min-width: 0px){b{color:red}}");
+    expect(out).toContain(THEME_MARK);
+  });
+
+  test("the toggle sits in the toolbar, persists, and forces the frame", async () => {
+    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    render(<MockupFrame html={themed} />);
+    const frame = () => document.querySelector("iframe")!;
+
+    // system by default, so the html reaches the frame as written
+    expect(frame().getAttribute("srcdoc")).toContain("(prefers-color-scheme: dark)");
+
+    fireEvent.click(screen.getByText("dark"));
+    expect(localStorage.getItem("aiview.theme")).toBe("dark");
+    expect(frame().getAttribute("srcdoc")).not.toContain("(prefers-color-scheme: dark)");
+    expect(frame().getAttribute("srcdoc")).toContain('setAttribute("data-theme","dark")');
+
+    fireEvent.click(screen.getByText("system"));
+    expect(frame().getAttribute("srcdoc")).toContain("(prefers-color-scheme: dark)");
+  });
+});
+
 describe("mockup variants", () => {
   const page = `<html><body><p>screen</p><div class="mockup-bar" data-component="MockupBar"><button data-aiview-variant="documents" aria-pressed="true">documents</button><button data-aiview-variant="profile">your profile</button><button data-aiview-action="reset">reset</button></div></body></html>`;
 

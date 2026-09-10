@@ -4,6 +4,7 @@ import { Button } from "../ui/button.tsx";
 import type { BindingsSummary } from "../../lib/api.ts";
 import { withOverlay } from "../../lib/overlay.ts";
 import { mockupControls, withBridge } from "../../lib/bridge.ts";
+import { THEMES, type Theme, withTheme } from "../../lib/theme.ts";
 
 const VIEWPORTS: Array<[string, number]> = [
   ["mobile", 390],
@@ -43,6 +44,10 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
   const [mode, setMode] = useState<MockupMode>(() =>
     stored("aiview.mockupMode", "rendered") === "composition" ? "composition" : "rendered",
   );
+  const [theme, setTheme] = useState<Theme>(() => {
+    const s = stored("aiview.theme", "system");
+    return THEMES.includes(s as Theme) ? (s as Theme) : "system";
+  });
   const frame = useRef<HTMLIFrameElement>(null);
   const width = VIEWPORTS.find(([n]) => n === viewport)?.[1] ?? 0;
   const selectViewport = (v: string) => {
@@ -54,6 +59,11 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
     if (!v) return;
     setMode(v as MockupMode);
     store("aiview.mockupMode", v);
+  };
+  const selectTheme = (v: string) => {
+    if (!v) return;
+    setTheme(v as Theme);
+    store("aiview.theme", v);
   };
 
   // The mockup's declared variants and actions, mirrored above the frame. The chosen
@@ -86,7 +96,9 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
     return () => window.removeEventListener("message", onMessage);
   }, [onOpenSource]);
 
-  const served = withBridge(mode === "composition" ? withOverlay(html, { bindings, target }) : html);
+  // The theme is forced last, so it also normalises whatever the overlay and the bridge
+  // brought with them: one pass over the html that actually reaches the frame.
+  const served = withTheme(withBridge(mode === "composition" ? withOverlay(html, { bindings, target }) : html), theme);
   const bound = bindings?.sources.length ?? 0;
 
   return (
@@ -106,6 +118,14 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
           {MODES.map((m) => (
             <ToggleGroupItem key={m} value={m}>
               {m}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <span className="ml-3">theme</span>
+        <ToggleGroup type="single" value={theme} onValueChange={selectTheme} data-component="MockupThemeToggle">
+          {THEMES.map((t) => (
+            <ToggleGroupItem key={t} value={t}>
+              {t}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
