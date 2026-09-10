@@ -72,13 +72,41 @@ is the shape of the work, not a status. "Nothing" only when nothing was ever req
 **Acceptance criteria.** A checklist. A command and its expected exit code wherever one
 exists.
 
-**Context.** What already exists that this work builds on. The interfaces the plan
-designed for it, inlined, since the tests are written against them. Links to the spec
-section, the mockups, the decisions that bind. Document names resolve through `aiview`.
+**Context.** Carried, not linked. The agent may open any document, but everything it
+needs to start should already be here, in this order, each block naming the document and
+the date it was carried from:
+
+- *What this is for*: the spec's own sentences about this behaviour, quoted.
+- *The decisions that bind*: each **quoted with its id and date, never paraphrased**. A
+  decision restated in your own words is a second copy that drifts, and the board stays
+  the authority: on a conflict the slice is wrong, and the agent reports it.
+- *The picture*: the fragment of the spec's or board's diagram this slice touches,
+  inlined as mermaid and trimmed to that fragment, never the whole architecture.
+- *The screen*, for work with a face: the mockup's relevant part rendered into markdown —
+  the component and element names it offers (`aiview components`), its copy, and each
+  state with what triggers it. The mockup file stays the authority for the look, and the
+  design language names the tokens.
+- *The interfaces* the plan designed for it, inlined, since the tests are written against
+  them.
+- *What exists already* that this work builds on.
+
+Document names resolve through `aiview`.
+
+**What is already known, so the slice does not rediscover it.** The environment facts a
+first command trips on: versions, what must be running, which credentials and how they
+expire, what is deployed right now and what that proves. Anything tried and abandoned,
+with why.
+
+**Not in this slice.** What a reader would reasonably assume is included and is not.
+Only when there is such a thing.
 
 **Watch out.** Only when the slice has a known trap.
 
 </slice-template>
+
+Carry the part that binds, trimmed to it. A slice document that reprints a spec is one
+nobody rereads, and the conventions file is never copied here at all: the agent reads it
+anyway, and a rule quoted in two places is a rule that will disagree with itself.
 
 No source file paths: they go stale between writing the slice and running it. Document
 names, commands and interfaces are not paths. A code snippet only when it carries a
