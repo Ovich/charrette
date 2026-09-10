@@ -11,7 +11,7 @@ inject it never sees it otherwise.
 Code here is written test-first, the TDD cycle: a failing test, the code that passes it,
 then the next one.
 
-The design it aims at, the same four groups `code-design-review` judges by:
+The design aims at:
 
 | | |
 |---|---|
