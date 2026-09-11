@@ -39,9 +39,10 @@ Either way, a slice marked `👤` stops before it starts, and a finding that cha
 
 ## Watching a subagent
 
-Read `references/watching.md`.
+**The watch is the orchestration.** Once a slice is delegated, this session's work *is* the loop: where the subagent is, whether it stalled, whether it left the brief. The `Agent` call and the watch loop go out in the same message; a subagent running with no loop behind it is a dispatch not finished. Read `references/watching.md` before the first dispatch.
 
 - **Probe every 30 seconds. Report only on change.** Move ▶ as it goes.
+- **The completion notification is not the watch.** It says the subagent ended, nothing about the two hours before.
 - **A subagent still for two minutes is news.** Report the stall.
 - **Read the transcript by digest, never whole.**
 
