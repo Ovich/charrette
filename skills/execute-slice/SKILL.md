@@ -12,7 +12,8 @@ Each is a report, never an improvisation.
 <stops>
 
 - **The acceptance criteria already pass.** Say so and end.
-- **The document has no modules table**, or the work touches a module it does not name, a test fixture included. Report it; a module is designed in the plan, never in the slice.
+- **The document has no seams under test or no module blocks**, or the work touches a module it does not name, a test fixture included. Report it; a module is designed in the plan, never in the slice.
+- **A test wants to cross past a seam the document names**, a table read, a private call, a spy. Report it; the module is the wrong shape, and that is the plan's to fix.
 - **The document names something that does not exist**, a module, a command, a fact the work depends on. Report it; never guess around it.
 - **The work reveals a dependency the document did not name.** Say what it is and where it surfaced.
 

@@ -9,7 +9,7 @@ description: Use when an approved spec exists and the implementation plan for it
 
 ## Input
 
-- **The approved spec**, open in the viewer (`aiview` skill, `../aiview/SKILL.md` in this collection), its board, and the previous plan's finished steps when this is not the first increment.
+- **The approved spec**, open in the viewer (`aiview` skill, `../aiview/SKILL.md` in this collection), and the previous plan's finished steps when this is not the first increment. The board is not opened: the spec is what the brainstorm extracted and tightened, and a decision the spec does not carry is a finding for the spec.
 - **How the project tests**, read before drawing a slice: its scripts, its existing tests, its CI. A codebase with no tests yet gets the question in the draft review: at which level each layer is tested, and what a test may touch.
 
 ## Slices
@@ -27,7 +27,7 @@ description: Use when an approved spec exists and the implementation plan for it
 **A table in the plan of the implementation decisions**: id (`ID4`), kind, decision, status (agreed, open, deferred), source, slice, rows ordered by slice.
 
 - **Kinds**: module (every module a slice touches, with its state as `write-slice` names them; the interface is the slice document's), architecture, API contract, technical clarification from the person.
-- **Sources**: `board D3`, `board Q7`, `plan Q2`, the code, the docs.
+- **Sources**: the spec by decision id (`D3`), `plan Q2`, the code, the docs.
 - **`execute-plan` adds rows** as the work decides things.
 
 ## Diagrams
@@ -42,8 +42,8 @@ description: Use when an approved spec exists and the implementation plan for it
 ## The document
 
 - **`YYYY-MM-DD-<topic>.plan.md` beside the spec**, kind `plan`, the spec's tags, in the group `aiview` gives a plan (`../aiview/SKILL.md` in this collection): its own, shared with its slices.
-- **Opening lines**: title, the spec's and the board's paths, the stories this increment delivers, `hardened: yes | no`.
-- **Note the plan's path at the top of the spec and the board.**
+- **Opening lines**: title, the spec's path, the stories this increment delivers, `hardened: yes | no`.
+- **Note the plan's path at the top of the spec.**
 - **With a roadmap** (`../roadmap/SKILL.md` in this collection), the plan carries the slot's slug as a tag, and a finished plan is one of the moments the roadmap is redrawn.
 
 ## Draft review, hardening, approval, then the slice documents

@@ -23,9 +23,9 @@ SL6 calls=86 idle=8s | Bash:pnpm run check | S6.7: removing CDK.
 
 ## The cadence
 
-- **Probe every 30 seconds. Report only when something changed.**
+- **Probe every minute. Report only when something changed.**
 - **Compare the line with its `idle=` counter stripped**; that number moves on the clock, not on progress.
-- **Report a subagent that has not moved for two minutes**, even though nothing changed. A stall means waiting, looping, or dead.
+- **Report a subagent that has not moved for three minutes**, even though nothing changed. A stall means waiting, looping, or dead.
 
 ```sh
 prev=""; quiet=0
@@ -36,9 +36,9 @@ while :; do
     echo "$now"; prev="$key"; quiet=0
   else
     quiet=$((quiet + 1))
-    [ $quiet -ge 4 ] && { echo "STALLED 2m+: $now"; quiet=0; }
+    [ $quiet -ge 3 ] && { echo "STALLED 3m+: $now"; quiet=0; }
   fi
-  sleep 30
+  sleep 60
 done
 ```
 
