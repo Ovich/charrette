@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: Use when reviewing a pull request, branch or diff in any language, to produce the analysis a reviewer decides from: what changed, why, how the structure moved, what it can break, and the decisions only a human can make, at five altitudes from code primitives to delivery and intent. Not a bug hunt, and not framework-specific review.
+description: "Use when reviewing a pull request, branch or diff in any language, to produce the analysis a reviewer decides from: what changed, why, how the structure moved, what it can break, and the decisions only a human can make, at five altitudes from code primitives to delivery and intent. Not a bug hunt, and not framework-specific review."
 ---
 
 # PR review

@@ -1,6 +1,6 @@
 ---
 name: project-conventions
-description: Use when a project's conventions need to be written down or extended: starting a codebase from scratch, settling how one tier uses its framework, capturing a design decision that was just made, or turning unwritten patterns in an existing repo into rules. Produces or grows an AGENTS.md / CLAUDE.md. Any language or stack.
+description: "Use when a project's conventions need to be written down or extended: starting a codebase from scratch, settling how one tier uses its framework, capturing a design decision that was just made, or turning unwritten patterns in an existing repo into rules. Produces or grows an AGENTS.md / CLAUDE.md. Any language or stack."
 ---
 
 # Project conventions

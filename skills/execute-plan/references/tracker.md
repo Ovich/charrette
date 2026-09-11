@@ -1,91 +1,59 @@
 # The tracker
 
-The diagram is the record of where the work stands, not an illustration of a record
-kept elsewhere.
+The **tracker** is the plan's phasing diagram, and the single record of where the work stands.
 
-A plan is read twice: once to agree on it, then by whoever resumes the work, often a
-later session with none of the conversation in context. The second reader needs state,
-and slices alone do not carry it. So the phasing diagram does double duty: it is the
-tracker, the single place that says where the work stands.
+## Markers
 
-## The markers a tool can find
-
-A plan holds several diagrams and only one of them is the record, so the tracker names
-itself. Two markers, both ordinary mermaid, both there so the block and its slices can
-be found without guessing:
-
-- **`%% tracker`**, a mermaid comment as the first line inside the fence, under
-  `flowchart TB`. Without it a reader has to infer which block is the tracker from the
-  glyphs in its labels, which is a guess that gets it wrong the day another diagram
-  quotes one.
-- **`SL<n>` as a slice's subgraph id**, matching the `S<n>.<step>` of the steps inside
-  it (`subgraph SL3[...]` holds `S3.1`, `S3.2`). The two say the same thing, so a step
-  pasted into the wrong slice is caught by comparing them.
-
-`aiview tracker check <plan>` reads both and reports every way the diagram disagrees
-with itself; `aiview tracker sync <plan>` rewrites the `class` lines from the glyphs.
-Run `check` after editing a tracker by hand, and `sync` instead of maintaining the
-class lines yourself.
+- **`%% tracker`** as the first line inside the fence, under `flowchart TB`, so the block names itself among the plan's diagrams.
+- **`SL<n>` as a slice's subgraph id**, matching the `S<n>.<step>` of the steps inside it (`subgraph SL3[...]` holds `S3.1`, `S3.2`), so a step pasted into the wrong slice is caught.
 
 ## Slices and steps
 
-A slice is a `subgraph` whose id is `SL<n>`, its title carrying the stories it serves
-and its `👤` mark when it needs a person (`Slice 2 · US3 · 👤 decision`). Its steps are the nodes
-inside it, and the slice's done-when is the done-when of its last node, or of the
-join where its arms meet. Every step is a node, at the granularity someone would
-pause at, with the dependency edges and decision gates that belong in a phasing
-diagram. Node ids are `S<slice>.<step>` (`S2.3`); a step discovered between `S2.3`
-and `S2.4` is `S2.3b`: insert, never renumber, since specs, boards and commit
-messages cite the old ids. A node whose done-when is a story's acceptance criterion
-carries the story's id in its label, and the observed criterion is written there
-when it is met. Each label opens with its status:
+- **A slice is a `subgraph`**, its title carrying the stories it serves and its `👤` mark when it needs a person (`Slice 2 · US3 · 👤 decision`).
+- **A slice's done-when is its last node's**, or the join's where its arms meet.
+- **Every step is a node** at the granularity someone would pause at, with its dependency edges and decision gates.
+- **Node ids are `S<slice>.<step>`** (`S2.3`); a step discovered between `S2.3` and `S2.4` is `S2.3b`. Insert, never renumber: specs, boards and commits cite the old ids.
+- **A node whose done-when is a story's acceptance criterion carries the story's id**, and the observed criterion is written into the label when met.
+- **A step whose first half can finish while the second waits on someone is two steps.**
+
+## Status
+
+Each label opens with its glyph:
 
 | Glyph | Means |
 |---|---|
-| ✅ | Done: its done-when was met, and the evidence is written into the step below |
+| ✅ | Done: its done-when was met, the evidence written into the step |
 | ▶ | In progress, the one place work is happening |
 | ⏸ | Blocked on someone else: the node says what it waits on and when it was asked for |
 | ⬜ | Not started |
 | ✖ | Failed or abandoned: the step says what happened and what changed because of it |
 
-One ▶ at a time, or the diagram stops answering "where am I"; where the plan forks, one
-▶ per fork. ⏸ keeps that rule honest:
-a step that stalls on something outside your control becomes ⏸ and the frontier moves
-to whatever can proceed. A step parked as ▶ for days claims attention it is not getting.
+- **One ▶ at a time**; where the plan forks, one ▶ per arm.
+- **A step that stalls on something outside your control becomes ⏸** and ▶ moves to whatever can proceed.
 
-A step whose first half can finish while the second waits on someone else is two
-steps; drawn as one, it guarantees a hole in the tracker the day it happens.
+## Forks
 
-Slices that are independent may be drawn as a fork: two or more arrows leaving one node
-and joining at a later one, each labeled with its area. A fork is between slices, never
-inside one: a slice is one agent's work. The test is disjointness: the arms touch
-different files or areas, and neither needs the other's result before the join. Two
-slices that touch one file are one arm. So are two that touch one cloud account, one
-deployed environment, one database or one registry, however disjoint their files: the
-second write wins and neither arm can see the other. The join node's done-when covers
-what the arms produced together.
+- **A fork is between slices, never inside one**: two or more arrows leaving one node and joining at a later one, each labeled with its area; a slice is one agent's work.
+- **Arms are disjoint**: they touch different files or areas, and neither needs the other's result before the join.
+- **Two slices that touch one file are one arm.** So are two that touch one cloud account, one deployed environment, one database or one registry, however disjoint their files.
+- **The join node's done-when covers what the arms produced together.**
+- **A fork's arms are slices, each on its own branch off the plan's**; *branch* means a git branch, nothing in the diagram.
 
-Reserve *branch* for a git branch. A fork's arms are slices, each on its own branch off
-the plan's. `execute-plan` (`../execute-plan/SKILL.md` in this collection) carries that
-rule.
+## Slots
 
-## Slots, when the tracker is a roadmap's
+The `roadmap` skill draws its tracker to this protocol with one difference: **the nodes are slots, one subgraph per iteration, and a slot's glyph is derived from the documents that carry its tag**, never from evidence observed in a step.
 
-The `roadmap` skill (`../roadmap/SKILL.md` in this collection) draws its
-tracker to this protocol with one difference: the nodes are slots, one subgraph per
-iteration, and a slot's glyph is derived from the documents that carry its tag,
-never from evidence observed in a step. ⬜ empty or in design, ▶ the slot whose
-pieces of work are being drawn, planned or run (one per iteration, as one ▶ per
-arm here), ⏸ blocked on a foundation row or on another slot, ✅ landed on the
-person's evidence that the feature is delivered and working, ✖ dropped with the
-reason. The state node's fields are the iteration, the slot in progress, next,
-blocked, and the foundation rows still open for the slot ahead.
+- ⬜ empty or in design.
+- ▶ the slot whose pieces of work are being drawn, planned or run, one per iteration.
+- ⏸ blocked on a foundation row or on another slot.
+- ✅ landed, on the person's evidence that the feature is delivered and working.
+- ✖ dropped, with the reason.
+
+The state node's fields are the iteration, the slot in progress, next, blocked, and the foundation rows still open for the slot ahead.
 
 ## The state node
 
-One node carries the resume state, drawn apart from the flow and connected to nothing.
-Its fields are fixed, and they are overwritten, never appended to: the node describes
-now, never how now was arrived at.
+**One node carries the resume state**, drawn apart from the flow and connected to nothing. **Its fields are fixed and overwritten, never appended**: the node describes now.
 
 ```
 📍 state · <date>
@@ -98,28 +66,20 @@ pace     <run through | stop at each slice, as the person answered when the run 
 steps    <delegated | inline, as the person answered when the run began>
 ```
 
-Add a field only when a resumer would act on it, such as a fact the work has earned
-that a fresh session would otherwise rediscover the hard way: a rename, a version bump,
-an environment quirk. If a line is history, it belongs in the step that produced it.
-The failure this prevents is accretion: within a day an appended node holds three
-deployed versions, a fixed bug and a deleted file, and the resumer has to work out
-which lines are still true.
+- **Add a field only when a resumer would act on it**: a rename, a version bump, an environment quirk.
+- **A line that is history goes in the step that produced it.**
 
-## Keeping it readable
+## Layout
 
-One column. A tracker is scanned, not studied, and width ruins the scan. `flowchart
-TB`, steps chained linearly, only the gates and the parallel arms sideways. Three
-things widen it:
+- **One column**: `flowchart TB`, steps chained linearly, only the gates and the parallel arms sideways.
+- **Pin the state node above the flow with an invisible edge**, `ST ~~~ S1.1`; connected to nothing, it would be parked beside the column.
+- **Keep every `<br/>` line short**; long labels set node width.
+- **Leave `direction` out of a subgraph that is itself an edge endpoint**; it fights the outer layout.
 
-- The state node is connected to nothing, so the layout parks it beside the flow. Pin
-  it above with an invisible edge, `ST ~~~ S1.1`, and the column starts at the top.
-- Long labels set node width. Keep every `<br/>` line short; the state node is the
-  usual offender.
-- `direction` inside a subgraph that is itself an edge endpoint fights the outer
-  layout. Leave it out.
+## Styling
 
-Styling repeats what the glyph already says, never replaces it. Eight-digit hex, never
-`rgba()`, whose commas break a `classDef` (the `write-diagrams` skill has the reasons):
+- **Styling repeats what the glyph says, never replaces it.**
+- **Eight-digit hex, never `rgba()`**, whose commas break a `classDef`:
 
 ```
 classDef done stroke:#4a9d5f,stroke-width:2px,fill:#7f7f7f1a
@@ -128,11 +88,8 @@ classDef todo stroke-dasharray:4 3
 classDef state stroke:#8a8a8a,stroke-width:1px,fill:#7f7f7f12
 ```
 
-Styling is derived, never maintained: a step's state is the glyph, and `aiview tracker
-sync <plan>` writes the `class` lines from it. Written by hand in two places they
-drift, which is what happened between two sessions on 2026-09-09, one moving a label to
-▶ and leaving the node in `todo`.
+- **`aiview tracker sync <plan>` writes the `class` lines from the glyphs**; written by hand they drift.
 
-Parse the diagram, do not eyeball it. Mermaid fails quietly, a broken `classDef` still
-renders, just wrong. Run `aiview mermaid-check <plan>` and `aiview tracker check <plan>`
-after every edit.
+## Checks
+
+- **Run `aiview mermaid-check <plan>` and `aiview tracker check <plan>` after every edit.** Mermaid fails quietly; a broken `classDef` still renders, wrong.

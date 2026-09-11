@@ -1,6 +1,6 @@
 ---
 name: code-design-review
-description: Use when reviewing program design quality on a pull request, a diff, or a whole codebase in any language: DRY, KISS, YAGNI, the SOLID principles, cohesion, coupling, and the Law of Demeter. Not for correctness bug-hunting, and not for framework-specific review.
+description: "Use when reviewing program design quality on a pull request, a diff, or a whole codebase in any language: DRY, KISS, YAGNI, the SOLID principles, cohesion, coupling, and the Law of Demeter. Not for correctness bug-hunting, and not for framework-specific review."
 ---
 
 # Code design review

@@ -1,112 +1,62 @@
 ---
 name: brainstorm
-description: Use before building anything non-trivial (a new feature, service, integration, or system) to turn an idea into an approved spec with its architecture diagrams, through a design conversation on a live board: requirements, approaches, boundaries, data flow. Produces the board and the spec; the plan is write-plan's. Not for bug fixes or mechanical edits.
+description: "Use before building anything non-trivial (a new feature, service, integration, or system) to turn an idea into an approved spec with its architecture diagrams, through a design conversation on a live board: requirements, approaches, boundaries, data flow. Produces the board and the spec; the plan is write-plan's. Not for bug fixes or mechanical edits."
 ---
 
 # Brainstorm
 
-Turns an idea into a design and a written spec (through questions, not assumptions)
-and **draws the design while discussing it.**
-
 <HARD-GATE>
-No implementation, no scaffolding, no code, no file creation for the thing being
-designed until the spec is written and the user has approved it. Every project, however
-simple. A simple project's spec is three paragraphs, but it exists and it's approved.
+No implementation, no scaffolding, no code, no file creation for the thing being designed until the spec is written and the user has approved it. Every project, however simple: a simple project's spec is three paragraphs, but it exists and it is approved.
 </HARD-GATE>
 
 ## Flow
 
-1. **Read the context**: existing code, `AGENTS.md`/`CLAUDE.md`, recent commits, the
-   conventions already in force, and when the topic has a group in aiview, its board
-   and the last plan's finished steps. Design that fights the house rules is wasted
-   design.
-2. **Scope check**: if the request is several independent systems, say so now and help
-   decompose it. Each piece gets its own spec. Don't refine details of a project that
-   needs splitting first.
-3. **Question loop**: run the `interview` skill (`../interview/SKILL.md` in this
-   collection) on the board's decisions table, which is its tree. The first rows are
-   purpose, constraints, success criteria, and what is explicitly out of scope. The
-   interview runs in chat; every decision it settles goes into the table as it lands,
-   and the exchange itself goes into the board's interview log (below). When the
-   table has no open row, ask one more question before moving on: is there anything
-   else this should cover? Point at directions the loop did not reach, chosen from
-   the design in hand (what happens when the new part fails, who else reads or
-   writes this data, what is deliberately left out, how it is undone, what the first
-   user sees), and take a new row for each one the person picks up.
-4. **Approaches**: propose 2–3 with real trade-offs. Lead with your recommendation and
-   why. YAGNI every one of them before presenting.
-5. **Design, in sections**: scale each section to its complexity. Ask after each one
-   whether it holds before moving on.
-6. **Write the spec** → self-review → user reviews it.
-7. **Hand off**: the plan is the `write-plan` skill's (`../write-plan/SKILL.md` in
-   this collection), written once the spec is approved. When the project has a
-   roadmap (`../roadmap/SKILL.md` in this collection), the board carries the slug of
-   the slot it serves as a tag, and the close says the roadmap may need a redraw.
+1. **Read the context**: existing code, `AGENTS.md`/`CLAUDE.md`, recent commits, the conventions in force, and when the topic has a group in aiview, its board and the last plan's finished steps.
+2. **Scope check**: a request that is several independent systems is decomposed now, one spec per piece, before any detail is refined.
+3. **Question loop**: run the `interview` skill (`../interview/SKILL.md` in this collection) on the board's decisions table. The first rows are purpose, constraints, success criteria, and what is explicitly out of scope. Every decision it settles goes into the table as it lands; the exchange goes into the interview log.
+4. **When the table has no open row, ask one more question**: is there anything else this should cover? Point at directions the loop did not reach, chosen from the design in hand (what happens when the new part fails, who else reads or writes this data, what is deliberately left out, how it is undone, what the first user sees), and take a new row for each one the person picks up.
+5. **Approaches**: 2–3 with real trade-offs, YAGNI applied to each, your recommendation first with its why. Present the trade-off that decides it, not a feature matrix; options that differ structurally are drawn side by side.
+6. **Design, in sections**, each scaled to its complexity; ask after each whether it holds.
+7. **Write the spec**, self-review it, then the user reviews it.
+8. **Hand off**: the plan is the `write-plan` skill's (`../write-plan/SKILL.md` in this collection), written once the spec is approved. With a roadmap (`../roadmap/SKILL.md` in this collection), the board carries the slug of the slot it serves as a tag, and the close says the roadmap may need a redraw.
 
-## The board (live document)
+## The board
 
-The design lives in one Markdown file from the first question, not in chat. Create
-`YYYY-MM-DD-<topic>.brainstorm.md` in the data home (ask the `aiview` skill for the
-path rather than composing one, and never write inside the project repo) as soon as
-the context is read, and keep every decision, open question, considered option,
-diagram, and research note in it: the chat is transient, the board is the record.
-Structure:
-decisions table (id `D3`, decision, depends on, status agreed / open / deferred, log
-entry `Q7`), context being built on,
-design sections, diagrams, research notes, and last the **interview log**: one entry
-per question in the order asked, appended as each answer lands, verbatim, the
-question with its options and recommendation, then the answer as given. The
-decisions table row cites its entry (`Q7`). The table says what was decided; the log
-says what else was on offer and why it lost, which is what a later session or the
-spec's alternatives need.
+**The design lives in one Markdown file from the first question, never in chat.** Create `YYYY-MM-DD-<topic>.brainstorm.md` as soon as the context is read, at the path the `aiview` skill gives, never inside the project repo. Every decision, open question, considered option, diagram and research note goes in it.
 
-Open the board via the `aiview` skill (`../aiview/SKILL.md` in this collection)
-the moment you create it: kind `brainstorm` (from the filename), tags = project + topic,
-group = the topic (titled: the spec will join it, the plan gets its own), started honestly. Tell
-the user the URL it prints. Nothing to babysit: the server is detached; keep editing
-the same file, it reloads on save. Resuming on another machine needs no
-re-registration: list the brainstorm-kind documents and read the relevant board before
-asking the user anything again.
+- **Open it via the `aiview` skill (`../aiview/SKILL.md` in this collection) the moment it exists**: kind `brainstorm` (from the filename), tags = project + topic, group = the topic (titled; the spec joins it, the plan gets its own), started honestly. Tell the user the URL it prints, then keep editing the same file.
+- **Resuming on another machine**: list the brainstorm-kind documents and read the board before asking the user anything again.
+
+Its sections, in order:
+
+- **Decisions table**: id `D3`, decision, depends on, status agreed / open / deferred, log entry `Q7`.
+- **Context being built on.**
+- **Design sections**, **diagrams**, **research notes.**
+- **Interview log**, last: one entry per question in the order asked, appended as each answer lands, verbatim: the question with its options and recommendation, then the answer as given. The table says what was decided; the log says what else was on offer and why it lost.
 
 ## Diagrams
 
-Use the `write-diagrams` skill (`../write-diagrams/SKILL.md` in this
-collection). Pick from its catalog by the open question, follow its discipline. Brainstorm-specific guidance: use
-diagrams **during the question loop**, not only in the spec: a diagram with a `?` on
-the contested arrow is the cheapest way to ask a question. Expect 2–4 for a feature;
-the board's most common catalog entries are container, sequence, state machine,
-dependency graph, and option comparison.
+**The `write-diagrams` skill (`../write-diagrams/SKILL.md` in this collection)**: pick from its catalog by the open question, follow its discipline.
 
-## Approaches
-
-Present options conversationally with the trade-off that actually decides it, not a
-feature matrix. When the options differ structurally, draw them: two small container
-diagrams side by side beat two paragraphs. Say which you'd pick and why.
+- **Draw during the question loop**, not only in the spec: a `?` on the contested arrow is the cheapest way to ask a question.
+- **Expect 2–4 for a feature**; the board's usual entries are container, sequence, state machine, dependency graph, and option comparison.
 
 ## The spec
 
-Write `YYYY-MM-DD-<topic>.spec.md` beside the board, register it with aiview as kind
-`spec` carrying the board's tags **and the board's `--group`** (one piece of work, one
-container), and note the spec path at the top of the board. Contents:
+**Write `YYYY-MM-DD-<topic>.spec.md` beside the board**, kind `spec`, the board's tags and the board's `--group`, and note the spec's path at the top of the board.
 
-**Problem**: what's wrong today, who feels it · **Goals / non-goals**: the non-goals
-are the valuable half · **User stories**: as many as the change needs, each with an
-id (`US3`), the role, what they want, why, and acceptance criteria written as
-something observed; the interview's answers on purpose, what the first user sees and
-what is out of scope are where they come from, and the plan's slices, the tracker's
-evidence and a review's L5 all cite them · **Design**: prose plus the diagrams that
-earned their place ·
-**Data**: shapes, ownership, migrations · **Failure modes**: what breaks, what the
-user sees · **Testing**: what proves this works · **Open questions**: with a named
-owner, or none at all.
+- **Problem**: what is wrong today, who feels it.
+- **Goals / non-goals**: the non-goals are the valuable half.
+- **User stories**: as many as the change needs, each with an id (`US3`), the role, what they want, why, and acceptance criteria written as something observed. They come from the interview's answers on purpose, the first user's view and the out-of-scope; the plan's slices, the tracker's evidence and a review cite them.
+- **Design**: prose plus the diagrams that earned their place.
+- **Data**: shapes, ownership, migrations.
+- **Failure modes**: what breaks, what the user sees.
+- **Testing**: what proves this works.
+- **Open questions**: with a named owner, or none at all.
 
-Then self-review with fresh eyes and fix inline: any TBD or placeholder left? Do two
-sections contradict each other? Does every diagram match the prose beside it? Could a
-requirement be read two ways? If so, pick one and write it plainly. Is this one
-increment's plan's worth of work, or does it still need splitting?
+**Self-review with fresh eyes and fix inline**: a TBD or placeholder left; two sections contradicting; a diagram that does not match the prose beside it; a requirement readable two ways, pick one and write it plainly; more than one increment's worth of work, split it.
 
-Then stop and ask the user to review the file. The plan comes after approval, from
-`write-plan`.
+**Then stop and ask the user to review the file.** The plan comes after approval, from `write-plan`.
 
 ## Red flags
 

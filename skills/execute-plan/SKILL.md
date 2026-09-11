@@ -5,11 +5,9 @@ description: Use when carrying out an implementation plan the person has already
 
 # Execute a plan
 
-An approved plan is a **mandate**. Run it, keep the tracker true, stop only where a person adds something.
-
 ## Before starting
 
-- A plan whose diagram is the **tracker**. Its protocol is `references/tracker.md`; read it before the first edit.
+- **The tracker** is the plan's diagram; `references/tracker.md` is its protocol, read before the first edit of it.
 - **Open the plan in aiview every session** (`../aiview/SKILL.md` in this collection) and give the person the URL.
 - **Do not start** if the plan has no tracker, a slice has no slice document, or a done-when no test can express. Say so and finish the plan first.
 - **Reconcile a tracker the repository has moved past** before starting; say what you found.
@@ -41,19 +39,11 @@ Either way, a slice marked `👤` stops before it starts, and a finding that cha
 
 ## Watching a subagent
 
-A subagent returns once; watch it while it runs.
+Read `references/watching.md`.
 
 - **Probe every 30 seconds. Report only on change.** Move ▶ as it goes.
 - **A subagent still for two minutes is news.** Report the stall.
-- **Read the transcript by digest, never whole.** `references/watching.md` has the digest.
-- **Report as a table, every time**, one row per subagent, from the first probe:
-
-| Agent | Doing | In brief | Status |
-|---|---|---|---|
-| slice · step | from the digest | yes, or what strayed | on track · steer · stalled |
-
-- **A step the subagent calls done stays ⬜**, the claim in its label, until this session re-runs the evidence.
-- **Watch, do not supervise.** Decisions the slice document leaves to the subagent are the subagent's.
+- **Read the transcript by digest, never whole.**
 
 ## Branches and pull requests
 

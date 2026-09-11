@@ -1,14 +1,6 @@
 # Watching a subagent while it runs
 
-Read when a slice is delegated.
-
-A subagent returns once, when it is finished. Nothing arrives in between, so an
-orchestrator that waits for the return keeps a tracker that says nothing for the whole
-length of the work and then ticks every step at once. Both halves of that are what
-`SKILL.md` forbids.
-
-Its transcript is written as it works, and that is the feed. It is also hundreds of
-kilobytes within minutes, so it is digested, never read.
+Read when a slice is delegated. **A subagent returns once**; its transcript is the feed while it runs, and the feed is read by **digest**, never whole.
 
 ## The digest
 
@@ -23,41 +15,17 @@ One line per live subagent:
 SL6 calls=86 idle=8s | Bash:pnpm run check | S6.7: removing CDK.
 ```
 
-`--forbidden` is the brief's boundary as a regex, and a subagent that crosses it prints
-`BREACH xN`. Give it only what the brief actually forbids; a slice that touches nothing
-outward-facing needs none. **A boundary belongs to a brief, not to a run**: when two
-slices forbid different things, invoke it once per transcript with that slice's own
-pattern, never a union of both, or one subagent is flagged for what only the other was
-forbidden.
-
-`--label` names each agent after its slice, so the rows read as work rather than as hex.
-`--json` emits `{id, name, calls, idle, breaches, signal, last, said}` for building a
-table. `signal` is `WORKING`, `STALLED` or `BREACH` — a fact about the run, not a verdict:
-whether a subagent wants steering is the orchestrator's call, never the script's.
-
-The transcripts are under the Claude home, beside this session's own:
-
-```text
-<claude home>/projects/<project>/<session id>/subagents/agent-<agent id>.jsonl
-```
-
-**Never read one directly**, with `Read` or with the shell. The Agent tool's `.output`
-path is the same file. One of them will exhaust the context this session needs to hold
-the plan.
+- **`--forbidden` is the brief's boundary as a regex**; a subagent that crosses it prints `BREACH xN`. Give it only what the brief forbids; a slice that touches nothing outward-facing needs none.
+- **A boundary belongs to a brief, not to a run**: when two slices forbid different things, invoke it once per transcript with that slice's own pattern, never a union.
+- **`--label` names each agent after its slice**, so the rows read as work rather than as hex.
+- **`--json` emits `{id, name, calls, idle, breaches, signal, last, said}`** for building the table. `signal` is `WORKING`, `STALLED` or `BREACH`, a fact about the run; whether a subagent wants steering is this session's call.
+- **Never open a transcript directly**, with `Read`, the shell, or the Agent tool's `.output` path; it exhausts the context this session needs for the plan. The transcripts are under `<claude home>/projects/<project>/<session id>/subagents/agent-<agent id>.jsonl`.
 
 ## The cadence
 
-**Probe every 30 seconds. Report only when something changed.** Anything faster reports
-the same state repeatedly; anything slower and the tracker lags a subagent that is moving
-through steps in a couple of minutes each.
-
-Compare the line **with its `idle=` counter stripped**. That number moves on the clock
-rather than on progress, so leaving it in makes every poll look like a change and the
-timer prints whether or not anything happened.
-
-Report a subagent that has not moved for **two minutes** even though nothing changed. A
-stall is news: it means waiting on something, looping, or dead. A repeated poll of a
-subagent that is working is not.
+- **Probe every 30 seconds. Report only when something changed.**
+- **Compare the line with its `idle=` counter stripped**; that number moves on the clock, not on progress.
+- **Report a subagent that has not moved for two minutes**, even though nothing changed. A stall means waiting, looping, or dead.
 
 ```sh
 prev=""; quiet=0
@@ -74,22 +42,22 @@ while :; do
 done
 ```
 
-## What the watching is for, and what it is not
+## The report
 
-- The tracker, and confirming the brief holds. Move ▶ down the chain as the subagent goes.
-- **A step the subagent says is done is a claim, not a tick.** Only evidence this session
-  re-ran turns a node ✅. There is no glyph for claimed-and-unverified, so such a step
-  stays ⬜ with the claim written into its label.
-- **Watch, do not supervise.** Decisions the slice document leaves to the subagent are the
-  subagent's. Reading its reasoning is for knowing where the work is, not for steering it.
+**A table, every time, from the first probe**, one row per subagent:
 
-## Two things that mislead
+| Agent | Doing | In brief | Status |
+|---|---|---|---|
+| slice · step | from the digest | yes, or what strayed | on track · steer · stalled |
 
-- **Commits lag badly.** A subagent may write five files and a passing test suite before
-  its first commit, so a watch on the slice branch reports nothing through the phase you
-  most want to see. Watch the transcript; the branch and the slice document's checkboxes
-  confirm it afterwards.
-- **A boundary check must match what is executed, not what is typed.** A subagent writing
-  a runbook that mentions the forbidden command is not running it.
-  `scripts/watch-agents.mjs` strips heredoc bodies before matching for exactly this; a
-  hand-rolled grep will report the false breach.
+## What the watching is for
+
+- **The tracker, and the brief holding.** Move ▶ down the chain as the subagent goes.
+- **A step the subagent calls done stays ⬜**, the claim written into its label, until this session re-runs the evidence.
+- **Watch, do not supervise.** Decisions the slice document leaves to the subagent are the subagent's; its reasoning is read to know where the work is, not to steer it.
+- **Steer only a drift from the brief.** A `BREACH`, or work outside the slice document: one `SendMessage` to the subagent, naming the brief line it left and what to do instead; it arrives at its next tool round. A subagent that drifts again after one steer is stopped and re-dispatched with the brief amended. A finding is not a drift: a subagent that stops on one is done.
+
+## What misleads
+
+- **Commits lag.** A subagent may write five files and a passing suite before its first commit. Watch the transcript; the branch and the slice document's checkboxes confirm afterwards.
+- **A boundary check matches what is executed, not what is typed.** A subagent writing a runbook that mentions the forbidden command is not running it; `watch-agents.mjs` strips heredoc bodies for this, and a hand-rolled grep reports the false breach.
