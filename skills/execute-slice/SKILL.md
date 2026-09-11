@@ -1,6 +1,6 @@
 ---
 name: execute-slice
-description: Use when handed one slice document to carry out, as the agent doing the work rather than the one holding the plan. Does the work from that document alone and returns the evidence and the branch. Not for writing slices (write-plan) and not for running a plan (execute-plan).
+description: Use when handed one slice document to carry out, as the agent doing the work rather than the one holding the plan. Does the work from that document alone and returns the evidence and the branch. Not for writing the slice document (write-slice) and not for running a plan (execute-plan).
 ---
 
 # Execute a slice
@@ -12,6 +12,7 @@ Each is a report, never an improvisation.
 <stops>
 
 - **The acceptance criteria already pass.** Say so and end.
+- **The document has no modules table**, or the work touches a module it does not name, a test fixture included. Report it; a module is designed in the plan, never in the slice.
 - **The document names something that does not exist**, a module, a command, a fact the work depends on. Report it; never guess around it.
 - **The work reveals a dependency the document did not name.** Say what it is and where it surfaced.
 

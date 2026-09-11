@@ -18,7 +18,8 @@ flowchart LR
   I["idea"] --> B["brainstorm<br/>board + spec"]
   RM["roadmap<br/>iterations of slots, the foundation"] -.->|names the next slot| B
   B --> P["write-plan<br/>one increment, hardened on request"]
-  P --> E["execute-plan<br/>the plan's diagram is the tracker"]
+  P --> WS["write-slice<br/>one node, one document"]
+  WS --> E["execute-plan<br/>the plan's diagram is the tracker"]
   E --> S["execute-slice<br/>one agent, one slice document"]
   S --> R["pr-review<br/>analysis, findings"]
   W["write-code"] -.->|the practice in| S
@@ -101,6 +102,7 @@ In the order work usually happens:
 | [brainstorm](skills/brainstorm/SKILL.md) | Something non-trivial is about to be built and the design conversation hasn't happened | *"Run brainstorm: I want per-user rate limiting on the API."* One question at a time, no code until the spec is approved. |
 | [interview](skills/interview/SKILL.md) | A design object has decisions nobody has resolved, or you want to be questioned about one until it is understood the same way | *"Interview me about this spec."* Decisions walked in dependency order, the codebase read before you are asked, a recommendation on every question. |
 | [write-plan](skills/write-plan/SKILL.md) | The spec is approved and the next increment needs its plan | *"Write the plan for the rate-limiting spec."* One increment cut into thin vertical slices, each verified end to end, the tracker drawn, hardened through an interview when you say so. |
+| [write-slice](skills/write-slice/SKILL.md) | The plan is approved and a slice needs the document an agent will carry it out from | *"Write the slice document for SL3."* One plan node in, its document out: the decisions quoted, the modules table its tests are written against, the environment facts the first command trips on. |
 | [execute-plan](skills/execute-plan/SKILL.md) | An approved plan is ready, or was left mid-way by an earlier session | *"Execute the rate-limiting plan."* Delegates each slice to a fresh agent, keeps the tracker, merges. Pauses only for your decisions, your checks, or an action that does not undo. Refuses a plan with no tracker. |
 | [execute-slice](skills/execute-slice/SKILL.md) | One slice document is handed to an agent to carry out | *"Do slice 2."* Checks the blockers first and stops if any is unmet, does the work, returns the branch and the runs as evidence. |
 | [write-code](skills/write-code/SKILL.md) | Code is about to be written or changed, from a slice or a request | The practice in any repository: test first, two commits, the runs as evidence. The repository's `AGENTS.md` carries its own rules. |

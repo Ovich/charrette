@@ -9,7 +9,7 @@ description: Use when carrying out an implementation plan the person has already
 
 - **The tracker** is the plan's diagram; `references/tracker.md` is its protocol, read before the first edit of it.
 - **Open the plan in aiview every session** (`../aiview/SKILL.md` in this collection) and give the person the URL.
-- **Do not start** if the plan has no tracker, a slice has no slice document, or a done-when no test can express. Say so and finish the plan first.
+- **Do not start** if the plan has no tracker, a slice has no slice document, a slice document has no modules table, or a done-when no test can express. Say so and finish the plan first.
 - **Reconcile a tracker the repository has moved past** before starting; say what you found.
 
 ## Pace and steps
@@ -39,10 +39,10 @@ Either way, a slice marked `👤` stops before it starts, and a finding that cha
 
 ## Watching a subagent
 
-**The watch is the orchestration.** Once a slice is delegated, this session's work *is* the loop: where the subagent is, whether it stalled, whether it left the brief. The `Agent` call and the watch loop go out in the same message; a subagent running with no loop behind it is a dispatch not finished. Read `references/watching.md` before the first dispatch.
+**The watch is the orchestration.** The `Agent` call and the watch loop go out in the same message; read `references/watching.md` before the first dispatch.
 
 - **Probe every 30 seconds. Report only on change.** Move ▶ as it goes.
-- **The completion notification is not the watch.** It says the subagent ended, nothing about the two hours before.
+- **The completion notification is not the watch.** The tell: "I'll hear when it finishes."
 - **A subagent still for two minutes is news.** Report the stall.
 - **Read the transcript by digest, never whole.**
 
@@ -79,7 +79,7 @@ Stop for exactly three things:
 - **Tick as you go, never in a batch.** ✅ when the step's own done-when is met, the evidence in the label: what was observed, the red run and the green run, the acceptance criterion seen.
 - **Update before every handoff**: a question, an approval, the end of a turn.
 - **Draw deviations before doing them.** New work is a node; a new dependency is an arc; waiting on someone is ⏸ naming what was asked and when; a dissolved step is ✖ with the reason; an answered gate shows its way. A deviation that decides a module, interface, schema, contract or architecture is a register row.
-- **A deviation that becomes a slice gets its slice document first** (`../write-plan/SKILL.md` in this collection).
+- **A deviation that becomes a slice gets its slice document first** (`write-slice`, `../write-slice/SKILL.md` in this collection).
 - **A step you paused inside was too coarse.** Split it where the pause fell.
 - **Rewrite finished steps as what happened**: past tense, values, commands, the wrong turns worth keeping.
 - **Overwrite the state node's fields; never append.**
