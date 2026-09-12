@@ -21,7 +21,10 @@ description: Use when about to write or change code, as the practice a slice, a 
 <rules>
 
 - **Write and change files with the file tools, Write and Edit, as long as they can do the job.**
-- **Test first.** Write the test that proves the behaviour, run it, watch it fail, then write the code that makes it pass.
+- **Test first, the TDD cycle.** Write the test that proves the behaviour. Run it. Watch it fail. Write the code that makes it pass. Then the next test.
+- **Red for the right reason.** The failing run names the missing behaviour. A failing import, a typo, a fixture not wired: not red yet. Fix the test, run again.
+- **Test at the seam where a consumer would notice.** A behaviour only a build or a browser can show is tested there, not in a unit. Green units beside a broken route prove nothing.
+- **Shape unknown? Spike first: throwaway code written to learn, never committed.** Then start over, test first, with what the spike taught.
 - **Two commits**: the test, then the implementation, and the second does not touch the test file.
 - **Never weaken a test to make a suite green**: not loosened, not deleted, not skipped. The one skip allowed is a case that cannot run until something outside the repository exists, marked with what it waits on, and the slice that gets there unskips it.
 - **Report the runs, not the conclusion**: the failing run and the passing run, with what they said.
