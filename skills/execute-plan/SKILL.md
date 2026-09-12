@@ -48,7 +48,7 @@ Either way, a slice marked `👤` stops before it starts, and a finding that cha
 
 ## Branches and pull requests
 
-**One branch, one pull request per slice**, off `main`. Draft on the first commit, small commits pushed as they land, reviewed and merged at the close by the person or the orchestrator as the pace says. **A merged slice leaves dev green**: complete, or inert where it is not yet. A plan branch is the exception, and the plan names it.
+**Never delete a branch**, and never pass the option that deletes one on merge (`gh pr merge --delete-branch`, the repository's *automatically delete head branches*): deleting a branch closes every pull request based on it. **One branch, one pull request per slice**, off `main`. Draft on the first commit, small commits pushed as they land, reviewed and merged at the close by the person or the orchestrator as the pace says. **A merged slice leaves dev green**: complete, or inert where it is not yet. A plan branch is the exception, and the plan names it.
 
 **On the first push:** open `<pr>/changes` in the browser, write the PR number into the state node, post the first table.
 
