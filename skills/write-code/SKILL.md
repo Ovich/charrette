@@ -20,6 +20,7 @@ description: Use when about to write or change code, as the practice a slice, a 
 
 <rules>
 
+- **Write and change files with the file tools, Write and Edit, as long as they can do the job.**
 - **Test first.** Write the test that proves the behaviour, run it, watch it fail, then write the code that makes it pass.
 - **Two commits**: the test, then the implementation, and the second does not touch the test file.
 - **Never weaken a test to make a suite green**: not loosened, not deleted, not skipped. The one skip allowed is a case that cannot run until something outside the repository exists, marked with what it waits on, and the slice that gets there unskips it.

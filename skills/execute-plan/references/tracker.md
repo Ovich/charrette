@@ -14,7 +14,9 @@ The **tracker** is the plan's phasing diagram, and the single record of where th
 - **Every step is a node** at the granularity someone would pause at, with its dependency edges and decision gates.
 - **Node ids are `S<slice>.<step>`** (`S2.3`); a step discovered between `S2.3` and `S2.4` is `S2.3b`. Insert, never renumber: specs, boards and commits cite the old ids.
 - **A node whose done-when is a story's acceptance criterion carries the story's id**, and the observed criterion is written into the label when met.
-- **A step whose first half can finish while the second waits on someone is two steps.**
+- **A step's label holds its done-when and the evidence it was met**, never the road there. A diagnosis belongs in the pull request that carries the fix, and the step cites it; a decision belongs in the register.
+- **A line stays only while a resumer would act on it.** An overturned finding keeps one line, and only to stop someone walking it again; the rest goes when the finding is settled.
+- **A step carrying two glyphs is already two steps.** Split it where the glyphs part, not when the work ends: one whose first half can finish while the second waits on someone was always two.
 
 ## Status
 

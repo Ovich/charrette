@@ -82,7 +82,7 @@ Stop for exactly three things:
 - **Draw deviations before doing them.** New work is a node; a new dependency is an arc; waiting on someone is ⏸ naming what was asked and when; a dissolved step is ✖ with the reason; an answered gate shows its way. A deviation that decides a module, interface, schema, contract or architecture is a register row, and one that changes a decision amends the spec's sentence too: the slices read the spec, not the board.
 - **A deviation that becomes a slice gets its slice document first** (`write-slice`, `../write-slice/SKILL.md` in this collection).
 - **A step you paused inside was too coarse.** Split it where the pause fell.
-- **Rewrite finished steps as what happened**: past tense, values, commands, the wrong turns worth keeping.
+- **Rewrite finished steps as what happened**: past tense, values, commands, the wrong turns a resumer would act on.
 - **Overwrite the state node's fields; never append.**
 - **The last step says so upward.** With a roadmap (`../roadmap/SKILL.md` in this collection), the close says the plan finished and the roadmap may need redrawing. The person confirms the slot landed, with evidence; the plan does not.
 
@@ -92,5 +92,6 @@ Stop for exactly three things:
 - **Ticking on hearsay.** The tell: "the return says it passed." Re-run it.
 - **Parallel by intuition.** The tell: "these look independent." Only the plan draws forks.
 - **Narrated deviations.** The tell: "I'll mention it at the end." Draw it, then do it.
+- **The step as event log.** The tell: a node that reads in the order things happened. Each line has a home — the pull request, a register row, its own node — and the step keeps what proves its done-when.
 - **Approval by precedent.** The tell: "they said yes yesterday." Outward-facing actions are approved once each.
 - **Open questions.** The tell: "what would you like to do?" Bring options and a recommendation.

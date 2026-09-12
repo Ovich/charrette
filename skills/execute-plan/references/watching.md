@@ -61,4 +61,4 @@ done
 
 - **Commits lag.** A subagent may write five files and a passing suite before its first commit. Watch the transcript; the branch and the slice document's checkboxes confirm afterwards.
 - **A boundary check matches what is executed, not what is typed.** A subagent writing a runbook that mentions the forbidden command is not running it; `watch-agents.mjs` strips heredoc bodies for this, and a hand-rolled grep reports the false breach.
-- **A pattern with a drive letter in it never reaches the script.** Git Bash rewrites `C:/x/y` inside an argument into a Windows path, and the regex fails to compile; write `x[\/]y` instead. A pattern that matches reading the plan reports a false breach too: the brief forbids editing it, not opening it.
+- **A pattern with a drive letter in it never reaches the script.** Git Bash rewrites `C:/x/y` inside an argument into a Windows path, and the regex fails to compile; write `x[\/]y` instead. A pattern that matches reading the plan reports a false breach too: the brief forbids editing it, not opening it. Anchor a short word (`aws`, not `aws `): unanchored, it fires on "draws" in a quoted document.
