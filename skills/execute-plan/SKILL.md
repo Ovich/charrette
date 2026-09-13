@@ -12,9 +12,9 @@ description: Use when carrying out an implementation plan the person has already
 - **Do not start** if the plan has no tracker, a slice has no slice document, a slice document has no seams under test or no module blocks, or a done-when no test can express. Say so and finish the plan first.
 - **Reconcile a tracker the repository has moved past** before starting; say what you found.
 
-## Pace and steps
+## Pace, steps and verification
 
-Ask both in one message, recommended answer first. Write the answers into the state node; a resumed session does not ask again.
+Ask all three in one message, recommended answer first. Write the answers into the state node; a resumed session does not ask again.
 
 **Pace** (`pace: run through | stop at each slice`):
 
@@ -27,6 +27,17 @@ Either way, a slice marked `👤` stops before it starts, and a finding that cha
 
 1. **Delegated** (recommended): a fresh subagent per slice runs `execute-slice` (`../execute-slice/SKILL.md` in this collection).
 2. **Inline**: this session does the work. For small plans, judgment-heavy slices, or a person who wants to watch.
+
+**Verification** (`verify: each slice | slot done | off`), the question decided by a lookup first: a `verify-<app>` skill in the project's local skill folder.
+
+It exists: "This project has a verification skill. Enable continuous verification?"
+
+1. **After each slice** (recommended).
+2. **After the slot is done.**
+
+It does not: "This project has no verification skill. Create one?" Yes runs `verification-skill-create` (`../verification-skill-create/SKILL.md` in this collection) before the first slice, then the question above is asked. No is `verify: off`.
+
+**A verification run** is `verification-skill-maintain` (`../verification-skill-maintain/SKILL.md` in this collection) anchored on the slice's merge range, then the project's `verify-<app>` skill, its document in the plan's group and tagged with the slot. After each slice: at the slice boundary, after the merge, before the next dispatch. After the slot is done: once, at the plan's close, anchored on the plan's whole range. A story that fails on the application is a pause: the slice claimed a done-when the consumer cannot reach.
 
 ## What stays in this session
 

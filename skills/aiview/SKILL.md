@@ -90,7 +90,7 @@ $A init                                          # create the data home
 ## Registering a document
 
 - **File name `YYYY-MM-DD-<topic>.<kind>.md`**, flat in the project's folder, no subfolders.
-- **Kind is mandatory**, from the filename or `--kind`: `brainstorm`, `spec`, `plan`, `slice`, `reference`, `mockup`, `pr-analysis`, `report`, `pdf`, `roadmap` (one per project). A kind names a type of document, never a topic; topics are tags.
+- **Kind is mandatory**, from the filename or `--kind`: `brainstorm`, `spec`, `plan`, `slice`, `reference`, `mockup`, `pr-analysis`, `report`, `pdf`, `roadmap` (one per project), `feature-map` (one per project), `verification` (one per run). A kind names a type of document, never a topic; topics are tags.
 - **Group the documents of one piece of work**: the same `--group <slug>`, a title set once with `--group-title`, at most one group per document. Tags say "same topic", the group says "same work".
 - **A spec takes its board's tags and group. A plan takes the tags but its own group, `<topic>-plan`**, shared with its slice documents and nothing else; the board notes their paths at its top.
 - **`--started <ISO>` when the discussion began before the file existed.**

@@ -13,12 +13,28 @@ export function KindChip({
   dim?: boolean;
   onClick?: () => void;
 }) {
-  const { h, s: sat } = kindColor(kind);
+  const { h, s: sat, tone } = kindColor(kind);
   const Tag = onClick ? "button" : "span";
+  // The tone is the second channel: a strong chip is filled, a light one tinted, so two
+  // kinds one spoke apart on the wheel still differ at a glance. Both keep the same
+  // text contrast in either theme.
+  const style =
+    tone === "strong"
+      ? {
+          background: `light-dark(hsl(${h} ${sat}% 80%), hsl(${h} ${Math.round(sat * 0.7)}% 32%))`,
+          color: `light-dark(hsl(${h} ${Math.round(sat * 1.1)}% 22%), hsl(${h} ${sat}% 90%))`,
+          borderColor: `light-dark(hsl(${h} ${sat}% 58%), hsl(${h} ${Math.round(sat * 0.7)}% 46%))`,
+        }
+      : {
+          background: `light-dark(hsl(${h} ${sat}% 94%), hsl(${h} ${Math.round(sat * 0.6)}% 17%))`,
+          color: `light-dark(hsl(${h} ${Math.round(sat * 1.1)}% 31%), hsl(${h} ${Math.round(sat * 1.15)}% 78%))`,
+          borderColor: `light-dark(hsl(${h} ${Math.round(sat * 0.8)}% 82%), hsl(${h} ${Math.round(sat * 0.55)}% 28%))`,
+        };
   return (
     <Tag
       onClick={onClick}
       data-component="KindChip"
+      data-tone={tone}
       className={cn(
         "inline-flex items-center whitespace-nowrap rounded-[5px] border px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide",
         // Without a handler the chip is decoration sitting on top of a clickable row,
@@ -26,11 +42,7 @@ export function KindChip({
         onClick ? "cursor-pointer" : "pointer-events-none",
         dim && "opacity-40",
       )}
-      style={{
-        background: `light-dark(hsl(${h} ${sat}% 94%), hsl(${h} ${Math.round(sat * 0.6)}% 17%))`,
-        color: `light-dark(hsl(${h} ${Math.round(sat * 1.1)}% 31%), hsl(${h} ${Math.round(sat * 1.15)}% 78%))`,
-        borderColor: `light-dark(hsl(${h} ${Math.round(sat * 0.8)}% 82%), hsl(${h} ${Math.round(sat * 0.55)}% 28%))`,
-      }}
+      style={style}
     >
       {kind}
     </Tag>

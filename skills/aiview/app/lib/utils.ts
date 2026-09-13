@@ -14,37 +14,46 @@ export function cn(...inputs: ClassValue[]) {
  * reading a sidebar of a dozen documents could not tell a plan from a roadmap by colour,
  * which is the only thing the chip is for.
  *
- * These eleven are placed by hand, evenly around the wheel, with the pairs that appear
- * together pushed as far apart as the wheel allows: a plan sits beside its slices, a
- * board beside its spec, a roadmap beside its reference, a mockup beside the
- * architecture. Chroma alternates as well, so two neighbours differ in more than hue and
- * remain distinct to a colour-blind reader and on a projector.
+ * Even spacing was the second attempt, eleven hues 33 degrees apart, and it failed at
+ * the chip's own lightness: at 94% every hue is pastel, and three greens, two blues and
+ * two purples sat side by side in the sidebar indistinguishable. Hue alone cannot carry
+ * thirteen kinds.
+ *
+ * So each kind has two channels. Its hue, one of eleven named colours a reader can call
+ * out (red, orange, amber, lime, green, teal, blue, indigo, violet, purple, magenta),
+ * and its tone: `strong` fills the chip, `light` tints it. Neighbours on the wheel
+ * alternate tone, so two kinds one spoke apart never share both. Pairs that appear
+ * together are pushed apart in hue as well: a plan beside its slices and its
+ * verifications, a board beside its spec, a roadmap beside its reference, the feature
+ * map beside its verifications. `pdf` is a foreign format and takes the one grey.
  *
  * A kind not listed here still gets a stable colour from the old hash, moved off the
  * spokes above so a new kind cannot be born looking like an existing one.
  */
-const KIND_COLORS: Record<string, { h: number; s: number }> = {
-  roadmap: { h: 0, s: 68 },
-  report: { h: 33, s: 55 },
-  mockup: { h: 65, s: 62 },
-  slice: { h: 98, s: 48 },
-  architecture: { h: 131, s: 58 },
-  spec: { h: 164, s: 46 },
-  plan: { h: 196, s: 66 },
-  reference: { h: 229, s: 50 },
-  pdf: { h: 262, s: 60 },
-  brainstorm: { h: 295, s: 52 },
-  "pr-analysis": { h: 327, s: 64 },
+export type KindTone = "strong" | "light";
+const KIND_COLORS: Record<string, { h: number; s: number; tone: KindTone }> = {
+  roadmap: { h: 0, s: 70, tone: "strong" },
+  report: { h: 30, s: 70, tone: "light" },
+  verification: { h: 50, s: 80, tone: "strong" },
+  mockup: { h: 85, s: 65, tone: "light" },
+  slice: { h: 130, s: 55, tone: "strong" },
+  spec: { h: 170, s: 60, tone: "light" },
+  plan: { h: 205, s: 70, tone: "strong" },
+  reference: { h: 235, s: 60, tone: "light" },
+  "feature-map": { h: 265, s: 55, tone: "strong" },
+  brainstorm: { h: 295, s: 60, tone: "light" },
+  "pr-analysis": { h: 330, s: 65, tone: "strong" },
+  pdf: { h: 0, s: 0, tone: "light" },
 };
 
-/** Hue and saturation for a kind. Hand-placed where it matters, hashed where it does not. */
-export function kindColor(kind: string): { h: number; s: number } {
+/** Hue, saturation and tone for a kind. Hand-placed where it matters, hashed where it does not. */
+export function kindColor(kind: string): { h: number; s: number; tone: KindTone } {
   const named = KIND_COLORS[kind];
   if (named) return named;
   let h = 0;
   for (const c of kind) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   // 16 degrees off every hand-placed spoke, which sit on multiples of about 33.
-  return { h: (((h % 11) * 33 + 16) % 360), s: 44 };
+  return { h: (((h % 11) * 33 + 16) % 360), s: 44, tone: "light" };
 }
 
 /** The hue alone. Kept because the tests and any older caller ask for a number. */
