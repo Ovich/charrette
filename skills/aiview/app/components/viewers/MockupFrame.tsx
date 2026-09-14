@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.tsx";
 import { Button } from "../ui/button.tsx";
 import type { BindingsSummary } from "../../lib/api.ts";
@@ -49,6 +50,32 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
     return THEMES.includes(s as Theme) ? (s as Theme) : "system";
   });
   const frame = useRef<HTMLIFrameElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
+
+  // Full screen: the browser's own on the stage, so the frame is not reloaded and the
+  // mockup keeps its state; Escape leaves it. Where the API is missing or refused (an
+  // embedded browser, a test), the stage covers the window instead and Escape leaves that.
+  const [full, setFull] = useState<"native" | "cover" | null>(null);
+  useEffect(() => {
+    const onChange = () => setFull(document.fullscreenElement === stage.current ? "native" : null);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  useEffect(() => {
+    if (full !== "cover") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFull(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [full]);
+  const toggleFull = () => {
+    if (full === "native") return void document.exitFullscreen?.();
+    if (full === "cover") return setFull(null);
+    const el = stage.current;
+    if (!el?.requestFullscreen) return setFull("cover");
+    el.requestFullscreen().catch(() => setFull("cover"));
+  };
   const width = VIEWPORTS.find(([n]) => n === viewport)?.[1] ?? 0;
   const selectViewport = (v: string) => {
     if (!v) return;
@@ -156,17 +183,47 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
           </span>
         )}
       </div>
-      <div className="flex justify-center">
-        {/* sandboxed: the mockup's scripts run, but it cannot touch the viewer, storage, or navigate the top window */}
-        <iframe
-          ref={frame}
-          title="mockup"
-          sandbox="allow-scripts allow-forms allow-modals allow-popups"
-          srcDoc={served}
-          onLoad={onLoad}
-          className="h-[calc(100vh-10rem)] w-full max-w-full rounded-[10px] border border-border bg-white shadow-lg transition-[width]"
-          style={width ? { width } : undefined}
-        />
+      <div
+        ref={stage}
+        data-component="MockupStage"
+        data-full={full ?? undefined}
+        className={
+          full
+            ? `flex justify-center bg-surface-2 ${full === "cover" ? "fixed inset-0 z-50" : "h-full w-full"}`
+            : "flex justify-center"
+        }
+      >
+        <div className="group relative w-full max-w-full" style={width ? { width } : undefined}>
+          {/* sandboxed: the mockup's scripts run, but it cannot touch the viewer, storage, or navigate the top window */}
+          <iframe
+            ref={frame}
+            title="mockup"
+            sandbox="allow-scripts allow-forms allow-modals allow-popups"
+            srcDoc={served}
+            onLoad={onLoad}
+            className={
+              full
+                ? "block h-screen w-full max-w-full border-0 bg-white"
+                : "block h-[calc(100vh-10rem)] w-full max-w-full rounded-[10px] border border-border bg-white shadow-lg transition-[width]"
+            }
+          />
+          {/* Shown while the pointer is over the mockup or a control in it has focus; a pointer
+              inside the frame still counts, because the frame is a child of this group. */}
+          <div
+            data-component="MockupHoverBar"
+            className="pointer-events-none absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100"
+          >
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label={full ? "Exit full screen" : "Full screen"}
+              title={full ? "Exit full screen (Esc)" : "Full screen"}
+              onClick={toggleFull}
+            >
+              {full ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

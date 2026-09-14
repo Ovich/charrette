@@ -369,6 +369,52 @@ describe("MockupFrame modes", () => {
   });
 });
 
+describe("mockup full screen", () => {
+  afterEach(() => {
+    delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen;
+    delete (document as { exitFullscreen?: unknown }).exitFullscreen;
+    Object.defineProperty(document, "fullscreenElement", { configurable: true, value: null });
+  });
+
+  test("the hover bar asks the browser for full screen on the stage, and leaves it again", async () => {
+    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    const request = vi.fn(() => Promise.resolve());
+    const exit = vi.fn(() => Promise.resolve());
+    (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen = request;
+    (document as { exitFullscreen?: unknown }).exitFullscreen = exit;
+    render(<MockupFrame html="<html><body><p>h</p></body></html>" />);
+    const stage = document.querySelector('[data-component="MockupStage"]')!;
+    const frameBefore = document.querySelector("iframe");
+
+    fireEvent.click(screen.getByLabelText("Full screen"));
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request.mock.contexts[0]).toBe(stage);
+
+    Object.defineProperty(document, "fullscreenElement", { configurable: true, value: stage });
+    fireEvent(document, new Event("fullscreenchange"));
+    expect(stage.getAttribute("data-full")).toBe("native");
+    // the same frame, not a new one: the mockup keeps its state
+    expect(document.querySelector("iframe")).toBe(frameBefore);
+
+    fireEvent.click(screen.getByLabelText("Exit full screen"));
+    expect(exit).toHaveBeenCalledTimes(1);
+    Object.defineProperty(document, "fullscreenElement", { configurable: true, value: null });
+    fireEvent(document, new Event("fullscreenchange"));
+    expect(stage.getAttribute("data-full")).toBeNull();
+  });
+
+  test("without the API the stage covers the window, and Escape leaves it", async () => {
+    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    render(<MockupFrame html="<html><body><p>h</p></body></html>" />);
+    const stage = document.querySelector('[data-component="MockupStage"]')!;
+    fireEvent.click(screen.getByLabelText("Full screen"));
+    expect(stage.getAttribute("data-full")).toBe("cover");
+    expect(stage.className).toContain("fixed");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(stage.getAttribute("data-full")).toBeNull();
+  });
+});
+
 describe("mockup theme", () => {
   afterEach(() => localStorage.clear());
 
