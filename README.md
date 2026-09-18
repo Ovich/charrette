@@ -1,5 +1,10 @@
 # Charrette
 
+[![version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FOvich%2Fcharrette%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=version&prefix=v)](RELEASING.md)
+[![stars](https://img.shields.io/github/stars/Ovich/charrette)](https://github.com/Ovich/charrette/stargazers)
+[![last commit](https://img.shields.io/github/last-commit/Ovich/charrette)](https://github.com/Ovich/charrette/commits/main)
+[![licence](https://img.shields.io/github/license/Ovich/charrette)](LICENSE)
+
 *(French, from architecture studios: the intense working session where a design is
 drawn, argued over, and decided before anything expensive is built.)*
 
