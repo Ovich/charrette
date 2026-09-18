@@ -1,6 +1,6 @@
 ---
 name: verification-skill-maintain
-description: Use when a project's `verify-<app>` skill, its scripts and references, or its feature map in aiview must be brought back in line with the application after it changed, from an anchor the caller names, a slice, a commit range or a date: on request at any time, or from execute-plan before each verification run. Produces the updated skill and map with the changed stories re-proven. Not for a project without a verify skill (verification-skill-create), not for running stories on a current one, and not for code quality or review.
+description: "Use when a project's `verify-<app>` skill, its scripts and references, or its feature map in aiview must be brought back in line with the application after it changed, from an anchor the caller names, a slice, a commit range or a date: on request at any time, or from execute-plan before each verification run. Produces the updated skill and map with the changed stories re-proven. Not for a project without a verify skill (verification-skill-create), not for running stories on a current one, and not for code quality or review."
 ---
 
 # Maintain a verification skill

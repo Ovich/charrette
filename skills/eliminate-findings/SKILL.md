@@ -1,6 +1,6 @@
 ---
 name: eliminate-findings
-description: Use when the same remark keeps being made in a repository's pull request reviews, or when someone asks what the reviews keep catching and how to stop catching it. Groups the comment history into recurring findings and decides, for each, the rung that removes it: a design that makes it impossible, a lint or type rule, a test in CI, a convention, a fix to the skill that produced the code. Produces a report in aiview with a recommendation per finding, applied on a yes. Not for reviewing one pull request (pr-review) and not for writing a rule already decided (project-conventions).
+description: "Use when the same remark keeps being made in a repository's pull request reviews, or when someone asks what the reviews keep catching and how to stop catching it. Groups the comment history into recurring findings and decides, for each, the rung that removes it: a design that makes it impossible, a lint or type rule, a test in CI, a convention, a fix to the skill that produced the code. Produces a report in aiview with a recommendation per finding, applied on a yes. Not for reviewing one pull request (pr-review) and not for writing a rule already decided (project-conventions)."
 ---
 
 # Eliminate findings

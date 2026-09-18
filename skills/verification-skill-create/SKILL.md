@@ -1,6 +1,6 @@
 ---
 name: verification-skill-create
-description: Use when a project has no verification skill of its own and its user stories should from now on be shown to work end to end through the interface their consumer uses: on request, or from execute-plan when the person says yes to creating one. Produces the project-local `verify-<app>` skill and the project's feature map in aiview, proven on one real story. Not for a project that already has one (verification-skill-maintain), not for running stories (the project's own verify skill), and not for tests, code quality or review.
+description: "Use when a project has no verification skill of its own and its user stories should from now on be shown to work end to end through the interface their consumer uses: on request, or from execute-plan when the person says yes to creating one. Produces the project-local `verify-<app>` skill and the project's feature map in aiview, proven on one real story. Not for a project that already has one (verification-skill-maintain), not for running stories (the project's own verify skill), and not for tests, code quality or review."
 ---
 
 # Create a verification skill

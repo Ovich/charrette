@@ -23,6 +23,10 @@ the maintainer's side — the bug reports come only from people who installed ea
 Bump `version` in both manifests, to the same value, on every release. Not on every
 commit — on every release.
 
+**Which number moves.** The major stays where it is: it moves only on the person's word.
+A release that adds or changes something, a skill, a step of the loop, a feature of the
+viewer, bumps the minor. A release that only fixes or rewords bumps the patch.
+
 ## The build output is versioned on purpose
 
 `skills/aiview/dist/` (the UI, ~5 MB) and `skills/aiview/dist-cli/cli.mjs` (the CLI and
