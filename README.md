@@ -3,11 +3,11 @@
 *(French, from architecture studios: the intense working session where a design is
 drawn, argued over, and decided before anything expensive is built.)*
 
-Agent skills that settle what gets built before code is written. They sharpen the engineer's thinking rather than replace it: every design, plan and screen is drawn, argued and approved by a person before an agent acts on it. A design conversation ends in a spec and a plan, a screen in a working mockup, a pull request in an analysis with the decisions only a human can make. Every document renders live in aiview, the companion app. None of it lands in your repository.
+Agent skills that settle what gets built before code is written. They sharpen the engineer's thinking rather than replace it: every design, plan and screen is drawn, argued and approved by a person before an agent acts on it. A design conversation ends in one plan, a screen in a working mockup, a pull request in an analysis with the decisions only a human can make. Every document renders live in aiview, the companion app. None of it lands in your repository.
 
 Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Charrette brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
 
-Twelve skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
+Eighteen skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
 
 ## The loop
 
@@ -15,28 +15,29 @@ Phasing: what a piece of work passes through, from idea to merge, and which skil
 
 ```mermaid
 flowchart LR
-  I["idea"] --> B["brainstorm<br/>board + spec"]
-  RM["roadmap<br/>iterations of slots, the foundation"] -.->|names the next slot| B
-  B --> P["write-plan<br/>one increment, hardened on request"]
+  I["idea"] -.->|optionally, kept on a board| B["brainstorm<br/>interview + board + diagrams"]
+  I -->|directly| P
+  RM["roadmap<br/>iterations of slots, the foundation"] -.->|names the next slot| P
+  B -.->|a starting point| P["write-plan<br/>one document: design, slices, tracker, mandate"]
   P --> WS["write-slice<br/>one node, one document"]
   WS --> E["execute-plan<br/>the plan's diagram is the tracker"]
   E --> S["execute-slice<br/>one agent, one slice document"]
   S --> R["pr-review<br/>analysis, findings"]
-  W["write-code"] -.->|the practice in| S
   R --> M["merge"]
   D["write-diagrams"] -.->|draws for| B & P & R
-  Q["interview"] -.->|resolves decisions for| B & P
+  Q["interview<br/>research and experiments on request"] -.->|resolves decisions for| B & P
+  DM["deepen-module"] -.->|shapes the major areas of| P
 ```
 
 The board is a Markdown file opened at the first question and edited through the whole conversation. The plan is the same kind of document for the build: its phasing diagram is the tracker, and a later session with none of the conversation in context resumes from it.
 
 ## Iterate the loop
 
-Charrette is run iteratively. One pass of the loop is one iteration: it brainstorms, specs, plans and builds a single increment, a feature or a bounded change that works and can be verified when the iteration ends. The plan is the iteration's plan, not the project's: it covers the increment and stops where the next one would begin, think of an agile approach. What the increment teaches feeds the next brainstorm, so the spec grows by increments and each plan is written with the last increment's learning in hand.
+Charrette is run iteratively. One pass of the loop is one iteration: it plans and builds a single increment, a feature or a bounded change that works and can be verified when the iteration ends. The plan is the iteration's plan, not the project's: it covers the increment and stops where the next one would begin, think of an agile approach. What the increment teaches feeds the next plan, so the design grows by increments and each plan is written with the last increment's learning in hand.
 
-The thing to avoid is big design up front: an agent loves writing plans, embellished and polished, and they can fall apart at the end. A spec and a plan are sized to what a person can hold in mind, understand and approve in one reading.
+The thing to avoid is big design up front: an agent loves writing plans, embellished and polished, and they can fall apart at the end. A plan is sized to what a person can hold in mind, understand and approve in one reading.
 
-Above the iterations sits the roadmap, one document per project kept by the `roadmap` skill: the iterations in order, each made of slots, a slot being something the customer can use or a system that can be deployed. Each slot points at the boards, specs, mockups and plans that exist for it, its state derived from them, and the foundation reference beside it records the technology decisions, closed no later than the first slot that needs them. Only the next iteration is drawn precisely: a slot is split when the work reaches it, and the roadmap is redrawn when a slot lands.
+Above the iterations sits the roadmap, one document per project kept by the `roadmap` skill: the iterations in order, each made of slots, a slot being something the customer can use or a system that can be deployed. Each slot points at the boards, mockups and plans that exist for it, its state derived from them, and the foundation reference beside it records the technology decisions, closed no later than the first slot that needs them. Only the next iteration is drawn precisely: a slot is split when the work reaches it, and the roadmap is redrawn when a slot lands.
 
 ## What it looks like
 
@@ -99,15 +100,15 @@ In the order work usually happens:
 | Skill | Use case | Example ask |
 |---|---|---|
 | [roadmap](skills/roadmap/SKILL.md) | A project has to be declared above its pieces of work, from nothing or from the boards and mockups already made, or a slot has landed and the picture must be redrawn | *"Declare the roadmap for this project."* Everything that exists read first, the missing slots named (accounts, the repository, the foundation), iterations of deliverable slots drafted with a recommendation in every open place, then an interview on the draft. The foundation reference beside it holds the stack, the database, the API, the hosting, each row closed no later than the first slot that needs it. |
-| [brainstorm](skills/brainstorm/SKILL.md) | Something non-trivial is about to be built and the design conversation hasn't happened | *"Run brainstorm: I want per-user rate limiting on the API."* One question at a time, no code until the spec is approved. |
-| [interview](skills/interview/SKILL.md) | A design object has decisions nobody has resolved, or you want to be questioned about one until it is understood the same way | *"Interview me about this spec."* Decisions walked in dependency order, the codebase read before you are asked, a recommendation on every question. |
-| [write-plan](skills/write-plan/SKILL.md) | The spec is approved and the next increment needs its plan | *"Write the plan for the rate-limiting spec."* One increment cut into thin vertical slices, each verified end to end, the tracker drawn, hardened through an interview when you say so. |
+| [brainstorm](skills/brainstorm/SKILL.md) | An idea is worth thinking through and keeping, before a plan or without one | *"Run brainstorm: should we move the agent onto LangGraph?"* The interview, kept on a live board with its diagrams and what was investigated. A plan can start from it and does not need it. |
+| [interview](skills/interview/SKILL.md) | A design object has decisions nobody has resolved, or you want to be questioned about one until it is understood the same way | *"Interview me about this plan."* Decisions walked in dependency order, the codebase read before you are asked, a recommendation on every question. Research on industry practice and very small proofs of concept with the libraries, when you say yes to them. |
+| [write-plan](skills/write-plan/SKILL.md) | Something non-trivial is about to be built and its plan has to be written | *"Write the plan for per-user rate limiting."* One document, written while interviewing: why, before and after, the deep modules, the flows, the failure modes, the suite, the slices with their tracker, and the mandate you give the orchestrator. No code until it is approved. |
+| [deepen-module](skills/deepen-module/SKILL.md) | A module's interface has to be designed or reworked so that it hides much behind little | *"Deepen the agent module."* The code a caller writes to use it, the one entry as signatures, what stays outside, the gap from today, discussed until agreed. write-plan shapes its major areas this way. |
 | [write-slice](skills/write-slice/SKILL.md) | The plan is approved and a slice needs the document an agent will carry it out from | *"Write the slice document for SL3."* One plan node in, its document out: the decisions quoted, the modules table its tests are written against, the environment facts the first command trips on. |
 | [execute-plan](skills/execute-plan/SKILL.md) | An approved plan is ready, or was left mid-way by an earlier session | *"Execute the rate-limiting plan."* Delegates each slice to a fresh agent, keeps the tracker, merges. Pauses only for your decisions, your checks, or an action that does not undo. Refuses a plan with no tracker. |
-| [execute-slice](skills/execute-slice/SKILL.md) | One slice document is handed to an agent to carry out | *"Do slice 2."* Checks the blockers first and stops if any is unmet, does the work, returns the branch and the runs as evidence. |
+| [execute-slice](skills/execute-slice/SKILL.md) | One slice document is handed to an agent to carry out | *"Do slice 2."* Checks the blockers first and stops if any is unmet, writes the code, then the tests the slice owes, returns the branch and the run as evidence. |
 | [verification-skill-create](skills/verification-skill-create/SKILL.md) | A project's user stories should be shown to work end to end, through the interface their consumer uses, and it has no verification skill yet | *"Create the verification skill for this app."* The consumer, the interface and the harness read from the repository, a project-local `verify-<app>` skill written, the feature map drawn in aiview, one story proven. execute-plan offers it when a plan starts. |
 | [verification-skill-maintain](skills/verification-skill-maintain/SKILL.md) | The application changed and its verify skill or feature map must follow, from a slice, a commit range or a date | *"Maintain the verification skill since the last slice."* Only what the diff moved is changed, the affected stories re-proven. execute-plan runs it before every verification. |
-| [write-code](skills/write-code/SKILL.md) | Code is about to be written or changed, from a slice or a request | The practice in any repository: test first, two commits, the runs as evidence. The repository's `AGENTS.md` carries its own rules. |
 | [write-diagrams](skills/write-diagrams/SKILL.md) | A design question would settle faster drawn than argued | *"Draw today's login flow: I need to see where the redirect happens."* |
 | [frontend-design](skills/frontend-design/SKILL.md) | A screen is about to be built or visually reworked | *"Before we code the settings page, propose a mockup."* Design language extracted once, every screen approved in the viewer, code after. |
 | [technical-writing](skills/technical-writing/SKILL.md) | A document that stays in the repository: a README, an architecture doc, an ADR, a runbook | *"Write an architecture doc of the payments service, audience: new backend hires."* |
@@ -128,7 +129,7 @@ In the order work usually happens:
 | The data home, `$CHARRETTE_HOME` or `charrette_appdata` in your OS home directory | `docs/<project>/*.md, *.html, *.pdf`, among them the project's roadmap and its foundation reference, and `aiview.sqlite`, the index and the active project | Never in a project repo. May be its own git repo, to sync between machines |
 | Your project repository | `AGENTS.md`, grown by project-conventions. README and architecture docs, written by technical-writing | Yes, by you |
 
-Charrette stores its documents outside the repository to avoid doc rot: outdated documents influence the agent badly. Boards, specs, plans, mockups and PR analyses are obsolete when the PR merges, so by default none is versioned and none lives in a project repository. For some types of documents, an architecture doc, an ADR, a spec the team keeps current, the codebase can be considered, and it is allowed: the index only points at files, and aiview serves a document from where it is.
+Charrette stores its documents outside the repository to avoid doc rot: outdated documents influence the agent badly. Boards, plans, mockups and PR analyses are obsolete when the PR merges, so by default none is versioned and none lives in a project repository. For some types of documents, an architecture doc, an ADR, a spec the team keeps current, the codebase can be considered, and it is allowed: the index only points at files, and aiview serves a document from where it is.
 
 
 ## Updating

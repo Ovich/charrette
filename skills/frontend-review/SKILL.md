@@ -5,69 +5,44 @@ description: Use when reviewing the quality of React code, readability, organisa
 
 # Frontend review
 
-Opinionated quality review of React code: is it well-organised, well-named, readable,
-and free of waste? Grounded in a sourced `checklist.md`. Reports findings; only edits
-with `--fix`. A finding is about readability, structure and waste, never about
-wrongness today.
+**A finding is about readability, structure or waste, never wrongness today.** Findings are reported; edits only with `--fix`.
 
-## Scope (default = the diff, cheap)
+## Scope
 
-The file list comes from the review scope script of the `pr-review` skill
-(`../pr-review/scripts/scope.mjs` in this collection), always with
-`--ext ts,tsx,js,jsx --json`:
+**The file list comes from `scripts/scope.mjs` of the `pr-review` skill, always with `--ext ts,tsx,js,jsx --json`.** Exit 1 is an empty scope: say so and stop.
 
-- `/frontend-review` → `diff` (the working tree, else upstream...HEAD).
-- `/frontend-review all` → `path <folder>`, the app's React source: the folder
-  `AGENTS.md` or the workspace names, else the package that depends on `react`.
-- `/frontend-review <path>` → `path <path>`.
-- Add `--fix` to apply the safe findings after reporting. Add one lens name to run just that lens.
+- `/frontend-review`: `diff`, the working tree, else upstream...HEAD.
+- `/frontend-review all`: `path <folder>`, the app's React source: the folder `AGENTS.md` or the workspace names, else the package that depends on `react`.
+- `/frontend-review <path>`: `path <path>`.
+- **One lens name runs that lens alone.**
 
-Exit 1 is an empty scope: say so and stop.
+## The lenses
 
-## The four lenses
-
-Each maps to a section of `checklist.md` (**read that section, don't review from memory**):
+**Each is a section of `checklist.md`, read before reviewing, never recalled.**
 
 1. **render**: purity, rules-of-hooks, you-might-not-need-an-effect, state shape
 2. **perf**: hoist static data, stable keys, lazy routes, anti-cargo-cult memoization
 3. **structure**: one-component-per-file, decomposition, composition over prop-drilling, AHA, reuse the primitives, simplification
 4. **organization**: colocation, feature islands, naming, domain vocabulary, `cn()` / wrap-raw-Tailwind, inferred types
 
-## Run it (keep it cheap)
+## Running it
 
-1. **Resolve scope** to a concrete file list. Skip a lens whose files aren't in scope (no route files → skip the lazy-route check).
-2. **Fan out, in one message:**
-   - *Diff or one folder:* one agent per lens over the scope.
-   - *`all` / many folders:* one agent per feature folder, each running all four lenses over that folder (bounds cost to the folder count).
-   Give each agent: the file list, its lens section from `checklist.md`, and the output contract below. Tight prompts, compact returns.
-3. **Merge:** dedup findings on the same line/mechanism, drop anything the project's linter already flags, rank most-impactful first.
-4. **Report** grouped by lens. *Diff scope:* in chat, terse, no diagrams. *`all` / folder scope:*
-   write `YYYY-MM-DD-<scope>.report.md` in the data home (ask the `aiview` skill for the
-   path; never in the repo under review) and open it via the `aiview` skill
-   (`../aiview/SKILL.md` in this collection). Mermaid renders there, not in the
-   terminal.
-   Kind `report` (from the filename), tags = project + review.
-5. With `--fix`, apply only the safe ones (skip anything that changes behavior or reaches outside the scope), then re-verify with the typecheck and lint commands the project defines (its `package.json` scripts, or `AGENTS.md`). Name the commands you ran.
+1. **Skip a lens whose files are not in scope**: no route files, no lazy-route check.
+2. **Fan out in one message**: on a diff or one folder, one agent per lens; on `all` or many folders, one agent per feature folder running all four. Each gets the file list, its lens section from `checklist.md` and the output contract.
+3. **Merge**: dedup on the same line or mechanism, drop what the project's linter already flags, rank by impact.
+4. **Report grouped by lens.** A diff: in chat, no diagrams. `all` or a folder: `YYYY-MM-DD-<scope>.report.md` through the `aiview` skill, kind `report`, tags = project + review.
+5. **With `--fix`**, apply the safe findings, nothing that changes behaviour or reaches outside the scope, then run the project's typecheck and lint and name the commands run.
 
-## Output contract (per finding)
+## Output contract
 
-`file:line` · **lens** · one-line issue · the concrete cost · the fix. No restating the code, no preamble. End with a one-line verdict (e.g. "6 findings: 2 structure, 3 organization, 1 perf, none blocking"). Empty scope or already-clean code → say so plainly. A short report is a good report.
+**Per finding**: `file:line` · **lens** · one-line issue · the concrete cost · the fix. No code restated. A one-line verdict last: "6 findings: 2 structure, 3 organization, 1 perf, none blocking". Clean code gets "clean".
 
-## Diagrams (file reports only)
+## Diagrams
 
-Diagrams: use the `write-diagrams` skill (`../write-diagrams/SKILL.md` in
-this collection). Pick from its catalog by the open question, follow its discipline. Review-specific guidance:
-per-finding prose stays prose; a diagram appears only in a file report, and only in
-these shapes; a trivial scope earns none, and the report says so:
+**In a file report only, through the `write-diagrams` skill**; a trivial scope earns none, and the report says so.
 
-- **Scope map** (one, at the top): the component tree of the reviewed scope, finding
-  counts marked on the hot nodes, the map the findings hang off, and compressed
-  context for the next session touching this feature.
-- **Cross-feature import violations** (organization): one dependency graph with the
-  forbidden edges drawn red, instead of N prose findings about individual imports.
-- **Structural fix** (structure): when the fix is a reshape, before/after as two small
-  trees, an option-comparison pair, deciding trade-off stated under it in one line.
-- **State-shape finding** (render): boolean-soup state → the state machine; one state
-  per boolean combination *is* the argument for one field.
-- **Re-render cascade** (perf): when the cost of a finding is "state here re-renders
-  all of this", the arrow diagram of what re-renders makes the cost visible.
+- **Scope map**, at the top: the component tree of the scope, finding counts on the hot nodes.
+- **Cross-feature import violations** (organization): one dependency graph, the imports that must not exist drawn red.
+- **Structural fix** (structure): when the fix is a reshape, before and after as two small trees, the deciding trade-off in one line under them.
+- **State-shape finding** (render): boolean-soup state drawn as the state machine.
+- **Re-render cascade** (perf): what re-renders when this state changes, as arrows.

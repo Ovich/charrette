@@ -1,6 +1,6 @@
 // Component + pure-logic tests (vitest, jsdom). Visual acceptance runs against the mockup.
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 afterEach(cleanup);
 import { applyFilters, applyScope } from "./hooks/useFilters.ts";
@@ -508,5 +508,71 @@ describe("mockup variants", () => {
     render(<MockupFrame html="<html><body><p>h</p></body></html>" />);
     expect(document.querySelector('[data-component="VariantToggle"]')).toBeNull();
     expect(document.querySelector('[data-component="MockupActions"]')).toBeNull();
+  });
+});
+
+describe("useDocuments: the stream is watched, not trusted", () => {
+  // A stream that broke without a FIN: still `OPEN`, no error, nothing arriving. The
+  // fake stands in for that state, which jsdom's EventSource cannot be put into.
+  class FakeEventSource {
+    static opened: FakeEventSource[] = [];
+    closed = false;
+    onopen: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onmessage: ((e: { data: string }) => void) | null = null;
+    url: string;
+    constructor(url: string) {
+      this.url = url;
+      FakeEventSource.opened.push(this);
+    }
+    close() {
+      this.closed = true;
+    }
+    say(event: unknown) {
+      this.onmessage?.({ data: JSON.stringify(event) });
+    }
+  }
+
+  const documents = { documents: [], groups: {}, projects: {}, activeProject: "*", start: null };
+
+  const mount = async () => {
+    FakeEventSource.opened = [];
+    vi.useFakeTimers();
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => documents }) as unknown as Response));
+    const { renderHook } = await import("@testing-library/react");
+    const { useDocuments } = await import("./hooks/useDocuments.ts");
+    return renderHook(() => useDocuments());
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  test("silence past three heartbeats reconnects, and the open document is reloaded", async () => {
+    const { result } = await mount();
+    expect(FakeEventSource.opened).toHaveLength(1);
+    act(() => { FakeEventSource.opened[0]!.say({ type: "hello" }); });
+    expect(result.current.connection).toBe("live");
+
+    act(() => { vi.advanceTimersByTime(46_000); });
+    expect(FakeEventSource.opened).toHaveLength(2);
+    expect(FakeEventSource.opened[0]!.closed).toBe(true);
+    expect(result.current.connection).toBe("reconnecting");
+    // a null id reloads whatever document is open: everything missed while it was dead
+    expect(result.current.changedTick).toBe(1);
+    expect(result.current.changedId).toBeNull();
+  });
+
+  test("a heartbeat is what keeps the stream alive, and it says live", async () => {
+    const { result } = await mount();
+    for (let i = 0; i < 4; i++) {
+      act(() => { vi.advanceTimersByTime(14_000); });
+      act(() => { FakeEventSource.opened.at(-1)!.say({ type: "ping" }); });
+    }
+    expect(FakeEventSource.opened).toHaveLength(1);
+    expect(result.current.connection).toBe("live");
+    expect(result.current.changedTick).toBe(0);
   });
 });

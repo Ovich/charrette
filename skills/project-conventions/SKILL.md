@@ -5,23 +5,19 @@ description: "Use when a project's conventions need to be written down or extend
 
 # Project conventions
 
-Turns design decisions into short, checkable rules in the repo's `AGENTS.md`
-(or `CLAUDE.md`, whichever the repo already uses; create `AGENTS.md` if neither).
-
-A convention document is not a style guide and not a tutorial. It is the set of
-decisions a fresh agent would otherwise guess differently every time.
+**A convention document is the set of decisions a fresh agent would otherwise guess differently every time**, as short checkable rules in the repo's `AGENTS.md` (or `CLAUDE.md`, whichever the repo uses; `AGENTS.md` if neither).
 
 ## What earns a rule
 
-A candidate becomes a rule only if **all five** hold. Say which one fails and drop it
-otherwise.
+**All five hold, or the candidate is dropped, naming the one that fails.**
 
 1. **Contested**: a competent developer could defensibly do it the other way.
-2. **Recurring**: it will come up again. A one-off belongs in a code comment.
-3. **Consequential**: breaking it costs rework or silent drift, not just taste.
+2. **Recurring**: a one-off belongs in a code comment.
+3. **Consequential**: breaking it costs rework or silent drift.
 4. **Checkable**: a reviewer can point at a line and say yes or no.
-5. **Not tool-enforceable**: if a linter, formatter, or type checker can enforce it,
-   configure the tool instead. Rules are for judgment; tools are for mechanics.
+5. **Not tool-enforceable**: what a linter, formatter or type checker can enforce is configured there.
+
+**Never a rule**: formatting, casing, import order, line length; a restated general principle (`code-design-review` holds those); an aspiration with no test; code that does not exist yet.
 
 ## Rule shape
 
@@ -29,87 +25,36 @@ otherwise.
 N. **MUST <imperative>.** <the cost of not doing it, or where it lives.> <optional: one path or symbol.>
 ```
 
-**Two or three sentences. Under ~50 words.** MUST for invariants, SHOULD for strong
-defaults. Name the real symbol, path, or command (`typeof <table>.$inferSelect`,
-`apps/api/src/lib/github/`), never a generic paraphrase of the idea.
-
-Every rule states its cost. A rule whose reason is invisible is a rule that gets
-rationalized away.
+- **Two or three sentences, under 50 words.** MUST for invariants, SHOULD for strong defaults.
+- **The real symbol, path or command**, never a paraphrase of the idea.
+- **Every rule states its cost**: a rule whose reason is invisible gets rationalised away.
 
 <Good>
 `2. **MUST derive DB-row types from Drizzle, never hand-write them.** Use `typeof <table>.$inferSelect`, or the aliases exported from `@roster/db`. Hand-written copies drift from the schema silently.`
 </Good>
 
-## Ground it in the vendor's own docs
+## Modes
 
-Before proposing rules for a stack or framework not yet codified, read its makers'
-own guidance, official domain only, and note the major version read: a rule sourced
-from an older major is worse than none. Blog posts and aggregators are not sources.
-The docs yield candidates, not rules, and candidates still face the five filters.
-Cite the URL in the rule. A rule that departs from official guidance says so and why:
-an accidental departure is a codebase fighting its framework. Where the docs are
-silent, which they are on most decision points, say so and decide on the merits.
+- **bootstrap**, a new codebase. Read the stack first: the foundation reference when the project has a roadmap, its boards in aiview, any conventions file present. Ask only what none answers, through the `interview` skill, on the decision points that stack forces (`decision-points.md`). Write an `## Architecture (context you must not break)` section and the rules the answers produce. Stop at 5 to 8: rules written before the code are guesses.
+- **harvest**, an existing codebase. Read the source and recent history for patterns followed but unwritten, and for places the codebase contradicts itself. Propose each with its evidence: the files that comply and the ones that do not. A pattern broken in three places is a rule or a mistake: say which.
+- **capture**, a decision just made. Run the five filters, write it in the shape, place it in its section.
 
-## Three modes
+## The vendor's own docs
 
-**bootstrap**: new codebase. Read the stack before asking for it: the foundation
-reference when the project has a roadmap (`../roadmap/SKILL.md` in this collection),
-its boards in aiview, any conventions file already present. Ask only what none of them
-answers. Read the stack's official guidance, then work through only the decision points
-*that stack actually forces* (`decision-points.md`), through the `interview` skill
-(`../interview/SKILL.md` in this collection). Write an `## Architecture (context you
-must not break)` section plus the handful of rules those answers produce. Stop there:
-5–8 rules is a healthy day one. A long document written before the code exists is
-mostly guesses, and wrong guesses are expensive to unwind.
+**Before rules for a stack not yet codified, read its makers' guidance, official domain only, and note the major version read.**
 
-**harvest**: existing codebase. Read the source and recent history for patterns that
-are already followed but unwritten, and for places the codebase contradicts itself.
-Propose each as a rule **with its evidence**: the files that already comply, and the
-ones that don't. A pattern with no counter-example may not need writing down; a
-pattern the codebase breaks in three places is either a rule or a mistake: say which
-you think it is.
-
-**capture**: a decision was just made, in conversation or in a PR. Run it through the
-five filters, write it in the shape above, place it in the section it belongs to.
-This is the common case: the document grows one decision at a time.
-
-## One level down: the framework's forks
-
-`decision-points.md` asks what the architecture forces. A framework forces a second
-set inside one tier: where state lives, how a leaf gets its data, which reactive
-primitive is the default. When the stack names a framework with a catalogue at
-`references/framework-<name>.md`, read it after the stack catalogue and treat it the
-same way in all three modes. Run it when that tier is about to get real, not on day
-one for every tier. A framework without one gets a catalogue first. An entry adds to a
-stack entry the official URL, the major version read, and two lines that let someone
-who does not know the framework judge the fork.
+- **The docs yield candidates**, which still face the five filters.
+- **Cite the URL in the rule.** A rule that departs from official guidance says so and why.
+- **Where the docs are silent, say so and decide on the merits.**
+- **A framework with a catalogue at `references/framework-<name>.md`** (`references/framework-angular.md` today): read it after the stack catalogue, when that tier is about to get real. A framework without one gets a catalogue first: per fork, the official URL, the major version read, and two lines that let someone who does not know the framework judge it.
 
 ## Placement and numbering
 
-Numbering is **append-only**. A new rule takes the next free number and existing rules
-are never renumbered, because `AGENTS EXCEPTION (rule 11)` markers in the code point at
-numbers. `node scripts/rules.mjs` prints the rules with their sections, the next free
-number, and every marker in the tree with the rule it cites, exit 1 on a marker citing
-a rule that does not exist or on a duplicate number: run it before writing a rule and
-before saying a marker holds. Group rules under the headings the document already
-uses; add a heading only when a third rule needs it.
-
-Every document gets two clauses, once, near the top. The escape hatch: a rule that is
-genuinely unreasonable at a specific site may be deviated from with a comment beginning
-`AGENTS EXCEPTION (rule N):` plus short reasoning; without one, deviation is a review
-finding, and so is a marker whose reasoning doesn't hold up. A convention doc with no
-escape hatch produces either lies or bad code. And the capture clause: when a decision
-made during a session would pass the five filters, say so in chat before the session
-ends and propose the rule, written here only on the person's yes.
-
-## Never propose
-
-Formatting, naming casing, import order, line length (tooling's job) · restatements of
-general principles like DRY or SOLID (that's `code-design-review`) · aspirations with
-no test ("write clean code") · rules about code that doesn't exist yet.
+- **Numbering is append-only**: `AGENTS EXCEPTION (rule 11)` markers in the code point at numbers.
+- **Run `node scripts/rules.mjs` before writing a rule and before saying a marker holds**: it prints the rules, the next free number and every marker with the rule it cites, exit 1 on a marker citing no rule or on a duplicate number.
+- **Group under the headings the document already uses**; a new heading waits for its third rule.
+- **Two clauses near the top of every document, once.** The escape hatch: a rule may be deviated from at a specific site with a comment beginning `AGENTS EXCEPTION (rule N):` and the reason; without one, deviation is a review finding, and so is a marker whose reason does not hold. The capture clause: a decision made during a session that would pass the five filters is said in chat before the session ends, and written only on the person's yes.
 
 ## Output
 
-Show the exact markdown block to be inserted and where it goes. Apply only on
-confirmation. When a proposal contradicts an existing rule, say so and name the number.
-Superseding is a decision for the user, not a silent edit.
+**Show the exact markdown block and where it goes; apply on confirmation.** A proposal that contradicts an existing rule names its number, and superseding is the person's decision.

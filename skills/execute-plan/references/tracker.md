@@ -12,7 +12,7 @@ The **tracker** is the plan's phasing diagram, and the single record of where th
 - **A slice is a `subgraph`**, its title carrying the stories it serves and its `👤` mark when it needs a person (`Slice 2 · US3 · 👤 decision`).
 - **A slice's done-when is its last node's**, or the join's where its arms meet.
 - **Every step is a node** at the granularity someone would pause at, with its dependency edges and decision gates.
-- **Node ids are `S<slice>.<step>`** (`S2.3`); a step discovered between `S2.3` and `S2.4` is `S2.3b`. Insert, never renumber: specs, boards and commits cite the old ids.
+- **Node ids are `S<slice>.<step>`** (`S2.3`); a step discovered between `S2.3` and `S2.4` is `S2.3b`. Insert, never renumber: plans, boards and commits cite the old ids.
 - **A node whose done-when is a story's acceptance criterion carries the story's id**, and the observed criterion is written into the label when met.
 - **A step's label holds its done-when and the evidence it was met**, never the road there. A diagnosis belongs in the pull request that carries the fix, and the step cites it; a decision belongs in the register.
 - **A line stays only while a resumer would act on it.** An overturned finding keeps one line, and only to stop someone walking it again; the rest goes when the finding is settled.
@@ -64,9 +64,6 @@ deployed <where and which version>
 next     <the one step to start on>
 blocked  <what and on whom, or nothing>
 parked   <side work, stashes, environments left behind, or nothing>
-pace     <run through | stop at each slice, as the person answered when the run began>
-steps    <delegated | inline, as the person answered when the run began>
-verify   <each slice | slot done | off, as the person answered when the run began>
 ```
 
 - **Add a field only when a resumer would act on it**: a rename, a version bump, an environment quirk.

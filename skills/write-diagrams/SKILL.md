@@ -1,6 +1,6 @@
 ---
 name: write-diagrams
-description: "Use when a document produced in this collection (board, spec, plan, report, analysis, durable doc) could carry a diagram, or when a design question would settle faster shown than said. Picks the diagram that answers the open question and holds the discipline that keeps a diagram readable. Not for decoration: no open question, no diagram."
+description: "Use when a document produced in this collection (board, plan, report, analysis, durable doc) could carry a diagram, or when a design question would settle faster shown than said. Picks the diagram that answers the open question and holds the discipline that keeps a diagram readable. Not for decoration: no open question, no diagram."
 ---
 
 # Write diagrams
@@ -9,7 +9,7 @@ description: "Use when a document produced in this collection (board, spec, plan
 
 ## The catalog
 
-**`diagrams.md` maps each open question to the diagram that answers it**: what runs where (container), in what order (sequence), what states are legal (state machine), what may import what (dependency), where untrusted input enters (data flow), what ships first (phasing), and more. Read it before drawing. No open question, no diagram.
+**`diagrams.md` maps each open question to the diagram that answers it.** Read it before drawing. No open question, no diagram.
 
 **Draw while a question is open, not only in the final document**: the container diagram with a `?` on the contested arrow, and ask "which of these two?".
 
@@ -17,7 +17,7 @@ description: "Use when a document produced in this collection (board, spec, plan
 
 - **One diagram per open question.** A diagram that restates a paragraph is deleted.
 - **Every diagram carries a one-line caption right above the fence**: its catalog type and the question it answers, *"Dependency graph: what may import what after this change."*
-- **Draw only what one sentence cannot say.** If you can say the sentence, say the sentence.
+- **Draw only what one sentence cannot say.**
 - **Every arrow is labeled** with what flows and in which direction, **unless the shape carries it**: when every arrow means the same thing and no node has two outgoing arrows, the node names already say it. The moment a node branches, or two arrows mean different things, every arrow gets a label.
 - **Real names of real things**: actual service, table and module names, never `Service A`.
 - **A box whose responsibility you cannot state in a phrase is deleted.**
@@ -38,9 +38,5 @@ description: "Use when a document produced in this collection (board, spec, plan
 
 | Thought | Reality |
 |---|---|
-| "One more diagram would help" | Would it answer an open question? If not, it's soup. |
-| "I'll draw the diagram after" | Then it's documentation, not design. Its value was in the argument you skipped. |
 | "The prose already covers the boundary" | A boundary described in a bullet is a boundary nobody checked. "What may import what" is a dependency graph, not a sentence. |
-| "The diagram from the board still matches" | The design changed in review. Update it in the same edit or it will be believed wrongly. |
 | "I'll invent a hybrid diagram" | The catalog's forms exist because each answers one question. Pick one; two questions get two diagrams. |
-| "I'll label the arrows to be safe" | On a straight unbranched chain of one arrow type, labels are noise. Count the branches before reaching for them. |

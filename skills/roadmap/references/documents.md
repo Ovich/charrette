@@ -11,7 +11,7 @@
 5. **The redraw log.**
 6. **The interview log.**
 
-**A slot row**: its slug, what it delivers, what exists for it (the documents by name, and their groups once the slot has been split into pieces of work), its derived state, what it depends on. **Stories are not here**; they live in the spec of the slot that makes them true.
+**A slot row**: its slug, what it delivers, what exists for it (the documents by name, and their groups once the slot has been split into pieces of work), its derived state, what it depends on. **Stories are not here**; they live in the plan of the slot that makes them true.
 
 ## The foundation
 
@@ -26,4 +26,4 @@
 - **The AI engine's place in the architecture**, when the product has one: provider, tiering, where the prompts and rules live. Its internal design is a slot's board, not a row.
 - **Any technology decision the boards hold that a slot will build on** (a rendering engine, a payments provider), added as a row.
 
-**Once code exists, re-derive the file from the code**, and distil the durable rules into the conventions file through the `project-conventions` skill (`../project-conventions/SKILL.md` in this collection).
+**Once code exists, re-derive the file from the code**, and distil the durable rules into the conventions file through the `project-conventions` skill.

@@ -10,7 +10,7 @@ description: Use when a project's `verify-<app>` skill, its scripts and referenc
 ## The anchor
 
 - **The caller names it**: a slice, a commit range, a date. execute-plan passes the slice's merge range. None given: from the map's `proven at` to the current commit.
-- **Locate both**: the `verify-<app>` skill in the project's local skill folder, and the map by `status --json` then `list --kind feature-map --json` (`aiview` skill, `../aiview/SKILL.md` in this collection). Either missing: stop and name `verification-skill-create` (`../verification-skill-create/SKILL.md` in this collection).
+- **Locate both**: the `verify-<app>` skill in the project's local skill folder, and the map by `status --json` then `list --kind feature-map --json` (`aiview` skill). Either missing: stop and name `verification-skill-create`.
 
 ## Inspect
 
@@ -23,12 +23,12 @@ description: Use when a project's `verify-<app>` skill, its scripts and referenc
 - **Change only what the diff moved**, in the skill and in the map alike. A path that still holds is left as written, however it could be reworded. A rewritten map loses the gotchas that were paid for.
 - **The skill follows the repository**: a new start command, port or ready signal in Launch, a new handle in Drive, a new thing a run creates in Cleanup, a script that no longer matches the command it wraps. A harness that changed, a CLI that grew a web front end, points at the other reference of `verification-skill-create` and rewrites the sections that reference shapes.
 - **A new consumer-facing feature gets its section in the map, its place in the navigation diagram, its handles in the skill's Drive, and a story.** A feature the design added with no story is a gap for the person, named in the handoff.
-- **A removed feature retires its section, its handles and its stories**, said in the handoff. A dead story fails forever and teaches nothing.
+- **A removed feature retires its section, its handles and its stories**, said in the handoff.
 - **The diagram is parsed** with `aiview mermaid-check` after every edit.
 
 ## Prove
 
-**Run the affected stories, and one unaffected story, through the project's verify skill**, the anchor being the same. The unaffected one catches a skill or map edit that broke what was true.
+**Run the affected stories, and one unaffected story, through the project's verify skill**, the anchor being the same.
 
 - **A story that fails on the skill or the map**: fix it, cleanup, retry from a clean state.
 - **A story that fails on the application**: a finding, reported apart. The story stays as designed, never loosened to pass. The skill and the map are updated regardless: they describe the application, not the wish.
@@ -44,7 +44,4 @@ What changed in the skill and in the map, the stories added, retired and affecte
 
 | Thought | Reality |
 |---|---|
-| "The skill is old, I'll regenerate it" | Only what the diff moved. The rest is knowledge a run paid for. |
 | "Nothing in the diff touches the UI, so no story is affected" | A prerequisite, a contract or a side effect moves a story as surely as a screen. Walk each story's path. |
-| "The new endpoint has no story, so the map is complete" | A feature with no story is a gap. Name it. |
-| "I'll drop the story that keeps failing" | It is either retired with its feature, or a finding. Never dropped for failing. |

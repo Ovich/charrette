@@ -13,7 +13,7 @@
 
 ## Diagrams
 
-**The `write-diagrams` skill (`../write-diagrams/SKILL.md` in this collection)**: pick from its catalog by the reviewer's question, follow its discipline. **Draw the delta, never the whole system.**
+**The `write-diagrams` skill**: pick from its catalog by the reviewer's question, follow its discipline. **Draw the delta, never the whole system.**
 
 - **Change map** (almost always): the components the PR touches and their edges, new edges and nodes marked, removed ones dashed.
 - **Behavior change**: a sequence diagram of the *new* ordering (a flow, a handshake, a retry), failure branches included; before/after as two small diagrams only when the contrast is the point.
@@ -49,7 +49,7 @@
 **Everything that earns a claim in the report, and nothing aimed at persuading anyone.** Sections, in reading order:
 
 1. **Provenance**: refs compared, merge-base, commit count, file count, evidence base, and anything the environment could not reach.
-2. **Intent**: what the PR claims, from its description, linked issue and commit messages, and when a spec was named, one line per user story: met, partial or not met, with the evidence. Quote, never paraphrase. No stated intent → "no stated intent", never one inferred and presented as theirs.
+2. **Intent**: what the PR claims, from its description, linked issue and commit messages, and when a plan was named, one line per user story: met, partial or not met, with the evidence. Quote, never paraphrase. No stated intent → "no stated intent", never one inferred and presented as theirs.
 3. **What actually changed**: prose per area, not per file, sized to the change; a files-touched table when it adds orientation. **And the triage record**: which layers ran, which did not, and why.
 4. **Diagrams** that support a specific finding (§ Diagrams).
 5. **Layer returns**: one section per dispatched layer, stamped, holding that layer's verified evidence; a skipped layer's slot holds the one-line skip and its reason.

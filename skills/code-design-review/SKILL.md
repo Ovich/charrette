@@ -5,24 +5,14 @@ description: "Use when reviewing program design quality on a pull request, a dif
 
 # Code design review
 
-Applies ten program design principles to a PR or a codebase and reports where the
-design will cost someone later. Grounded in a sourced `checklist.md`: one section
-per lens. Reports findings; only edits with `--fix`.
-
-A design finding is about *cost of change*, not wrongness today.
+**A design finding is a cost of change, never wrongness today.** Findings are reported; edits only with `--fix`.
 
 ## Scope
 
-Point it at whatever the user named and resolve the file list with the review
-scope script of the `pr-review` skill (`../pr-review/scripts/scope.mjs` in this
-collection): `diff`, `pr <n>`, `branch <ref>`, `path <p>` or `all`, with `--json`.
-It skips vendored, generated, build and lockfile paths. Exit 1 is an empty scope:
-say so and stop.
+- **Resolve the file list with `scripts/scope.mjs` of the `pr-review` skill**: `diff`, `pr <n>`, `branch <ref>`, `path <p>` or `all`, with `--json`. Exit 1 is an empty scope: say so and stop.
+- **On a diff, review the changed code and the design it lands in**: a hunk can be locally fine and still push a module past one responsibility.
 
-On a diff, review the changed code **plus the design context it lands in**: a hunk
-can be locally fine and still push a module past one responsibility.
-
-## The four lenses
+## The lenses
 
 | Lens | Principles |
 |---|---|
@@ -31,66 +21,26 @@ can be locally fine and still push a module past one responsibility.
 | **extension** | OCP · LSP · ISP |
 | **dependencies** | DIP · Low Coupling · Law of Demeter |
 
-## Run it
+## Running it
 
-Dispatch **one independent subagent per lens** (for a large codebase, one per module
-running all four lenses: this bounds cost to the module count).
-
-Each subagent starts with no conversation history, and that is the point: it must
-judge the code, not inherit your opinion of it. Its prompt contains exactly four
-things: the file list, its lens section quoted from `checklist.md`, the output
-contract below, and the instruction to read the files first. Nothing about this
-conversation, and never a lens summarized from memory.
-
-Then merge: drop duplicates on the same line or mechanism, drop anything the
-project's own linter already flags, rank by cost.
-
-## Two standing rules
-
-**A principle name is not a finding.** "Violates SRP" is a label. The finding is the
-concrete cost: which future change this makes expensive, what edit will silently
-break something else, what bug the shape invites. No cost, no finding.
-
-**Over-application is a finding too.** Every principle here does more damage applied
-too eagerly than not at all: the wrong abstraction, the interface with one
-implementor, the plugin point for a variation nobody asked for. Each checklist
-section carries its counterweight. "Consider deleting this indirection" is a
-first-class result.
+- **One fresh-context subagent per lens**; on a large codebase, one per module running all four.
+- **Its prompt is exactly**: the file list, its lens section quoted from `checklist.md`, the output contract, the instruction to read the files first. Nothing of this conversation, never a lens from memory.
+- **Merge**: drop duplicates on the same line or mechanism, drop what the project's linter already flags, rank by cost.
+- **A principle name is a label.** The finding is the cost: which future change this makes expensive, what edit silently breaks something else, what bug the shape invites.
+- **Over-application is a finding too**: the wrong abstraction, the interface with one implementor, the plugin point nobody asked for. "Consider deleting this indirection" is a first-class result.
 
 ## Output contract
 
-Per finding: `file:line` · **principle** · one-line issue · the concrete cost · the
-fix. Grouped by lens, ranked by cost, no code restated, no preamble.
+- **Per finding**: `file:line` · **principle** · one-line issue · the concrete cost · the fix. Grouped by lens, ranked by cost, no code restated.
+- **A one-line verdict last**: `9 findings: 3 dependencies, 4 responsibility, 2 simplicity (1 blocking)`. Clean code gets "clean".
+- **A diff review is answered in chat.** A path or whole-codebase review is `YYYY-MM-DD-<scope>.report.md` through the `aiview` skill, kind `report`, tags = project + review.
+- **With `--fix`**, apply the safe findings afterward, nothing that changes behaviour or reaches outside the scope, then run the project's own typecheck, lint and tests.
 
-End with a one-line verdict, e.g. `9 findings: 3 dependencies, 4 responsibility,
-2 simplicity (1 blocking)`. Clean code gets "clean" and nothing more. A short report
-is a good report.
+## Diagrams
 
-A diff review is answered in chat. A path or whole-codebase review is a document
-someone reads later: write `YYYY-MM-DD-<scope>.report.md` in the data home and open
-it via the `aiview` skill (`../aiview/SKILL.md` in this collection), kind `report`,
-tags = project + review.
+**In a file report only, through the `write-diagrams` skill**, one per lens where the findings call for it; a trivial scope earns none.
 
-## Diagrams (file reports only)
-
-Diagrams: use the `write-diagrams` skill (`../write-diagrams/SKILL.md` in this
-collection). Pick from its catalog by the open question, follow its discipline. Per
-finding the prose stays prose; a diagram appears only in a file report, and in these
-shapes, one per lens where the findings call for it. A trivial scope earns none: say so.
-
-- **Scope map** (one, at the top): the modules of the reviewed scope with the finding
-  counts on the hot nodes. The map the findings hang off, and compressed context for
-  the next session touching this code.
-- **Dependency graph** (dependencies): the modules and what imports what, the
-  forbidden edges drawn red: policy importing a mechanism, an inner layer naming an
-  outer one, a cycle. One graph instead of N prose findings about individual imports.
-- **Before and after** (responsibility, extension): when the fix is a reshape, an
-  extraction or a split, two small trees side by side with the deciding trade-off
-  stated under them in one line.
-- **Option comparison** (simplicity): when the finding is over-application, the
-  indirection as it stands against the inlined version, so "delete this abstraction"
-  is seen, not argued.
-
-With `--fix`, apply only the safe findings afterward (nothing that changes behavior
-or reaches outside the scope), then re-run whatever typecheck/lint/test command the
-project already defines.
+- **Scope map**, at the top: the modules of the scope, the finding counts on the hot nodes.
+- **Dependency graph** (dependencies): what imports what, the imports that must not exist drawn red: policy importing a mechanism, an inner layer naming an outer one, a cycle.
+- **Before and after** (responsibility, extension): when the fix is a reshape, two small trees side by side, the deciding trade-off in one line under them.
+- **Option comparison** (simplicity): the indirection as it stands against the inlined version.

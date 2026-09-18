@@ -27,7 +27,7 @@ file the person was looking for. Refresh the cache with
 
 ## Skills
 
-1. **MUST reference another skill by name plus the relative path `../<name>/SKILL.md`, "in this collection".** Every skill is a sibling, so the path is the same from anywhere; an absolute path or a bare `skills/<name>/` breaks on the next checkout and in a plugin cache.
+1. **MUST reference another skill by its name alone, the `<name>` skill.** The harness resolves a skill by name wherever it is installed; a path, relative or absolute, breaks on the next layout and is paid for at every load. A file inside another skill is named as that skill's `references/<topic>.md` or `scripts/<name>`.
 
 2. **MUST keep in `SKILL.md` only what every use of the skill needs, and put what one situation needs in `references/<topic>.md`, named in `SKILL.md` at the point where the situation arises, with the condition to read it stated there.** Everything in `SKILL.md` is paid for at every load, and a condition written inside a reference is read only by an agent that has already opened it. `skills/aiview/references/`, `skills/execute-plan/references/`, `skills/frontend-design/references/`.
 

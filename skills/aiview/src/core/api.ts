@@ -62,3 +62,9 @@ export interface PendingEventPayload {
 export interface IndexEventPayload {
   type: "index";
 }
+
+/** The heartbeat. It carries nothing: what matters is that it arrives, so a tab whose
+ *  stream died in silence can tell (app/hooks/useDocuments.ts) and reconnect. */
+export interface PingEventPayload {
+  type: "ping";
+}

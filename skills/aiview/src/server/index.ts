@@ -28,6 +28,8 @@ export interface ServeOptions {
   /** Claim the data home's pid/port files. Tests pass false so a suite run never
    *  clobbers the state of the real server the user has open. */
   writeState?: boolean;
+  /** How often open tabs are pinged. Injectable for tests. */
+  heartbeatMs?: number;
 }
 
 const MIME: Record<string, string> = {
@@ -64,9 +66,9 @@ function openBrowser(url: string): void {
 
 export function startServer(
   index: Index,
-  { port, open, startDoc, toolRoot = TOOL_ROOT, writeState = true }: ServeOptions,
+  { port, open, startDoc, toolRoot = TOOL_ROOT, writeState = true, heartbeatMs }: ServeOptions,
 ): http.Server {
-  const sse = createSseHub();
+  const sse = createSseHub(heartbeatMs);
   const watcher = new DocWatcher((dir, name) =>
     index
       .all()
@@ -236,7 +238,10 @@ export function startServer(
     serveStatic(res, p);
   });
 
-  server.on("close", () => watcher.close());
+  server.on("close", () => {
+    watcher.close();
+    sse.close();
+  });
   // Without this the process dies unhandled and, when detached with stdio ignored,
   // silently — the caller only sees "did not come up within 10s".
   server.on("error", (err: NodeJS.ErrnoException) => {

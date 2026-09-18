@@ -5,6 +5,15 @@ export type ConnectionState = "connecting" | "live" | "reconnecting";
 
 export const ALL_PROJECTS = "*";
 
+/** Nothing heard for this long means the stream is dead, whatever the browser thinks.
+ *  Three server heartbeats (src/server/sse.ts), so one lost beat is not a reconnect. */
+export const SILENCE_MS = 45_000;
+
+/** Has the stream gone quiet? An EventSource whose socket broke without a FIN stays
+ *  `OPEN` and fires no error, so silence is the only evidence there is. */
+export const isSilent = (lastSeenMs: number, nowMs: number, timeoutMs = SILENCE_MS): boolean =>
+  nowMs - lastSeenMs >= timeoutMs;
+
 export interface DocumentsState {
   docs: DocumentWithState[];
   groups: Record<string, string>;
@@ -46,24 +55,50 @@ export function useDocuments(): DocumentsState {
 
   useEffect(() => {
     reload();
-    const es = new EventSource("/events");
-    es.onopen = () => setConnection("live");
-    es.onerror = () => setConnection("reconnecting");
-    es.onmessage = (e) => {
-      const ev = JSON.parse(e.data) as { type: string; id?: number; slug?: string };
-      if (ev.type === "hello") setConnection("live");
-      if (ev.type === "changed") {
-        reload();
-        setChanged((c) => ({ tick: c.tick + 1, id: ev.id ?? null }));
-      }
-      // A document was registered, moved, re-tagged or dropped by the CLI: the list
-      // itself moved, so refetch it. This is what makes a new document appear without
-      // a manual refresh — `changed` only fires for files already being watched.
-      if (ev.type === "index") reload();
-      // The agent switched project: this tab follows (D3).
-      if (ev.type === "project" && ev.slug) setActiveProject(ev.slug);
+    let es: EventSource | null = null;
+    let lastSeen = Date.now();
+
+    const connect = (): void => {
+      es?.close();
+      lastSeen = Date.now();
+      es = new EventSource("/events");
+      es.onopen = () => setConnection("live");
+      es.onerror = () => setConnection("reconnecting");
+      es.onmessage = (e) => {
+        lastSeen = Date.now();
+        const ev = JSON.parse(e.data) as { type: string; id?: number; slug?: string };
+        if (ev.type === "hello" || ev.type === "ping") setConnection("live");
+        if (ev.type === "changed") {
+          reload();
+          setChanged((c) => ({ tick: c.tick + 1, id: ev.id ?? null }));
+        }
+        // A document was registered, moved, re-tagged or dropped by the CLI: the list
+        // itself moved, so refetch it. This is what makes a new document appear without
+        // a manual refresh — `changed` only fires for files already being watched.
+        if (ev.type === "index") reload();
+        // The agent switched project: this tab follows (D3).
+        if (ev.type === "project" && ev.slug) setActiveProject(ev.slug);
+      };
     };
-    return () => es.close();
+    connect();
+
+    // The watchdog. A broken socket that never sent a FIN leaves the EventSource `OPEN`
+    // and silent, so no error ever fires and the tab shows stale documents while the
+    // sidebar says "live". Silence past three heartbeats is taken as death: reconnect,
+    // and catch up on everything missed — the list, and the open document, which a null
+    // `id` reloads whatever it is.
+    const watchdog = setInterval(() => {
+      if (!isSilent(lastSeen, Date.now())) return;
+      setConnection("reconnecting");
+      connect();
+      reload();
+      setChanged((c) => ({ tick: c.tick + 1, id: null }));
+    }, SILENCE_MS / 3);
+
+    return () => {
+      clearInterval(watchdog);
+      es?.close();
+    };
   }, [reload]);
 
   return {

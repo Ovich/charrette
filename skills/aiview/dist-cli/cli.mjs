@@ -8843,8 +8843,27 @@ var init_watcher = __esm({
 });
 
 // src/server/sse.ts
-function createSseHub() {
+function createSseHub(heartbeatMs = HEARTBEAT_MS) {
   const clients = /* @__PURE__ */ new Set();
+  const drop = (res) => {
+    if (clients.delete(res)) res.destroy();
+  };
+  const send = (res, event) => {
+    if (res.writableEnded || res.destroyed) return drop(res);
+    try {
+      res.write(`data: ${JSON.stringify(event)}
+
+`, (err) => {
+        if (err) drop(res);
+      });
+    } catch {
+      drop(res);
+    }
+  };
+  const beat = setInterval(() => {
+    for (const res of [...clients]) send(res, { type: "ping" });
+  }, heartbeatMs);
+  beat.unref?.();
   return {
     add(res) {
       res.writeHead(200, {
@@ -8852,22 +8871,27 @@ function createSseHub() {
         "cache-control": "no-store",
         connection: "keep-alive"
       });
-      res.write(`data: ${JSON.stringify({ type: "hello" })}
-
-`);
       clients.add(res);
       res.on("close", () => clients.delete(res));
+      res.on("error", () => drop(res));
+      send(res, { type: "hello" });
     },
+    // The set is copied: a write that fails drops its client from it.
     broadcast(event) {
-      for (const res of clients) res.write(`data: ${JSON.stringify(event)}
-
-`);
+      for (const res of [...clients]) send(res, event);
+    },
+    size: () => clients.size,
+    close() {
+      clearInterval(beat);
+      for (const res of [...clients]) drop(res);
     }
   };
 }
+var HEARTBEAT_MS;
 var init_sse = __esm({
   "src/server/sse.ts"() {
     "use strict";
+    HEARTBEAT_MS = 15e3;
   }
 });
 
@@ -8888,8 +8912,8 @@ function openBrowser(url) {
     console.error(`could not open browser: ${e.message}`);
   }
 }
-function startServer(index, { port, open, startDoc, toolRoot = TOOL_ROOT, writeState = true }) {
-  const sse = createSseHub();
+function startServer(index, { port, open, startDoc, toolRoot = TOOL_ROOT, writeState = true, heartbeatMs }) {
+  const sse = createSseHub(heartbeatMs);
   const watcher = new DocWatcher(
     (dir, name) => index.all().find((d) => path7.dirname(d.abs_path) === dir && path7.basename(d.abs_path) === name)
   );
@@ -9029,7 +9053,10 @@ function startServer(index, { port, open, startDoc, toolRoot = TOOL_ROOT, writeS
     if (p.startsWith("/api/")) return send(res, 404, "not found", "text/plain");
     serveStatic(res, p);
   });
-  server.on("close", () => watcher.close());
+  server.on("close", () => {
+    watcher.close();
+    sse.close();
+  });
   server.on("error", (err) => {
     console.error(
       err.code === "EADDRINUSE" ? `aiview: port ${port} is already in use. Retry with --port <n> or set AIVIEW_PORT.` : `aiview: server error: ${err.message}`
