@@ -172,7 +172,7 @@ has one state per boolean combination, the state should be one field, not N bool
 
 ```mermaid
 erDiagram
-    CLASS ||--o{ LAB : contains
+    COURSE ||--o{ LAB : contains
     LAB ||--o{ GROUP : has
     GROUP }o--o{ USER : "membership"
 ```
@@ -279,8 +279,8 @@ State the deciding trade-off under it in one line, not a feature matrix.
 
 ```mermaid
 flowchart LR
-    p1["1 · schema + migration"] --> p2["2 · API handlers"]
-    p1 --> p3["3 · seed + fixtures"]
+    p1["1 · schema + migration"] -->|tables to query| p2["2 · API handlers"]
+    p1 -->|tables to fill| p3["3 · seed + fixtures"]
     p2 --> p4["4 · SPA screens"]
     p3 --> p4
 ```
