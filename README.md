@@ -11,25 +11,18 @@ Eighteen skills in plain Markdown and a companion app in plain Node. No harness,
 
 ## The loop
 
-Phasing: what a piece of work passes through, from idea to merge, and which skills serve every stage.
+Phasing: what a piece of work passes through, from idea to merge.
 
 ```mermaid
 flowchart LR
-  I["idea"] -.->|optionally, kept on a board| B["brainstorm<br/>interview + board + diagrams"]
-  I -->|directly| P
-  RM["roadmap<br/>iterations of slots, the foundation"] -.->|names the next slot| P
-  B -.->|a starting point| P["write-plan<br/>one document: design, slices, tracker, mandate"]
-  P --> WS["write-slice<br/>one node, one document"]
-  WS --> E["execute-plan<br/>the plan's diagram is the tracker"]
-  E --> S["execute-slice<br/>one agent, one slice document"]
-  S --> R["pr-review<br/>analysis, findings"]
+  I["idea"] --> P["write-plan<br/>one document, written while interviewing"]
+  P --> WS["write-slice<br/>one document per slice"]
+  WS --> E["execute-plan<br/>one agent per slice"]
+  E --> R["pr-review"]
   R --> M["merge"]
-  D["write-diagrams"] -.->|draws for| B & P & R
-  Q["interview<br/>research and experiments on request"] -.->|resolves decisions for| B & P
-  DM["deepen-module"] -.->|shapes the major areas of| P
 ```
 
-The board is a Markdown file opened at the first question and edited through the whole conversation. The plan is the same kind of document for the build: its phasing diagram is the tracker, and a later session with none of the conversation in context resumes from it.
+Everything else serves these four: `interview` resolves the decisions, `brainstorm` keeps an idea on a board before there is a plan, `deepen-module` and `write-diagrams` shape and draw the design, `roadmap` names what comes next. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it.
 
 ## Iterate the loop
 
