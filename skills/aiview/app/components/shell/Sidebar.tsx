@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { Search, Star } from "lucide-react";
 import type { DocumentWithState } from "../../lib/api.ts";
 import { ALL_PROJECTS, type ConnectionState } from "../../hooks/useDocuments.ts";
 import { useFilters } from "../../hooks/useFilters.ts";
@@ -25,6 +25,7 @@ export function Sidebar({
   projects,
   activeProject,
   connection,
+  version,
   currentId,
   onOpen,
   onPickProject,
@@ -34,6 +35,7 @@ export function Sidebar({
   projects: Record<string, string>;
   activeProject: string;
   connection: ConnectionState;
+  version?: string | null;
   currentId: number | null;
   onOpen: (id: number) => void;
   onPickProject: (slug: string) => void;
@@ -113,9 +115,35 @@ export function Sidebar({
         )}
       </div>
 
-      <div className="flex items-center gap-1.5 border-t border-border px-3.5 py-2 text-[10.5px] text-faint-foreground">
-        {f.shown.length} documents ·{" "}
-        {scoped ? (projects[activeProject] ?? activeProject) : `${Object.keys(projects).length} projects`}
+      <div
+        data-component="SidebarFooter"
+        className="flex items-center gap-1.5 border-t border-border px-3.5 py-2 text-[11px] text-faint-foreground"
+      >
+        <span className="min-w-0 truncate">
+          {f.shown.length} documents ·{" "}
+          {scoped ? (projects[activeProject] ?? activeProject) : `${Object.keys(projects).length} projects`}
+        </span>
+        <span className="ml-auto flex items-center gap-1.5 whitespace-nowrap">
+          {version && (
+            <>
+              <span className="font-mono" data-component="Version">
+                v{version}
+              </span>
+              <span aria-hidden="true">·</span>
+            </>
+          )}
+          <a
+            data-component="GitHubLink"
+            href="https://github.com/Ovich/charrette"
+            target="_blank"
+            rel="noreferrer"
+            title="Charrette on GitHub. A star helps others find it."
+            className="-mx-[3px] -my-0.5 inline-flex items-center gap-[5px] rounded px-[3px] py-0.5 hover:text-foreground focus-visible:text-foreground"
+          >
+            <Star size={14} aria-hidden="true" className="star-glow fill-star text-star" />
+            Star on GitHub
+          </a>
+        </span>
       </div>
     </aside>
   );

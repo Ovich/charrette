@@ -21,6 +21,9 @@ export interface DocumentsResponse {
   /** The active project slug, or `*` for All projects. */
   activeProject: string;
   start: number | null;
+  /** The collection's version, from the plugin manifest the tool was installed with.
+   *  null when the tool runs outside one. */
+  version: string | null;
 }
 
 export interface ActiveProjectResponse {

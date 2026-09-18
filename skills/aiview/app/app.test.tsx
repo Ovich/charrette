@@ -576,3 +576,31 @@ describe("useDocuments: the stream is watched, not trusted", () => {
     expect(result.current.changedTick).toBe(0);
   });
 });
+
+describe("Sidebar footer: the way to the repository", () => {
+  const footer = (version?: string | null) => {
+    render(
+      <Sidebar docs={[doc({ id: 1 })]} groups={{}} projects={{ JOBS: "JOBS" }} activeProject="JOBS"
+        connection="live" version={version} currentId={null} onOpen={() => {}} onPickProject={() => {}} />,
+    );
+    return document.querySelector('[data-component="SidebarFooter"]')!;
+  };
+
+  test("the link opens the repository in a new tab and says what a star is for", () => {
+    const link = footer("2.0.0").querySelector('[data-component="GitHubLink"]') as HTMLAnchorElement;
+    expect(link.textContent).toContain("Star on GitHub");
+    expect(link.href).toBe("https://github.com/Ovich/charrette");
+    expect(link.target).toBe("_blank");
+    expect(link.rel).toBe("noreferrer");
+    expect(link.title).toBe("Charrette on GitHub. A star helps others find it.");
+  });
+
+  test("the version is the server's, and is left out when the server has none", () => {
+    expect(footer("2.0.0").querySelector('[data-component="Version"]')!.textContent).toBe("v2.0.0");
+    cleanup();
+    const bare = footer(null);
+    expect(bare.querySelector('[data-component="Version"]')).toBeNull();
+    expect(bare.querySelector('[data-component="GitHubLink"]')).not.toBeNull();
+    expect(bare.textContent).toContain("1 documents · JOBS");
+  });
+});

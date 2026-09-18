@@ -6,7 +6,7 @@ import path from "node:path";
 import type { AddressInfo } from "node:net";
 import type http from "node:http";
 import { openIndex, type Index } from "../src/core/db.ts";
-import { startServer } from "../src/server/index.ts";
+import { collectionVersion, startServer } from "../src/server/index.ts";
 import type { DocumentsResponse, DocumentResponse } from "../src/core/api.ts";
 
 let tmp: string;
@@ -254,4 +254,18 @@ test("an html document is served composed: bindings resolved, summary carried, t
 
   const again = (await (await fetch(`${base}/api/document/${hostId}`)).json()) as DocumentResponse;
   assert.ok(again.content!.includes('data-bound="tools.mockup.html#Pill"'));
+});
+
+test("the version is the plugin manifest's, two levels above the skill, and null without one", async () => {
+  const skill = path.join(tmp, "plugin", "skills", "aiview");
+  fs.mkdirSync(skill, { recursive: true });
+  assert.equal(collectionVersion(skill), null);
+  fs.mkdirSync(path.join(tmp, "plugin", ".claude-plugin"), { recursive: true });
+  fs.writeFileSync(path.join(tmp, "plugin", ".claude-plugin", "plugin.json"), JSON.stringify({ version: "9.8.7" }));
+  assert.equal(collectionVersion(skill), "9.8.7");
+  fs.writeFileSync(path.join(tmp, "plugin", ".claude-plugin", "plugin.json"), "not json");
+  assert.equal(collectionVersion(skill), null);
+
+  const body = (await (await fetch(`${base}/api/documents`)).json()) as DocumentsResponse;
+  assert.ok("version" in body, "GET /api/documents carries the version field");
 });

@@ -12,6 +12,8 @@
   --accent: #4f46e5;
   --accent-soft: #eef2ff;
   --ok: #16a34a;
+  --star: #eab308;
+  --star-glow: #facc1599;
   --radius: 10px;
   --radius-sm: 6px;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -28,6 +30,8 @@
     --accent: #818cf8;
     --accent-soft: #1e1b3a;
     --ok: #4ade80;
+    --star: #facc15;
+    --star-glow: #facc15b3;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 }
@@ -43,6 +47,7 @@
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-ok: var(--ok);
+  --color-star: var(--star);
   --radius-md: var(--radius-sm);
   --radius-lg: var(--radius);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
@@ -60,6 +65,22 @@ body {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* The one bright thing in the sidebar: the star of the link to the repository. */
+.star-glow {
+  filter: drop-shadow(0 0 3px var(--star-glow));
+  transition: filter 0.2s, transform 0.2s;
+}
+a:hover > .star-glow,
+a:focus-visible > .star-glow {
+  filter: drop-shadow(0 0 5px var(--star-glow)) drop-shadow(0 0 10px var(--star-glow));
+  transform: scale(1.15);
+}
+@media (prefers-reduced-motion: reduce) {
+  .star-glow {
+    transition: none;
+  }
 }
 
 /* rendered markdown — mirrors the mockup's .md styles */

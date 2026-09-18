@@ -43,7 +43,7 @@ export function shouldLoad(
 }
 
 export function App() {
-  const { docs, groups, projects, activeProject, startId, connection, changedTick, changedId } = useDocuments();
+  const { docs, groups, projects, activeProject, startId, version, connection, changedTick, changedId } = useDocuments();
   const [currentId, setCurrentId] = useState<number | null>(hashId);
   const [response, setResponse] = useState<DocumentResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -146,6 +146,7 @@ export function App() {
         projects={projects}
         activeProject={activeProject}
         connection={connection}
+        version={version}
         currentId={currentId}
         onOpen={open}
         onPickProject={pickProject}

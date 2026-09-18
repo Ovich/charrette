@@ -50,6 +50,17 @@ const MIME: Record<string, string> = {
   ".ico": "image/x-icon",
 };
 
+/** The version the collection ships as: `.claude-plugin/plugin.json`, two levels above the
+ *  skill in a checkout and in the plugin cache alike. Read once; the file does not move. */
+export function collectionVersion(toolRoot: string): string | null {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(toolRoot, "..", "..", ".claude-plugin", "plugin.json"), "utf8")) as { version?: unknown };
+    return typeof manifest.version === "string" ? manifest.version : null;
+  } catch {
+    return null;
+  }
+}
+
 function openBrowser(url: string): void {
   const [c, args] =
     process.platform === "win32"
@@ -69,6 +80,7 @@ export function startServer(
   { port, open, startDoc, toolRoot = TOOL_ROOT, writeState = true, heartbeatMs }: ServeOptions,
 ): http.Server {
   const sse = createSseHub(heartbeatMs);
+  const version = collectionVersion(toolRoot);
   const watcher = new DocWatcher((dir, name) =>
     index
       .all()
@@ -116,6 +128,7 @@ export function startServer(
         projects: Object.fromEntries(index.allProjects().map((x) => [x.slug, x.title ?? x.slug])),
         activeProject: index.activeProject(),
         start: startDoc?.id ?? null,
+        version,
       } satisfies DocumentsResponse);
     // The CLI writes the index in its own process; this is how it tells an open tab
     // that the document list moved, so a new document appears without a refresh.

@@ -21,6 +21,8 @@ export interface DocumentsState {
   /** The active project, shared with the CLI. `*` = All projects. */
   activeProject: string;
   startId: number | null;
+  /** The collection's version, or null when the server could not read one. */
+  version: string | null;
   connection: ConnectionState;
   /** Bumped whenever the given doc id changed on disk — viewers key refetches off it. */
   changedTick: number;
@@ -34,6 +36,7 @@ export function useDocuments(): DocumentsState {
   const [projects, setProjects] = useState<Record<string, string>>({});
   const [activeProject, setActiveProject] = useState<string>(ALL_PROJECTS);
   const [startId, setStartId] = useState<number | null>(null);
+  const [version, setVersion] = useState<string | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [changed, setChanged] = useState<{ tick: number; id: number | null }>({ tick: 0, id: null });
   const loadedOnce = useRef(false);
@@ -45,6 +48,7 @@ export function useDocuments(): DocumentsState {
         setGroups(data.groups);
         setProjects(data.projects);
         setActiveProject(data.activeProject);
+        setVersion(data.version ?? null);
         if (!loadedOnce.current) {
           setStartId(data.start);
           loadedOnce.current = true;
@@ -107,6 +111,7 @@ export function useDocuments(): DocumentsState {
     projects,
     activeProject,
     startId,
+    version,
     connection,
     changedTick: changed.tick,
     changedId: changed.id,

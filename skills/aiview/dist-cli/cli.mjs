@@ -8898,12 +8898,21 @@ var init_sse = __esm({
 // src/server/index.ts
 var server_exports = {};
 __export(server_exports, {
+  collectionVersion: () => collectionVersion,
   startServer: () => startServer
 });
 import { spawn } from "node:child_process";
 import fs6 from "node:fs";
 import http from "node:http";
 import path7 from "node:path";
+function collectionVersion(toolRoot) {
+  try {
+    const manifest = JSON.parse(fs6.readFileSync(path7.join(toolRoot, "..", "..", ".claude-plugin", "plugin.json"), "utf8"));
+    return typeof manifest.version === "string" ? manifest.version : null;
+  } catch {
+    return null;
+  }
+}
 function openBrowser(url) {
   const [c, args2] = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
   try {
@@ -8914,6 +8923,7 @@ function openBrowser(url) {
 }
 function startServer(index, { port, open, startDoc, toolRoot = TOOL_ROOT, writeState = true, heartbeatMs }) {
   const sse = createSseHub(heartbeatMs);
+  const version = collectionVersion(toolRoot);
   const watcher = new DocWatcher(
     (dir, name) => index.all().find((d) => path7.dirname(d.abs_path) === dir && path7.basename(d.abs_path) === name)
   );
@@ -8947,7 +8957,8 @@ function startServer(index, { port, open, startDoc, toolRoot = TOOL_ROOT, writeS
         groups: Object.fromEntries(index.allGroups().map((g) => [g.slug, g.title ?? g.slug])),
         projects: Object.fromEntries(index.allProjects().map((x) => [x.slug, x.title ?? x.slug])),
         activeProject: index.activeProject(),
-        start: startDoc?.id ?? null
+        start: startDoc?.id ?? null,
+        version
       });
     if (p === "/api/index-changed" && req.method === "POST") {
       req.resume();
