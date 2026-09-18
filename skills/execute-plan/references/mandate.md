@@ -1,7 +1,7 @@
 # The orchestrator's mandate
 
 What the person hands the agent that carries the plan out. Ask all of it in one message,
-the recommended answer first, and write the answers into the plan's *Execution* section
+the recommended answer first, and write the answers into the plan's *Mandate* section
 as `field: value` lines.
 
 **Autonomy** (`pace: run through | stop at each slice`):

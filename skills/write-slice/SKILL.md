@@ -1,17 +1,19 @@
 ---
 name: write-slice
-description: Use when an approved plan exists and one of its slices needs the document an agent will carry it out from, including a slice execute-plan draws mid-run. Takes one slice of the plan; produces its document, with the modules table its tests are written against. Not for cutting the increment into slices (write-plan) and not for carrying a slice out (execute-slice).
+description: Use when a plan's increment has to be cut into slices, or when an approved plan exists and one of its slices needs the document an agent will carry it out from, including a slice execute-plan draws mid-run. Produces the cut, or one slice's document with the modules table its tests are written against. Not for writing the plan (write-plan) and not for carrying a slice out (execute-slice).
 ---
 
 # Write a slice
+
+**Cutting a plan's increment into slices**: read `references/cutting.md`. The rest of this skill is one slice's document.
 
 **One document per slice, the whole context one agent needs, and the only place instructions live.**
 
 ## Before writing
 
-- **The approved plan**, open through the `aiview` skill: the slice, its check, its `👤` mark, the decisions that name it, its row of *What each slice carries*. The mockup too, when the slice has a face.
+- **The approved plan**, open through the `aiview` skill: the slice, its check, its `👤` mark, the decisions that name it. The mockup too, when the slice has a face.
 - **The plan is the approved statement of every decision.** A decision it does not carry is a finding for the plan.
-- **After the plan is approved**: the interview moves decisions, and the slice carries them word for word.
+- **After the plan is approved**: the interview moves decisions, and the slice carries them verbatim.
 
 ## Modules
 
@@ -39,7 +41,7 @@ description: Use when an approved plan exists and one of its slices needs the do
 - **A seam block carries**: the module whose interface it is, what sits behind it and how the tests cross it (table below), the cases by name, each traced to an acceptance criterion or a branch of the flow, and what is not tested past it.
 - **One glance per seam**: the block fits a screen, the signature block stays under ten lines, the cases are a list of names, and with more than two seams the flow marks where each sits.
 - **A branch with no case, or a case on no branch, is a gap in the design.**
-- **Tests read the answer through the interface**, never through a table the library owns, a private function or a spy on a collaborator.
+- **Tests read the answer through the interface**, never through a table the library owns, a private function or a spy on a collaborator. An answer the interface cannot give back is a finding: the interface is missing something.
 - **One adapter is a hypothetical seam, two are a real one.**
 
 | Behind the seam | How the tests cross it |
@@ -74,9 +76,9 @@ expected exit code wherever one exists.
 
 **Context.** Carried, not linked, in this order, each block naming its document and date:
 
-- *The decisions that bind* and the plan's sections its row of *What each slice carries*
-  names: **carried whole, never paraphrased, trimmed or redrawn**, under the plan's own
-  headings and decision ids. On a conflict the slice is wrong, and the agent reports it.
+- *The design*: the structure of the plan's **Design** part, each section narrowed to the
+  scope of this slice, verbatim, and each diagram narrowed the same way. On a conflict the slice is wrong,
+  and the agent reports it.
 - *The flow*: the slice's own sequence, every branch, as mermaid, the seams marked on it.
 - *The screen*, for work with a face: the mockup's component names (`aiview components`)
   and its copy. Its copy, states and routes are decisions, and a departure is a finding.

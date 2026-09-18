@@ -15,10 +15,10 @@ answer into the board as it lands.
 
 The board, in this order:
 
-- **Decisions table**: id `D3`, decision, depends on, status (agreed, open, deferred), log entry `Q7`. The interview's two options are its first rows.
+- **Decisions table**: id `D3`, decision, depends on, status (agreed, open, deferred), log entry `Q7`. The interview's `experiments` option is its first row.
 - **Context being built on.**
 - **Diagrams**, through the `write-diagrams` skill, drawn during the questions.
-- **What ran**: the recipes the investigation hands back.
+- **What ran**: the recipes the experiments hand back.
 - **Interview log**, last: one entry per question, verbatim, the options and the recommendation, then the answer as given.
 
 **No code in the repository for the thing being discussed.**

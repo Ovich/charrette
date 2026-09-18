@@ -36,7 +36,7 @@ N. **MUST <imperative>.** <the cost of not doing it, or where it lives.> <option
 ## Modes
 
 - **bootstrap**, a new codebase. Read the stack first: the foundation reference when the project has a roadmap, its boards in aiview, any conventions file present. Ask only what none answers, through the `interview` skill, on the decision points that stack forces (`decision-points.md`). Write an `## Architecture (context you must not break)` section and the rules the answers produce. Stop at 5 to 8: rules written before the code are guesses.
-- **harvest**, an existing codebase. Read the source and recent history for patterns followed but unwritten, and for places the codebase contradicts itself. Propose each with its evidence: the files that comply and the ones that do not. A pattern broken in three places is a rule or a mistake: say which.
+- **harvest**, an existing codebase. Read the source and recent history for patterns followed but unwritten, and for places the codebase contradicts itself. Propose each with its evidence: the files that comply and the ones that do not. A pattern with no counter-example may not need writing down. A pattern broken in three places is a rule or a mistake: say which.
 - **capture**, a decision just made. Run the five filters, write it in the shape, place it in its section.
 
 ## The vendor's own docs

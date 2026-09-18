@@ -5,13 +5,23 @@ description: Use when a person asks to be interviewed about an idea or an existi
 
 # Interview
 
+**The interview ends at shared understanding**: the person and the agent would describe
+the object the same way, and every decision is agreed or deferred. Until then, keep going.
+
 The object is a tree of decisions. Each is answered by what can be read or by the person.
 
-**Two options, `research: yes | no` and `experiments: yes | no`.** Ask them first, in one
-message with your recommendation, when the subject makes them plausible. Ask them later,
-the moment a decision rests on a claim about the world: a tool exists, it works with our
-versions, the industry does it this way, or the person doubts a tool. On a yes to either,
-read `references/investigate.md`. The caller stores the answers with its decisions.
+**Research every decision that rests on a claim about the world**: a tool exists, it works
+with our versions, the industry does it this way. Read the official source, the
+specification, the package as published, its types and its changelog, and how reputable
+projects solve the same problem, from their sources. State the version read and the date.
+A search result or a blog is where reading starts, never where it stops.
+
+**One option, `experiments: yes | no`.** Ask it first, with your recommendation, when the
+subject makes it plausible, and later the moment reading cannot settle a claim or the
+person doubts a tool. On a yes, read `references/experiments.md`. The caller stores the
+answer with its decisions.
+
+**Before each question, read**: the code, the history, the existing documents.
 
 **One decision per message, in tree order**, a branch once its parent is agreed. What
 reading settles is stated with its source, and the person confirms. Where a document says
@@ -21,7 +31,5 @@ recommended option first and marked, each option with the trade-off that decides
 a closing line that takes a number or a rejection of the frame. A decision left unasked
 is one the implementation makes silently.
 
-**"Not now" is an answer**: deferred, with an owner and a reason.
-
-**Close in chat**: every decision with its status and source. The caller decides where
+**Close in chat**, once understanding is shared: every decision with its status and source. The caller decides where
 that goes.

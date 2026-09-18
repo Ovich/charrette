@@ -14,7 +14,7 @@ description: Use when carrying out an implementation plan the person has already
 
 ## The mandate
 
-**The plan's *Execution* section is the mandate**: the pace, the pull requests, the steps, the subagents' model, the verification. A field it lacks is asked from `references/mandate.md` before the first slice and written there. A resumed session reads it and does not ask again. Every dispatch passes the mandate's model.
+**The plan's *Mandate* section is the mandate**: the pace, the pull requests, the steps, the subagents' model, the verification. A field it lacks is asked from `references/mandate.md` before the first slice and written there. A resumed session reads it and does not ask again. Every dispatch passes the mandate's model.
 
 **A verification run** is `verification-skill-maintain` anchored on the slice's merge range, then the project's `verify-<app>` skill, its document in the plan's group and tagged with the slot. After each slice: at the slice boundary, after the merge, before the next dispatch. After the slot is done: once, at the plan's close, anchored on the plan's whole range. A story that fails on the application is a pause.
 
@@ -25,7 +25,7 @@ description: Use when carrying out an implementation plan the person has already
 - **Checks blockers before every dispatch.**
 - **A subagent that stops on a finding is done.** Fix the plan or the slice document; never re-brief it past what it found.
 
-**A brief is**: the slice document's path, the workspace, the branch and its base, the command that prepares the workspace, the pull request to open. Nothing else.
+**A brief is**: the slice document's path, the workspace, the branch and its base, the command that prepares the workspace, the pull request to open. Nothing else, and never the plan.
 
 ## Watching a subagent
 
