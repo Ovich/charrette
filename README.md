@@ -11,18 +11,21 @@ Eighteen skills in plain Markdown and a companion app in plain Node. No harness,
 
 ## The loop
 
-Phasing: what a piece of work passes through, from idea to merge.
+Phasing: what a piece of work passes through, from its entry points to merge.
 
 ```mermaid
 flowchart LR
-  I["idea"] --> P["write-plan<br/>one document, written while interviewing"]
-  P --> WS["write-slice<br/>one document per slice"]
+  I["an idea"] --> P
+  B["brainstorm<br/>a board"] --> P
+  DM["deepen-module<br/>a module document"] --> P
+  RM["roadmap<br/>the next slot"] --> P
+  P["write-plan<br/>one document, written while interviewing"] --> WS["write-slice<br/>one document per slice"]
   WS --> E["execute-plan<br/>one agent per slice"]
   E --> R["pr-review"]
   R --> M["merge"]
 ```
 
-Everything else serves these four: `interview` resolves the decisions, `brainstorm` keeps an idea on a board before there is a plan, `deepen-module` and `write-diagrams` shape and draw the design, `roadmap` names what comes next. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it.
+A plan starts from whatever exists: an idea said in chat, a board, an agreed module, the roadmap's next slot. `interview` resolves the decisions along the way and `write-diagrams` draws them. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it.
 
 ## Iterate the loop
 
