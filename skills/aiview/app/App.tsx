@@ -42,7 +42,7 @@ export function shouldLoad(
 }
 
 export function App() {
-  const { docs, groups, projects, activeProject, startId, version, connection, changedTick, changedId, shownTick, shown } = useDocuments();
+  const { docs, groups, projects, activeProject, startId, version, connection, changedTick, changedId, shownTick, shown, showDoneTick } = useDocuments();
   const [pointer, setPointer] = useState<Pointer | null>(hashPointer);
   const [currentId, setCurrentId] = useState<number | null>(() => hashPointer()?.id ?? null);
   const [response, setResponse] = useState<DocumentResponse | null>(null);
@@ -53,6 +53,11 @@ export function App() {
   /** Set when a document was opened from a Composition label: which component to scroll to. */
   const [sourceTarget, setSourceTarget] = useState<{ id: number; component: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  /** Where this tab was before the agent's pointer moved it, as a hash: what the person
+   *  was reading, and where they go back to once the question is answered. Set by the
+   *  first pointer only, so a run of questions returns to the start and not to the
+   *  previous question. null: the pointer moved nothing, or the person has moved on. */
+  const returnTo = useRef<string | null>(null);
 
   // The server owns the active project; the SSE echo is what actually moves this tab,
   // so picking is fire-and-follow rather than optimistic local state.
@@ -62,6 +67,7 @@ export function App() {
 
   const open = useCallback(
     (id: number) => {
+      returnTo.current = null; // the person chose where to be: nothing to go back to
       setCurrentId(id);
       location.hash = `doc=${id}`;
       // Opening a document outside the active project moves the mode to it (D9),
@@ -113,16 +119,40 @@ export function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, [currentId]);
 
+  /** Move this tab by its hash, the project following the document as it does for any
+   *  document opened from outside the active one. */
+  const goTo = (hash: string): void => {
+    location.hash = hash;
+    const target = docs.find((d) => d.id === readPointer(hash)?.id);
+    if (target && activeProject !== "*" && target.project !== activeProject) pickProject(target.project);
+  };
+
   // The agent pointed (`aiview show`): go where the link it printed goes. The hash is the
   // one way in, so a pasted link and a broadcast can never disagree; the project follows
   // as it does for any document opened from outside the active one.
   useEffect(() => {
     if (shownTick === 0 || shown === null) return;
-    location.hash = pointerHash(shown);
-    const target = docs.find((d) => d.id === shown.id);
-    if (target && activeProject !== "*" && target.project !== activeProject) pickProject(target.project);
+    if (returnTo.current === null) returnTo.current = location.hash.replace(/^#/, "");
+    goTo(pointerHash(shown));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shownTick]);
+
+  // The question is answered, by the agent's word (`aiview show --done`) or the person's
+  // (the chip's cross): back to what they were reading, or the document alone when the
+  // pointer moved nothing. A tab the person has since taken elsewhere stays where it is.
+  const stopPointing = useCallback(() => {
+    const back = returnTo.current;
+    returnTo.current = null;
+    const here = hashPointer();
+    if (back === null && !here?.components.length) return;
+    goTo(back || (here ? `doc=${here.id}` : ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docs, activeProject]);
+
+  useEffect(() => {
+    if (showDoneTick > 0) stopPointing();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDoneTick]);
 
   // (re)load the open document — also when the SSE says it changed on disk
   useEffect(() => {
@@ -187,9 +217,7 @@ export function App() {
                   onOpenSource={openSource}
                   pointed={pointer?.id === doc.id ? pointer.components : undefined}
                   pointedVariant={pointer?.id === doc.id ? pointer.variant : undefined}
-                  onClearPointer={() => {
-                    location.hash = `doc=${doc.id}`;
-                  }}
+                  onClearPointer={stopPointing}
                 />
               )}
               {format === "markdown" && response!.content !== null && (

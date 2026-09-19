@@ -81,6 +81,12 @@ export interface ShowEventPayload {
   variant?: string;
 }
 
+/** Broadcast when the pointing is over (`aiview show --done`): the question is answered,
+ *  and every tab the pointer moved goes back to what the person was reading. */
+export interface ShowDoneEventPayload {
+  type: "show-done";
+}
+
 /** What `POST /api/show` answers: how many tabs heard it, so the agent knows whether
  *  the person is looking or has to be handed the link. */
 export interface ShowResponse {

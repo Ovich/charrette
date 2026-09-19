@@ -53,6 +53,7 @@ const USAGE = [
   "  components <file|#id>                    # what this mockup offers to siblings, what it pulls, every name on its page and its variants",
   "  check <file|#id>                         # do this mockup's bindings resolve? errors as text, exit 1 if any",
   "  show <file|#id> [--component Name]... [--variant v]   # point the person's viewer at these components of a mockup; prints the link",
+  "  show --done                              # the question is answered: every tab goes back to what the person was reading",
   "  mermaid-check <file|#id>                 # parse every mermaid block; warn on a missing caption or an unlabeled fork; exit 1 if one fails",
   "  tracker check <file|#id>                 # a plan's tracker judged against itself; exit 1 if anything disagrees",
   "  tracker sync <file|#id>                  # rewrite the class lines from the glyphs, the one place a step's state is written twice",
@@ -294,7 +295,14 @@ function pageVocabulary(abs: string): { page: string[]; variants: string[] } {
  *  a region named in the agent's own words stops here. The link is the pointer: it is
  *  printed whether or not a tab heard the broadcast. */
 function cmdShow(): void {
-  const usage = "usage: aiview show <file|#id> [--component Name]... [--variant v]";
+  const usage = "usage: aiview show <file|#id> [--component Name]... [--variant v]  |  aiview show --done";
+  // The pointing is over. The tabs remember where they were; the agent only says so.
+  if (args.has("--done")) {
+    const answer = askServer("/api/show-done", {});
+    const tabs = answer === null ? 0 : (JSON.parse(answer) as ShowResponse).tabs;
+    emit({ done: true, tabs }, tabs ? `${tabs} open tab${tabs > 1 ? "s" : ""} sent back to what the person was reading` : "no tab is open: nothing to send back");
+    return;
+  }
   const abs = mockupArg(usage);
   const doc = resolveRef(args.positional[0]);
   if (!doc) {

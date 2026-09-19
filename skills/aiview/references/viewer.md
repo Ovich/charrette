@@ -24,7 +24,9 @@ here; the in-page bar is hidden, the chosen variant persists across reloads.
 **Pointing.** When the agent points at components of a mockup (`show`), the tab goes to
 that mockup, switches to the variant named, scrolls to the first component and outlines
 each one with its name, the rest of the page dimmed. The page still takes the mouse. A
-chip in the toolbar says what is pointed at, and its cross stops it. The address bar
+chip in the toolbar says what is pointed at. Its cross stops it and takes the tab back
+to what the person was reading before the agent pointed, as the agent's `show --done`
+does; a tab the person has since moved is left where it is. The address bar
 holds the pointer (`#doc=12&show=Strip,Menu&variant=step-2`), so the link can be kept.
 
 **Bindings.** An html mockup that pulls components from siblings (`data-bind`) is

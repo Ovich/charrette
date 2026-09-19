@@ -12,6 +12,7 @@ import type {
   PendingEventPayload,
   IndexEventPayload,
   ProjectEventPayload,
+  ShowDoneEventPayload,
   ShowEventPayload,
   ShowResponse,
 } from "../core/api.ts";
@@ -213,6 +214,15 @@ export function startServer(
         if (variant !== undefined && (typeof variant !== "string" || !isName(variant)))
           return json(res, { error: "variant must be a name" }, 400);
         sse.broadcast({ type: "show", id, components, ...(variant ? { variant } : {}) } satisfies ShowEventPayload);
+        json(res, { tabs: sse.size() } satisfies ShowResponse);
+      });
+      return;
+    }
+    // The pointing is over: the tabs it moved go back to where they were.
+    if (p === "/api/show-done" && req.method === "POST") {
+      req.resume(); // drain; the notification carries nothing
+      req.on("end", () => {
+        sse.broadcast({ type: "show-done" } satisfies ShowDoneEventPayload);
         json(res, { tabs: sse.size() } satisfies ShowResponse);
       });
       return;

@@ -220,6 +220,9 @@ test("POST /api/show moves every open tab to the components, and says how many h
   const frame = new TextDecoder().decode((await reader.read()).value);
   assert.match(frame, /"type":"show"/);
   assert.match(frame, /"components":\["Pill","Dock"\],"variant":"step-2"/);
+  const done = await fetch(`${base}/api/show-done`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  assert.equal(done.status, 200);
+  assert.match(new TextDecoder().decode((await reader.read()).value), /"type":"show-done"/, "the tabs are told the question is answered");
   await reader.cancel();
 
   assert.equal((await post({ id: 99999, components: [] })).status, 404, "a document that is not registered");

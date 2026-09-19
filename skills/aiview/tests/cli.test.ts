@@ -189,6 +189,10 @@ test("show: names are held to the page the person sees, and the link is the poin
     const r = JSON.parse(shown.stdout);
     assert.match(r.url, /^http:\/\/localhost:\d+\/#doc=1&show=ApplicationStrip,Pill&variant=step-2$/);
     assert.equal(r.tabs, 0, "nobody is looking: the agent hands over the link");
+
+    const done = run("show", "--done", "--json");
+    assert.equal(done.status, 0, done.stderr);
+    assert.deepEqual(JSON.parse(done.stdout), { done: true, tabs: 0 });
   } finally {
     stopServer();
   }

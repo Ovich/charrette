@@ -54,7 +54,7 @@ $A open "$F" --tag <slug> --tag <topic>
 
 ## Pointing at a mockup
 
-**`show <file|#id> --component <Name>... [--variant <v>]` moves every open tab to the mockup and lights those components**, dimming the rest, until the next `show` or until the person stops it. `components <file|#id>` lists every name on the page and its variants, and `show` refuses any other, listing the ones it has. It prints the link that does the same in a tab opened later, and says how many tabs heard it. When to point and how to word the question: the `point-at` skill.
+**`show <file|#id> --component <Name>... [--variant <v>]` moves every open tab to the mockup and lights those components**, dimming the rest, until the next `show`, until `show --done` sends every tab back to what the person was reading, or until the person stops it themselves. `components <file|#id>` lists every name on the page and its variants, and `show` refuses any other, listing the ones it has. It prints the link that does the same in a tab opened later, and says how many tabs heard it. When to point and how to word the question: the `point-at` skill.
 
 ## Retiring the work
 

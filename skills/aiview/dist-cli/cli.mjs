@@ -9055,6 +9055,14 @@ function startServer(index, { port, open, startDoc, toolRoot = TOOL_ROOT, writeS
       });
       return;
     }
+    if (p === "/api/show-done" && req.method === "POST") {
+      req.resume();
+      req.on("end", () => {
+        sse.broadcast({ type: "show-done" });
+        json(res, { tabs: sse.size() });
+      });
+      return;
+    }
     const a = p.match(/^\/api\/asset\/(\d+)\/(.+)$/);
     if (a) {
       const doc = index.get(Number(a[1]));
@@ -9510,6 +9518,7 @@ var USAGE = [
   "  components <file|#id>                    # what this mockup offers to siblings, what it pulls, every name on its page and its variants",
   "  check <file|#id>                         # do this mockup's bindings resolve? errors as text, exit 1 if any",
   "  show <file|#id> [--component Name]... [--variant v]   # point the person's viewer at these components of a mockup; prints the link",
+  "  show --done                              # the question is answered: every tab goes back to what the person was reading",
   "  mermaid-check <file|#id>                 # parse every mermaid block; warn on a missing caption or an unlabeled fork; exit 1 if one fails",
   "  tracker check <file|#id>                 # a plan's tracker judged against itself; exit 1 if anything disagrees",
   "  tracker sync <file|#id>                  # rewrite the class lines from the glyphs, the one place a step's state is written twice",
@@ -9704,7 +9713,13 @@ function pageVocabulary(abs) {
   };
 }
 function cmdShow() {
-  const usage = "usage: aiview show <file|#id> [--component Name]... [--variant v]";
+  const usage = "usage: aiview show <file|#id> [--component Name]... [--variant v]  |  aiview show --done";
+  if (args.has("--done")) {
+    const answer2 = askServer("/api/show-done", {});
+    const tabs2 = answer2 === null ? 0 : JSON.parse(answer2).tabs;
+    emit({ done: true, tabs: tabs2 }, tabs2 ? `${tabs2} open tab${tabs2 > 1 ? "s" : ""} sent back to what the person was reading` : "no tab is open: nothing to send back");
+    return;
+  }
   const abs = mockupArg(usage);
   const doc = resolveRef(args.positional[0]);
   if (!doc) {
