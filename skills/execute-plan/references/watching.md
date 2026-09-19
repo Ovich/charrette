@@ -1,6 +1,6 @@
 # Watching a subagent while it runs
 
-Read when a slice is delegated. **A subagent returns once**; its transcript is the feed while it runs, and the feed is read by **digest**, never whole.
+**A subagent returns once**; its transcript is the feed while it runs, and the feed is read by **digest**, never whole.
 
 ## The digest
 
@@ -23,9 +23,7 @@ SL6 calls=86 idle=8s | Bash:pnpm run check | S6.7: removing CDK.
 
 ## The cadence
 
-- **Probe every minute. Report only when something changed.**
 - **Compare the line with its `idle=` counter stripped**; that number moves on the clock, not on progress.
-- **Report a subagent that has not moved for three minutes**, even though nothing changed. A stall means waiting, looping, or dead.
 
 ```sh
 prev=""; quiet=0
@@ -53,9 +51,9 @@ done
 ## What the watching is for
 
 - **The tracker, and the brief holding.** Move ▶ down the chain as the subagent goes.
-- **A step the subagent calls done stays ⬜**, the claim written into its label, until this session re-runs the evidence.
+- **A step the subagent calls done stays ▶** until this session re-runs its done-when; the claim lives in the report's table, never in the label.
 - **Watch, do not supervise.** Decisions the slice document leaves to the subagent are the subagent's; its reasoning is read to know where the work is, not to steer it.
-- **Steer only a drift from the brief.** A `BREACH`, or work outside the slice document: one `SendMessage` to the subagent, naming the brief line it left and what to do instead; it arrives at its next tool round. A subagent that drifts again after one steer is stopped and re-dispatched with the brief amended. A finding is not a drift: a subagent that stops on one is done.
+- **Steer only a drift from the brief.** A `BREACH`, or work outside the slice document: one `SendMessage` to the subagent, naming the brief line it left and what to do instead; it arrives at its next tool round. A subagent that drifts again after one steer is stopped and re-dispatched with the brief amended.
 
 ## What misleads
 

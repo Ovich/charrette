@@ -15,8 +15,8 @@ once, there, and each slice carries its part of it verbatim, narrowed to its sco
 3. **Every major area is a deep module**, designed as the `deepen-module` skill says, in the plan's modules section. A module the interview cannot settle there gets its own `module` document, and the plan quotes its entry.
 4. **When no row is open, ask once what else this should cover.**
 5. **Discuss and decide the testing strategy.**
-6. **Cut the slices** as the `write-slice` skill's `references/cutting.md` says, **and draw the tracker** to the `execute-plan` skill's `references/tracker.md`, both read first. `aiview mermaid-check <plan>` and `aiview tracker check <plan>` after every edit.
-7. **Close the interview with the orchestrator's mandate**: the questions of the `execute-plan` skill's `references/mandate.md`, the answers in the plan's *Mandate* section.
+6. **Cut the slices** as the `write-slice` skill's `references/cutting.md` says, **and draw the tracker** to the `execute-plan` skill's `references/tracker.md`, from its `references/tracker-skeleton.md`, all read first. `aiview mermaid-check <plan>` and `aiview tracker check <plan>` after every edit.
+7. **Close the interview with the orchestrator's mandate**: the questions of the `execute-plan` skill's `references/orchestrator-mandate.md`, the answers in the plan's *Mandate* section.
 8. **Stop and ask the person to approve the plan.** Then one slice document per slice, with `write-slice`.
 
 ## Red flags

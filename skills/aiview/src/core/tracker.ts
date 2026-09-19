@@ -224,24 +224,55 @@ export function check(t: Tracker): Finding[] {
     }
   }
 
+  for (const n of t.nodes) {
+    if (n.glyph && n.glyph !== "📍") found.push(...shapeFindings(n));
+  }
+
   const state = t.nodes.find((n) => n.glyph === "📍");
   if (state) found.push(...stateFindings(state));
   return found;
 }
 
-/** The fixed fields of the state node, which are overwritten and never appended to. */
-const STATE_FIELDS = ["branch", "deployed", "next", "blocked", "parked", "pace", "steps"] as const;
+/** A step's shape: the orchestrator reads it to decide what comes next, so it holds the
+ *  done-when and what proved it, and a step that grows past that has become a log. */
+const STEP_LINES = 4;
+const STEP_WIDTH = 80;
+
+function shapeFindings(n: TrackerNode): Finding[] {
+  const lines = n.label.split(/<br\s*\/?>/i).map((l) => l.trim());
+  const found: Finding[] = [];
+  if (lines.length > STEP_LINES) {
+    found.push({ line: n.line, text: `${n.id} has ${lines.length} lines: a step holds ${STEP_LINES} at most, and the rest has a home in the pull request, a decisions row or the slice document` });
+  }
+  const wide = lines.filter((l) => [...l].length > STEP_WIDTH);
+  if (wide.length) {
+    found.push({ line: n.line, text: `${n.id} has ${wide.length === 1 ? "a line" : `${wide.length} lines`} over ${STEP_WIDTH} characters: "${[...wide[0]].slice(0, 40).join("")}…"` });
+  }
+  return found;
+}
+
+/** The fixed fields of the state node, which are overwritten and never appended to. The
+ *  mandate's fields (pace, steps, model, verify) live in the plan's Mandate section. */
+const STATE_FIELDS = ["branch", "deployed", "next", "blocked", "parked"] as const;
+const MANDATE_FIELDS = ["pace", "steps", "model", "verify"] as const;
 
 function stateFindings(state: TrackerNode): Finding[] {
   const seen = new Map<string, number>();
+  const mandate: string[] = [];
   for (const part of state.label.split(/<br\s*\/?>/i)) {
-    const word = part.trim().split(/\s+/)[0]?.toLowerCase();
+    const word = part.trim().split(/\s+/)[0]?.toLowerCase().replace(/:$/, "");
+    if (word && (MANDATE_FIELDS as readonly string[]).includes(word)) mandate.push(word);
     if (word && (STATE_FIELDS as readonly string[]).includes(word)) seen.set(word, (seen.get(word) ?? 0) + 1);
   }
   const twice = [...seen].filter(([, n]) => n > 1).map(([f]) => f);
-  return twice.length
-    ? [{ line: state.line, text: `the state node names ${twice.join(" and ")} more than once: its fields are overwritten, and a node appended to becomes a log` }]
-    : [];
+  const found: Finding[] = [];
+  if (twice.length) {
+    found.push({ line: state.line, text: `the state node names ${twice.join(" and ")} more than once: its fields are overwritten, and a node appended to becomes a log` });
+  }
+  if (mandate.length) {
+    found.push({ line: state.line, text: `the state node carries ${mandate.join(" and ")}: the mandate lives in the plan's Mandate section, and the state node describes now` });
+  }
+  return found;
 }
 
 /** The class lines rewritten from the glyphs, one line per class, node order kept.

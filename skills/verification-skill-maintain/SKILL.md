@@ -1,6 +1,6 @@
 ---
 name: verification-skill-maintain
-description: "Use when a project's `verify-<app>` skill, its scripts and references, or its feature map in aiview must be brought back in line with the application after it changed, from an anchor the caller names, a slice, a commit range or a date: on request at any time, or from execute-plan before each verification run. Produces the updated skill and map with the changed stories re-proven. Not for a project without a verify skill (verification-skill-create), not for running stories on a current one, and not for code quality or review."
+description: "Use when a project's `verify-<app>` skill, its scripts and references, or its feature map in aiview must be brought back in line with the application after it changed, from an anchor the caller names, a slice, a commit range or a date: on request at any time, or from execute-plan at a slot's end. Produces the updated skill and map with the changed stories re-proven. Not for a project without a verify skill (verification-skill-create), not for running stories on a current one, and not for code quality or review."
 ---
 
 # Maintain a verification skill
@@ -9,7 +9,7 @@ description: "Use when a project's `verify-<app>` skill, its scripts and referen
 
 ## The anchor
 
-- **The caller names it**: a slice, a commit range, a date. execute-plan passes the slice's merge range. None given: from the map's `proven at` to the current commit.
+- **The caller names it**: a slice, a commit range, a date. execute-plan passes the plan's whole range. None given: from the map's `proven at` to the current commit.
 - **Locate both**: the `verify-<app>` skill in the project's local skill folder, and the map by `status --json` then `list --kind feature-map --json` (`aiview` skill). Either missing: stop and name `verification-skill-create`.
 
 ## Inspect

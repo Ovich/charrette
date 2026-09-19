@@ -9351,19 +9351,46 @@ function check(t) {
       found.push({ line: n.line, text: `${n.id} is \u23F8 and does not say what it waits on, or since when` });
     }
   }
+  for (const n of t.nodes) {
+    if (n.glyph && n.glyph !== "\u{1F4CD}") found.push(...shapeFindings(n));
+  }
   const state = t.nodes.find((n) => n.glyph === "\u{1F4CD}");
   if (state) found.push(...stateFindings(state));
   return found;
 }
-var STATE_FIELDS = ["branch", "deployed", "next", "blocked", "parked", "pace", "steps"];
+var STEP_LINES = 4;
+var STEP_WIDTH = 80;
+function shapeFindings(n) {
+  const lines = n.label.split(/<br\s*\/?>/i).map((l) => l.trim());
+  const found = [];
+  if (lines.length > STEP_LINES) {
+    found.push({ line: n.line, text: `${n.id} has ${lines.length} lines: a step holds ${STEP_LINES} at most, and the rest has a home in the pull request, a decisions row or the slice document` });
+  }
+  const wide = lines.filter((l) => [...l].length > STEP_WIDTH);
+  if (wide.length) {
+    found.push({ line: n.line, text: `${n.id} has ${wide.length === 1 ? "a line" : `${wide.length} lines`} over ${STEP_WIDTH} characters: "${[...wide[0]].slice(0, 40).join("")}\u2026"` });
+  }
+  return found;
+}
+var STATE_FIELDS = ["branch", "deployed", "next", "blocked", "parked"];
+var MANDATE_FIELDS = ["pace", "steps", "model", "verify"];
 function stateFindings(state) {
   const seen = /* @__PURE__ */ new Map();
+  const mandate = [];
   for (const part of state.label.split(/<br\s*\/?>/i)) {
-    const word = part.trim().split(/\s+/)[0]?.toLowerCase();
+    const word = part.trim().split(/\s+/)[0]?.toLowerCase().replace(/:$/, "");
+    if (word && MANDATE_FIELDS.includes(word)) mandate.push(word);
     if (word && STATE_FIELDS.includes(word)) seen.set(word, (seen.get(word) ?? 0) + 1);
   }
   const twice = [...seen].filter(([, n]) => n > 1).map(([f]) => f);
-  return twice.length ? [{ line: state.line, text: `the state node names ${twice.join(" and ")} more than once: its fields are overwritten, and a node appended to becomes a log` }] : [];
+  const found = [];
+  if (twice.length) {
+    found.push({ line: state.line, text: `the state node names ${twice.join(" and ")} more than once: its fields are overwritten, and a node appended to becomes a log` });
+  }
+  if (mandate.length) {
+    found.push({ line: state.line, text: `the state node carries ${mandate.join(" and ")}: the mandate lives in the plan's Mandate section, and the state node describes now` });
+  }
+  return found;
 }
 function sync(text, t) {
   const want = derive(t);

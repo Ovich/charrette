@@ -13,10 +13,38 @@ The **tracker** is the plan's phasing diagram, and the single record of where th
 - **A slice's done-when is its last node's**, or the join's where its arms meet.
 - **Every step is a node** at the granularity someone would pause at, with its dependency edges and decision gates.
 - **Node ids are `S<slice>.<step>`** (`S2.3`); a step discovered between `S2.3` and `S2.4` is `S2.3b`. Insert, never renumber: plans, boards and commits cite the old ids.
-- **A node whose done-when is a story's acceptance criterion carries the story's id**, and the observed criterion is written into the label when met.
-- **A step's label holds its done-when and the evidence it was met**, never the road there. A diagnosis belongs in the pull request that carries the fix, and the step cites it; a decision belongs in the register.
+- **A node whose done-when is a story's acceptance criterion carries the story's id**, and the observed criterion is its `seen` line when met.
 - **A line stays only while a resumer would act on it.** An overturned finding keeps one line, and only to stop someone walking it again; the rest goes when the finding is settled.
-- **A step carrying two glyphs is already two steps.** Split it where the glyphs part, not when the work ends: one whose first half can finish while the second waits on someone was always two.
+- **A step carrying two glyphs is already two steps.** Split it where the glyphs part.
+
+## The step's shape
+
+**The orchestrator reads a step to decide what comes next, never to learn what was built.** Its lines are fixed: **four at most, each under 80 characters**, and `aiview tracker check` holds both.
+
+```
+⬜ S2.1 <the outcome, as a noun phrase> · <US id when it is a story's criterion>
+done when: <the command that exits 0, or what is observed>
+```
+
+The first two lines are written with the plan and never change. The glyph adds the rest:
+
+| Glyph | Adds |
+|---|---|
+| ✅ | `seen: <sha> · <what this session re-ran, and its result> · #<pr>`, then, when there is something, `carries: <decision ids> · owes <slice>` |
+| ⏸ | `waits on: <whom, for what, asked <date>>` |
+| ✖ | `because: <what happened> · <the decision id, or the step that replaces it>` |
+| ▶ ⬜ | nothing |
+
+- **`seen` is what this session re-ran**, never what the subagent reported: a commit, a command's result, a count, the criterion observed.
+- **Everything else has a home, and the step cites it at most:**
+
+| What | Its home |
+|---|---|
+| What changed and where: files, line counts, greps, the road there | the pull request |
+| A decision made on the way | a row in the plan's decisions, its id in `carries` |
+| Tests or work owed to a later slice | the receiving slice's heading and document, and a dotted edge to the step that pays: `S1.1 -.->\|"owes: the specs it broke"\| S4.1` |
+| Something a person should look at in a later step | a criterion in that step's slice document, and the same dotted edge |
+| A subagent's claim, not yet re-run | the watch report; the step stays ▶ |
 
 ## Status
 
@@ -24,11 +52,11 @@ Each label opens with its glyph:
 
 | Glyph | Means |
 |---|---|
-| ✅ | Done: its done-when was met, the evidence written into the step |
+| ✅ | Done: its done-when was met, and `seen` says what proved it |
 | ▶ | In progress, the one place work is happening |
 | ⏸ | Blocked on someone else: the node says what it waits on and when it was asked for |
 | ⬜ | Not started |
-| ✖ | Failed or abandoned: the step says what happened and what changed because of it |
+| ✖ | Failed or abandoned: `because` says what happened and what changed because of it |
 
 - **One ▶ at a time**; where the plan forks, one ▶ per arm.
 - **A step that stalls on something outside your control becomes ⏸** and ▶ moves to whatever can proceed.
@@ -67,13 +95,15 @@ parked   <side work, stashes, environments left behind, or nothing>
 ```
 
 - **Add a field only when a resumer would act on it**: a rename, a version bump, an environment quirk.
-- **A line that is history goes in the step that produced it.**
+- **The mandate is not state**: pace, steps, model and verify live in the plan's *Mandate* section.
+- **A line that is history leaves the tracker**: the pull request holds it.
 
 ## Layout
 
 - **One column**: `flowchart TB`, steps chained linearly, only the gates and the parallel arms sideways.
 - **Pin the state node above the flow with an invisible edge**, `ST ~~~ S1.1`; connected to nothing, it would be parked beside the column.
-- **Keep every `<br/>` line short**; long labels set node width.
+- **Keep every `<br/>` line short**; long labels set node width, and a step's lines are held under 80 characters.
+- **A dotted edge is a debt, a solid one a dependency.** A node that a dotted edge leaves has two arrows, so its solid one takes a label too (`then`).
 - **Leave `direction` out of a subgraph that is itself an edge endpoint**; it fights the outer layout.
 
 ## Styling
@@ -89,6 +119,10 @@ classDef state stroke:#8a8a8a,stroke-width:1px,fill:#7f7f7f12
 ```
 
 - **`aiview tracker sync <plan>` writes the `class` lines from the glyphs**; written by hand they drift.
+
+## The skeleton
+
+**A new tracker starts from `references/tracker-skeleton.md`**, which passes both checks as it stands.
 
 ## Checks
 

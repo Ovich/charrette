@@ -1,13 +1,13 @@
 # Workspaces
 
-Read when the plan forks. A **workspace** is one slice's isolated checkout.
+A **workspace** is one slice's isolated checkout.
 
 ## Setting up
 
 - **One workspace per slice**; two agents in one checkout collide where git cannot see it.
 - **Locally a workspace is a git worktree**, `isolation: "worktree"` on the Agent tool; on another machine, a clone.
 - **Name the base branch in the brief and check it in the return**; tools default to the repository's default branch.
-- **Each workspace gets its own install**; with a shared package store it is seconds.
+- **Each workspace gets its own install.**
 - **Keep the path short and ignore the directory in the repository.**
 - **On Windows, `git config core.longpaths true` in the repository before the first removal**; a worktree prefix pushes a dependency tree past the 260-character limit, and Node creates what git then cannot delete.
 - **One orchestrator per plan**; aiview does not lock the document.

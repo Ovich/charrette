@@ -49,7 +49,7 @@ The recipes the experiments handed back.
 One series, `D1` onward, continuing the project's numbering. Kinds: purpose, module (with
 its state, as write-slice names them), architecture, contract, clarification. Open
 questions are rows with status open and an owner. A departure from a rule is a row naming
-what is owed for it. execute-plan adds rows as the work decides things.
+what is owed for it.
 
 # Execution
 

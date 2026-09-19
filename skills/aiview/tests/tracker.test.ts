@@ -159,6 +159,27 @@ test("check: the state node's fields are overwritten, so a repeated one is a log
   assert.match(check(logged)[0].text, /the state node names branch more than once/);
 });
 
+test("check: the state node describes now, and the mandate lives in the plan", () => {
+  const mixed = need(plan([slice(1, [`A["✅ done"]`]), `  ST["📍 state · today<br/>branch: main @ abc<br/>branch: main @ def<br/>pace: run through"]`, "  class A done", "  class ST state"].join("\n")));
+  const texts = check(mixed).map((x) => x.text);
+  assert.ok(texts.some((x) => /names branch more than once/.test(x)), "a field written with a colon is still the field");
+  assert.ok(texts.some((x) => /^the state node carries pace: the mandate lives/.test(x)));
+});
+
+test("check: a step holds four short lines, and one that grows past them is a log", () => {
+  const shaped = need(plan([slice(1, [`A["✅ A the route<br/>done when: pnpm check exits 0<br/>seen: abc1234 · check 0 · #41<br/>carries: D12 · owes SL4"]`]), "  class A done"].join("\n")));
+  assert.deepEqual(check(shaped), []);
+
+  const logged = need(plan([slice(1, [`A["✅ A the route<br/>one<br/>two<br/>three<br/>four"]`]), "  class A done"].join("\n")));
+  assert.match(check(logged)[0].text, /^A has 5 lines: a step holds 4 at most/);
+
+  const wide = need(plan([slice(1, [`A["✅ A the route<br/>${"x".repeat(81)}"]`]), "  class A done"].join("\n")));
+  assert.match(check(wide)[0].text, /^A has a line over 80 characters/);
+
+  const state = need(plan([slice(1, [`A["✅ done"]`]), `  ST["📍 state · today<br/>branch: b<br/>deployed: d<br/>next: n<br/>blocked: nothing<br/>parked: nothing"]`, "  class A done", "  class ST state"].join("\n")));
+  assert.deepEqual(check(state), [], "the state node is not a step");
+});
+
 test("sync: the class lines are rewritten from the glyphs, in classDef order", () => {
   const before = plan([slice(1, [`A["✅ done"]`, `B["▶ running"]`, `C["⬜ later"]`]), "  class A,B done", "  class C,A todo"].join("\n"));
   const { text, changed } = sync(before, need(before));

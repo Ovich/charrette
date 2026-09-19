@@ -4,6 +4,21 @@ import { useEffect, useId, useState } from "react";
 let mermaidPromise: Promise<typeof import("mermaid")> | null = null;
 const loadMermaid = () => (mermaidPromise ??= import("mermaid"));
 
+/** A tracker's nodes are read down a column, line by line: the title, then its fields.
+ *  Carried by the diagram's own init directive, so mermaid measures the labels as they
+ *  will be drawn, and never through `initialize`: that is global, and the next diagram
+ *  on the page would overwrite it mid-render. */
+const TRACKER = /^\s*%%\s*(aiview:)?tracker\b/im;
+const TRACKER_CSS =
+  ".node foreignObject div, .node .nodeLabel, .node .nodeLabel p { text-align: left !important; } " +
+  ".node .nodeLabel p::first-line { font-weight: 600; }";
+/** Wide enough that a step's 80-character line stays one row (mermaid wraps at 200). */
+const TRACKER_WIDTH = 560;
+const TRACKER_INIT = `%%{init: ${JSON.stringify({ themeCSS: TRACKER_CSS, flowchart: { wrappingWidth: TRACKER_WIDTH } })}}%%\n`;
+/** `done when:`, `seen:`, `branch:`: a field's name opening a line steps back from its value. */
+const dimFields = (svg: string) =>
+  svg.replace(/(<br\s*\/?>)\s*([a-z][a-z ]{1,14}:)/g, '$1<span style="opacity:.55">$2</span>');
+
 export function MermaidView({ source }: { source: string }) {
   const id = useId().replaceAll(":", "_");
   const [svg, setSvg] = useState<string | null>(null);
@@ -16,9 +31,10 @@ export function MermaidView({ source }: { source: string }) {
     loadMermaid()
       .then(async ({ default: mermaid }) => {
         const dark = matchMedia("(prefers-color-scheme: dark)").matches;
-        mermaid.initialize({ startOnLoad: false, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
-        const { svg } = await mermaid.render(`mmd_${id}`, source);
-        if (!cancelled) setSvg(svg);
+        const tracker = TRACKER.test(source);
+        mermaid.initialize({ startOnLoad: false, theme: dark ? "dark" : "neutral", securityLevel: "antiscript" });
+        const { svg } = await mermaid.render(`mmd_${id}`, tracker ? TRACKER_INIT + source : source);
+        if (!cancelled) setSvg(tracker ? dimFields(svg) : svg);
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message);
