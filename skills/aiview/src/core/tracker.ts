@@ -57,6 +57,9 @@ export interface Tracker {
   /** True when the block named itself with `%% tracker`, false when it was found by
    *  its glyphs. The fallback keeps plans written before the marker working. */
   readonly marked: boolean;
+  /** How many diagrams the plan draws above this one. The tracker is what a reader opens
+   *  the plan for, so it comes first. */
+  readonly diagramsAbove: number;
   readonly nodes: readonly TrackerNode[];
   readonly slices: readonly Slice[];
   /** Class name per node id, as the `class` lines currently assign it. */
@@ -86,7 +89,7 @@ export function findTracker(text: string): Tracker | undefined {
   });
   if (!blocks.length) blocks.push({ fence: 0, from: 0, to: lines.length });
 
-  const read = (block: { fence: number; from: number; to: number }): Tracker => {
+  const read = (block: { fence: number; from: number; to: number }, diagramsAbove: number): Tracker => {
     const nodes: TrackerNode[] = [];
     const slices: Slice[] = [];
     const assigned = new Map<string, string[]>();
@@ -135,10 +138,10 @@ export function findTracker(text: string): Tracker | undefined {
         }
       }
     }
-    return { fence: block.fence, marked, nodes, slices, assigned, declared, classLines, indent };
+    return { fence: block.fence, marked, diagramsAbove, nodes, slices, assigned, declared, classLines, indent };
   };
 
-  const all = blocks.map(read);
+  const all = blocks.map((block, i) => read(block, i));
   return all.find((t) => t.marked) ?? all.find((t) => t.nodes.some((n) => n.glyph));
 }
 
@@ -162,6 +165,10 @@ export interface Finding {
 export function check(t: Tracker): Finding[] {
   const found: Finding[] = [];
   const want = derive(t);
+
+  if (t.diagramsAbove > 0) {
+    found.push({ line: t.fence, text: `the tracker is drawn below ${t.diagramsAbove === 1 ? "another diagram" : `${t.diagramsAbove} other diagrams`}: it is the first thing in the plan, under the header` });
+  }
 
   for (const n of t.nodes) {
     const has = t.assigned.get(n.id) ?? [];
@@ -219,7 +226,7 @@ export function check(t: Tracker): Finding[] {
   }
 
   for (const n of t.nodes) {
-    if (n.glyph === "⏸" && !/wait|block|until|needs|asked/i.test(n.label)) {
+    if (n.glyph === "⏸" && !/paused|wait|block|until|needs|asked/i.test(n.label)) {
       found.push({ line: n.line, text: `${n.id} is ⏸ and does not say what it waits on, or since when` });
     }
   }
@@ -233,10 +240,25 @@ export function check(t: Tracker): Finding[] {
   return found;
 }
 
-/** A step's shape: the orchestrator reads it to decide what comes next, so it holds the
- *  done-when and what proved it, and a step that grows past that has become a log. */
-const STEP_LINES = 4;
+/** A step's shape: the person reads it to see where the run stands and the orchestrator
+ *  to decide what comes next, so it holds its title, its verdict and at most the one
+ *  thing the orchestrator did; a step that grows past that has become a log. */
+const STEP_LINES = 3;
 const STEP_WIDTH = 80;
+
+/** The verdict line each glyph allows, and the ones it has left behind: a ✅ step that
+ *  still says `done when` was ticked without saying what was observed. */
+const VERDICTS = ["done when", "went on", "paused", "dropped"] as const;
+const VERDICT_OF: ReadonlyMap<string, readonly string[]> = new Map([
+  ["⬜", ["done when"]],
+  ["▶", ["done when"]],
+  ["✅", ["went on"]],
+  ["⏸", ["done when", "paused"]],
+  ["✖", ["dropped"]],
+]);
+
+/** An identifier from the code in a step's title: a call, or a camelCase name. */
+const IDENTIFIER = /\w\(\)|\b[a-z]+[A-Z]\w*/;
 
 function shapeFindings(n: TrackerNode): Finding[] {
   const lines = n.label.split(/<br\s*\/?>/i).map((l) => l.trim());
@@ -247,6 +269,17 @@ function shapeFindings(n: TrackerNode): Finding[] {
   const wide = lines.filter((l) => [...l].length > STEP_WIDTH);
   if (wide.length) {
     found.push({ line: n.line, text: `${n.id} has ${wide.length === 1 ? "a line" : `${wide.length} lines`} over ${STEP_WIDTH} characters: "${[...wide[0]].slice(0, 40).join("")}…"` });
+  }
+  const allowed = VERDICT_OF.get(n.glyph ?? "") ?? [];
+  const stray = lines
+    .map((l) => VERDICTS.find((v) => l.toLowerCase().startsWith(`${v}:`)))
+    .filter((v): v is (typeof VERDICTS)[number] => !!v && !allowed.includes(v));
+  if (stray.length) {
+    found.push({ line: n.line, text: `${n.id} is ${n.glyph} and says '${stray.join("', '")}': its verdict line is '${allowed.at(-1)}'` });
+  }
+  const named = IDENTIFIER.exec(lines[0])?.[0];
+  if (named) {
+    found.push({ line: n.line, text: `${n.id} names '${named}' in its title: the first line says what an observer of the system could tell, and the slice document holds the identifier` });
   }
   return found;
 }

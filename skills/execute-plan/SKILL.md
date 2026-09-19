@@ -69,7 +69,7 @@ Stop for exactly three things:
 
 ## Keeping the tracker
 
-- **Tick as you go, never in a batch.** ✅ when this session has re-run the step's own done-when, its `seen` line written.
+- **Tick as you go, never in a batch.** ✅ when this session has re-run the step's own done-when, its `went on` line written.
 - **Update before every handoff**: a question, an approval, the end of a turn.
 - **The person's criterion is this session's tick**, in the slice document and on the pull request's checklist: it lands after the subagent has returned.
 - **Draw deviations before doing them.** New work is a node; a new dependency is an arc; waiting on someone is ⏸ naming what was asked and when; a dissolved step is ✖ with the reason; an answered gate shows its way. A deviation that decides a module, interface, schema, contract or architecture is a row in the plan's decisions, and one that changes a decision amends the plan's sentence too: the slices carry it.

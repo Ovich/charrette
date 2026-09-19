@@ -9235,7 +9235,7 @@ function findTracker(text) {
     }
   });
   if (!blocks.length) blocks.push({ fence: 0, from: 0, to: lines.length });
-  const read = (block) => {
+  const read = (block, diagramsAbove) => {
     const nodes = [];
     const slices = [];
     const assigned = /* @__PURE__ */ new Map();
@@ -9284,9 +9284,9 @@ function findTracker(text) {
         }
       }
     }
-    return { fence: block.fence, marked, nodes, slices, assigned, declared, classLines, indent };
+    return { fence: block.fence, marked, diagramsAbove, nodes, slices, assigned, declared, classLines, indent };
   };
-  const all = blocks.map(read);
+  const all = blocks.map((block, i) => read(block, i));
   return all.find((t) => t.marked) ?? all.find((t) => t.nodes.some((n) => n.glyph));
 }
 function derive(t) {
@@ -9300,6 +9300,9 @@ function derive(t) {
 function check(t) {
   const found = [];
   const want = derive(t);
+  if (t.diagramsAbove > 0) {
+    found.push({ line: t.fence, text: `the tracker is drawn below ${t.diagramsAbove === 1 ? "another diagram" : `${t.diagramsAbove} other diagrams`}: it is the first thing in the plan, under the header` });
+  }
   for (const n of t.nodes) {
     const has = t.assigned.get(n.id) ?? [];
     if (!n.glyph) {
@@ -9347,7 +9350,7 @@ function check(t) {
     }
   }
   for (const n of t.nodes) {
-    if (n.glyph === "\u23F8" && !/wait|block|until|needs|asked/i.test(n.label)) {
+    if (n.glyph === "\u23F8" && !/paused|wait|block|until|needs|asked/i.test(n.label)) {
       found.push({ line: n.line, text: `${n.id} is \u23F8 and does not say what it waits on, or since when` });
     }
   }
@@ -9358,8 +9361,17 @@ function check(t) {
   if (state) found.push(...stateFindings(state));
   return found;
 }
-var STEP_LINES = 4;
+var STEP_LINES = 3;
 var STEP_WIDTH = 80;
+var VERDICTS = ["done when", "went on", "paused", "dropped"];
+var VERDICT_OF = /* @__PURE__ */ new Map([
+  ["\u2B1C", ["done when"]],
+  ["\u25B6", ["done when"]],
+  ["\u2705", ["went on"]],
+  ["\u23F8", ["done when", "paused"]],
+  ["\u2716", ["dropped"]]
+]);
+var IDENTIFIER = /\w\(\)|\b[a-z]+[A-Z]\w*/;
 function shapeFindings(n) {
   const lines = n.label.split(/<br\s*\/?>/i).map((l) => l.trim());
   const found = [];
@@ -9369,6 +9381,15 @@ function shapeFindings(n) {
   const wide = lines.filter((l) => [...l].length > STEP_WIDTH);
   if (wide.length) {
     found.push({ line: n.line, text: `${n.id} has ${wide.length === 1 ? "a line" : `${wide.length} lines`} over ${STEP_WIDTH} characters: "${[...wide[0]].slice(0, 40).join("")}\u2026"` });
+  }
+  const allowed = VERDICT_OF.get(n.glyph ?? "") ?? [];
+  const stray = lines.map((l) => VERDICTS.find((v) => l.toLowerCase().startsWith(`${v}:`))).filter((v) => !!v && !allowed.includes(v));
+  if (stray.length) {
+    found.push({ line: n.line, text: `${n.id} is ${n.glyph} and says '${stray.join("', '")}': its verdict line is '${allowed.at(-1)}'` });
+  }
+  const named = IDENTIFIER.exec(lines[0])?.[0];
+  if (named) {
+    found.push({ line: n.line, text: `${n.id} names '${named}' in its title: the first line says what an observer of the system could tell, and the slice document holds the identifier` });
   }
   return found;
 }

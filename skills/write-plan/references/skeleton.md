@@ -1,8 +1,8 @@
 # The plan document
 
-Two parts. **Design** is what gets built, and every slice carries its structure. **Execution**
-is for whoever runs the plan. A section that does not apply is left out, and the header
-says which. A small change's section is a sentence.
+The tracker first, then two parts. **Design** is what gets built, and every slice carries its
+structure. **Execution** is for whoever runs the plan. A section that does not apply is left
+out, and the header says which. A small change's section is a sentence.
 
 ```markdown
 # <topic>, plan
@@ -13,6 +13,10 @@ says which. A small change's section is a sentence.
 > **Read against**: `<branch>` at `<sha>`; every `file:line` cited holds there
 > **Libraries read from source**: `<package>` `<version>`, <date>
 > **Left out**: the sections below that do not apply
+
+## The tracker
+The diagram, above everything else: it is what a reader opens the plan for. Drawn when the
+slices are cut; until then the heading holds one line saying so.
 
 # Design
 
@@ -53,8 +57,8 @@ what is owed for it.
 
 # Execution
 
-## 10. The tracker
-The diagram, then one heading per slice: the stories it serves, delivers, blocked by, its
+## 10. The slices
+One heading per slice: the stories it serves, delivers, blocked by, its
 check, the tests it owes, its mark, its slice document.
 
 ## 11. The mandate

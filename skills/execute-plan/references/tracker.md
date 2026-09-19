@@ -4,6 +4,7 @@ The **tracker** is the plan's phasing diagram, and the single record of where th
 
 ## Markers
 
+- **The tracker is the first thing in the plan**, under the header and above every other section and diagram: it is what a reader opens the plan for, to see where the work stands. `aiview tracker check` holds it.
 - **`%% tracker`** as the first line inside the fence, under `flowchart TB`, so the block names itself among the plan's diagrams.
 - **`SL<n>` as a slice's subgraph id**, matching the `S<n>.<step>` of the steps inside it (`subgraph SL3[...]` holds `S3.1`, `S3.2`), so a step pasted into the wrong slice is caught.
 
@@ -13,35 +14,38 @@ The **tracker** is the plan's phasing diagram, and the single record of where th
 - **A slice's done-when is its last node's**, or the join's where its arms meet.
 - **Every step is a node** at the granularity someone would pause at, with its dependency edges and decision gates.
 - **Node ids are `S<slice>.<step>`** (`S2.3`); a step discovered between `S2.3` and `S2.4` is `S2.3b`. Insert, never renumber: plans, boards and commits cite the old ids.
-- **A node whose done-when is a story's acceptance criterion carries the story's id**, and the observed criterion is its `seen` line when met.
+- **A node whose done-when is a story's acceptance criterion carries the story's id**, and the observed criterion is its `went on` line when met.
 - **A line stays only while a resumer would act on it.** An overturned finding keeps one line, and only to stop someone walking it again; the rest goes when the finding is settled.
 - **A step carrying two glyphs is already two steps.** Split it where the glyphs part.
 
 ## The step's shape
 
-**The orchestrator reads a step to decide what comes next, never to learn what was built.** Its lines are fixed: **four at most, each under 80 characters**, and `aiview tracker check` holds both.
+**The person reads a step to see where the run stands, and the orchestrator to decide what comes next; neither reads it to learn what was built.** Its lines are fixed: **three at most, each under 80 characters**, and `aiview tracker check` holds both.
 
 ```
-⬜ S2.1 <the outcome, as a noun phrase> · <US id when it is a story's criterion>
+⬜ S2.1 <what an observer of the system could tell> · <US id when it is a story's criterion>
 done when: <the command that exits 0, or what is observed>
 ```
 
-The first two lines are written with the plan and never change. The glyph adds the rest:
+- **The first line names what an observer of the system could tell**: a behaviour gained or, for a rework, the structure reached and the invariant held (`the hand-written loop is gone, every walk unchanged`). No identifier from the code: it is renamed before the plan ends, and the slice document holds it.
+- **The second line is the verdict, and the glyph names it.** It says what made the orchestrator go on, pause or drop the step, in one line:
 
-| Glyph | Adds |
+| Glyph | Second line |
 |---|---|
-| ✅ | `seen: <sha> · <what this session re-ran, and its result> · #<pr>`, then, when there is something, `carries: <decision ids> · owes <slice>` |
-| ⏸ | `waits on: <whom, for what, asked <date>>` |
-| ✖ | `because: <what happened> · <the decision id, or the step that replaces it>` |
-| ▶ ⬜ | nothing |
+| ⬜ ▶ | `done when: <the command that exits 0, or what is observed>` |
+| ✅ | `went on: <what was observed here> · <sha> · #<pr>`, in place of the done-when |
+| ⏸ | the done-when kept, then `paused: <on whom, for what, asked <date>>` |
+| ✖ | `dropped: <what happened> · <the decision id, or the step that replaces it>`, in place of the done-when |
 
-- **`seen` is what this session re-ran**, never what the subagent reported: a commit, a command's result, a count, the criterion observed.
-- **Everything else has a home, and the step cites it at most:**
+- **`here` is this session's own observation**, never what the subagent reported: `went on: suite and e2e green here · a1b2c3d · #41`. Another observer is named: `went on: the person's word, 2026-01-01`.
+- **`went on` names the result, never its numbers**: test counts, greps and file names are the pull request's.
+- **A last line, `run:`, only when the orchestrator changed the route**: a steer, a fix of its own, a retry, a slice drawn mid-run (`run: steered a rename after lint refused it`). One event, the one a reader would ask about.
+- **Everything else has a home, and the step never cites it:**
 
 | What | Its home |
 |---|---|
 | What changed and where: files, line counts, greps, the road there | the pull request |
-| A decision made on the way | a row in the plan's decisions, its id in `carries` |
+| A decision made on the way | a row in the plan's decisions |
 | Tests or work owed to a later slice | the receiving slice's heading and document, and a dotted edge to the step that pays: `S1.1 -.->\|"owes: the specs it broke"\| S4.1` |
 | Something a person should look at in a later step | a criterion in that step's slice document, and the same dotted edge |
 | A subagent's claim, not yet re-run | the watch report; the step stays ▶ |
@@ -52,11 +56,11 @@ Each label opens with its glyph:
 
 | Glyph | Means |
 |---|---|
-| ✅ | Done: its done-when was met, and `seen` says what proved it |
+| ✅ | Done: its done-when was met, and `went on` says what was observed |
 | ▶ | In progress, the one place work is happening |
-| ⏸ | Blocked on someone else: the node says what it waits on and when it was asked for |
+| ⏸ | Blocked on someone else: `paused` says on whom, for what, and when it was asked |
 | ⬜ | Not started |
-| ✖ | Failed or abandoned: `because` says what happened and what changed because of it |
+| ✖ | Failed or abandoned: `dropped` says what happened and what changed because of it |
 
 - **One ▶ at a time**; where the plan forks, one ▶ per arm.
 - **A step that stalls on something outside your control becomes ⏸** and ▶ moves to whatever can proceed.

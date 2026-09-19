@@ -11,7 +11,7 @@ flowchart TB
   ST["📍 state · 2026-01-01<br/>branch: feat/topic @ 0000000, not pushed<br/>deployed: nothing yet<br/>next: S1.1<br/>blocked: nothing<br/>parked: nothing"]
 
   subgraph SL1["Slice 1 · US1 · what it delivers"]
-    S1.1["✅ S1.1 the outcome, as a noun phrase<br/>done when: pnpm check exits 0<br/>seen: a1b2c3d · pnpm check 0, 212 passed · #41<br/>carries: D12 · owes SL4"]
+    S1.1["✅ S1.1 what an observer could tell<br/>went on: suite green here · a1b2c3d · #41<br/>run: steered a rename after lint refused it"]
     S1.2["▶ S1.2 the outcome · US1<br/>done when: the acceptance criterion, observed"]
   end
 
@@ -20,8 +20,8 @@ flowchart TB
   end
 
   subgraph SL3["Slice 3 · US2 · the web arm"]
-    S3.1["⏸ S3.1 the outcome<br/>done when: the command exits 0<br/>waits on: the registrar, for the DNS record, asked 2026-01-01"]
-    S3.2["✖ S3.2 the outcome<br/>because: the library cannot stream · D14, replaced by S3.2b"]
+    S3.1["⏸ S3.1 the outcome<br/>done when: the command exits 0<br/>paused: the registrar, for the DNS record, asked 2026-01-01"]
+    S3.2["✖ S3.2 the outcome<br/>dropped: the library cannot stream · D14, replaced by S3.2b"]
     S3.2b["⬜ S3.2b the outcome that replaces it<br/>done when: the command exits 0"]
   end
 

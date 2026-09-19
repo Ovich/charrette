@@ -2,19 +2,36 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { findTracker, derive, check, sync } from "../src/core/tracker.ts";
 
-/** A plan whose tracker block sits after another diagram, as a real one does. */
+/** A plan as it is written: the tracker first, the design's diagrams below it. */
 const plan = (body: string) => `# A plan
-
-Dependency graph: what may import what.
-
-\`\`\`mermaid
-flowchart TB
-  a["apps/web"] --> b["apps/api"]
-\`\`\`
 
 Phasing diagram, and the record of where the work stands.
 
-\`\`\`mermaid
+${tracker(body)}
+
+Dependency graph: what may import what.
+
+${other}
+`;
+
+/** A plan whose tracker sits below another diagram, as plans written before the rule do. */
+const buried = (body: string) => `# A plan
+
+Dependency graph: what may import what.
+
+${other}
+
+Phasing diagram, and the record of where the work stands.
+
+${tracker(body)}
+`;
+
+const other = `\`\`\`mermaid
+flowchart TB
+  a["apps/web"] --> b["apps/api"]
+\`\`\``;
+
+const tracker = (body: string) => `\`\`\`mermaid
 flowchart TB
   %% tracker
 ${body}
@@ -22,8 +39,7 @@ ${body}
   classDef next stroke:#d08b28
   classDef todo stroke-dasharray:4 3
   classDef state stroke:#8a8a8a
-\`\`\`
-`;
+\`\`\``;
 
 /** Steps live inside a slice, so a fixture that omits one is not a tracker. */
 const slice = (n: number, steps: string[], title = `Slice ${n}`) =>
@@ -36,8 +52,10 @@ const need = (text: string) => {
 };
 
 test("the tracker names itself, and is not merely the first diagram", () => {
-  const t = need(plan([slice(1, [`S1.1["✅ S1.1 done"]`]), "  class S1.1 done"].join("\n")));
+  const t = need(buried([slice(1, [`S1.1["✅ S1.1 done"]`]), "  class S1.1 done"].join("\n")));
   assert.equal(t.marked, true);
+  assert.match(check(t)[0].text, /^the tracker is drawn below another diagram: it is the first thing in the plan/);
+  assert.deepEqual(check(need(plan([slice(1, [`S1.1["✅ S1.1 done"]`]), "  class S1.1 done"].join("\n")))), []);
   assert.deepEqual(t.nodes.map((n) => n.id), ["S1.1"]);
   assert.equal(t.nodes[0].glyph, "✅");
   // The dependency graph above has nodes too, and none of them reaches the result.
@@ -166,18 +184,40 @@ test("check: the state node describes now, and the mandate lives in the plan", (
   assert.ok(texts.some((x) => /^the state node carries pace: the mandate lives/.test(x)));
 });
 
-test("check: a step holds four short lines, and one that grows past them is a log", () => {
-  const shaped = need(plan([slice(1, [`A["✅ A the route<br/>done when: pnpm check exits 0<br/>seen: abc1234 · check 0 · #41<br/>carries: D12 · owes SL4"]`]), "  class A done"].join("\n")));
+test("check: a step holds three short lines, and one that grows past them is a log", () => {
+  const shaped = need(plan([slice(1, [`A["✅ A the route answers<br/>went on: suite green here · abc1234 · #41<br/>run: steered a rename"]`]), "  class A done"].join("\n")));
   assert.deepEqual(check(shaped), []);
 
-  const logged = need(plan([slice(1, [`A["✅ A the route<br/>one<br/>two<br/>three<br/>four"]`]), "  class A done"].join("\n")));
-  assert.match(check(logged)[0].text, /^A has 5 lines: a step holds 4 at most/);
+  const logged = need(plan([slice(1, [`A["✅ A the route<br/>one<br/>two<br/>three"]`]), "  class A done"].join("\n")));
+  assert.match(check(logged)[0].text, /^A has 4 lines: a step holds 3 at most/);
 
   const wide = need(plan([slice(1, [`A["✅ A the route<br/>${"x".repeat(81)}"]`]), "  class A done"].join("\n")));
   assert.match(check(wide)[0].text, /^A has a line over 80 characters/);
 
   const state = need(plan([slice(1, [`A["✅ done"]`]), `  ST["📍 state · today<br/>branch: b<br/>deployed: d<br/>next: n<br/>blocked: nothing<br/>parked: nothing"]`, "  class A done", "  class ST state"].join("\n")));
   assert.deepEqual(check(state), [], "the state node is not a step");
+});
+
+test("check: the glyph names the verdict line, and a step ticked without one is caught", () => {
+  const ticked = need(plan([slice(1, [`A["✅ A the route answers<br/>done when: pnpm check exits 0"]`]), "  class A done"].join("\n")));
+  assert.match(check(ticked)[0].text, /^A is ✅ and says 'done when': its verdict line is 'went on'/);
+
+  const early = need(plan([slice(1, [`A["⬜ A the route answers<br/>went on: suite green here"]`]), "  class A todo"].join("\n")));
+  assert.match(check(early)[0].text, /^A is ⬜ and says 'went on': its verdict line is 'done when'/);
+
+  const paused = need(plan([slice(1, [`A["⏸ A the route answers<br/>done when: the record resolves<br/>paused: the registrar, asked 2026-01-01"]`]), "  class A todo"].join("\n")));
+  assert.deepEqual(check(paused), [], "a paused step keeps its done-when");
+
+  const dropped = need(plan([slice(1, [`A["✖ A the route answers<br/>dropped: the library cannot stream · D14"]`]), "  class A todo"].join("\n")));
+  assert.deepEqual(check(dropped), []);
+});
+
+test("check: a step's title says what an observer could tell, never an identifier", () => {
+  const called = need(plan([slice(1, [`A["⬜ A chatModel() and the mock<br/>done when: pnpm check exits 0"]`]), "  class A todo"].join("\n")));
+  assert.match(check(called)[0].text, /^A names 'chatModel' in its title/);
+
+  const plain = need(plan([slice(1, [`A["⬜ A LangGraph ships in the bundle, unused · US1<br/>done when: pnpm check exits 0"]`]), "  class A todo"].join("\n")));
+  assert.deepEqual(check(plain), [], "a product name and a story id are not identifiers");
 });
 
 test("sync: the class lines are rewritten from the glyphs, in classDef order", () => {
