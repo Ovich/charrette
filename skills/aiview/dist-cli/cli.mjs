@@ -8727,6 +8727,28 @@ var init_bind = __esm({
   }
 });
 
+// src/core/pointer.ts
+function pointerHash(p) {
+  const parts = [`doc=${p.id}`];
+  if (p.components.length) parts.push(`show=${p.components.join(",")}`);
+  if (p.variant) parts.push(`variant=${p.variant}`);
+  return parts.join("&");
+}
+function unknownNames(asked, known, what) {
+  const missing = asked.filter((n) => !known.includes(n));
+  if (!missing.length) return void 0;
+  const has = known.length ? `it has: ${known.join(", ")}` : `it declares none`;
+  return `no ${what} named ${missing.join(", ")} in this mockup; ${has}`;
+}
+var NAME, isName;
+var init_pointer = __esm({
+  "src/core/pointer.ts"() {
+    "use strict";
+    NAME = /^[\w.-]+$/;
+    isName = (s) => NAME.test(s);
+  }
+});
+
 // src/core/serverstate.ts
 import fs4 from "node:fs";
 import path5 from "node:path";
@@ -9009,6 +9031,30 @@ function startServer(index, { port, open, startDoc, toolRoot = TOOL_ROOT, writeS
       });
       return;
     }
+    if (p === "/api/show" && req.method === "POST") {
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+        if (body.length > 4096) req.destroy();
+      });
+      req.on("end", () => {
+        let asked;
+        try {
+          asked = JSON.parse(body);
+        } catch {
+          return json(res, { error: "bad json" }, 400);
+        }
+        const { id, components, variant } = asked;
+        if (typeof id !== "number" || !index.get(id)) return json(res, { error: "no such document" }, 404);
+        if (!Array.isArray(components) || !components.every((c) => typeof c === "string" && isName(c)))
+          return json(res, { error: "components must be names" }, 400);
+        if (variant !== void 0 && (typeof variant !== "string" || !isName(variant)))
+          return json(res, { error: "variant must be a name" }, 400);
+        sse.broadcast({ type: "show", id, components, ...variant ? { variant } : {} });
+        json(res, { tabs: sse.size() });
+      });
+      return;
+    }
     const a = p.match(/^\/api\/asset\/(\d+)\/(.+)$/);
     if (a) {
       const doc = index.get(Number(a[1]));
@@ -9094,6 +9140,7 @@ var init_server = __esm({
     await init_db();
     init_bind();
     init_paths();
+    init_pointer();
     init_serverstate();
     init_watcher();
     init_sse();
@@ -9121,6 +9168,7 @@ var init_server = __esm({
 await init_db();
 init_bind();
 init_paths();
+init_pointer();
 init_projects();
 init_home();
 init_serverstate();
@@ -9140,7 +9188,9 @@ var VALUE_FLAGS = /* @__PURE__ */ new Set([
   "--group-title",
   "--project",
   "--title",
-  "--path"
+  "--path",
+  "--component",
+  "--variant"
 ]);
 function parseArgs(argv) {
   const [verb, ...rest] = argv;
@@ -9457,8 +9507,9 @@ var USAGE = [
   "  pending list [<file|#id>] | clear <file|#id>",
   "  status",
   "  path <filename> [--project <slug>]       # where this document belongs, joined for this OS",
-  "  components <file|#id>                    # what this mockup offers to siblings, and what it pulls",
+  "  components <file|#id>                    # what this mockup offers to siblings, what it pulls, every name on its page and its variants",
   "  check <file|#id>                         # do this mockup's bindings resolve? errors as text, exit 1 if any",
+  "  show <file|#id> [--component Name]... [--variant v]   # point the person's viewer at these components of a mockup; prints the link",
   "  mermaid-check <file|#id>                 # parse every mermaid block; warn on a missing caption or an unlabeled fork; exit 1 if one fails",
   "  tracker check <file|#id>                 # a plan's tracker judged against itself; exit 1 if anything disagrees",
   "  tracker sync <file|#id>                  # rewrite the class lines from the glyphs, the one place a step's state is written twice",
@@ -9473,8 +9524,11 @@ var registerOpts = () => ({
   project: args.flag("--project") ?? ""
 });
 function postToServer(route, body) {
+  return askServer(route, body) !== null;
+}
+function askServer(route, body) {
   const st = readServerStatus();
-  if (!st.running || st.port === null) return false;
+  if (!st.running || st.port === null) return null;
   const b = JSON.stringify(body);
   const r = spawnSync(
     process.execPath,
@@ -9483,12 +9537,12 @@ function postToServer(route, body) {
       `const b=${JSON.stringify(b)};const q=require('node:http').request(
          {host:'127.0.0.1',port:${st.port},path:${JSON.stringify(route)},method:'POST',
           headers:{'content-type':'application/json','content-length':Buffer.byteLength(b)}},
-         r=>{r.resume();r.on('end',()=>process.exit(r.statusCode===200?0:1))});
+         r=>{r.pipe(process.stdout);r.on('end',()=>process.exitCode=r.statusCode===200?0:1)});
        q.on('error',()=>process.exit(1));q.end(b);`
     ],
-    { timeout: 5e3 }
+    { timeout: 5e3, encoding: "utf8" }
   );
-  return r.status === 0;
+  return r.status === 0 ? r.stdout : null;
 }
 function setActive(index, slug) {
   if (!postToServer("/api/active", { project: slug })) index.setActiveProject(slug);
@@ -9618,7 +9672,8 @@ function mockupArg(usage) {
 function cmdComponents() {
   const abs = mockupArg("usage: aiview components <file|#id>");
   const r = listComponents(readDoc(abs));
-  emit({ file: path8.basename(abs), ...r }, () => {
+  const vocabulary = pageVocabulary(abs);
+  emit({ file: path8.basename(abs), ...r, ...vocabulary }, () => {
     if (!r.offers.length) console.log("offers   nothing: no data-component in this file");
     for (const o of r.offers)
       console.log(
@@ -9626,17 +9681,59 @@ function cmdComponents() {
       );
     for (const x of r.pulls) console.log(`pulls    ${x.name || x.ref}  from ${x.file || "(invalid ref)"}`);
     if (!r.pulls.length) console.log("pulls    nothing: no data-bind in this file");
+    console.log(`page     ${vocabulary.page.join(", ") || "no component"}`);
+    console.log(`variants ${vocabulary.variants.join(", ") || "none declared"}`);
   });
 }
-function cmdCheck() {
-  const abs = mockupArg("usage: aiview check <file|#id>");
+function composed(abs) {
   const dir = path8.dirname(abs);
   const reader = (name) => {
     if (/[\\/]/.test(name) || name.includes("..")) return void 0;
     const f = path8.join(dir, name);
     return fs7.existsSync(f) && fs7.statSync(f).isFile() ? readDoc(f) : void 0;
   };
-  const r = resolveBindings(readDoc(abs), reader);
+  return resolveBindings(readDoc(abs), reader);
+}
+function pageVocabulary(abs) {
+  const raw = readDoc(abs);
+  const html = composed(abs).html;
+  const names = [...listComponents(html).offers, ...listComponents(raw).pulls].map((c) => c.name).filter(Boolean);
+  return {
+    page: [...new Set(names)],
+    variants: [...new Set([...html.matchAll(/data-aiview-variant="([^"]+)"/g)].map((m) => m[1]))]
+  };
+}
+function cmdShow() {
+  const usage = "usage: aiview show <file|#id> [--component Name]... [--variant v]";
+  const abs = mockupArg(usage);
+  const doc = resolveRef(args.positional[0]);
+  if (!doc) {
+    console.error(`not registered: ${abs}. Register and serve it with: aiview open <file>`);
+    process.exit(1);
+  }
+  const components = args.flags("--component");
+  const variant = args.flag("--variant");
+  const { page: known, variants } = pageVocabulary(abs);
+  const wrong = [...components, ...variant ? [variant] : []].find((n) => !isName(n)) !== void 0 ? "a name holds letters, digits, dot, dash and underscore only" : unknownNames(components, known, "component") ?? (variant ? unknownNames([variant], variants, "variant") : void 0);
+  if (wrong) {
+    console.error(wrong);
+    process.exit(1);
+  }
+  ensureDist();
+  const st = readServerStatus();
+  const port = st.running && st.port !== null ? st.port : spawnDetachedServer(Number(args.flag("--port") ?? process.env.AIVIEW_PORT ?? 4321));
+  const pointer = { id: doc.id, components, ...variant ? { variant } : {} };
+  const url = `http://localhost:${port}/#${pointerHash(pointer)}`;
+  const answer = askServer("/api/show", pointer);
+  const tabs = answer === null ? 0 : JSON.parse(answer).tabs;
+  emit({ id: doc.id, url, components, variant: variant ?? null, tabs }, () => {
+    console.log(url);
+    console.log(tabs ? `shown in ${tabs} open tab${tabs > 1 ? "s" : ""}` : "no tab is open: give the person the link");
+  });
+}
+function cmdCheck() {
+  const abs = mockupArg("usage: aiview check <file|#id>");
+  const r = composed(abs);
   emit({ file: path8.basename(abs), bound: r.bound, sources: r.sources, errors: r.errors, warnings: r.warnings }, () => {
     console.log(`${r.bound} bound from ${r.sources.length} source${r.sources.length === 1 ? "" : "s"}${r.sources.length ? `: ${r.sources.join(", ")}` : ""}`);
     for (const e of r.errors) console.log(`error    ${e.ref}: ${e.message}`);
@@ -10061,6 +10158,9 @@ switch (args.verb) {
     break;
   case "components":
     cmdComponents();
+    break;
+  case "show":
+    cmdShow();
     break;
   case "check":
     cmdCheck();

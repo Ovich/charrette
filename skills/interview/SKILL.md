@@ -21,7 +21,7 @@ subject makes it plausible, and later the moment reading cannot settle a claim o
 person doubts a tool. On a yes, read `references/experiments.md`. The caller stores the
 answer with its decisions.
 
-**Before each question, read**: the code, the history, the existing documents.
+**Before each question, read**: the code, the history, the existing documents. A question about a screen goes through the `point-at` skill first.
 
 **One decision per message, in tree order**, a branch once its parent is agreed. What
 reading settles is stated with its source, and the person confirms. Where a document says

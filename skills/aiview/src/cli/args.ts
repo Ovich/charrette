@@ -10,6 +10,8 @@ const VALUE_FLAGS = new Set([
   "--project",
   "--title",
   "--path",
+  "--component",
+  "--variant",
 ]);
 
 export interface ParsedArgs {

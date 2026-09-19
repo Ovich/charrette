@@ -52,6 +52,10 @@ $A open "$F" --tag <slug> --tag <topic>
 
 **`pending add` puts a card at the head of the document for each unit of work still running; `pending done` removes it when the section is written.** On a fan-out, one card per subagent as it is dispatched, closed when its result lands, on the failure paths too. The properties and the wording: `references/pending.md`.
 
+## Pointing at a mockup
+
+**`show <file|#id> --component <Name>... [--variant <v>]` moves every open tab to the mockup and lights those components**, dimming the rest, until the next `show` or until the person stops it. `components <file|#id>` lists every name on the page and its variants, and `show` refuses any other, listing the ones it has. It prints the link that does the same in a tab opened later, and says how many tabs heard it. When to point and how to word the question: the `point-at` skill.
+
 ## Retiring the work
 
 - **Before the merge, distil what outlives the work into somewhere versioned**: durable rules into `AGENTS.md` (the `project-conventions` skill), the story of the change into the PR description.

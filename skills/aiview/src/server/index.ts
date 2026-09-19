@@ -12,9 +12,12 @@ import type {
   PendingEventPayload,
   IndexEventPayload,
   ProjectEventPayload,
+  ShowEventPayload,
+  ShowResponse,
 } from "../core/api.ts";
 import { resolveBindings } from "../core/bind.ts";
 import { formatOf, isHtml, isPdf, readDoc } from "../core/paths.ts";
+import { isName } from "../core/pointer.ts";
 import { clearServerFiles, writeServerFiles } from "../core/serverstate.ts";
 import { DocWatcher } from "../core/watcher.ts";
 import { createSseHub } from "./sse.ts";
@@ -183,6 +186,34 @@ export function startServer(
         if (typeof id !== "number") return json(res, { error: "id required" }, 400);
         sse.broadcast({ type: "changed", id } satisfies PendingEventPayload);
         json(res, { ok: true });
+      });
+      return;
+    }
+    // The agent points at a mockup's components (`aiview show`). The CLI has validated the
+    // names against the file; here they are only held to what travels safely in a URL.
+    // The answer counts the tabs that heard it, so the agent knows whether to hand the
+    // person the link instead.
+    if (p === "/api/show" && req.method === "POST") {
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+        if (body.length > 4096) req.destroy(); // a few names, not a payload
+      });
+      req.on("end", () => {
+        let asked: { id?: unknown; components?: unknown; variant?: unknown };
+        try {
+          asked = JSON.parse(body) as typeof asked;
+        } catch {
+          return json(res, { error: "bad json" }, 400);
+        }
+        const { id, components, variant } = asked;
+        if (typeof id !== "number" || !index.get(id)) return json(res, { error: "no such document" }, 404);
+        if (!Array.isArray(components) || !components.every((c): c is string => typeof c === "string" && isName(c)))
+          return json(res, { error: "components must be names" }, 400);
+        if (variant !== undefined && (typeof variant !== "string" || !isName(variant)))
+          return json(res, { error: "variant must be a name" }, 400);
+        sse.broadcast({ type: "show", id, components, ...(variant ? { variant } : {}) } satisfies ShowEventPayload);
+        json(res, { tabs: sse.size() } satisfies ShowResponse);
       });
       return;
     }

@@ -604,3 +604,28 @@ describe("Sidebar footer: the way to the repository", () => {
     expect(bare.textContent).toContain("1 documents · JOBS");
   });
 });
+
+describe("pointing at a mockup's components", () => {
+  test("the spotlight is installed once, idle, inside the body", async () => {
+    const { withSpotlight, pointMessage, SPOTLIGHT_MARK } = await import("./lib/spotlight.ts");
+    const once = withSpotlight("<html><body><p>x</p></body></html>");
+    expect(once.indexOf(SPOTLIGHT_MARK)).toBeLessThan(once.indexOf("</body>"));
+    expect(withSpotlight(once)).toBe(once);
+    expect(pointMessage(["Pill", "Dock"])).toEqual({ type: "aiview:point", names: ["Pill", "Dock"] });
+  });
+
+  test("the toolbar says what the agent is pointing at, and the person can stop it", async () => {
+    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    const onClear = vi.fn();
+    const { container, rerender } = render(
+      <MockupFrame html="<html><body></body></html>" pointed={["ApplicationStrip", "MenuSquare"]} onClearPointer={onClear} />,
+    );
+    const chip = container.querySelector('[data-component="PointerChip"]')!;
+    expect(chip.textContent).toContain("pointing at ApplicationStrip, MenuSquare");
+    fireEvent.click(screen.getByLabelText("Stop pointing"));
+    expect(onClear).toHaveBeenCalledTimes(1);
+
+    rerender(<MockupFrame html="<html><body></body></html>" />);
+    expect(container.querySelector('[data-component="PointerChip"]')).toBeNull();
+  });
+});

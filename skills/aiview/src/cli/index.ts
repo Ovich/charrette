@@ -17,6 +17,8 @@ import {
 } from "../core/db.ts";
 import { listComponents, resolveBindings } from "../core/bind.ts";
 import { isHtml, readDoc } from "../core/paths.ts";
+import { pointerHash, isName, unknownNames } from "../core/pointer.ts";
+import type { ShowResponse } from "../core/api.ts";
 import { projectForCwd } from "../core/projects.ts";
 import { adoptLegacyIndex, DATA_ROOT, docsDirFor, DOCS_ROOT, ensureHome } from "../core/home.ts";
 import { readServerStatus, PORT_FILE, type ServerStatus } from "../core/serverstate.ts";
@@ -48,8 +50,9 @@ const USAGE = [
   "  pending list [<file|#id>] | clear <file|#id>",
   "  status",
   "  path <filename> [--project <slug>]       # where this document belongs, joined for this OS",
-  "  components <file|#id>                    # what this mockup offers to siblings, and what it pulls",
+  "  components <file|#id>                    # what this mockup offers to siblings, what it pulls, every name on its page and its variants",
   "  check <file|#id>                         # do this mockup's bindings resolve? errors as text, exit 1 if any",
+  "  show <file|#id> [--component Name]... [--variant v]   # point the person's viewer at these components of a mockup; prints the link",
   "  mermaid-check <file|#id>                 # parse every mermaid block; warn on a missing caption or an unlabeled fork; exit 1 if one fails",
   "  tracker check <file|#id>                 # a plan's tracker judged against itself; exit 1 if anything disagrees",
   "  tracker sync <file|#id>                  # rewrite the class lines from the glyphs, the one place a step's state is written twice",
@@ -68,8 +71,13 @@ const registerOpts = (): RegisterOptions => ({
 /** POST to the running server, synchronously (the CLI has no event loop to await on).
  *  false = no server, or it refused; the caller decides whether that matters. */
 function postToServer(route: string, body: unknown): boolean {
+  return askServer(route, body) !== null;
+}
+
+/** The same POST, with the server's answer: its body on a 200, null on anything else. */
+function askServer(route: string, body: unknown): string | null {
   const st = readServerStatus();
-  if (!st.running || st.port === null) return false;
+  if (!st.running || st.port === null) return null;
   const b = JSON.stringify(body);
   const r = spawnSync(
     process.execPath,
@@ -78,12 +86,12 @@ function postToServer(route: string, body: unknown): boolean {
       `const b=${JSON.stringify(b)};const q=require('node:http').request(
          {host:'127.0.0.1',port:${st.port},path:${JSON.stringify(route)},method:'POST',
           headers:{'content-type':'application/json','content-length':Buffer.byteLength(b)}},
-         r=>{r.resume();r.on('end',()=>process.exit(r.statusCode===200?0:1))});
+         r=>{r.pipe(process.stdout);r.on('end',()=>process.exitCode=r.statusCode===200?0:1)});
        q.on('error',()=>process.exit(1));q.end(b);`,
     ],
-    { timeout: 5000 },
+    { timeout: 5000, encoding: "utf8" },
   );
-  return r.status === 0;
+  return r.status === 0 ? r.stdout : null;
 }
 
 /** Set the active project through the ONE write path: POST so the server writes the
@@ -242,7 +250,8 @@ function mockupArg(usage: string): string {
 function cmdComponents(): void {
   const abs = mockupArg("usage: aiview components <file|#id>");
   const r = listComponents(readDoc(abs));
-  emit({ file: path.basename(abs), ...r }, () => {
+  const vocabulary = pageVocabulary(abs);
+  emit({ file: path.basename(abs), ...r, ...vocabulary }, () => {
     if (!r.offers.length) console.log("offers   nothing: no data-component in this file");
     for (const o of r.offers)
       console.log(
@@ -250,19 +259,78 @@ function cmdComponents(): void {
       );
     for (const x of r.pulls) console.log(`pulls    ${x.name || x.ref}  from ${x.file || "(invalid ref)"}`);
     if (!r.pulls.length) console.log("pulls    nothing: no data-bind in this file");
+    console.log(`page     ${vocabulary.page.join(", ") || "no component"}`);
+    console.log(`variants ${vocabulary.variants.join(", ") || "none declared"}`);
   });
 }
 
-/** Resolve a host the way the server does and say what went wrong, as text. Exit 1 on errors. */
-function cmdCheck(): void {
-  const abs = mockupArg("usage: aiview check <file|#id>");
+/** A mockup composed the way the server composes it: `data-bind` placeholders replaced
+ *  from sibling files of the same folder, bare names only. */
+function composed(abs: string): ReturnType<typeof resolveBindings> {
   const dir = path.dirname(abs);
   const reader = (name: string): string | undefined => {
     if (/[\\/]/.test(name) || name.includes("..")) return undefined;
     const f = path.join(dir, name);
     return fs.existsSync(f) && fs.statSync(f).isFile() ? readDoc(f) : undefined;
   };
-  const r = resolveBindings(readDoc(abs), reader);
+  return resolveBindings(readDoc(abs), reader);
+}
+
+/** What the person sees on a mockup's page and can be pointed at: every component name
+ *  once composed, the bound ones and what they hold included, and the variants declared.
+ *  `components` prints it and `show` holds names to it, so the two never disagree. */
+function pageVocabulary(abs: string): { page: string[]; variants: string[] } {
+  const raw = readDoc(abs);
+  const html = composed(abs).html;
+  const names = [...listComponents(html).offers, ...listComponents(raw).pulls].map((c) => c.name).filter(Boolean);
+  return {
+    page: [...new Set(names)],
+    variants: [...new Set([...html.matchAll(/data-aiview-variant="([^"]+)"/g)].map((m) => m[1]))],
+  };
+}
+
+/** Point the person's viewer at components of a mockup, before asking them about it.
+ *  The names are held to the page as the person sees it, bound components included, so
+ *  a region named in the agent's own words stops here. The link is the pointer: it is
+ *  printed whether or not a tab heard the broadcast. */
+function cmdShow(): void {
+  const usage = "usage: aiview show <file|#id> [--component Name]... [--variant v]";
+  const abs = mockupArg(usage);
+  const doc = resolveRef(args.positional[0]);
+  if (!doc) {
+    console.error(`not registered: ${abs}. Register and serve it with: aiview open <file>`);
+    process.exit(1);
+  }
+  const components = args.flags("--component");
+  const variant = args.flag("--variant");
+
+  const { page: known, variants } = pageVocabulary(abs);
+  const wrong =
+    [...components, ...(variant ? [variant] : [])].find((n) => !isName(n)) !== undefined
+      ? "a name holds letters, digits, dot, dash and underscore only"
+      : (unknownNames(components, known, "component") ?? (variant ? unknownNames([variant], variants, "variant") : undefined));
+  if (wrong) {
+    console.error(wrong);
+    process.exit(1);
+  }
+
+  ensureDist();
+  const st: ServerStatus = readServerStatus();
+  const port = st.running && st.port !== null ? st.port : spawnDetachedServer(Number(args.flag("--port") ?? process.env.AIVIEW_PORT ?? 4321));
+  const pointer = { id: doc.id, components, ...(variant ? { variant } : {}) };
+  const url = `http://localhost:${port}/#${pointerHash(pointer)}`;
+  const answer = askServer("/api/show", pointer);
+  const tabs = answer === null ? 0 : (JSON.parse(answer) as ShowResponse).tabs;
+  emit({ id: doc.id, url, components, variant: variant ?? null, tabs }, () => {
+    console.log(url);
+    console.log(tabs ? `shown in ${tabs} open tab${tabs > 1 ? "s" : ""}` : "no tab is open: give the person the link");
+  });
+}
+
+/** Resolve a host the way the server does and say what went wrong, as text. Exit 1 on errors. */
+function cmdCheck(): void {
+  const abs = mockupArg("usage: aiview check <file|#id>");
+  const r = composed(abs);
   emit({ file: path.basename(abs), bound: r.bound, sources: r.sources, errors: r.errors, warnings: r.warnings }, () => {
     console.log(`${r.bound} bound from ${r.sources.length} source${r.sources.length === 1 ? "" : "s"}${r.sources.length ? `: ${r.sources.join(", ")}` : ""}`);
     for (const e of r.errors) console.log(`error    ${e.ref}: ${e.message}`);
@@ -729,6 +797,9 @@ switch (args.verb) {
     break;
   case "components":
     cmdComponents();
+    break;
+  case "show":
+    cmdShow();
     break;
   case "check":
     cmdCheck();

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchDocument, setActiveProject, type DocumentResponse } from "./lib/api.ts";
 import { useDocuments } from "./hooks/useDocuments.ts";
+import { pointerHash, readPointer, type Pointer } from "../src/core/pointer.ts";
 import { Sidebar } from "./components/shell/Sidebar.tsx";
 import { TopBar } from "./components/shell/TopBar.tsx";
 import { DocHeader } from "./components/docs/DocHeader.tsx";
@@ -9,10 +10,8 @@ import { PendingCards } from "./components/docs/PendingCards.tsx";
 import { MockupFrame } from "./components/viewers/MockupFrame.tsx";
 import { PdfFrame } from "./components/viewers/PdfFrame.tsx";
 
-const hashId = (): number | null => {
-  const m = location.hash.match(/doc=(\d+)/);
-  return m ? Number(m[1]) : null;
-};
+/** The hash is the pointer: the document, and what the agent is pointing at in it. */
+const hashPointer = (): Pointer | null => readPointer(location.hash);
 
 const folderOf = (p: string): string => p.replace(/[\\/][^\\/]*$/, "");
 const baseOf = (p: string): string => p.replace(/^.*[\\/]/, "");
@@ -43,8 +42,9 @@ export function shouldLoad(
 }
 
 export function App() {
-  const { docs, groups, projects, activeProject, startId, version, connection, changedTick, changedId } = useDocuments();
-  const [currentId, setCurrentId] = useState<number | null>(hashId);
+  const { docs, groups, projects, activeProject, startId, version, connection, changedTick, changedId, shownTick, shown } = useDocuments();
+  const [pointer, setPointer] = useState<Pointer | null>(hashPointer);
+  const [currentId, setCurrentId] = useState<number | null>(() => hashPointer()?.id ?? null);
   const [response, setResponse] = useState<DocumentResponse | null>(null);
   const [loading, setLoading] = useState(false);
   /** Which document the pane is actually showing, so a selection is never mistaken
@@ -105,12 +105,24 @@ export function App() {
 
   useEffect(() => {
     const onHash = () => {
-      const id = hashId();
-      if (id !== null && id !== currentId) setCurrentId(id);
+      const p = hashPointer();
+      setPointer(p);
+      if (p !== null && p.id !== currentId) setCurrentId(p.id);
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, [currentId]);
+
+  // The agent pointed (`aiview show`): go where the link it printed goes. The hash is the
+  // one way in, so a pasted link and a broadcast can never disagree; the project follows
+  // as it does for any document opened from outside the active one.
+  useEffect(() => {
+    if (shownTick === 0 || shown === null) return;
+    location.hash = pointerHash(shown);
+    const target = docs.find((d) => d.id === shown.id);
+    if (target && activeProject !== "*" && target.project !== activeProject) pickProject(target.project);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownTick]);
 
   // (re)load the open document — also when the SSE says it changed on disk
   useEffect(() => {
@@ -173,6 +185,11 @@ export function App() {
                   bindings={response!.bindings}
                   target={sourceTarget?.id === doc.id ? sourceTarget.component : undefined}
                   onOpenSource={openSource}
+                  pointed={pointer?.id === doc.id ? pointer.components : undefined}
+                  pointedVariant={pointer?.id === doc.id ? pointer.variant : undefined}
+                  onClearPointer={() => {
+                    location.hash = `doc=${doc.id}`;
+                  }}
                 />
               )}
               {format === "markdown" && response!.content !== null && (

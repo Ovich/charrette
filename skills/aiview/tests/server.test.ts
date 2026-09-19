@@ -7,7 +7,7 @@ import type { AddressInfo } from "node:net";
 import type http from "node:http";
 import { openIndex, type Index } from "../src/core/db.ts";
 import { collectionVersion, startServer } from "../src/server/index.ts";
-import type { DocumentsResponse, DocumentResponse } from "../src/core/api.ts";
+import type { DocumentsResponse, DocumentResponse, ShowResponse } from "../src/core/api.ts";
 
 let tmp: string;
 let root: string;
@@ -204,6 +204,27 @@ test("POST /api/index-changed tells open tabs the document list moved", async ()
   const frame = new TextDecoder().decode((await reader.read()).value);
   assert.match(frame, /"type":"index"/);
   await reader.cancel();
+});
+
+test("POST /api/show moves every open tab to the components, and says how many heard", async () => {
+  const es = await fetch(`${base}/events`);
+  const reader = es.body!.getReader();
+  await reader.read(); // hello
+
+  const post = (body: unknown) =>
+    fetch(`${base}/api/show`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+
+  const ok = await post({ id: boardId, components: ["Pill", "Dock"], variant: "step-2" });
+  assert.equal(ok.status, 200);
+  assert.ok(((await ok.json()) as ShowResponse).tabs >= 1, "the tab listening is counted");
+  const frame = new TextDecoder().decode((await reader.read()).value);
+  assert.match(frame, /"type":"show"/);
+  assert.match(frame, /"components":\["Pill","Dock"\],"variant":"step-2"/);
+  await reader.cancel();
+
+  assert.equal((await post({ id: 99999, components: [] })).status, 404, "a document that is not registered");
+  assert.equal((await post({ id: boardId, components: ['x"]y'] })).status, 400, "a name that would not survive a selector");
+  assert.equal((await post({ id: boardId, components: [], variant: "a b" })).status, 400);
 });
 
 test("an html document is served composed: bindings resolved, summary carried, title from the raw file", async () => {

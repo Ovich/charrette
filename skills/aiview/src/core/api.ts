@@ -71,3 +71,18 @@ export interface IndexEventPayload {
 export interface PingEventPayload {
   type: "ping";
 }
+
+/** Broadcast when the agent points at a mockup's components (`aiview show`): every open
+ *  tab moves to the document and highlights them. The fields are a `Pointer`'s. */
+export interface ShowEventPayload {
+  type: "show";
+  id: number;
+  components: string[];
+  variant?: string;
+}
+
+/** What `POST /api/show` answers: how many tabs heard it, so the agent knows whether
+ *  the person is looking or has to be handed the link. */
+export interface ShowResponse {
+  tabs: number;
+}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchDocuments, type DocumentWithState } from "../lib/api.ts";
+import type { Pointer } from "../../src/core/pointer.ts";
 
 export type ConnectionState = "connecting" | "live" | "reconnecting";
 
@@ -27,6 +28,9 @@ export interface DocumentsState {
   /** Bumped whenever the given doc id changed on disk — viewers key refetches off it. */
   changedTick: number;
   changedId: number | null;
+  /** Bumped whenever the agent points at a mockup's components (`aiview show`). */
+  shownTick: number;
+  shown: Pointer | null;
   reload: () => void;
 }
 
@@ -39,6 +43,7 @@ export function useDocuments(): DocumentsState {
   const [version, setVersion] = useState<string | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [changed, setChanged] = useState<{ tick: number; id: number | null }>({ tick: 0, id: null });
+  const [shown, setShown] = useState<{ tick: number; pointer: Pointer | null }>({ tick: 0, pointer: null });
   const loadedOnce = useRef(false);
 
   const reload = useCallback(() => {
@@ -70,7 +75,7 @@ export function useDocuments(): DocumentsState {
       es.onerror = () => setConnection("reconnecting");
       es.onmessage = (e) => {
         lastSeen = Date.now();
-        const ev = JSON.parse(e.data) as { type: string; id?: number; slug?: string };
+        const ev = JSON.parse(e.data) as { type: string; id?: number; slug?: string; components?: string[]; variant?: string };
         if (ev.type === "hello" || ev.type === "ping") setConnection("live");
         if (ev.type === "changed") {
           reload();
@@ -80,6 +85,11 @@ export function useDocuments(): DocumentsState {
         // itself moved, so refetch it. This is what makes a new document appear without
         // a manual refresh — `changed` only fires for files already being watched.
         if (ev.type === "index") reload();
+        // The agent is pointing at a mockup's components: this tab goes there.
+        if (ev.type === "show" && typeof ev.id === "number") {
+          const pointer: Pointer = { id: ev.id, components: ev.components ?? [], ...(ev.variant ? { variant: ev.variant } : {}) };
+          setShown((s) => ({ tick: s.tick + 1, pointer }));
+        }
         // The agent switched project: this tab follows (D3).
         if (ev.type === "project" && ev.slug) setActiveProject(ev.slug);
       };
@@ -115,6 +125,8 @@ export function useDocuments(): DocumentsState {
     connection,
     changedTick: changed.tick,
     changedId: changed.id,
+    shownTick: shown.tick,
+    shown: shown.pointer,
     reload,
   };
 }

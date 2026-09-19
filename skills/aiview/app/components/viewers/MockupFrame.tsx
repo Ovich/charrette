@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, X } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.tsx";
 import { Button } from "../ui/button.tsx";
 import type { BindingsSummary } from "../../lib/api.ts";
 import { withOverlay } from "../../lib/overlay.ts";
 import { mockupControls, withBridge } from "../../lib/bridge.ts";
+import { pointMessage, withSpotlight } from "../../lib/spotlight.ts";
 import { THEMES, type Theme, withTheme } from "../../lib/theme.ts";
 
 const VIEWPORTS: Array<[string, number]> = [
@@ -38,9 +39,17 @@ export interface MockupFrameProps {
   target?: string;
   /** A pulled region in Composition mode was clicked: open `file` at `component`. */
   onOpenSource?: (file: string, component: string) => void;
+  /** The components the agent is pointing at (`aiview show`), lit until it points elsewhere. */
+  pointed?: readonly string[];
+  /** The variant the pointed components live in, switched to first. */
+  pointedVariant?: string;
+  /** The person dismissed the pointer. */
+  onClearPointer?: () => void;
 }
 
-export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFrameProps) {
+const NONE: readonly string[] = [];
+
+export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NONE, pointedVariant, onClearPointer }: MockupFrameProps) {
   const [viewport, setViewport] = useState(() => stored("aiview.viewport", "full"));
   const [mode, setMode] = useState<MockupMode>(() =>
     stored("aiview.mockupMode", "rendered") === "composition" ? "composition" : "rendered",
@@ -99,7 +108,7 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
   const controls = useMemo(() => mockupControls(html), [html]);
   const [variant, setVariant] = useState<string | null>(null);
   const chosen = variant && controls.variants.some((v) => v.name === variant) ? variant : controls.initial;
-  const post = (msg: { type: string; name: string }) => frame.current?.contentWindow?.postMessage(msg, "*");
+  const post = (msg: { type: string; name?: string; names?: string[] }) => frame.current?.contentWindow?.postMessage(msg, "*");
   const selectVariant = (v: string) => {
     if (!v) return;
     setVariant(v);
@@ -107,7 +116,21 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
   };
   const onLoad = () => {
     if (chosen && chosen !== controls.initial) post({ type: "aiview:variant", name: chosen });
+    if (pointed.length) post(pointMessage(pointed));
   };
+
+  // The agent pointed somewhere: its variant first, since the components may exist only
+  // there, then the names. The spotlight waits for them to appear, so the order is safe.
+  // Keyed on the joined names: the array is a new one on every render of the parent.
+  const pointedKey = pointed.join(",");
+  useEffect(() => {
+    if (pointedVariant && controls.variants.some((v) => v.name === pointedVariant)) {
+      setVariant(pointedVariant);
+      post({ type: "aiview:variant", name: pointedVariant });
+    }
+    post(pointMessage(pointedKey ? pointedKey.split(",") : []));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pointedKey, pointedVariant]);
 
   // The sandboxed frame has an opaque origin, so postMessage is the only way up. Only
   // messages from this frame's own window are honoured.
@@ -125,7 +148,7 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
 
   // The theme is forced last, so it also normalises whatever the overlay and the bridge
   // brought with them: one pass over the html that actually reaches the frame.
-  const served = withTheme(withBridge(mode === "composition" ? withOverlay(html, { bindings, target }) : html), theme);
+  const served = withTheme(withSpotlight(withBridge(mode === "composition" ? withOverlay(html, { bindings, target }) : html)), theme);
   const bound = bindings?.sources.length ?? 0;
 
   return (
@@ -172,6 +195,19 @@ export function MockupFrame({ html, bindings, target, onOpenSource }: MockupFram
               ))}
             </ToggleGroup>
           </>
+        )}
+        {pointed.length > 0 && (
+          <span
+            className="ml-3 inline-flex items-center gap-1 rounded-md bg-[#4f46e5] px-2 py-0.5 font-medium text-white"
+            data-component="PointerChip"
+          >
+            pointing at {pointed.join(", ")}
+            {onClearPointer && (
+              <button type="button" aria-label="Stop pointing" title="Stop pointing" className="ml-0.5 cursor-pointer opacity-80 hover:opacity-100" onClick={onClearPointer}>
+                <X className="size-3" />
+              </button>
+            )}
+          </span>
         )}
         {controls.actions.length > 0 && (
           <span className="ml-3 inline-flex items-center gap-1" data-component="MockupActions">

@@ -21,6 +21,12 @@ the page takes no mouse: it is looked at, not operated. *Variant*: the variants 
 actions the mockup declares in its `MockupBar` (the `frontend-design` skill), mirrored
 here; the in-page bar is hidden, the chosen variant persists across reloads.
 
+**Pointing.** When the agent points at components of a mockup (`show`), the tab goes to
+that mockup, switches to the variant named, scrolls to the first component and outlines
+each one with its name, the rest of the page dimmed. The page still takes the mouse. A
+chip in the toolbar says what is pointed at, and its cross stops it. The address bar
+holds the pointer (`#doc=12&show=Strip,Menu&variant=step-2`), so the link can be kept.
+
 **Bindings.** An html mockup that pulls components from siblings (`data-bind`) is
 composed at serve time; the file on disk never changes. Opened as a plain file it shows
 a notice, not the page. Saving a source reloads every open host.

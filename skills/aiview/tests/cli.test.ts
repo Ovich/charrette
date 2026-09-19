@@ -46,6 +46,25 @@ afterEach(() => {
   }
 });
 
+/** Stop the detached server a test started, and wait for it to be gone so afterEach can
+ *  delete the temp dir. */
+const stopServer = (): void => {
+  const pid = Number(fs.readFileSync(path.join(toolRoot, "aiview.pid"), "utf8"));
+  try {
+    process.kill(pid);
+  } catch {}
+  const t0 = Date.now();
+  for (;;) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      break; // gone
+    }
+    if (Date.now() - t0 > 5000) break;
+    spawnSync(process.execPath, ["-e", "setTimeout(()=>{},100)"]);
+  }
+};
+
 test("status --json reports sqlite path and count", () => {
   const r = run("status", "--json");
   assert.equal(r.status, 0, r.stderr);
@@ -133,21 +152,45 @@ test("open: registers, starts a detached server, second open reuses it", () => {
     const r2 = JSON.parse(second.stdout);
     assert.equal(r2.url, r1.url); // idempotent: same server, same doc, same URL
   } finally {
-    const pid = Number(fs.readFileSync(path.join(toolRoot, "aiview.pid"), "utf8"));
-    try {
-      process.kill(pid);
-    } catch {}
-    // wait for the process to actually exit so afterEach can delete the temp dir
-    const t0 = Date.now();
-    for (;;) {
-      try {
-        process.kill(pid, 0);
-      } catch {
-        break; // gone
-      }
-      if (Date.now() - t0 > 5000) break;
-      spawnSync(process.execPath, ["-e", "setTimeout(()=>{},100)"]);
-    }
+    stopServer();
+  }
+});
+
+test("show: names are held to the page the person sees, and the link is the pointer", () => {
+  write("docs/tools.mockup.html", `<!doctype html><html><body><span data-component="Pill">v1</span></body></html>`);
+  const host = write(
+    "docs/host.mockup.html",
+    `<!doctype html><html><head><title>Host</title></head><body>` +
+      `<div data-component="MockupBar"><button data-aiview-variant="empty" aria-pressed="true">Empty</button><button data-aiview-variant="step-2">Step 2</button></div>` +
+      `<header data-component="ApplicationStrip">strip</header><div data-bind="tools.mockup.html#Pill"></div></body></html>`,
+  );
+
+  const unregistered = run("show", host, "--component", "ApplicationStrip");
+  assert.equal(unregistered.status, 1);
+  assert.match(unregistered.stderr, /not registered/);
+
+  const first = run("open", host, "--port", "0", "--json");
+  assert.equal(first.status, 0, first.stderr);
+  try {
+    const listed = JSON.parse(run("components", host, "--json").stdout);
+    assert.deepEqual(listed.page, ["MockupBar", "ApplicationStrip", "Pill"], "the names show accepts, the bound one included");
+    assert.deepEqual(listed.variants, ["empty", "step-2"]);
+
+    const invented = run("show", host, "--component", "ShellMiddle");
+    assert.equal(invented.status, 1);
+    assert.match(invented.stderr, /no component named ShellMiddle in this mockup; it has: .*ApplicationStrip.*Pill/);
+
+    const variant = run("show", host, "--component", "Pill", "--variant", "loading");
+    assert.equal(variant.status, 1);
+    assert.match(variant.stderr, /no variant named loading in this mockup; it has: empty, step-2/);
+
+    const shown = run("show", "#1", "--component", "ApplicationStrip", "--component", "Pill", "--variant", "step-2", "--json");
+    assert.equal(shown.status, 0, shown.stderr);
+    const r = JSON.parse(shown.stdout);
+    assert.match(r.url, /^http:\/\/localhost:\d+\/#doc=1&show=ApplicationStrip,Pill&variant=step-2$/);
+    assert.equal(r.tabs, 0, "nobody is looking: the agent hands over the link");
+  } finally {
+    stopServer();
   }
 });
 
