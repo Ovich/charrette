@@ -9,7 +9,7 @@ plan's *Mandate* section as `field: value` lines, and into the one line under th
 
 **Autonomy** (`pace:`):
 
-1. **run through** (recommended): at each boundary the pull requests give, mark ready, merge once the check is green, and the verification where the mandate has one, report, continue.
+1. **run through** (recommended): at each boundary the pull requests give, mark ready, merge once the check, re-run in this session, exits 0, and the verification where the mandate has one, report, continue.
 2. **run through, the person merges**: push, mark ready, report, continue. Never merge.
 3. **stop at each slice**: finish, report, name what is next, wait. The person merges.
 
