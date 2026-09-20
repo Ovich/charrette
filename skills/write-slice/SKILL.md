@@ -7,7 +7,7 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 **Cutting a plan's increment into slices**: read `references/cutting.md`. The rest of this skill is one slice's document.
 
-**When the plan's mandate says `tests: at the plan end`**, read `references/tests-at-the-plan-end.md` before writing any slice's document: what every slice carries in place of its tests, and the test slice's own document.
+**Every document carries its testing instructions, from the mandate's `tests` or the slice's own in the plan's heading**: before writing one, read the `execute-plan` skill's `references/tests.md`. The mandate not asked yet: ask it first, with that skill's `references/orchestrator-mandate.md`.
 
 **One document per slice, the whole context one agent needs, and the only place instructions live.**
 
@@ -38,7 +38,7 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 ## Seams under test
 
-**Agreed with the person before the work starts; when the tests are written is the mandate's, or this slice's own `tests:`.** One block per seam, the fewest seams that cover the criteria, existing seams before new ones, the highest seam that still names the behaviour.
+**Agreed with the person before the work starts.** When they are written and what runs when is the document's *Tests* section. One block per seam, the fewest seams that cover the criteria, existing seams before new ones, the highest seam that still names the behaviour.
 
 - **A seam block carries**: the module whose interface it is, what sits behind it and how the tests cross it (table below), the cases by name, each traced to an acceptance criterion or a branch of the flow, and what is not tested past it.
 - **One glance per seam**: the block fits a screen, the signature block stays under ten lines, the cases are a list of names, and with more than two seams the flow marks where each sits.
@@ -66,7 +66,6 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 > **Slice document** of `<plan file>`. Carry it out with the `execute-slice` skill:
 > check the blockers first, and stop if any is unmet.
-> **tests:** <only where this slice departs from the mandate's, in the mandate's words>
 
 **What this delivers.** The end-to-end behaviour, from the user's side.
 
@@ -75,6 +74,8 @@ was ever required.
 
 **Acceptance criteria.** A checklist, the slice's `👤` mark among them. A command and its
 expected exit code wherever one exists.
+
+**Tests.** The block of the answer in force, verbatim, its commands filled for this project.
 
 **Context.** Carried, not linked, in this order, each block naming its document and date:
 
@@ -90,8 +91,7 @@ expected exit code wherever one exists.
   then the decisions this document could not take, numbered, for the person.
 - *What exists already* that this work builds on.
 
-**What is already known, so the slice does not rediscover it.** The command that runs one
-test file, and the one that runs one end-to-end spec. The environment facts a
+**What is already known, so the slice does not rediscover it.** The environment facts a
 first command trips on: versions, what must be running, which credentials and how they
 expire, what is deployed and what that proves. Anything tried and abandoned, with why.
 

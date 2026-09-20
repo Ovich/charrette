@@ -14,7 +14,7 @@ description: Use when carrying out an implementation plan the person has already
 
 ## The orchestrator's mandate
 
-**You, the plan's executor, are the orchestrator.** Read the plan's *Mandate* section. What it leaves open, ask the person before the first slice, with the questions of `references/orchestrator-mandate.md`, and write the answers into the plan's *Mandate* section. An answer that changes the plan's slices, `tests: at the plan end`, is carried out before the first dispatch, as that reference says. Every dispatch passes its model.
+**You, the plan's executor, are the orchestrator.** Read the plan's *Mandate* section. What it leaves open, ask the person before the first slice, with the questions of `references/orchestrator-mandate.md`, and write the answers into the plan's *Mandate* section. An answer that changes the plan's slices, `tests: at the plan end`, is carried out before the first dispatch, as that reference says. Before a slice document is written or amended for its tests, read `references/tests.md`. Every dispatch passes its model.
 
 **When the project has a `verify-<app>` skill**, and only then:
 
@@ -24,11 +24,11 @@ description: Use when carrying out an implementation plan the person has already
 ## What stays in this session
 
 - **The tracker, the briefs, the verification, the merges, the README, the plan's decisions.** A subagent never edits any of them.
-- **Verifies every return**: a tick rests on what this session re-ran: the slice's check, and the tests it owed, present and green, or under `tests: at the plan end` the proof the slice names in their place.
+- **Verifies every return**: a tick rests on what this session re-ran: the slice's check, and what its *Tests* section owed.
 - **Checks blockers before every dispatch.**
 - **A subagent that stops on a finding is done.** Fix the plan or the slice document; never re-brief it past what it found.
 
-**A brief is**: the slice document's path, the workspace, the branch and its base, the command that prepares the workspace, the pull request to open or the open one to push to, the mandate's `tests`. Nothing else, and never the plan.
+**A brief is**: the slice document's path, the workspace, the branch and its base, the command that prepares the workspace, the pull request to open or the open one to push to. Nothing else, and never the plan.
 
 ## Watching a subagent
 

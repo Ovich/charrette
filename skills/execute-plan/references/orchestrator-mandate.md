@@ -29,16 +29,17 @@ next slice is a pause.
 **Model**, when delegated (`model: opus | <other>`): the model every slice's subagent
 runs on. **Opus** (recommended).
 
-**Tests** (`tests:`): when the implementer writes the tests a slice names. The procedures
-are the `execute-slice` skill's, one reference per answer.
+**Tests** (`tests:`): when the implementer writes the tests a slice names. The answer
+decides the instructions every slice document carries: `references/tests.md`.
 
 1. **at the plan end** (recommended), the fast lane: the slices write code only; once they are done, a last slice writes every owed test and repairs the broken ones. No test is rewritten because a later slice moved what it pinned.
 2. **at the slice end**: the code first, then the slice's tests in one pass.
 3. **commit only at green**: test-driven, one named case at a time, a commit only when the tests at the slice's seams are green, the full check once at the slice's end. No refactor phase.
 4. **commit per phase (red/green/refactor)**: test-driven, a commit at each phase, the full check once at the slice's end. For a run audited commit by commit; the slowest.
 
-A slice that departs from the mandate's names its own `tests:` in its heading, and the
-brief carries that one. Test && commit || revert is not offered: one typo reverts a
+A slice that departs from the mandate's names its own `tests:` in its heading in the plan,
+and its document carries that one. **Amended mid-run, the *Tests* section of every slice
+not yet started is rewritten**, through the `write-slice` skill, before its dispatch. Test && commit || revert is not offered: one typo reverts a
 multi-file change.
 
 **Choosing at the plan end**: whoever asks the mandate does this before anything else,
@@ -47,8 +48,7 @@ multi-file change.
 
 1. **Refuse it with one pull request per slice**: tell the person the pair merges untested code, and ask for one of the two to move.
 2. **Draw the test slice in the tracker**: a subgraph titled `… · the tests`, last before the plan's `👤` checks, blocked by every other slice, its done-when the full check at 0, and a dotted edge from every other slice's last step, `owes: its tests`.
-3. **Through the `write-slice` skill, give every other slice's document the proof that stands in for its tests**, amending documents already written. The test slice gets no document yet.
-4. **Amended mid-run, it holds for the slices not yet started.**
+3. **Through the `write-slice` skill, give every other slice's document its proof and its *Tests* section**, amending documents already written. The test slice gets no document yet.
 
 During the run:
 
