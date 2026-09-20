@@ -36,7 +36,7 @@ runs on. **Opus** (recommended).
 and at which seams, is the plan's testing strategy and is not asked here. The procedure
 of each is the `execute-slice` skill's, one reference per answer.
 
-1. **at the plan end** (recommended), the fast lane: the slices write code only, and a last slice writes every owed test and repairs the broken ones against the code as it ended, from the cases the plan named. No test is rewritten because a later slice moved what it pinned.
+1. **at the plan end** (recommended), the fast lane: the slices write code only. When they are all done, a last slice is written against the code as it ended, and it writes every owed test and repairs the broken ones, from the cases the slices named. No test is rewritten because a later slice moved what it pinned, and no test slice is guessed at before the implementation exists.
 2. **at the slice end**: the code first, held by the suite as it stands, then the slice's tests in one pass.
 3. **commit only at green**: test-driven, one named case at a time, a commit only when the suite is green, so a failed attempt is dropped back to the last good state. No refactor phase.
 4. **commit per phase (red/green/refactor)**: test-driven with a commit at each phase. For a run someone will audit commit by commit; the slowest.
@@ -48,13 +48,13 @@ runs every slice untested to the end, and `aiview tracker check` refuses it.
 
 1. **Refuse it with one pull request per slice**: the pair merges untested code. Say why, and ask for one of the two to move.
 2. **Draw the test slice in the tracker**: a subgraph titled `… · the tests`, last before the plan's `👤` checks, blocked by every other slice, its done-when the full check at 0, and a dotted edge from every other slice's last step, `owes: its tests`.
-3. **Have the slice documents follow**, through the `write-slice` skill: the test slice's own document, and in every other slice the proof that stands in for its tests. Documents already written are amended, never left.
+3. **Have the slice documents follow**, through the `write-slice` skill: in every other slice, the proof that stands in for its tests. Documents already written are amended, never left. **The test slice gets no document yet**: its step stands in the tracker from now, and its document waits for the code.
 4. **Amended mid-run, it holds for the slices not yet started.** A slice already done keeps the tests it wrote.
 
 **During the run:**
 
 - **A tick rests on the slice's proof**, re-run in this session. A slice that names none is not dispatched.
-- **Before the test slice is dispatched, its document is filled**: the tests each return listed as broken go under its heading *Tests the slices broke*, and it is read again against any slice document amended mid-run.
+- **When every other slice is done, and not before, write the test slice's document**, through the `write-slice` skill, from what the run left: the slice documents as amended, the decisions made on the way, the tests each return listed as broken, the interfaces as they ended. Then dispatch it. Written at planning, it describes an implementation nobody has seen.
 
 A slice whose nature wants another rhythm names it in its heading, and the brief carries
 that one. Test && commit || revert is not offered: one typo reverts a multi-file change,

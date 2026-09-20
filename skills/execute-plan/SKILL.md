@@ -9,7 +9,7 @@ description: Use when carrying out an implementation plan the person has already
 
 - **The tracker** is the plan's diagram; `references/tracker.md` is its protocol, read before the first edit of it.
 - **Open the plan in aiview every session** and give the person the URL.
-- **Do not start** if the plan has no tracker, a slice has no slice document, a slice document has no seams under test or no module blocks, or a slice whose check is not a command. Say so and finish the plan first.
+- **Do not start** if the plan has no tracker, a slice has no slice document (the test slice of `tests: at the plan end` excepted: its document is written once the others are done), a slice document has no seams under test or no module blocks, or a slice whose check is not a command. Say so and finish the plan first.
 - **Reconcile a tracker the repository has moved past** before starting; say what you found.
 
 ## The orchestrator's mandate
