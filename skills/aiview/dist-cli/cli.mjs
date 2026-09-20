@@ -9345,7 +9345,8 @@ function findTracker(text) {
     }
     const under = lines.slice(block.to + 1).find((l) => l.trim() !== "") ?? "";
     const mandateLine = block.fence === 0 || MANDATE_LINE.test(under);
-    return { fence: block.fence, marked, diagramsAbove, mandateLine, nodes, slices, assigned, declared, classLines, indent };
+    const mandate = MANDATE_LINE.test(under) ? under.trim() : "";
+    return { fence: block.fence, marked, diagramsAbove, mandateLine, mandate, nodes, slices, assigned, declared, classLines, indent };
   };
   const all = blocks.map((block, i) => read(block, i));
   return all.find((t) => t.marked) ?? all.find((t) => t.nodes.some((n) => n.glyph));
@@ -9366,6 +9367,9 @@ function check(t) {
   }
   if (!t.mandateLine) {
     found.push({ line: t.fence, text: "no mandate line under the tracker: the first line below the diagram states the mandate in force, `mandate: run through \xB7 one for the plan \xB7 \u2026`" });
+  }
+  if (/tests at the plan end/i.test(t.mandate) && !t.slices.some((sl) => /\bthe tests\b/i.test(sl.title))) {
+    found.push({ line: t.fence, text: "the mandate says tests at the plan end and no slice is the test slice: draw it, titled `\u2026 \xB7 the tests`, last before the person's checks, every other slice owing it its tests" });
   }
   for (const n of t.nodes) {
     const has = t.assigned.get(n.id) ?? [];

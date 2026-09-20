@@ -7,6 +7,8 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 **Cutting a plan's increment into slices**: read `references/cutting.md`. The rest of this skill is one slice's document.
 
+**When the plan's mandate says `tests: at the plan end`**, read `references/tests-at-the-plan-end.md` before writing any slice's document: what every slice carries in place of its tests, and the test slice's own document.
+
 **One document per slice, the whole context one agent needs, and the only place instructions live.**
 
 ## Before writing

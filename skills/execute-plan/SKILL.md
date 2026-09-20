@@ -14,7 +14,7 @@ description: Use when carrying out an implementation plan the person has already
 
 ## The orchestrator's mandate
 
-**You, the plan's executor, are the orchestrator.** Read the plan's *Mandate* section. What it leaves open, ask the person before the first slice, with the questions of `references/orchestrator-mandate.md`, and write the answers into the plan's *Mandate* section. Every dispatch passes its model.
+**You, the plan's executor, are the orchestrator.** Read the plan's *Mandate* section. What it leaves open, ask the person before the first slice, with the questions of `references/orchestrator-mandate.md`, and write the answers into the plan's *Mandate* section. An answer that changes the plan's slices, `tests: at the plan end`, is carried out before the first dispatch, as that reference says. Every dispatch passes its model.
 
 **When the project has a `verify-<app>` skill**, and only then:
 

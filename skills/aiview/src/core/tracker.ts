@@ -67,6 +67,9 @@ export interface Tracker {
   /** True when the first line under the diagram states the mandate in force. A bare
    *  diagram has no document around it, and counts as having one. */
   readonly mandateLine: boolean;
+  /** That line's text, empty when there is none: what the mandate says decides what the
+   *  tracker must hold. */
+  readonly mandate: string;
   readonly nodes: readonly TrackerNode[];
   readonly slices: readonly Slice[];
   /** Class name per node id, as the `class` lines currently assign it. */
@@ -147,7 +150,8 @@ export function findTracker(text: string): Tracker | undefined {
     }
     const under = lines.slice(block.to + 1).find((l) => l.trim() !== "") ?? "";
     const mandateLine = block.fence === 0 || MANDATE_LINE.test(under);
-    return { fence: block.fence, marked, diagramsAbove, mandateLine, nodes, slices, assigned, declared, classLines, indent };
+    const mandate = MANDATE_LINE.test(under) ? under.trim() : "";
+    return { fence: block.fence, marked, diagramsAbove, mandateLine, mandate, nodes, slices, assigned, declared, classLines, indent };
   };
 
   const all = blocks.map((block, i) => read(block, i));
@@ -181,6 +185,12 @@ export function check(t: Tracker): Finding[] {
 
   if (!t.mandateLine) {
     found.push({ line: t.fence, text: "no mandate line under the tracker: the first line below the diagram states the mandate in force, `mandate: run through · one for the plan · …`" });
+  }
+
+  // Tests at the plan end is chosen in the mandate and paid for in the tracker: without
+  // its test slice every slice runs untested and nothing ever writes the tests.
+  if (/tests at the plan end/i.test(t.mandate) && !t.slices.some((sl) => /\bthe tests\b/i.test(sl.title))) {
+    found.push({ line: t.fence, text: "the mandate says tests at the plan end and no slice is the test slice: draw it, titled `… · the tests`, last before the person's checks, every other slice owing it its tests" });
   }
 
   for (const n of t.nodes) {

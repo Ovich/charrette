@@ -41,11 +41,20 @@ of each is the `execute-slice` skill's, one reference per answer.
 3. **commit only at green**: test-driven, one named case at a time, a commit only when the suite is green, so a failed attempt is dropped back to the last good state. No refactor phase.
 4. **commit per phase (red/green/refactor)**: test-driven with a commit at each phase. For a run someone will audit commit by commit; the slowest.
 
-**At the plan end holds on three rules**, the orchestrator's to keep:
+**Choosing at the plan end changes the plan, and whoever asks the mandate makes the change
+before anything else**: `write-plan` closing its interview, the orchestrator filling a field
+left open, or an amendment mid-run. A mandate that says it over a plan with no test slice
+runs every slice untested to the end, and `aiview tracker check` refuses it.
 
-- **One pull request for the plan.** With one per slice it would merge untested code: refuse the pair when the mandate is asked, and say why.
-- **Every slice names a proof in place of its tests**, a story of the verify skill, a walk of the screen or a command whose output shows the behaviour, and the tick rests on this session re-running it. A slice with none is not dispatched.
-- **Every slice's step draws a dotted edge to the test slice**, `owes: its tests`, and the test slice's done-when is the full check at 0.
+1. **Refuse it with one pull request per slice**: the pair merges untested code. Say why, and ask for one of the two to move.
+2. **Draw the test slice in the tracker**: a subgraph titled `… · the tests`, last before the plan's `👤` checks, blocked by every other slice, its done-when the full check at 0, and a dotted edge from every other slice's last step, `owes: its tests`.
+3. **Have the slice documents follow**, through the `write-slice` skill: the test slice's own document, and in every other slice the proof that stands in for its tests. Documents already written are amended, never left.
+4. **Amended mid-run, it holds for the slices not yet started.** A slice already done keeps the tests it wrote.
+
+**During the run:**
+
+- **A tick rests on the slice's proof**, re-run in this session. A slice that names none is not dispatched.
+- **Before the test slice is dispatched, its document is filled**: the tests each return listed as broken go under its heading *Tests the slices broke*, and it is read again against any slice document amended mid-run.
 
 A slice whose nature wants another rhythm names it in its heading, and the brief carries
 that one. Test && commit || revert is not offered: one typo reverts a multi-file change,

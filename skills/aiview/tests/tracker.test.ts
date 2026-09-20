@@ -209,6 +209,15 @@ test("check: the mandate in force is stated right under the tracker", () => {
   assert.deepEqual(check(need(bold)), [], "bold or not");
 });
 
+test("check: a mandate that says tests at the plan end needs its test slice in the tracker", () => {
+  const fast = (body: string) => plan(body).replace("tests at the slice end", "tests at the plan end");
+  const without = [slice(1, [`A["⬜ A the route answers"]`]), "  class A todo"].join("\n");
+  assert.match(check(need(fast(without)))[0].text, /^the mandate says tests at the plan end and no slice is the test slice/);
+  const withIt = [slice(1, [`A["⬜ A the route answers"]`]), slice(2, [`B["⬜ B every named case a test"]`], "Slice 2 · US1 · the tests"), "  class A,B todo"].join("\n");
+  assert.deepEqual(check(need(fast(withIt))), []);
+  assert.deepEqual(check(need(plan(without))), [], "another rhythm asks for no test slice");
+});
+
 test("check: the glyph names the verdict line, and a step ticked without one is caught", () => {
   const ticked = need(plan([slice(1, [`A["✅ A the route answers<br/>done when: pnpm check exits 0"]`]), "  class A done"].join("\n")));
   assert.match(check(ticked)[0].text, /^A is ✅ and says 'done when': its verdict line is 'went on'/);
