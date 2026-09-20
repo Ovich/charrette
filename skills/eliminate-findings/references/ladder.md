@@ -22,9 +22,9 @@ Six rungs, highest first. A finding is tried against each from the top and takes
 
 **Tell it is this rung**: the comment could be written as a regular expression or a type. "Rename to", "don't import x from y", "this should be readonly".
 
-## 3. A convention test
+## 3. A test in CI
 
-**Criterion**: the finding is a property of the tree that a script can walk and a parser cannot: a file that must sit beside another, a class named after its selector, a folder that must not contain a certain kind of module, a route that must have a test. It fails the project's check.
+**Criterion**: the finding is a property of the tree that a script can walk and a parser cannot: a file that must sit beside another, a class named after its selector, a folder that must not contain a certain kind of module, a route that must have a test. It fails the push.
 
 **Artefacts**: a convention test under the tests folder the repository already uses for them (`tests/conventions/<finding>.test.ts`), reading the tree and asserting the property, one message per violation with the file. Red on the existing violations first, the pull request that adds it fixes them.
 

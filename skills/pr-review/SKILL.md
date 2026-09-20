@@ -54,7 +54,7 @@ description: "Use when reviewing a pull request, branch or diff in any language,
 
 - **Triage in this session**: L3 and L5 from the script's `layers`, L4 your call from the diff. Settle every seam the review will meet and the shared facts. Each question has one owner.
 - **Each layer is a fresh-context subagent**: the diff, its brief, the output contract, and the instruction "Do not invoke skills or spawn agents: review directly." Name the surface in a brief, keep your hypothesis out of it.
-- **Merge in this session**: dedup, rank by cost, drop what the project's linter or check already flags.
+- **Merge in this session**: dedup, rank by cost, drop what the project's linter or CI already flags.
 - **A finding outside its layer's jurisdiction is dropped from that return**, and re-verified under the owning layer if it matters. One that implicates a skipped layer reopens the triage: dispatch the layer, or record why not.
 - **Re-verify the findings that carry the verdict**: a well-argued wrong finding reaches the author in your name.
 
