@@ -1,7 +1,8 @@
 # The tracker's skeleton
 
 Copy the block, replace every phrase, delete what the plan has no use for. The caption
-line above the fence stays: `aiview mermaid-check` warns without one.
+line above the fence stays: `aiview mermaid-check` warns without one. So does the mandate
+line under it: `aiview tracker check` holds it.
 
 Phasing diagram: the slices, the fork, and what each step has to show before the next begins.
 
@@ -52,3 +53,5 @@ flowchart TB
   class S2.1,S3.1,S3.2,S3.2b,S4.1,S4.2 todo
   class ST state
 ```
+
+mandate: run through · one for the plan · delegated · opus · tests at the slice end · verify off

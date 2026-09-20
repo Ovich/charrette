@@ -36,7 +36,7 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 ## Seams under test
 
-**Agreed with the person before the work starts; the tests are written at the end of the slice.** One block per seam, the fewest seams that cover the criteria, existing seams before new ones, the highest seam that still names the behaviour.
+**Agreed with the person before the work starts; when the tests are written is the mandate's, or this slice's own `tests:`.** One block per seam, the fewest seams that cover the criteria, existing seams before new ones, the highest seam that still names the behaviour.
 
 - **A seam block carries**: the module whose interface it is, what sits behind it and how the tests cross it (table below), the cases by name, each traced to an acceptance criterion or a branch of the flow, and what is not tested past it.
 - **One glance per seam**: the block fits a screen, the signature block stays under ten lines, the cases are a list of names, and with more than two seams the flow marks where each sits.
@@ -63,8 +63,8 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 # <node id>: <title>
 
 > **Slice document** of `<plan file>`. Carry it out with the `execute-slice` skill:
-> check the blockers first, and stop if any is unmet. Code first, the tests this
-> document names at the end of the slice.
+> check the blockers first, and stop if any is unmet.
+> **tests:** <only where this slice departs from the mandate's, in the mandate's words>
 
 **What this delivers.** The end-to-end behaviour, from the user's side.
 

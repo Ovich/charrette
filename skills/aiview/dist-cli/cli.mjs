@@ -9280,6 +9280,7 @@ var SUBGRAPH = /^\s*subgraph\s+([A-Za-z_][\w.-]*)\s*\[\s*"?(.*?)"?\s*\]\s*$/;
 var END = /^\s*end\s*$/;
 var sliceOf = (id) => (/^SL(\d+)$/i.exec(id) ?? /^S(\d+)\.\w+$/i.exec(id))?.[1];
 var MARKER2 = /^\s*%%\s*(aiview:)?tracker\b/i;
+var MANDATE_LINE = /^\s*(\*\*)?mandate(\*\*)?\s*:/i;
 function findTracker(text) {
   const lines = text.split("\n");
   let start = -1;
@@ -9342,7 +9343,9 @@ function findTracker(text) {
         }
       }
     }
-    return { fence: block.fence, marked, diagramsAbove, nodes, slices, assigned, declared, classLines, indent };
+    const under = lines.slice(block.to + 1).find((l) => l.trim() !== "") ?? "";
+    const mandateLine = block.fence === 0 || MANDATE_LINE.test(under);
+    return { fence: block.fence, marked, diagramsAbove, mandateLine, nodes, slices, assigned, declared, classLines, indent };
   };
   const all = blocks.map((block, i) => read(block, i));
   return all.find((t) => t.marked) ?? all.find((t) => t.nodes.some((n) => n.glyph));
@@ -9360,6 +9363,9 @@ function check(t) {
   const want = derive(t);
   if (t.diagramsAbove > 0) {
     found.push({ line: t.fence, text: `the tracker is drawn below ${t.diagramsAbove === 1 ? "another diagram" : `${t.diagramsAbove} other diagrams`}: it is the first thing in the plan, under the header` });
+  }
+  if (!t.mandateLine) {
+    found.push({ line: t.fence, text: "no mandate line under the tracker: the first line below the diagram states the mandate in force, `mandate: run through \xB7 one for the plan \xB7 \u2026`" });
   }
   for (const n of t.nodes) {
     const has = t.assigned.get(n.id) ?? [];

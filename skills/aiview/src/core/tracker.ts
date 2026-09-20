@@ -51,6 +51,10 @@ export interface Slice {
  *  A plan holds several diagrams and only one is the record, so it says which. */
 const MARKER = /^\s*%%\s*(aiview:)?tracker\b/i;
 
+/** The mandate in force, as one line right under the diagram: `mandate: run through · …`,
+ *  bold or not. */
+const MANDATE_LINE = /^\s*(\*\*)?mandate(\*\*)?\s*:/i;
+
 export interface Tracker {
   /** 1-based line of the block's opening fence, 0 when the file is a bare diagram. */
   readonly fence: number;
@@ -60,6 +64,9 @@ export interface Tracker {
   /** How many diagrams the plan draws above this one. The tracker is what a reader opens
    *  the plan for, so it comes first. */
   readonly diagramsAbove: number;
+  /** True when the first line under the diagram states the mandate in force. A bare
+   *  diagram has no document around it, and counts as having one. */
+  readonly mandateLine: boolean;
   readonly nodes: readonly TrackerNode[];
   readonly slices: readonly Slice[];
   /** Class name per node id, as the `class` lines currently assign it. */
@@ -138,7 +145,9 @@ export function findTracker(text: string): Tracker | undefined {
         }
       }
     }
-    return { fence: block.fence, marked, diagramsAbove, nodes, slices, assigned, declared, classLines, indent };
+    const under = lines.slice(block.to + 1).find((l) => l.trim() !== "") ?? "";
+    const mandateLine = block.fence === 0 || MANDATE_LINE.test(under);
+    return { fence: block.fence, marked, diagramsAbove, mandateLine, nodes, slices, assigned, declared, classLines, indent };
   };
 
   const all = blocks.map((block, i) => read(block, i));
@@ -168,6 +177,10 @@ export function check(t: Tracker): Finding[] {
 
   if (t.diagramsAbove > 0) {
     found.push({ line: t.fence, text: `the tracker is drawn below ${t.diagramsAbove === 1 ? "another diagram" : `${t.diagramsAbove} other diagrams`}: it is the first thing in the plan, under the header` });
+  }
+
+  if (!t.mandateLine) {
+    found.push({ line: t.fence, text: "no mandate line under the tracker: the first line below the diagram states the mandate in force, `mandate: run through · one for the plan · …`" });
   }
 
   for (const n of t.nodes) {

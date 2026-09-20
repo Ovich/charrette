@@ -16,7 +16,8 @@ out, and the header says which. A small change's section is a sentence.
 
 ## The tracker
 The diagram, above everything else: it is what a reader opens the plan for. Drawn when the
-slices are cut; until then the heading holds one line saying so.
+slices are cut; until then the heading holds one line saying so. Under it, the mandate in
+one line, once answered.
 
 # Design
 
@@ -59,7 +60,8 @@ what is owed for it.
 
 ## 10. The slices
 One heading per slice: the stories it serves, delivers, blocked by, its
-check, the tests it owes, its mark, its slice document.
+check, the tests it owes, its `tests:` where it departs from the mandate's, its mark, its
+slice document.
 
 ## 11. The mandate
 The orchestrator's mandate, as answered.

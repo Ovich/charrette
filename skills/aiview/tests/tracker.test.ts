@@ -39,7 +39,9 @@ ${body}
   classDef next stroke:#d08b28
   classDef todo stroke-dasharray:4 3
   classDef state stroke:#8a8a8a
-\`\`\``;
+\`\`\`
+
+mandate: run through · one for the plan · delegated · opus · tests at the slice end · verify off`;
 
 /** Steps live inside a slice, so a fixture that omits one is not a tracker. */
 const slice = (n: number, steps: string[], title = `Slice ${n}`) =>
@@ -196,6 +198,15 @@ test("check: a step holds three short lines, and one that grows past them is a l
 
   const state = need(plan([slice(1, [`A["✅ done"]`]), `  ST["📍 state · today<br/>branch: b<br/>deployed: d<br/>next: n<br/>blocked: nothing<br/>parked: nothing"]`, "  class A done", "  class ST state"].join("\n")));
   assert.deepEqual(check(state), [], "the state node is not a step");
+});
+
+test("check: the mandate in force is stated right under the tracker", () => {
+  const body = [slice(1, [`A["✅ done"]`]), "  class A done"].join("\n");
+  assert.deepEqual(check(need(plan(body))), []);
+  const silent = plan(body).replace(/^mandate:.*$/m, "Some prose about the slices.");
+  assert.match(check(need(silent))[0].text, /^no mandate line under the tracker/);
+  const bold = plan(body).replace(/^mandate:/m, "**mandate**:");
+  assert.deepEqual(check(need(bold)), [], "bold or not");
 });
 
 test("check: the glyph names the verdict line, and a step ticked without one is caught", () => {

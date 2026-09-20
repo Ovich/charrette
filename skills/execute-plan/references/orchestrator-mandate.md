@@ -1,29 +1,48 @@
 # The orchestrator's mandate
 
-Ask all of it in one message,
-the recommended answer first, and write the answers into the plan's *Mandate* section
-as `field: value` lines.
+Ask all of it in one message, the recommended answer first, and write the answers into
+the plan's *Mandate* section as `field: value` lines, then into the one line under the
+tracker (`references/tracker.md`). **The recommended answers are the fast and unattended
+ones**: a person who wants to watch, to merge or to audit says so here.
 
-**Autonomy** (`pace: run through | stop at each slice`):
+**The section states the mandate in force.** An amendment mid-run overwrites its field,
+the decision's id beside it (`pace: run through, the person merges (D41)`), and the line
+under the tracker follows. Left as a decisions row alone, a resuming session reads the
+old field and merges.
 
-1. **Run through** (recommended): at each slice boundary, merge, report, continue.
-2. **Stop at each slice**: finish, report, name what is next, wait. The person merges.
+**Autonomy** (`pace:`):
 
-Either way, a slice marked `👤` stops before it starts, and a finding that changes the
-next slice is a pause.
+1. **run through** (recommended): at each boundary the pull requests give, mark ready, merge once the check is green, and the verification where the mandate has one, report, continue.
+2. **run through, the person merges**: push, mark ready, report, continue. Never merge.
+3. **stop at each slice**: finish, report, name what is next, wait. The person merges.
 
-**Pull requests** (`pull requests: one per slice | one for the plan`):
+Whichever it is, a slice marked `👤` stops before it starts, and a finding that changes
+the next slice is a pause.
 
-1. **One per slice** (recommended), off `main`: every slice lands on its own and leaves `main` green, complete or inert.
-2. **One for the plan**: one branch, slices commit on it, forks merge into it at the join, and it merges to `main` at the last slice on the person's word. For work that is green only when whole.
+**Pull requests** (`pull requests:`):
 
-**Steps** (`steps: delegated | inline`):
+1. **one for the plan** (recommended): one branch off `main`, slices commit on it, forks merge into it at the join, one review and one merge at the last slice.
+2. **one per slice**, off `main`: every slice lands on its own and leaves `main` green, complete or inert. For a plan whose slices are worth having before the whole.
 
-1. **Delegated** (recommended): a fresh subagent per slice runs `execute-slice`.
-2. **Inline**: the orchestrator's session does the work. For small plans, judgment-heavy slices, or a person who wants to watch.
+**Steps** (`steps:`):
+
+1. **delegated** (recommended): a fresh subagent per slice runs `execute-slice`.
+2. **inline**: the orchestrator's session does the work. For small plans, judgment-heavy slices, or a person who wants to watch.
 
 **Model**, when delegated (`model: opus | <other>`): the model every slice's subagent
 runs on. **Opus** (recommended).
+
+**Tests** (`tests:`): when the implementer writes the tests a slice names. What is tested,
+and at which seams, is the plan's testing strategy and is not asked here. The procedure
+of each is the `execute-slice` skill's.
+
+1. **at the slice end** (recommended), the fast lane: the code first, held by the suite as it stands, then the slice's tests in one pass.
+2. **commit only at green**: test-driven, one named case at a time, a commit only when the suite is green, so a failed attempt is dropped back to the last good state. No refactor phase.
+3. **commit per phase (red/green/refactor)**: test-driven with a commit at each phase. For a run someone will audit commit by commit; the slowest.
+
+A slice whose nature wants another rhythm names it in its heading, and the brief carries
+that one. Test && commit || revert is not offered: one typo reverts a multi-file change,
+and the agent regenerates it in a loop.
 
 **Verification** (`verify: each slice | slot done | off`), decided by a lookup first: a
 `verify-<app>` skill in the project's local skill folder.

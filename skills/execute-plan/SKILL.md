@@ -28,7 +28,7 @@ description: Use when carrying out an implementation plan the person has already
 - **Checks blockers before every dispatch.**
 - **A subagent that stops on a finding is done.** Fix the plan or the slice document; never re-brief it past what it found.
 
-**A brief is**: the slice document's path, the workspace, the branch and its base, the command that prepares the workspace, the pull request to open. Nothing else, and never the plan.
+**A brief is**: the slice document's path, the workspace, the branch and its base, the command that prepares the workspace, the pull request to open, the mandate's `tests`. Nothing else, and never the plan.
 
 ## Watching a subagent
 
@@ -77,6 +77,7 @@ Stop for exactly three things:
 - **A step you paused inside was too coarse.** Split it where the pause fell.
 - **A subagent's return is read, never pasted into a step**: each line of it has a home, listed in `references/tracker.md`.
 - **Overwrite the state node's fields; never append.**
+- **An amended mandate overwrites its field too**, in the plan's *Mandate* section and in the line under the tracker, as `references/orchestrator-mandate.md` says.
 - **The last step says so upward.** With a roadmap, the close says the plan finished and the roadmap may need redrawing. The person confirms the slot landed, with evidence; the plan does not.
 
 ## Anti-patterns
