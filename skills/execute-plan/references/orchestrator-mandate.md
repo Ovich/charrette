@@ -29,6 +29,18 @@ next slice is a pause.
 **Model**, when delegated (`model: opus | <other>`): the model every slice's subagent
 runs on. **Opus** (recommended).
 
+**Effort**, when delegated (`effort: low | medium | high | xhigh | max`): how hard each
+slice's subagent thinks. **low** (recommended): the design is settled, written down and
+carried whole by the slice document, so the work is reading the existing code, porting it
+faithfully and proving it ran. A slice that needs more than low is a slice whose decisions
+were left open — a finding for the plan, not a reason to raise the level.
+
+**It is not passed at dispatch.** The `Agent` call carries a model and no effort, so the
+field is carried by the subagent definition the dispatch names, `effort:` beside `model:`
+in its frontmatter (`<claude home>/agents/<name>.md`, or the project's `.claude/agents/`).
+A dispatch that names no such definition inherits the session's level, and the field is
+then the person's to set before the run.
+
 **Tests** (`tests:`): when the implementer writes the tests a slice names. The answer
 decides the instructions every slice document carries: `references/tests.md`.
 
