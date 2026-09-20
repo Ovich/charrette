@@ -54,4 +54,4 @@ flowchart TB
   class ST state
 ```
 
-mandate: run through · one for the plan · delegated · opus · tests at the slice end · verify off
+mandate: run through · one for the plan · delegated · opus · tests at the plan end · verify off

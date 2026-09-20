@@ -24,7 +24,7 @@ description: Use when carrying out an implementation plan the person has already
 ## What stays in this session
 
 - **The tracker, the briefs, the verification, the merges, the README, the plan's decisions.** A subagent never edits any of them.
-- **Verifies every return**: a tick rests on what this session re-ran: the slice's check, and the tests it owed, present and green.
+- **Verifies every return**: a tick rests on what this session re-ran: the slice's check, and the tests it owed, present and green, or under `tests: at the plan end` the proof the slice names in their place.
 - **Checks blockers before every dispatch.**
 - **A subagent that stops on a finding is done.** Fix the plan or the slice document; never re-brief it past what it found.
 

@@ -16,7 +16,7 @@ once, there, and each slice carries its part of it verbatim, narrowed to its sco
 4. **When no row is open, ask once what else this should cover.**
 5. **Discuss and decide the testing strategy**: what is tested and at which seams. When the implementer writes the tests is the mandate's.
 6. **Cut the slices** as the `write-slice` skill's `references/cutting.md` says, **and draw the tracker** to the `execute-plan` skill's `references/tracker.md`, from its `references/tracker-skeleton.md`, all read first. `aiview mermaid-check <plan>` and `aiview tracker check <plan>` after every edit.
-7. **Close the interview with the orchestrator's mandate**: the questions of the `execute-plan` skill's `references/orchestrator-mandate.md`, the answers in the plan's *Mandate* section and in the one line under the tracker.
+7. **Close the interview with the orchestrator's mandate**: the questions of the `execute-plan` skill's `references/orchestrator-mandate.md`, the answers in the plan's *Mandate* section and in the one line under the tracker. `tests: at the plan end` adds the test slice to the cut, as the `write-slice` skill's `references/cutting.md` says.
 8. **Stop and ask the person to approve the plan.** Then one slice document per slice, with `write-slice`.
 
 ## Red flags

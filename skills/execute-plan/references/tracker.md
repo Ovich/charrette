@@ -100,7 +100,7 @@ parked   <side work, stashes, environments left behind, or nothing>
 
 - **Add a field only when a resumer would act on it**: a rename, a version bump, an environment quirk.
 - **The mandate is not state**: pace, pull requests, steps, model, tests and verify live in the plan's *Mandate* section.
-- **The mandate in force is one line right under the diagram**, so the person reads how the run behaves where they read where it stands: `mandate: run through · one for the plan · delegated · opus · tests at the slice end · verify off`. An amended field carries its decision's id. `aiview tracker check` holds that the line is there.
+- **The mandate in force is one line right under the diagram**, so the person reads how the run behaves where they read where it stands: `mandate: run through · one for the plan · delegated · opus · tests at the plan end · verify off`. An amended field carries its decision's id. `aiview tracker check` holds that the line is there.
 - **A line that is history leaves the tracker**: the pull request holds it.
 
 ## Layout

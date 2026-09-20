@@ -34,11 +34,18 @@ runs on. **Opus** (recommended).
 
 **Tests** (`tests:`): when the implementer writes the tests a slice names. What is tested,
 and at which seams, is the plan's testing strategy and is not asked here. The procedure
-of each is the `execute-slice` skill's.
+of each is the `execute-slice` skill's, one reference per answer.
 
-1. **at the slice end** (recommended), the fast lane: the code first, held by the suite as it stands, then the slice's tests in one pass.
-2. **commit only at green**: test-driven, one named case at a time, a commit only when the suite is green, so a failed attempt is dropped back to the last good state. No refactor phase.
-3. **commit per phase (red/green/refactor)**: test-driven with a commit at each phase. For a run someone will audit commit by commit; the slowest.
+1. **at the plan end** (recommended), the fast lane: the slices write code only, and a last slice writes every owed test and repairs the broken ones against the code as it ended, from the cases the plan named. No test is rewritten because a later slice moved what it pinned.
+2. **at the slice end**: the code first, held by the suite as it stands, then the slice's tests in one pass.
+3. **commit only at green**: test-driven, one named case at a time, a commit only when the suite is green, so a failed attempt is dropped back to the last good state. No refactor phase.
+4. **commit per phase (red/green/refactor)**: test-driven with a commit at each phase. For a run someone will audit commit by commit; the slowest.
+
+**At the plan end holds on three rules**, the orchestrator's to keep:
+
+- **One pull request for the plan.** With one per slice it would merge untested code: refuse the pair when the mandate is asked, and say why.
+- **Every slice names a proof in place of its tests**, a story of the verify skill, a walk of the screen or a command whose output shows the behaviour, and the tick rests on this session re-running it. A slice with none is not dispatched.
+- **Every slice's step draws a dotted edge to the test slice**, `owes: its tests`, and the test slice's done-when is the full check at 0.
 
 A slice whose nature wants another rhythm names it in its heading, and the brief carries
 that one. Test && commit || revert is not offered: one typo reverts a multi-file change,

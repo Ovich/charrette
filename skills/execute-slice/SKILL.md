@@ -21,10 +21,7 @@ Each is a report, never an improvisation.
 
 ## The work
 
-- **The brief names when the tests are written**, and the slice document's own `tests:` wins over it. No rhythm named is *at the slice end*. In all three the tests are the ones the document names, at the seams it names, and the slice lands with the check at 0.
-  - ***at the slice end***: write the production code. Validate it with the project's check and the suite as it stands, adjusted only where the slice changes a shape. Then write the tests, and see each one that guards new behaviour fail once: written after the code, it has never been red.
-  - ***commit only at green***: one named case at a time: the test, its failure for the reason the case names, the code that passes it. Commit only with the suite green. An attempt that will not go green is dropped back to the last commit, never patched forward. No refactor phase: one tidy inside the module before the last commit.
-  - ***commit per phase (red/green/refactor)***: the same cycle with a commit at each phase, the failing one's message opening `[RED]`. A `[RED]` commit is pushed only with the green that follows it: alone on the branch it fails the pull request's check.
+- **The brief names when the tests are written**, and the slice document's own `tests:` wins over it; none named is *at the slice end*. Before the first line of code, read the one reference for it and no other: `references/tests-at-the-plan-end.md`, `references/tests-at-the-slice-end.md`, `references/tests-commit-only-at-green.md` or `references/tests-commit-per-phase.md`. In all four the tests are the ones the documents name, at the seams they name.
 - **Never weaken a test to make a suite green**: not loosened, not deleted, not skipped.
 - **Stay inside the acceptance criteria**; anything the document did not ask for is out of scope.
 - **Open the draft pull request the brief names on the first commit**, which is the first self-contained change, a dependency install included. Commit small, push as you go, keep its checklist current.
@@ -36,5 +33,5 @@ Each is a report, never an improvisation.
 - **What changed and where.**
 - **The check's last run**, verbatim.
 - **Each criterion with its evidence.**
-- **The rhythm followed, and each test's failure as seen**, by case.
+- **The rhythm followed**: each test's failure as seen, by case, or, at the plan end, the proof run in their place and the tests this slice broke, by name.
 - **Anything the document did not predict**, above all a blocker it failed to name.
