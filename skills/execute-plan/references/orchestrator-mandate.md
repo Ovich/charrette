@@ -9,7 +9,7 @@ plan's *Mandate* section as `field: value` lines, and into the one line under th
 
 **Autonomy** (`pace:`):
 
-1. **run through** (recommended): at each boundary the pull requests give, mark ready, merge once the check, re-run in this session, exits 0, and the verification where the mandate has one, report, continue.
+1. **run through** (recommended): at each boundary the `pull requests:` answer gives — one per slice, at every slice; one for the plan, once, at the end — mark ready, merge once the check, re-run in this session, exits 0, and the verification where the mandate has one, report, continue.
 2. **run through, the person merges**: push, mark ready, report, continue. Never merge.
 3. **stop at each slice**: finish, report, name what is next, wait. The person merges.
 
@@ -32,7 +32,7 @@ runs on. **Opus** (recommended).
 **Tests** (`tests:`): when the implementer writes the tests a slice names. The answer
 decides the instructions every slice document carries: `references/tests.md`.
 
-1. **at the plan end** (recommended), the fast lane: the slices write code only; once they are done, a last slice writes every owed test and repairs the broken ones. No test is rewritten because a later slice moved what it pinned.
+1. **at the plan end** (recommended), the fast lane: the slices write code only; once they are done, a last slice writes every owed test and repairs the broken ones. No test is rewritten because a later slice moved what it pinned. This answer costs a slice: `aiview tracker check` refuses the mandate until the tracker carries the test slice, drawn as *Choosing at the plan end* below says.
 2. **at the slice end**: the code first, then the slice's tests in one pass.
 3. **commit only at green**: test-driven, one named case at a time, a commit only when the tests at the slice's seams are green, the full check once at the slice's end. No refactor phase.
 4. **commit per phase (red/green/refactor)**: test-driven, a commit at each phase, the full check once at the slice's end. For a run audited commit by commit; the slowest.

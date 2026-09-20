@@ -4,6 +4,13 @@
 verbatim in its *Tests* section, its commands filled for the project.** Nothing else about
 tests is written anywhere else in the document.
 
+**The answer decides when the tests are written, never whether the seams are designed.**
+Under every answer the seams under test and their cases are designed when the slice
+document is written, by the `write-slice` skill, which owns them; this file owns only the
+block. A person who says tests are not planned is answering `tests`, not removing the
+seams: the fastest answer is `at the plan end`, where no slice writes a test until the
+last one.
+
 ## at the plan end
 
 Two kinds of document.
@@ -11,8 +18,8 @@ Two kinds of document.
 **Every slice that is not the test slice.** Its acceptance criteria open with the proof
 that stands in for its tests: a story of the verify skill, a walk of the screen, or a
 command with the output expected of it. No criterion says a test passes. Its check is
-format, lint and types. Its seams under test stay, every case named at planning against
-the design, headed *owed to `<the test slice's node id>`*. Test support gets no block.
+format, lint and types. Its seams under test stay, designed as the `write-slice` skill
+says and headed *owed to `<the test slice's node id>`*. Test support gets no block.
 
 ```markdown
 **Tests: at the plan end. This slice writes none; `<the test slice's node id>` writes them.**

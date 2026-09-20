@@ -15,7 +15,8 @@ One line per live subagent:
 SL6 calls=86 idle=8s | Bash:pnpm run check | S6.7: removing CDK.
 ```
 
-- **`--forbidden` is the brief's boundary as a regex**; a subagent that crosses it prints `BREACH xN`. Give it only what the brief forbids; a slice that touches nothing outward-facing needs none.
+- **`--forbidden` is the brief's boundary as a regex**; a subagent that crosses it prints `BREACH xN`. Give it only what the brief forbids; a slice that touches nothing outward-facing needs none, and none is the default.
+- **A pattern names a command, anchored on its verb, never a path or a file name.** A path is read, printed by the compiler and quoted in errors, so a pattern carrying one fires on work that stayed inside the brief; `aws[ _-]?s3|gh pr merge` is a boundary, `apps[\/]web` is a false breach waiting.
 - **A boundary belongs to a brief, not to a run**: when two slices forbid different things, invoke it once per transcript with that slice's own pattern, never a union.
 - **`--label` names each agent after its slice**, so the rows read as work rather than as hex.
 - **`--json` emits `{id, name, calls, idle, breaches, signal, last, said}`** for building the table. `signal` is `WORKING`, `STALLED` or `BREACH`, a fact about the run; whether a subagent wants steering is this session's call.
