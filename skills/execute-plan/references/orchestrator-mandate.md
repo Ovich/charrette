@@ -49,9 +49,10 @@ decides the instructions every slice document carries: `references/tests.md`.
 3. **commit only at green**: test-driven, one named case at a time, a commit only when the tests at the slice's seams are green, the full check once at the slice's end. No refactor phase.
 4. **commit per phase (red/green/refactor)**: test-driven, a commit at each phase, the full check once at the slice's end. For a run audited commit by commit; the slowest.
 
-A slice that departs from the mandate's names its own `tests:` in its heading in the plan,
-and its document carries that one. **Amended mid-run, the *Tests* section of every slice
-not yet started is rewritten**, through the `write-slice` skill, before its dispatch. Test && commit || revert is not offered: one typo reverts a
+A slice that departs from the mandate's names its own `tests:` in its heading in the plan, and
+its brief carries that one. **Amended mid-run, the next brief carries the new answer and no slice
+document is touched**: the mandate travels at dispatch (`references/brief.md`), so a slice already
+written cannot disagree with it. Test && commit || revert is not offered: one typo reverts a
 multi-file change.
 
 **Choosing at the plan end**: whoever asks the mandate does this before anything else,
@@ -60,7 +61,7 @@ multi-file change.
 
 1. **Refuse it with one pull request per slice**: tell the person the pair merges untested code, and ask for one of the two to move.
 2. **Draw the test slice in the tracker**: a subgraph titled `… · the tests`, last before the plan's `👤` checks, blocked by every other slice, its done-when the full check at 0, and a dotted edge from every other slice's last step, `owes: its tests`.
-3. **Through the `write-slice` skill, give every other slice's document its proof and its *Tests* section**, amending documents already written. The test slice gets no document yet.
+3. **Through the `write-slice` skill, give every other slice's document its proof**, amending documents already written; the testing instructions travel in each brief, not in the documents. The test slice gets no document yet.
 
 During the run:
 

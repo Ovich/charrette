@@ -1,8 +1,14 @@
 # The testing instructions a slice carries
 
-**The mandate's `tests` answer decides the block, and every slice document carries it
-verbatim in its *Tests* section, its commands filled for the project.** Nothing else about
-tests is written anywhere else in the document.
+**The mandate's `tests` answer decides the block, and the brief carries it at dispatch**, its
+commands filled for the project (`references/brief.md`). **A slice document does not carry it**,
+so a mandate amended mid-run changes the next brief and nothing else — no document is rewritten,
+and none can disagree with the plan. Nothing else about tests is written anywhere else.
+
+**The brief's `tests` line names the answer and its consequence in one sentence; the block below
+is what that sentence stands for**, and the implementer works to it through the `execute-slice`
+skill. Where a brief must be explicit — a long-running dispatch, an unattended one — the block
+goes in whole, but it is copied from here and never rewritten.
 
 **The answer decides when the tests are written, never whether the seams are designed.**
 Under every answer the seams under test and their cases are designed when the slice
@@ -20,6 +26,12 @@ that stands in for its tests: a story of the verify skill, a walk of the screen,
 command with the output expected of it. No criterion says a test passes. Its check is
 format, lint and types. Its seams under test stay, designed as the `write-slice` skill
 says and headed *owed to `<the test slice's node id>`*. Test support gets no block.
+
+**The proof is not a test, and its driver is not a test file.** A walk needs a browser driver, a
+command needs a script; both are scratch, live outside the repository, and never land in a test
+directory or under a name the suite collects. A dispatch that omits this sentence gets specs it
+did not ask for: one did, having read *"write no test, and touch none"* in the document it was
+given.
 
 ```markdown
 **Tests: at the plan end. This slice writes none; `<the test slice's node id>` writes them.**

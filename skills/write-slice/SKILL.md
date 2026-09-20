@@ -7,7 +7,7 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 **Cutting a plan's increment into slices**: read `references/cutting.md`. The rest of this skill is one slice's document.
 
-**Every document carries its testing instructions, from the mandate's `tests` or the slice's own in the plan's heading**: before writing one, read the `execute-plan` skill's `references/tests.md`. The mandate not asked yet: ask it first, with that skill's `references/orchestrator-mandate.md`.
+**No document carries the mandate.** When the tests are written is the mandate's `tests`, and it reaches the implementer through the brief at dispatch, never through this document: the `execute-plan` skill's `references/brief.md` owns that, `references/tests.md` owns what each answer asks for. So a slice document has no *Tests* section. What it does carry is the design that section used to sit beside — the seams under test and their cases, below — under every answer, and for the test slice of `tests: at the plan end`, the cases the run left owed. A document written before this rule keeps its section; where it and the brief disagree, the brief is the plan's and wins.
 
 **One document per slice, the whole context one agent needs, and the only place instructions live.**
 
@@ -38,7 +38,7 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 ## Seams under test
 
-**Agreed with the person before the work starts.** When they are written and what runs when is the document's *Tests* section. One block per seam, the fewest seams that cover the criteria, existing seams before new ones, the highest seam that still names the behaviour.
+**Agreed with the person before the work starts, and written under every `tests` answer.** When they are written and what runs when is the brief's, not this document's. One block per seam, the fewest seams that cover the criteria, existing seams before new ones, the highest seam that still names the behaviour.
 
 - **A seam block carries**: the module whose interface it is, what sits behind it and how the tests cross it (table below), the cases by name, each traced to an acceptance criterion or a branch of the flow, and what is not tested past it.
 - **One glance per seam**: the block fits a screen, the signature block stays under ten lines, the cases are a list of names, and with more than two seams the flow marks where each sits.
