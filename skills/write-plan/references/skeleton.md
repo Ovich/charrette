@@ -15,9 +15,9 @@ out, and the header says which. A small change's section is a sentence.
 > **Left out**: the sections below that do not apply
 
 ## The tracker
-The diagram, above everything else: it is what a reader opens the plan for. Drawn when the
-slices are cut; until then the heading holds one line saying so. Under it, the mandate in
-one line, once answered.
+The diagram, above everything else. Drawn when the slices are cut; until then the heading
+holds one line saying so. Under it, the mandate in one line: `mandate: not asked yet` until
+it is.
 
 # Design
 

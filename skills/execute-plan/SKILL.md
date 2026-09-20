@@ -7,7 +7,7 @@ description: Use when carrying out an implementation plan the person has already
 
 ## Before starting
 
-- **The tracker** is the plan's diagram; `references/tracker.md` is its protocol, read before the first edit of it.
+- **The tracker** is the plan's diagram; `references/tracker.md` is its protocol, read before the first edit of it. A tracker drawn anew starts from `references/tracker-skeleton.md`.
 - **Open the plan in aiview every session** and give the person the URL.
 - **Do not start** if the plan has no tracker, a slice has no slice document (the test slice of `tests: at the plan end` excepted: its document is written once the others are done), a slice document has no seams under test or no module blocks, or a slice whose check is not a command. Say so and finish the plan first.
 - **Reconcile a tracker the repository has moved past** before starting; say what you found.
@@ -28,7 +28,7 @@ description: Use when carrying out an implementation plan the person has already
 - **Checks blockers before every dispatch.**
 - **A subagent that stops on a finding is done.** Fix the plan or the slice document; never re-brief it past what it found.
 
-**A brief is**: the slice document's path, the workspace, the branch and its base, the command that prepares the workspace, the pull request to open, the mandate's `tests`. Nothing else, and never the plan.
+**A brief is**: the slice document's path, the workspace, the branch and its base, the command that prepares the workspace, the pull request to open or the open one to push to, the mandate's `tests`. Nothing else, and never the plan.
 
 ## Watching a subagent
 
@@ -53,7 +53,7 @@ Stop for exactly three things:
 
 - **A decision that is the person's.** A step that cannot be done as written, a finding that breaks a decision the plan rests on, a repair with real options, work outside the plan's scope. Back to the plan is a valid outcome: say what was learned and stop.
 - **Verification only a person can do.** A browser flow, a real sign-in, another team's approval. Do everything mechanical first.
-- **An action that leaves the machine and does not undo cheaply.** A production deploy, a migration on shared data, anything outward-facing. Approved once each, never once for all.
+- **An action that leaves the machine and does not undo cheaply.** A production deploy, a migration on shared data, anything outward-facing. Approved once each, never once for all. A merge the mandate's `pace` gives the orchestrator is approved by the mandate.
 
 **A pause is a handoff.** In this order:
 

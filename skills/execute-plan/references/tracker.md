@@ -4,7 +4,7 @@ The **tracker** is the plan's phasing diagram, and the single record of where th
 
 ## Markers
 
-- **The tracker is the first thing in the plan**, under the header and above every other section and diagram: it is what a reader opens the plan for, to see where the work stands. `aiview tracker check` holds it.
+- **The tracker is the first thing in the plan**, under the header and above every other section and diagram. `aiview tracker check` holds it.
 - **`%% tracker`** as the first line inside the fence, under `flowchart TB`, so the block names itself among the plan's diagrams.
 - **`SL<n>` as a slice's subgraph id**, matching the `S<n>.<step>` of the steps inside it (`subgraph SL3[...]` holds `S3.1`, `S3.2`), so a step pasted into the wrong slice is caught.
 
@@ -20,15 +20,15 @@ The **tracker** is the plan's phasing diagram, and the single record of where th
 
 ## The step's shape
 
-**The person reads a step to see where the run stands, and the orchestrator to decide what comes next; neither reads it to learn what was built.** Its lines are fixed: **three at most, each under 80 characters**, and `aiview tracker check` holds both.
+**A step says where the run stands and what decided it, never what was built.** Its lines are fixed: **three at most, each under 80 characters**, and `aiview tracker check` holds both.
 
 ```
 ⬜ S2.1 <what an observer of the system could tell> · <US id when it is a story's criterion>
 done when: <the command that exits 0, or what is observed>
 ```
 
-- **The first line names what an observer of the system could tell**: a behaviour gained or, for a rework, the structure reached and the invariant held (`the hand-written loop is gone, every walk unchanged`). No identifier from the code: it is renamed before the plan ends, and the slice document holds it.
-- **The second line is the verdict, and the glyph names it.** It says what made the orchestrator go on, pause or drop the step, in one line:
+- **The first line names what an observer of the system could tell**: a behaviour gained or, for a rework, the structure reached and the invariant held (`the hand-written loop is gone, every walk unchanged`). No identifier from the code.
+- **The second line is the verdict, and the glyph names it**: what made the orchestrator go on, pause or drop the step.
 
 | Glyph | Second line |
 |---|---|
@@ -39,7 +39,7 @@ done when: <the command that exits 0, or what is observed>
 
 - **`here` is this session's own observation**, never what the subagent reported: `went on: suite and e2e green here · a1b2c3d · #41`. Another observer is named: `went on: the person's word, 2026-01-01`.
 - **`went on` names the result, never its numbers**: test counts, greps and file names are the pull request's.
-- **A last line, `run:`, only when the orchestrator changed the route**: a steer, a fix of its own, a retry, a slice drawn mid-run (`run: steered a rename after lint refused it`). One event, the one a reader would ask about.
+- **A last line, `run:`, only when the orchestrator changed the route**: a steer, a fix of its own, a retry, a slice drawn mid-run (`run: steered a rename after lint refused it`). One event.
 - **Everything else has a home, and the step never cites it:**
 
 | What | Its home |
@@ -83,7 +83,7 @@ The `roadmap` skill draws its tracker to this protocol with one difference: **th
 - ✅ landed, on the person's evidence that the feature is delivered and working.
 - ✖ dropped, with the reason.
 
-The state node's fields are the iteration, the slot in progress, next, blocked, and the foundation rows still open for the slot ahead.
+The state node's fields are the iteration, the slot in progress, next, blocked, and the foundation rows still open for the slot ahead. A slot's node has no verdict line and a roadmap no mandate line: the step's shape and `aiview tracker check` are a plan's.
 
 ## The state node
 
@@ -100,7 +100,7 @@ parked   <side work, stashes, environments left behind, or nothing>
 
 - **Add a field only when a resumer would act on it**: a rename, a version bump, an environment quirk.
 - **The mandate is not state**: pace, pull requests, steps, model, tests and verify live in the plan's *Mandate* section.
-- **The mandate in force is one line right under the diagram**, so the person reads how the run behaves where they read where it stands: `mandate: run through · one for the plan · delegated · opus · tests at the plan end · verify off`. An amended field carries its decision's id. `aiview tracker check` holds that the line is there.
+- **The mandate in force is one line right under the diagram**: `mandate: run through · one for the plan · delegated · opus · tests at the plan end · verify off`. `mandate: not asked yet` until it is. An amended field carries its decision's id. `aiview tracker check` holds that the line is there.
 - **A line that is history leaves the tracker**: the pull request holds it.
 
 ## Layout

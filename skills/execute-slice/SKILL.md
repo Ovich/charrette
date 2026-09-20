@@ -24,7 +24,7 @@ Each is a report, never an improvisation.
 - **The brief names when the tests are written**, and the slice document's own `tests:` wins over it; none named is *at the slice end*. Before the first line of code, read the one reference for it and no other: `references/tests-at-the-plan-end.md`, `references/tests-at-the-slice-end.md`, `references/tests-commit-only-at-green.md` or `references/tests-commit-per-phase.md`. In all four the tests are the ones the documents name, at the seams they name.
 - **Never weaken a test to make a suite green**: not loosened, not deleted, not skipped.
 - **Stay inside the acceptance criteria**; anything the document did not ask for is out of scope.
-- **Open the draft pull request the brief names on the first commit**, which is the first self-contained change, a dependency install included. Commit small, push as you go, keep its checklist current.
+- **Open the draft pull request the brief names on the first commit**, which is the first self-contained change, a dependency install included; push to it when the brief says it is open. Commit small, push as you go, keep its checklist current.
 - **Tick each criterion in the slice document as its evidence lands.** The document is yours to edit; the plan is not.
 
 ## The return

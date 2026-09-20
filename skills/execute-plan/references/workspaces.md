@@ -15,6 +15,6 @@ A **workspace** is one slice's isolated checkout.
 ## Joining
 
 - **A merge conflict means the fork was wrong.** Report both sides and redraw it.
-- **Removing each workspace and its branch is a step of the join.** A removal that fails is reported, never skipped; an orphaned workspace still holds a branch.
+- **Removing each workspace is a step of the join; its branch stays**, as every branch does. A removal that fails is reported, never skipped.
 - **Remove it from the main checkout, never from inside it**; Windows refuses to delete any process's working directory, and a shell that ran anything in there is that process.
 - **Check that the path is gone, not that `git worktree list` is short**; a failed removal can unregister the worktree and leave the directory holding the branch.

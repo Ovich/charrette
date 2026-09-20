@@ -1,9 +1,8 @@
 # The tracker's skeleton
 
-Copy the block, replace every phrase, delete what the plan has no use for. The caption
-line above the fence stays: `aiview mermaid-check` warns without one. So does the mandate
-line under it: `aiview tracker check` holds it. The skeleton runs `tests: at the plan end`,
-so it carries the test slice and the edges that owe it; under another answer both go.
+Copy the block, replace every phrase, delete what the plan has no use for. Keep the caption
+line above the fence and the mandate line under it. Under a `tests:` other than *at the
+plan end*, delete the test slice and the dotted edges that owe it.
 
 Phasing diagram: the slices, the fork, and what each step has to show before the next begins.
 

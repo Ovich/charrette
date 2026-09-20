@@ -1,6 +1,6 @@
 ---
 name: interview
-description: Use when a person asks to be interviewed about an idea or an existing design document (a board, a plan, a change) until it is understood the same way by them and the agent, or when another skill needs open decisions resolved one by one. Runs in chat and leaves the resolved decisions there, for the caller to write where they belong. Keeping the discussion as a document is brainstorm's, turning it into a plan is write-plan's.
+description: Use when a person says "interview me" or asks to be interviewed about an idea or an existing design document (a board, a plan, a change) until it is understood the same way by them and the agent, or when another skill needs open decisions resolved one by one. Runs in chat and leaves the resolved decisions there, for the caller to write where they belong. Keeping the discussion as a document is brainstorm's, turning it into a plan is write-plan's.
 ---
 
 # Interview
