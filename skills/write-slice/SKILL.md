@@ -90,7 +90,8 @@ expected exit code wherever one exists.
   then the decisions this document could not take, numbered, for the person.
 - *What exists already* that this work builds on.
 
-**What is already known, so the slice does not rediscover it.** The environment facts a
+**What is already known, so the slice does not rediscover it.** The command that runs one
+test file, and the one that runs one end-to-end spec. The environment facts a
 first command trips on: versions, what must be running, which credentials and how they
 expire, what is deployed and what that proves. Anything tried and abandoned, with why.
 
