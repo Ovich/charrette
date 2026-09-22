@@ -10,6 +10,11 @@ the object the same way, and every decision is agreed or deferred. Until then, k
 
 The object is a tree of decisions. Each is answered by what can be read or by the person.
 
+**Throw ideas in as you go.** An option the person did not list, a consequence they did not
+name, a neighbouring decision the conversation points at: one line, marked as yours, beside
+the question it belongs to. The interview draws the person out; it also gives them something
+to push against.
+
 **Research every decision that rests on a claim about the world**: a tool exists, it works
 with our versions, the industry does it this way. Read the official source, the
 specification, the package as published, its types and its changelog, and how reputable
