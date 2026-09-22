@@ -7,6 +7,7 @@ description: Use when carrying out an implementation plan the person has already
 
 ## Before starting
 
+- **Four references are read at their moment, not skipped**: `references/tracker.md` before the first tracker edit, `references/brief.md` and `references/watching.md` before the first dispatch, `references/workspaces.md` before the first fork. The signs a read was skipped: a tracker line longer than its protocol allows, a brief that paraphrases a required sentence, a watch that polls commits instead of running the digest.
 - **The tracker** is the plan's diagram; `references/tracker.md` is its protocol, read before the first edit of it. A tracker drawn anew starts from `references/tracker-skeleton.md`.
 - **Open the plan in aiview every session** and give the person the URL.
 - **Do not start** if the plan has no tracker, a slice has no slice document (the test slice of `tests: at the plan end` excepted: its document is written once the others are done), a slice document has no seams under test or no module blocks, or a slice whose check is not a command. Say so and finish the plan first.
