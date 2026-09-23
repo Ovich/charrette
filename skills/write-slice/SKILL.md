@@ -23,6 +23,7 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 - **Signatures as code, bodies never**: a block in the project's language, the exports with their types. Before the first block, read `references/examples.md`: one block per state and per kind of seam.
 - **An agreed `module` document (`deepen-module`) is quoted word for word.**
+- **Every new or changed entry, deep or a building block, is held to the checklist item on entries in the `code-design-review` skill**: callers bound by different rules get an entry each.
 - **A test's fixture is a module too**, in the tests' support folder behind one small interface.
 - **One block per module the slice touches, test support included, each from the plan under the plan's name for it.** A module the slice only calls gets no block. A module the plan does not name, or names under a state that cannot be its, is a finding for the plan, never a block invented here; the document lists the gap.
 - **The decisions table is the authority** when the plan carries one module under two states.

@@ -183,6 +183,13 @@ Source: `https://blog.cleancoder.com/uncle-bob/2020/10/18/Solid-Relevance.html` 
   the interface telling you it's too fat.
 - **A "god" interface** aggregating unrelated capabilities so callers can reach
   everything from one handle.
+- **An entry that does not say which case its caller is in**: callers bound by
+  different rules share one surface, and an option or a flag picks the mode, so
+  neither the import nor the call tells a reader which rules apply. Give each case its
+  own entry, named for it, with the stricter case's rules in its signature (a
+  parameter required, a parameter absent), and a shared core behind them that callers
+  cannot import. Split by the caller's rules, never by the data's shape: two callers
+  can receive the same format under different rules.
 
 **Counterweight: one interface per method is its own disease.** Split along the lines
 real consumers actually use; if every implementor implements the whole thing and every

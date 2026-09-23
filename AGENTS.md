@@ -35,6 +35,8 @@ file the person was looking for. Refresh the cache with
 
 4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute-plan/references/tracker.md`; diagram discipline is `skills/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/aiview/`.
 
+8. **MUST write a skill, its examples included, only in terms every project has, never a file, module or name from the project the change came from.** A skill loads in every project; a foreign name reads as a fact about the current codebase, and the agent looks for it. Abstract the case to the rule it taught, and the counterweight it needed.
+
 ## aiview
 
 5. **MUST bundle a new runtime dependency into `dist-cli/` through `skills/aiview/build.mjs`, never require `node_modules` at runtime.** An installed plugin has no `node_modules`; a bare import fails only for users. `parse5` and `mermaid` are bundled this way, the checker as its own bundle.

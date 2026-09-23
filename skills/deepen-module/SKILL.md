@@ -7,6 +7,8 @@ description: Use when a person asks to design a new module's interface or to rew
 
 **The goal is to hide accidental complexity**: the codebase knows the module's entry and nothing behind it, as if it were a package that has not been published.
 
+**A building block is not a deep module**: a module other modules are built from, one job, several callers, no module document of its own. It still has an entry, held to the same checklist item on entries in the `code-design-review` skill.
+
 **One `module` document per module, written from the first finding, never in chat.** Through the `aiview` skill: kind `module`, file `YYYY-MM-DD-<module>.module.md`, tags = project + module name, in the plan's group when a plan waits on it. Each stage below writes its sections into it.
 
 ## Discover
@@ -18,7 +20,7 @@ description: Use when a person asks to design a new module's interface or to rew
 **Sections in this order, each marked provisional where an open decision could change it.**
 
 1. **Usage**: the complete code a caller writes to use the module; for a component, its tag with its inputs and outputs. It carries the caller's intent and no accidental complexity: no wiring, ordering, configuration or knowledge of internals.
-2. **The entry**: one logical public entry point: a file, a component, a factory or a package entry. All public access goes through it, its surface stays cohesive, and it is written as signatures without bodies.
+2. **The entry**: one logical public entry point per case the callers are in: a file, a component, a factory or a package entry. Callers bound by different rules get an entry each, named for their case, over a core they cannot import. All public access goes through an entry, each surface stays cohesive, and each is written as signatures without bodies.
 3. **Outside**: what stays in the project: its data, and the one binding that passes the project's names to the module.
 4. **The conditions**, each marked held or broken today:
    - all access to the module goes through the entry
@@ -46,4 +48,5 @@ description: Use when a person asks to design a new module's interface or to rew
 | Thought | Reality |
 |---|---|
 | "I'll add an option for that" | An option nobody passes is surface. |
+| "One entry, an option picks the mode" | Neither the import nor the call says which rules apply. One entry per case. |
 | "Callers may need this helper" | Name the caller. One that exists only in the tests is served by the entry. |
