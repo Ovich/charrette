@@ -1,9 +1,9 @@
 ---
-name: cyclomatic-complexity-rework
-description: "Use when branch-heavy code is to be audited or reworked: long if/else or switch chains, cascades of type checks or parse attempts, kind fields compared to strings, flag parameters, deep nesting. Also for complexity guardrails, or one long conditional function pasted. Produces a ranked audit of families, one family reworked behind characterization tests, or the guardrails."
+name: complexity-rework
+description: "Use when code is hard to follow and is to be audited or reworked: long if/else or switch chains, cascades of type checks or parse attempts, kind fields compared to strings, flag parameters, deep nesting, a function hard to read. Also for complexity guardrails, or one long conditional function pasted. Produces a ranked audit of families, one family reworked behind characterization tests, or the guardrails."
 ---
 
-# Cyclomatic complexity rework
+# Complexity rework
 
 **Branching is the symptom; the cause is usually late typing.** Data enters typed by a schema and is handled as a bag, so every consumer rediscovers its shape by trying parsers and comparing strings. Look for that before splitting a function, and look for a domain rule before touching anything: ifs over values are the domain, and "reviewed, left alone" is a result.
 

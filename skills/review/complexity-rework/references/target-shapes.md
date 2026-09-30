@@ -1,6 +1,6 @@
 # Target shapes
 
-Language-neutral. `languages.md` for the idiomatic form.
+Language-neutral. `languages.md` for the idiomatic form. A function over its band on paths (cyclomatic) usually takes A to F; one over on reading load (cognitive) only takes G first, then whatever its branches need.
 
 ## A. Closed set of variants: sum type, exhaustive matching
 
