@@ -15,5 +15,14 @@
     "specs",
     "pr-review",
     "technical-writing"
+  ],
+  "skills": [
+    "./skills/project",
+    "./skills/architecture",
+    "./skills/ui",
+    "./skills/plan",
+    "./skills/execute",
+    "./skills/verify",
+    "./skills/review"
   ]
 }

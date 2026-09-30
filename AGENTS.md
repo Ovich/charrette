@@ -4,18 +4,23 @@ Conventions of the charrette repository: the decisions a fresh agent would other
 guess differently. A rule may be deviated from at a specific site with a comment
 beginning `AGENTS EXCEPTION (rule N):` and the reason; without one, deviation is a
 review finding. When a decision made during a session would pass the five filters of
-the `project-conventions` skill (contested, recurring, consequential, checkable, not
+the `write-conventions` skill (contested, recurring, consequential, checkable, not
 tool-enforceable), say so in chat before the session ends and propose the rule, in
 that skill's shape; it is written here only on the person's yes.
 
 ## Architecture (context you must not break)
 
-Every skill is one flat folder, `skills/<name>/`, opening on a `SKILL.md`; supporting
-files sit beside it, situational ones under `references/`. aiview, `skills/aiview/`,
-is the one tool: a CLI, a server and a UI, shipped as versioned bundles so an install
-never builds. What runs for a user is the plugin cache, not this checkout; a change
-reaches anyone only through a release (`RELEASING.md`). Documents the skills produce
-live in the data home, never here.
+Every skill is one folder under `skills/`, opening on a `SKILL.md`; supporting files
+sit beside it, situational ones under `references/`. `project/` holds what a project
+has once and keeps, `verify/` its verification skill; the loop's phases group the rest,
+`architecture/`, `ui/`, `plan/`, `execute/`, `review/`; `interview/` and `whiteboard-defense/` sit at the root, as does
+aiview, `skills/aiview/`, the one tool: a CLI, a server and a UI, shipped as versioned
+bundles so an install never builds. The plugin sees a group only through the `skills`
+list in `.claude-plugin/plugin.json`: the default scan reads one level under `skills/`,
+so a group left off the list ships none of its skills, and `claude plugin validate`
+passes all the same. What runs for a user is the plugin cache, not this checkout; a
+change reaches anyone only through a release (`RELEASING.md`). Documents the skills
+produce live in the data home, never here.
 
 **This checkout is the only place this repository is edited.** The plugin cache under
 `<claude home>/plugins/marketplaces/charrette` is a clone of the same remote, with the
@@ -29,11 +34,11 @@ file the person was looking for. Refresh the cache with
 
 1. **MUST reference another skill by its name alone, the `<name>` skill.** The harness resolves a skill by name wherever it is installed; a path, relative or absolute, breaks on the next layout and is paid for at every load. A file inside another skill is named as that skill's `references/<topic>.md` or `scripts/<name>`.
 
-2. **MUST keep in `SKILL.md` only what every use of the skill needs, and put what one situation needs in `references/<topic>.md`, named in `SKILL.md` at the point where the situation arises, with the condition to read it stated there.** Everything in `SKILL.md` is paid for at every load, and a condition written inside a reference is read only by an agent that has already opened it. `skills/aiview/references/`, `skills/execute-plan/references/`, `skills/frontend-design/references/`.
+2. **MUST keep in `SKILL.md` only what every use of the skill needs, and put what one situation needs in `references/<topic>.md`, named in `SKILL.md` at the point where the situation arises, with the condition to read it stated there.** Everything in `SKILL.md` is paid for at every load, and a condition written inside a reference is read only by an agent that has already opened it. `skills/aiview/references/`, `skills/execute/execute-plan/references/`, `skills/ui/design-prototype/references/`.
 
 3. **MUST write a description as the trigger and nothing else: what activates the skill, what it produces, what it excludes.** Method, mechanics and instructions to a loaded agent belong in the body, and the body carries no "when to use" section of its own. The router reads only the description; the agent reads the body only after.
 
-4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute-plan/references/tracker.md`; diagram discipline is `skills/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/aiview/`.
+4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute/execute-plan/references/tracker.md`; diagram discipline is `skills/architecture/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/aiview/`.
 
 8. **MUST write a skill, its examples included, only in terms every project has, never a file, module or name from the project the change came from.** A skill loads in every project; a foreign name reads as a fact about the current codebase, and the agent looks for it. Abstract the case to the rule it taught, and the counterweight it needed.
 

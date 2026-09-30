@@ -18,7 +18,7 @@ bound from another mockup in indigo, "pulled", with its source and component on 
 and a click opening that source at that component, every component the mockup offers
 in green, "offered", and the rest of the page receding under a veil. In Composition
 the page takes no mouse: it is looked at, not operated. *Variant*: the variants and
-actions the mockup declares in its `MockupBar` (the `frontend-design` skill), mirrored
+actions the mockup declares in its `MockupBar` (the `design-prototype` skill), mirrored
 here; the in-page bar is hidden, the chosen variant persists across reloads.
 
 **Pointing.** When the agent points at components of a mockup (`show`), the tab goes to
