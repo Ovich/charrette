@@ -12,7 +12,7 @@ Agent skills that settle what gets built before code is written. They sharpen th
 
 Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Charrette brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
 
-Twenty-one skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
+Twenty-two skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
 
 ## The loop
 
@@ -96,32 +96,75 @@ Then ask in plain language. Each skill states when it applies and maps your requ
 
 ## Skills
 
-In the order work usually happens:
+By group, in the order work usually happens. The folder under `skills/` is the group.
+
+### Project: what a project has once and keeps
 
 | Skill | Use case | Example ask |
 |---|---|---|
 | [roadmap](skills/project/roadmap/SKILL.md) | A project has to be declared above its pieces of work, from nothing or from the boards and mockups already made, or a slot has landed and the picture must be redrawn | *"Declare the roadmap for this project."* Everything that exists read first, the missing slots named (accounts, the repository, the foundation), iterations of deliverable slots drafted with a recommendation in every open place, then an interview on the draft. The foundation reference beside it holds the stack, the database, the API, the hosting, each row closed no later than the first slot that needs it. |
-| [brainstorm](skills/architecture/brainstorm/SKILL.md) | An idea is worth thinking through and keeping, before a plan or without one | *"Run brainstorm: should we move the agent onto LangGraph?"* The interview, kept on a live board with its diagrams and what was investigated. A plan can start from it and does not need it. |
+| [write-conventions](skills/project/write-conventions/SKILL.md) | A decision was just made, or a repo's unwritten rules need writing down | *"We just settled on soft deletes everywhere: capture that."* Or: *"Harvest this repo's conventions into AGENTS.md."* |
+| [technical-writing](skills/project/technical-writing/SKILL.md) | A document that stays in the repository: a README, an architecture doc, an ADR, a runbook | *"Write an architecture doc of the payments service, audience: new backend hires."* |
+
+### Thinking it through
+
+| Skill | Use case | Example ask |
+|---|---|---|
 | [interview](skills/interview/SKILL.md) | A design object has decisions nobody has resolved, or you want to be questioned about one until it is understood the same way | *"Interview me about this plan."* Decisions walked in dependency order, the codebase read before you are asked, a recommendation on every question. Every claim about a tool or a practice is researched from its sources; very small proofs of concept with the libraries, when you say yes to them. |
 | [whiteboard-defense](skills/whiteboard-defense/SKILL.md) | A system has shipped and you want to be able to explain and defend it to anyone who pulls you aside | *"Whiteboard me on the sync engine."* Hard questions on the system and on its stack, one at a time, open-book: you go read, come back, get pushed. A defense report with the gaps, the reading that closes them, the decisions an agent made without you, and the architecture leads the questions turned up. |
-| [write-plan](skills/plan/write-plan/SKILL.md) | Something non-trivial is about to be built and its plan has to be written | *"Write the plan for per-user rate limiting."* One document, written while interviewing: why, before and after, the deep modules, the flows, the failure modes, the suite, the slices with their tracker, and the mandate you give the orchestrator. No code until it is approved. |
+
+### Architecture
+
+| Skill | Use case | Example ask |
+|---|---|---|
+| [brainstorm](skills/architecture/brainstorm/SKILL.md) | An idea is worth thinking through and keeping, before a plan or without one | *"Run brainstorm: should we move the agent onto LangGraph?"* The interview, kept on a live board with its diagrams and what was investigated. A plan can start from it and does not need it. |
 | [deepen-module](skills/architecture/deepen-module/SKILL.md) | A module's interface has to be designed or reworked so that it hides much behind little | *"Deepen the agent module."* The code a caller writes to use it, the one entry as signatures, what stays outside, the gap from today, discussed until agreed. write-plan shapes its major areas this way. |
-| [write-slice](skills/plan/write-slice/SKILL.md) | A plan's increment has to be cut into slices, or a slice of an approved plan needs the document an agent will carry it out from | *"Write the slice document for SL3."* One plan node in, its document out: the decisions quoted, the modules table its tests are written against, the environment facts the first command trips on. |
-| [execute-plan](skills/execute/execute-plan/SKILL.md) | An approved plan is ready, or was left mid-way by an earlier session | *"Execute the rate-limiting plan."* Delegates each slice to a fresh agent, keeps the tracker, merges. Pauses only for your decisions, your checks, or an action that does not undo. Refuses a plan with no tracker. |
-| [execute-slice](skills/execute/execute-slice/SKILL.md) | One slice document is handed to an agent to carry out | *"Do slice 2."* Checks the blockers first and stops if any is unmet, writes the code and the tests as the document's Tests section says, which carries the mandate's answer in full: at the plan end in a last test slice (the fast lane, recommended), at the slice end, commit only at green, or commit per phase, returns the branch and the run as evidence. |
-| [verification-skill-create](skills/verify/verification-skill-create/SKILL.md) | A project's user stories should be shown to work end to end, through the interface their consumer uses, and it has no verification skill yet | *"Create the verification skill for this app."* The consumer, the interface and the harness read from the repository, a project-local `verify-<app>` skill written, the feature map drawn in aiview, one story proven. execute-plan offers it when a plan starts. |
-| [verification-skill-maintain](skills/verify/verification-skill-maintain/SKILL.md) | The application changed and its verify skill or feature map must follow, from a slice, a commit range or a date | *"Maintain the verification skill since the last slice."* Only what the diff moved is changed, the affected stories re-proven. execute-plan runs it once, at the slot's end. |
 | [write-diagrams](skills/architecture/write-diagrams/SKILL.md) | A design question would settle faster drawn than argued | *"Draw today's login flow: I need to see where the redirect happens."* |
+
+### UI
+
+| Skill | Use case | Example ask |
+|---|---|---|
 | [design-prototype](skills/ui/design-prototype/SKILL.md) | A screen is about to be built or visually reworked | *"Before we code the settings page, propose a mockup."* Design language extracted once, every screen approved in the viewer, code after. |
 | [point-at](skills/ui/point-at/SKILL.md) | The agent is about to ask you about a screen, or you do not see what it means | *"Show me what you mean."* Finds the screen's mockup, asks in the mockup's own component names, and points your open viewer at them: the tab moves there, the components are outlined and named, the rest dimmed. Called by the skills that ask questions. |
-| [technical-writing](skills/project/technical-writing/SKILL.md) | A document that stays in the repository: a README, an architecture doc, an ADR, a runbook | *"Write an architecture doc of the payments service, audience: new backend hires."* |
-| [write-conventions](skills/project/write-conventions/SKILL.md) | A decision was just made, or a repo's unwritten rules need writing down | *"We just settled on soft deletes everywhere: capture that."* Or: *"Harvest this repo's conventions into AGENTS.md."* |
+
+### Plan
+
+| Skill | Use case | Example ask |
+|---|---|---|
+| [write-plan](skills/plan/write-plan/SKILL.md) | Something non-trivial is about to be built and its plan has to be written | *"Write the plan for per-user rate limiting."* One document, written while interviewing: why, before and after, the deep modules, the flows, the failure modes, the suite, the slices with their tracker, and the mandate you give the orchestrator. No code until it is approved. |
+| [write-slice](skills/plan/write-slice/SKILL.md) | A plan's increment has to be cut into slices, or a slice of an approved plan needs the document an agent will carry it out from | *"Write the slice document for SL3."* One plan node in, its document out: the decisions quoted, the seams under test, the modules table its tests are written against, the environment facts the first command trips on. |
+
+### Execute
+
+| Skill | Use case | Example ask |
+|---|---|---|
+| [execute-plan](skills/execute/execute-plan/SKILL.md) | An approved plan is ready, or was left mid-way by an earlier session | *"Execute the rate-limiting plan."* Delegates each slice to a fresh agent, watches it, re-runs each slice's check itself, keeps the tracker, merges as the mandate says. Pull requests open as drafts and are marked ready only at the merge. Pauses only for your decisions, your checks, or an action that does not undo. Refuses a plan with no tracker. |
+| [execute-slice](skills/execute/execute-slice/SKILL.md) | One slice document is handed to an agent to carry out | *"Do slice 2."* Checks the blockers first and stops if any is unmet, writes the code and its tests when the mandate in its brief says (at the plan end, at the slice end, commit only at green, or commit per phase), returns the branch and the run as evidence. |
+
+### Verify
+
+| Skill | Use case | Example ask |
+|---|---|---|
+| [verification-skill-create](skills/verify/verification-skill-create/SKILL.md) | A project's user stories should be shown to work end to end, through the interface their consumer uses, and it has no verification skill yet | *"Create the verification skill for this app."* The consumer, the interface and the harness read from the repository, a project-local `verify-<app>` skill written, the feature map drawn in aiview, one story proven. execute-plan offers it when a plan starts. |
+| [verification-skill-maintain](skills/verify/verification-skill-maintain/SKILL.md) | The application changed and its verify skill or feature map must follow, from a slice, a commit range or a date | *"Maintain the verification skill since the last slice."* Only what the diff moved is changed, the affected stories re-proven. execute-plan runs it once, at the slot's end. |
+
+### Review
+
+| Skill | Use case | Example ask |
+|---|---|---|
 | [pr-review](skills/review/pr-review/SKILL.md) | A pull request needs an informed merge decision | *"Run pr-review on PR #142."* Five layers, each its own subagent, dispatched where the diff gives them material. Two documents: the analysis, and a report with what changed (drawn), a verdict per layer, what you must decide, and a comment to post as-is. |
-| [recurring-review-findings](skills/review/recurring-review-findings/SKILL.md) | The same remark keeps coming back in the pull request reviews | *"What do my reviews keep catching, and how do we stop catching it?"* The comment history read, grouped into findings by the person's words, each tried against a ladder: impossible by design, a lint or type rule, a test in CI, a convention, a sentence in the skill that produced the code. A report with the artefact drafted per finding, applied on a yes. |
-| [prompt-review](skills/review/prompt-review/SKILL.md) | A model call or an agentic walk has to be judged from what the model was actually sent and what it returned | *"Review the offer assistant's last walk."* One page: the prompt, tools and data as sent, the reply as returned, and the prompt's own rules as checks with their hits. A failed check changes the prompt or the data, and the run is recorded again. |
 | [code-design-review](skills/review/code-design-review/SKILL.md) | Design quality on code that is not in a PR, any language | *"Code-design-review the billing module."* DRY, KISS, YAGNI, SOLID, cohesion, coupling. Inside a PR these lenses are pr-review's. |
+| [complexity-rework](skills/review/complexity-rework/SKILL.md) | Code is hard to follow: long condition chains, parse attempts tried one after another, deep nesting, a function doing several jobs, or complexity guardrails wanted | *"Audit where this codebase is complex, then rework the worst family."* Two measures in three bands (cyclomatic paths 1 to 6, 7 to 10, 11+; cognitive reading load 0 to 10, 11 to 15, 16+). An audit of families ranked by the data they branch on, the types that already exist named first; each family's behaviour pinned by tests before any code moves, then reworked with the tests unchanged; a gate against a baseline that only shrinks. |
 | [frontend-review](skills/review/frontend-review/SKILL.md) | React/TSX quality | *"Run frontend-review on src/features/checkout."* Findings in chat for a diff, an aiview report for a whole scope. |
-| [aiview](skills/aiview/SKILL.md) | The companion app: a viewer at `localhost:4321` and an index, driven by the agent from a CLI. Called by the other skills; directly, to show a document or query the index | *"Open docs/notes/cache-idea.md in aiview, tagged payments."* |
+| [prompt-review](skills/review/prompt-review/SKILL.md) | A model call or an agentic walk has to be judged from what the model was actually sent and what it returned | *"Review the offer assistant's last walk."* One page: the prompt, tools and data as sent, the reply as returned, and the prompt's own rules as checks with their hits. A failed check changes the prompt or the data, and the run is recorded again. |
+| [recurring-review-findings](skills/review/recurring-review-findings/SKILL.md) | The same remark keeps coming back in the pull request reviews | *"What do my reviews keep catching, and how do we stop catching it?"* The comment history read, grouped into findings by the person's words, each tried against a ladder: impossible by design, a lint or type rule, a test in CI, a convention, a sentence in the skill that produced the code. A report with the artefact drafted per finding, applied on a yes. |
+
+### The companion app
+
+| Skill | Use case | Example ask |
+|---|---|---|
+| [aiview](skills/aiview/SKILL.md) | A viewer at `localhost:4321` and an index, driven by the agent from a CLI. Called by the other skills; directly, to show a document or query the index | *"Open docs/notes/cache-idea.md in aiview, tagged payments."* |
 
 `write-diagrams`, `interview`, the tracker protocol in `execute-plan` and the companion app are the shared layer the others delegate to. `roadmap` sits above the loop: it names the next slot, and a board, a plan or a run finishing tells it to redraw. House rules in `AGENTS.md` win over general principles wherever the two disagree.
 
