@@ -1,5 +1,12 @@
 # The testing instructions a slice carries
 
+## Contents
+
+- at the plan end
+- at the slice end
+- commit only at green
+- commit per phase (red/green/refactor)
+
 **The mandate's `tests` answer decides the block, and the brief carries it at dispatch**, its
 commands filled for the project (`references/brief.md`). **A slice document does not carry it**,
 so a mandate amended mid-run changes the next brief and nothing else — no document is rewritten,

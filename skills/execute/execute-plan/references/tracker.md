@@ -1,5 +1,19 @@
 # The tracker
 
+## Contents
+
+- Markers
+- Slices and steps
+- The step's shape
+- Status
+- Forks
+- Slots
+- The state node
+- Layout
+- Styling
+- The skeleton
+- Checks
+
 The **tracker** is the plan's phasing diagram, and the single record of where the work stands.
 
 ## Markers

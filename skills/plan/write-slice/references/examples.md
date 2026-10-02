@@ -1,5 +1,22 @@
 # Blocks, one per concern
 
+## Contents
+
+- Module blocks, by state
+  - new
+  - deepened
+  - interface change
+  - wiring
+  - ui
+  - ui, a component tree
+  - schema
+- Seam blocks, by what sits behind them
+  - in-process
+  - a local stand-in
+  - our own service across a network
+  - a screen
+  - a third party
+
 Each block below is the whole of what a slice document carries for that concern: shallow
 code for the contract, a line each for what the code cannot say, nothing a body would
 say. The names are one project's; the shape is every project's.

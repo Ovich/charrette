@@ -1,5 +1,17 @@
 # Decision points: Angular
 
+## Contents
+
+- A. Reactivity
+- B. State and data flow
+- C. Templates and components
+- D. Forms
+- E. Dependency injection
+- F. Change detection and rendering
+- G. Routing
+- H. Testing
+- Using this catalogue
+
 The questions Angular forces inside the frontend tier, one level below
 this skill's `decision-points.md`. Same contract: a catalogue of **questions, not rules**. A
 project's answers go in that project's conventions file, in Angular's own vocabulary.
