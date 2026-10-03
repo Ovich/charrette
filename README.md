@@ -40,14 +40,6 @@ The thing to avoid is big design up front: an agent loves writing plans, embelli
 
 Above the iterations sits the roadmap, one document per project kept by the `roadmap` skill: the iterations in order, each made of slots, a slot being something the customer can use or a system that can be deployed. Each slot points at the boards, mockups and plans that exist for it, its state derived from them, and the foundation reference beside it records the technology decisions, closed no later than the first slot that needs them. Only the next iteration is drawn precisely: a slot is split when the work reaches it, and the roadmap is redrawn when a slot lands.
 
-## Workbenches: tools out of the work
-
-Some work is done by hand with an agent before anyone thinks of a tool for it: walking an agent's calls one by one, putting model answers side by side, measuring an output against the template it must fit. A session like that ends with a way of working, scripts written on the way and a page that showed what mattered, and the next session starts from nothing.
-
-`create-workbench` turns that into a tool. The best moment to run it is at the end of the session that did the work, with the agent that did it: the sources, the shape of the data and what the person kept looking at are all in its context, so the definition is mostly already answered and the interview confirms it instead of discovering it. A workbench defined cold, from a description, guesses the very things that session learned.
-
-What it leaves is a page in aiview of kind `workbench`, fed with the project's data exactly as the project produces it, and a `workbench-<bench>` skill in the project holding the feed, the scripts and the steps to operate it. The next session, and the next agent, start from that skill, and it tells them to adapt the bench when the project's data moves on.
-
 ## What it looks like
 
 The first two are from one real piece of work: the redesign of this collection's own `pr-review` skill into layers. The viewer follows the OS theme.
@@ -83,6 +75,14 @@ A component is drawn once and bound by every screen that needs it. The cart page
 The parts sheet in the same view, one outline per exposed component:
 
 ![aiview: the parts sheet in Composition view, the product card outlined in green and labelled "ProductCard · offered"](assets/aiview-mockup-parts.png)
+
+## Beyond the loop: workbenches
+
+Some work is done by hand with an agent before anyone thinks of a tool for it: walking an agent's calls one by one, putting model answers side by side, measuring an output against the template it must fit. A session like that ends with a way of working, scripts written on the way and a page that showed what mattered, and the next session starts from nothing.
+
+`create-workbench` turns that into a tool. The best moment to run it is at the end of the session that did the work, with the agent that did it: the sources, the shape of the data and what the person kept looking at are all in its context, so the definition is mostly already answered and the interview confirms it instead of discovering it. A workbench defined cold, from a description, guesses the very things that session learned.
+
+What it leaves is a page in aiview of kind `workbench`, fed with the project's data exactly as the project produces it, and a `workbench-<bench>` skill in the project holding the feed, the scripts and the steps to operate it. The next session, and the next agent, start from that skill, and it tells them to adapt the bench when the project's data moves on.
 
 ## Install
 
