@@ -78,9 +78,9 @@ The parts sheet in the same view, one outline per exposed component:
 
 ## Beyond the loop: workbenches
 
-Some work is done by hand with an agent before anyone thinks of a tool for it: walking an agent's calls one by one, putting model answers side by side, measuring an output against the template it must fit. A session like that ends with a way of working, scripts written on the way and a page that showed what mattered, and the next session starts from nothing.
+Some work keeps coming back during development and is done by hand with an agent each time: diffing an API's responses before and after a refactor, checking a migration's dry run table by table, comparing a parser's output with its fixtures, following a background job's runs to where they failed, stepping through an LLM agent's calls to see which prompt went wrong. A session like that ends with a way of working, scripts written on the way and a page that showed what mattered, and the next session starts from nothing.
 
-`create-workbench` turns that into a tool. The best moment to run it is at the end of the session that did the work, with the agent that did it: the sources, the shape of the data and what the person kept looking at are all in its context, so the definition is mostly already answered and the interview confirms it instead of discovering it. A workbench defined cold, from a description, guesses the very things that session learned.
+`create-workbench` turns that into a reusable tool, for any project and any kind of data. The best moment to run it is at the end of the session that did the work, with the agent that did it: the sources, the shape of the data and what the person kept looking at are all in its context, so the definition is mostly already answered and the interview confirms it instead of discovering it. A workbench defined cold, from a description, guesses the very things that session learned.
 
 What it leaves is a page in aiview of kind `workbench`, fed with the project's data exactly as the project produces it, and a `workbench-<bench>` skill in the project holding the feed, the scripts and the steps to operate it. The next session, and the next agent, start from that skill, and it tells them to adapt the bench when the project's data moves on.
 
@@ -161,7 +161,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 
 | Skill | Use case | Example ask |
 |---|---|---|
-| [create-workbench](skills/workbench/create-workbench/SKILL.md) | A page is wanted to work on something with you during development, fed by the project's real data: model answers side by side, an agent walked call by call, an output measured against its template | *"We just compared the CV drafts across models by hand: make it a workbench."* Best run at the end of the session that did the work by hand. Defined through the interview, built live in a browser you watch, one change at a time. The page lives in aiview as a `workbench`, its data copied in as the project produces it by a feed in the project's own `workbench-<bench>` skill, which also says how to operate it and tells the next agent to adapt the bench when the project's data moves on. |
+| [create-workbench](skills/workbench/create-workbench/SKILL.md) | A recurring piece of development work should become a dedicated development tool, built with you, fed by the project's own data, with the steps to run it again | *"We keep diffing the API's responses before and after each refactor: make it a workbench."* Or a migration's dry run checked table by table, a parser's output against its fixtures, a background job's runs and where they failed, an LLM agent's calls stepped through one by one. Best run at the end of the session that did the work by hand. Defined through the interview, built live in a browser you watch, one change at a time. The page lives in aiview as a `workbench`; the project gets a `workbench-<bench>` skill with the feed that fills the page, the scripts to operate it, and the order to adapt the bench when the project's data moves on. |
 
 ### Review
 
