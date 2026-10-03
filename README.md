@@ -84,6 +84,10 @@ Some work keeps coming back during development and is done by hand with an agent
 
 What it leaves is a page in aiview of kind `workbench`, fed with the project's data exactly as the project produces it, and a `workbench-<bench>` skill in the project holding the feed, the scripts and the steps to operate it. The next session, and the next agent, start from that skill, and it tells them to adapt the bench when the project's data moves on.
 
+An agent trace bench: a support assistant walked call by call, each step with the request as the app sent it, the reply, and a verdict that quotes the prompt's own rule. Step 3 refunded a whole order unasked; the prompt was changed and the call replayed as step 4.
+
+![aiview: an agent trace workbench, the steps of a support assistant's walk on the left with their verdicts, step 3 open with its tool call, the wrong verdict quoting the prompt's refund rule, and the context the agent received](assets/aiview-workbench-trace.png)
+
 ## Install
 
 **Claude Code**, as a plugin. The skills answer to `charrette:`, as `/charrette:brainstorm` or `/charrette:pr-review`, so nothing collides with skills you already have:
