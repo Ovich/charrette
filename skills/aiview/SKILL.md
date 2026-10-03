@@ -40,13 +40,14 @@ $A open "$F" --tag <slug> --tag <topic>
 ## Registering a document
 
 - **File name `YYYY-MM-DD-<topic>.<kind>.md`**, flat in the project's folder.
-- **Kind is mandatory**, from the filename or `--kind`: `brainstorm`, `plan`, `slice`, `module`, `reference`, `mockup`, `prompt`, `pr-analysis`, `report`, `pdf`, `roadmap` (one per project), `feature-map` (one per project), `verification` (one per run). A kind is a type of document; a topic is a tag.
+- **Kind is mandatory**, from the filename or `--kind`: `brainstorm`, `plan`, `slice`, `module`, `reference`, `mockup`, `workbench`, `prompt`, `pr-analysis`, `report`, `pdf`, `roadmap` (one per project), `feature-map` (one per project), `verification` (one per run). A kind is a type of document; a topic is a tag.
 - **One `--group <slug>` per piece of work**, titled once with `--group-title`, at most one group per document.
 - **A plan takes its own group, `<topic>-plan`**, shared with its slice documents and nothing else.
 - **`--started <ISO>` when the discussion began before the file existed.**
 - **One document per subject**: iterate the file, never a v2. A rejected variant is removed from the index.
 - **Fix metadata with `update`.** `aiview.sqlite` is the tool's to write, and scratch files stay unregistered.
 - **Mockups are self-contained HTML**, per the `design-prototype` skill.
+- **Workbenches are self-contained HTML too**, per the `create-workbench` skill; a trace is a workbench.
 
 ## Publishing before the work is done
 

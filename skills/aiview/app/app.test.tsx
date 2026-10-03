@@ -367,6 +367,22 @@ describe("MockupFrame modes", () => {
     window.dispatchEvent(new MessageEvent("message", { data, source: frame.contentWindow }));
     expect(onOpenSource).toHaveBeenCalledWith("tools.mockup.html", "ToolPrefix");
   });
+
+  test("a workbench keeps the theme alone, at full width, and leaves the stored choices for the next mockup", async () => {
+    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    const { OVERLAY_MARK } = await import("./lib/overlay.ts");
+    localStorage.setItem("aiview.viewport", "mobile");
+    localStorage.setItem("aiview.mockupMode", "composition");
+    const bindings = { sources: ["tools.mockup.html"], errors: [], warnings: [] };
+    render(<MockupFrame html="<html><body><p>h</p></body></html>" bindings={bindings} workbench />);
+    expect(document.querySelector('[data-component="MockupViewportToggle"]')).toBeNull();
+    expect(document.querySelector('[data-component="MockupModeToggle"]')).toBeNull();
+    expect(document.querySelector('[data-component="MockupThemeToggle"]')).toBeTruthy();
+    expect(document.querySelector("iframe")!.getAttribute("srcdoc")).not.toContain(OVERLAY_MARK);
+    expect((document.querySelector('[data-component="MockupStage"] > div') as HTMLElement).style.width).toBe("");
+    expect(localStorage.getItem("aiview.viewport")).toBe("mobile");
+    expect(localStorage.getItem("aiview.mockupMode")).toBe("composition");
+  });
 });
 
 describe("mockup full screen", () => {

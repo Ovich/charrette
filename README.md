@@ -12,7 +12,7 @@ Agent skills that settle what gets built before code is written. They sharpen th
 
 Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Charrette brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
 
-Twenty-two skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
+Twenty-three skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
 
 ## The loop
 
@@ -39,6 +39,14 @@ Charrette is run iteratively. One pass of the loop is one iteration: it plans an
 The thing to avoid is big design up front: an agent loves writing plans, embellished and polished, and they can fall apart at the end. A plan is sized to what a person can hold in mind, understand and approve in one reading.
 
 Above the iterations sits the roadmap, one document per project kept by the `roadmap` skill: the iterations in order, each made of slots, a slot being something the customer can use or a system that can be deployed. Each slot points at the boards, mockups and plans that exist for it, its state derived from them, and the foundation reference beside it records the technology decisions, closed no later than the first slot that needs them. Only the next iteration is drawn precisely: a slot is split when the work reaches it, and the roadmap is redrawn when a slot lands.
+
+## Workbenches: tools out of the work
+
+Some work is done by hand with an agent before anyone thinks of a tool for it: walking an agent's calls one by one, putting model answers side by side, measuring an output against the template it must fit. A session like that ends with a way of working, scripts written on the way and a page that showed what mattered, and the next session starts from nothing.
+
+`create-workbench` turns that into a tool. The best moment to run it is at the end of the session that did the work, with the agent that did it: the sources, the shape of the data and what the person kept looking at are all in its context, so the definition is mostly already answered and the interview confirms it instead of discovering it. A workbench defined cold, from a description, guesses the very things that session learned.
+
+What it leaves is a page in aiview of kind `workbench`, fed with the project's data exactly as the project produces it, and a `workbench-<bench>` skill in the project holding the feed, the scripts and the steps to operate it. The next session, and the next agent, start from that skill, and it tells them to adapt the bench when the project's data moves on.
 
 ## What it looks like
 
@@ -149,6 +157,12 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | [verification-skill-create](skills/verify/verification-skill-create/SKILL.md) | A project's user stories should be shown to work end to end, through the interface their consumer uses, and it has no verification skill yet | *"Create the verification skill for this app."* The consumer, the interface and the harness read from the repository, a project-local `verify-<app>` skill written, the feature map drawn in aiview, one story proven. execute-plan offers it when a plan starts. |
 | [verification-skill-maintain](skills/verify/verification-skill-maintain/SKILL.md) | The application changed and its verify skill or feature map must follow, from a slice, a commit range or a date | *"Maintain the verification skill since the last slice."* Only what the diff moved is changed, the affected stories re-proven. execute-plan runs it once, at the slot's end. |
 
+### Workbench
+
+| Skill | Use case | Example ask |
+|---|---|---|
+| [create-workbench](skills/workbench/create-workbench/SKILL.md) | A page is wanted to work on something with you during development, fed by the project's real data: model answers side by side, an agent walked call by call, an output measured against its template | *"We just compared the CV drafts across models by hand: make it a workbench."* Best run at the end of the session that did the work by hand. Defined through the interview, built live in a browser you watch, one change at a time. The page lives in aiview as a `workbench`, its data copied in as the project produces it by a feed in the project's own `workbench-<bench>` skill, which also says how to operate it and tells the next agent to adapt the bench when the project's data moves on. |
+
 ### Review
 
 | Skill | Use case | Example ask |
@@ -172,7 +186,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 
 | Root | Holds | Versioned |
 |---|---|---|
-| The checkout, or the plugin cache | `skills/<group>/<name>/SKILL.md`, one folder per skill under its group: the loop's phases `architecture`, `ui`, `plan`, `execute`, `review`, `project` for what a project has once and keeps, `verify` for its verification skill; `interview` and `whiteboard-defense` at the root; supporting files alongside. `skills/aiview/`: CLI, server and UI, outside the groups | Yes, rebuildable |
+| The checkout, or the plugin cache | `skills/<group>/<name>/SKILL.md`, one folder per skill under its group: the loop's phases `architecture`, `ui`, `plan`, `execute`, `review`, `project` for what a project has once and keeps, `verify` for its verification skill, `workbench` for the pages worked on during development; `interview` and `whiteboard-defense` at the root; supporting files alongside. `skills/aiview/`: CLI, server and UI, outside the groups | Yes, rebuildable |
 | The data home, `$CHARRETTE_HOME` or `charrette_appdata` in your OS home directory | `docs/<project>/*.md, *.html, *.pdf`, among them the project's roadmap and its foundation reference, and `aiview.sqlite`, the index and the active project | Never in a project repo. May be its own git repo, to sync between machines |
 | Your project repository | `AGENTS.md`, grown by write-conventions. README and architecture docs, written by technical-writing | Yes, by you |
 

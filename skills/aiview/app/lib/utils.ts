@@ -25,7 +25,8 @@ export function cn(...inputs: ClassValue[]) {
  * alternate tone, so two kinds one spoke apart never share both. Pairs that appear
  * together are pushed apart in hue as well: a plan beside its slices and its
  * verifications, a board beside its spec, a roadmap beside its reference, the feature
- * map beside its verifications. `pdf` is a foreign format and takes the one grey.
+ * map beside its verifications, a workbench beside the mockups and reports it sits
+ * among. `pdf` is a foreign format and takes the one grey.
  *
  * A kind not listed here still gets a stable colour from the old hash, moved off the
  * spokes above so a new kind cannot be born looking like an existing one.
@@ -43,6 +44,7 @@ const KIND_COLORS: Record<string, { h: number; s: number; tone: KindTone }> = {
   "feature-map": { h: 265, s: 55, tone: "strong" },
   brainstorm: { h: 295, s: 60, tone: "light" },
   "pr-analysis": { h: 330, s: 65, tone: "strong" },
+  workbench: { h: 345, s: 70, tone: "light" },
   pdf: { h: 0, s: 0, tone: "light" },
 };
 

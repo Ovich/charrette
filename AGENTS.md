@@ -12,7 +12,8 @@ that skill's shape; it is written here only on the person's yes.
 
 Every skill is one folder under `skills/`, opening on a `SKILL.md`; supporting files
 sit beside it, situational ones under `references/`. `project/` holds what a project
-has once and keeps, `verify/` its verification skill; the loop's phases group the rest,
+has once and keeps, `verify/` its verification skill, `workbench/` the pages worked on
+with the person during development and the project skills that feed them; the loop's phases group the rest,
 `architecture/`, `ui/`, `plan/`, `execute/`, `review/`; `interview/` and `whiteboard-defense/` sit at the root, as does
 aiview, `skills/aiview/`, the one tool: a CLI, a server and a UI, shipped as versioned
 bundles so an install never builds. The plugin sees a group only through the `skills`

@@ -45,15 +45,21 @@ export interface MockupFrameProps {
   pointedVariant?: string;
   /** The person dismissed the pointer. */
   onClearPointer?: () => void;
+  /** A workbench, a tool used at full size: no viewport and no Composition, the theme alone. */
+  workbench?: boolean;
 }
 
 const NONE: readonly string[] = [];
 
-export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NONE, pointedVariant, onClearPointer }: MockupFrameProps) {
-  const [viewport, setViewport] = useState(() => stored("aiview.viewport", "full"));
-  const [mode, setMode] = useState<MockupMode>(() =>
+export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NONE, pointedVariant, onClearPointer, workbench = false }: MockupFrameProps) {
+  const [storedViewport, setViewport] = useState(() => stored("aiview.viewport", "full"));
+  const [storedMode, setMode] = useState<MockupMode>(() =>
     stored("aiview.mockupMode", "rendered") === "composition" ? "composition" : "rendered",
   );
+  // A workbench ignores the stored choices without overwriting them: the next mockup
+  // opens at the viewport and in the view the person left it.
+  const viewport = workbench ? "full" : storedViewport;
+  const mode: MockupMode = workbench ? "rendered" : storedMode;
   const [theme, setTheme] = useState<Theme>(() => {
     const s = stored("aiview.theme", "system");
     return THEMES.includes(s as Theme) ? (s as Theme) : "system";
@@ -154,24 +160,28 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
   return (
     <div data-component="MockupFrame">
       <div className="mb-2.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-        <span>viewport</span>
-        <ToggleGroup type="single" value={viewport} onValueChange={selectViewport}>
-          {VIEWPORTS.map(([n]) => (
-            <ToggleGroupItem key={n} value={n}>
-              {n}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        <span className="font-mono">{width ? `${width}px` : ""}</span>
-        <span className="ml-3">view</span>
-        <ToggleGroup type="single" value={mode} onValueChange={selectMode} data-component="MockupModeToggle">
-          {MODES.map((m) => (
-            <ToggleGroupItem key={m} value={m}>
-              {m}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        <span className="ml-3">theme</span>
+        {!workbench && (
+          <>
+            <span>viewport</span>
+            <ToggleGroup type="single" value={viewport} onValueChange={selectViewport} data-component="MockupViewportToggle">
+              {VIEWPORTS.map(([n]) => (
+                <ToggleGroupItem key={n} value={n}>
+                  {n}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            <span className="font-mono">{width ? `${width}px` : ""}</span>
+            <span className="ml-3">view</span>
+            <ToggleGroup type="single" value={mode} onValueChange={selectMode} data-component="MockupModeToggle">
+              {MODES.map((m) => (
+                <ToggleGroupItem key={m} value={m}>
+                  {m}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </>
+        )}
+        <span className={workbench ? undefined : "ml-3"}>theme</span>
         <ToggleGroup type="single" value={theme} onValueChange={selectTheme} data-component="MockupThemeToggle">
           {THEMES.map((t) => (
             <ToggleGroupItem key={t} value={t}>

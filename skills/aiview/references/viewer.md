@@ -21,6 +21,10 @@ the page takes no mouse: it is looked at, not operated. *Variant*: the variants 
 actions the mockup declares in its `MockupBar` (the `design-prototype` skill), mirrored
 here; the in-page bar is hidden, the chosen variant persists across reloads.
 
+**A workbench's toolbar.** Theme alone, the page at full width: a workbench is a tool
+used at its size, so viewport and Composition are not offered, and the person's choices
+for mockups are kept for the next one.
+
 **Pointing.** When the agent points at components of a mockup (`show`), the tab goes to
 that mockup, switches to the variant named, scrolls to the first component and outlines
 each one with its name, the rest of the page dimmed. The page still takes the mouse. A

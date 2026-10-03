@@ -218,6 +218,7 @@ export function App() {
                   pointed={pointer?.id === doc.id ? pointer.components : undefined}
                   pointedVariant={pointer?.id === doc.id ? pointer.variant : undefined}
                   onClearPointer={stopPointing}
+                  workbench={doc.kind === "workbench"}
                 />
               )}
               {format === "markdown" && response!.content !== null && (
