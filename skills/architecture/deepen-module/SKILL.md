@@ -9,7 +9,7 @@ description: Use when a person asks to design a new module's interface or to rew
 
 **A building block is not a deep module**: a module other modules are built from, one job, several callers, no module document of its own. It still has an entry, held to the same checklist item on entries in the `code-design-review` skill.
 
-**One `module` document per module, written from the first finding, never in chat.** Through the `aiview` skill: kind `module`, file `YYYY-MM-DD-<module>.module.md`, tags = project + module name, in the plan's group when a plan waits on it. Each stage below writes its sections into it.
+**One `module` document per module, written from the first finding, never in chat.** Through the `aiview` skill: kind `module`, file `YYYY-MM-DD-<module>.module.md`, tags = module name, in the plan's group when a plan waits on it. Each stage below writes its sections into it.
 
 ## Discover
 

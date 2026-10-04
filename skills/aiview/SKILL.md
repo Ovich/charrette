@@ -27,14 +27,14 @@ $A status --json          # cwdProject: the project this working directory belon
 $A use <slug>             # only if cwdProject differs from the active project
 F=$($A path 2026-08-24-topic.brainstorm.md)   # the absolute path, joined for this OS
 # write the document at $F
-$A open "$F" --tag <slug> --tag <topic>
+$A open "$F" --tag <topic>
 ```
 
 - **`open` is the standard gesture**, on creation: it registers the file, starts a detached server if none runs, and prints the URL to tell the user.
 - **A project is a folder of the data home, `docs/<slug>/`**; refiling is `move <ref> --project <slug>`, and `status --json` says which project claims a working directory.
 - **The date in the name is when the work started.**
 - **A location the user states explicitly wins.**
-- **Tag with the project slug as well as the topic.**
+- **A tag names a topic, never the project**: the project is the folder and the viewer's scope already. Reuse a spelling `list` already shows before inventing one.
 - **To declare a project, or when `status --json` reports no `cwdProject`**: `references/projects.md`.
 
 ## Registering a document

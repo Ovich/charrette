@@ -20,7 +20,7 @@ description: "Use when a model call or a chain of them has to be judged from wha
 2. **Get the reply as returned**, and for a walk every call of the chain in order: which tool, with what arguments, and what the model said between calls.
 3. **Derive the checks.** One per rule the prompt states, one per property the data promises (a shape, a limit, a language), one per thing the person is worried about. Name each by the rule's own words. Severity: what the prompt forbids is bad, what it prefers is warn, what is only worth seeing is info.
 4. **Write the page** to the contract in `references/page.md`, read before the first line. Embed the raw files by a script that is rerun after every recording, never by pasting.
-5. **Register through the `aiview` skill**: kind `prompt` (from the filename), tags = project + the agent's name, the group of the piece of work. Tell the person the URL.
+5. **Register through the `aiview` skill**: kind `prompt` (from the filename), tags = the agent's name, the group of the piece of work. Tell the person the URL.
 6. **Walk the hits with the person**, worst first. Each hit ends in one of three: a change to the prompt, a change to the data, or a check that was wrong. A change to the prompt is proposed as the sentence to add or replace, in the prompt's own voice.
 
 ## Red flags

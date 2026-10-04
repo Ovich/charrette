@@ -68,7 +68,7 @@ the official source before asking it, as the `interview` skill researches a clai
 ## The report
 
 **`YYYY-MM-DD-<subsystem>.defense.report.md` through the `aiview` skill**, kind `report`,
-tags = project + subsystem + defense, written as each answer lands. In this order:
+tags = subsystem + defense, written as each answer lands. In this order:
 
 - **Readiness**: per layer of the system track and per stack topic, solid, vague, wrong or
   inherited, with the count of each.

@@ -38,7 +38,7 @@ Per story, in the map's order: establish the starting state the map lists, perfo
 
 Per story, what was done and what resulted: the actions with their inputs, the observation (<screenshots and traces | requests and responses | messages | transcripts and files>), under `<the skill's folder>/evidence/<YYYY-MM-DD-anchor>/`, ignored by git, never deleted by cleanup.
 
-One `verification` document per run, opened in aiview the moment the run starts: kind `verification` from the filename `YYYY-MM-DD-<anchor>.verification.md`, tags = project + `verification` + the slot when there is one, group = the plan's when execute-plan called, started when the run began. Tell the person the URL. It opens on the anchor, the map's `proven at` and the launch as it happened, then one section per story: `passed`, `failed` or `flaky`, the expected outcome, the observed one, the evidence paths. A `pending` card per story while it runs. The close: counts, the gaps found in the map, the cleanup as it happened.
+One `verification` document per run, opened in aiview the moment the run starts: kind `verification` from the filename `YYYY-MM-DD-<anchor>.verification.md`, tags = `verification` + the slot when there is one, group = the plan's when execute-plan called, started when the run began. Tell the person the URL. It opens on the anchor, the map's `proven at` and the launch as it happened, then one section per story: `passed`, `failed` or `flaky`, the expected outcome, the observed one, the evidence paths. A `pending` card per story while it runs. The close: counts, the gaps found in the map, the cleanup as it happened.
 
 ## Cleanup
 

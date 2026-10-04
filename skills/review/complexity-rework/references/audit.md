@@ -34,7 +34,7 @@ Name it concretely. Refactors of branching code most often break:
 
 ## 6. The report
 
-Highest-ranked family first. The report goes through the `aiview` skill: kind `report`, tags = project + `complexity`. Every number is copied from the tool's output, never retyped, and names its measure beside it (`cyclomatic 11`, `cognitive 23`). Mark any function only skimmed, not read.
+Highest-ranked family first. The report goes through the `aiview` skill: kind `report`, tags = `complexity`. Every number is copied from the tool's output, never retyped, and names its measure beside it (`cyclomatic 11`, `cognitive 23`). Mark any function only skimmed, not read.
 
 ```markdown
 # Complexity audit: <repo or package>

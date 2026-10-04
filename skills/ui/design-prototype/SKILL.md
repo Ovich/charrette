@@ -34,7 +34,7 @@ No component code, no route, no CSS in the app for the screen being designed unt
 
 ## The design language
 
-**`design-language.reference.md` outlives every PR.** It lives in the project's folder in the data home, kind `reference`, tags = project + design. When the token or UI files have moved on, extract again rather than patch.
+**`design-language.reference.md` outlives every PR.** It lives in the project's folder in the data home, kind `reference`, tags = design. When the token or UI files have moved on, extract again rather than patch.
 
 ## Mockups
 
@@ -42,7 +42,7 @@ No component code, no route, no CSS in the app for the screen being designed unt
 - **Self-contained**: inline `<style>` and, if needed, inline `<script>`; no CDN, no build. The `<style>` opens with the design-language tokens as `:root` custom properties (light) plus the dark overrides under `@media (prefers-color-scheme: dark)`, and uses only those tokens. A new token is flagged in the handoff note as "new token: needs a name in the theme".
 - **Native look**: every region is recognisably one of the project's components, annotated `data-component="Pill"` so the handoff maps one to one. Real copy in the product's voice, never lorem. Real-looking data.
 - **Shared between mockups**: a component drawn once is bound by every other mockup that needs it, and a screen's variants are declared as buttons the viewer mirrors. How to declare, bind, keep a component bindable, and when to split a screen: `references/binding.md`. The first mockup of a project needs none of it.
-- **Register and serve via the `aiview` skill**: kind `mockup` (from the filename), tags = project + feature, and the group of the piece of work it belongs to. Tell the user the URL it prints.
+- **Register and serve via the `aiview` skill**: kind `mockup` (from the filename), tags = feature, and the group of the piece of work it belongs to. Tell the user the URL it prints.
 
 ## Red flags
 

@@ -42,7 +42,7 @@ Each answer is written into the bench skill's head as it lands.
 
 1. **The page**: `node scripts/page.mjs <path> --label "<label>"`, at the path the `aiview`
    skill gives for `YYYY-MM-DD-<bench>.workbench.html`. Register it through the `aiview`
-   skill: kind `workbench`, tags the project, the bench and `trace` for a walk, group the
+   skill: kind `workbench`, tags the bench and `trace` for a walk, group the
    piece of work it serves. Open it in the watched browser. A bench that makes one page
    per run (a walk, a session) keeps the page's code as `page-template.html` in its skill instead:
    its feed's `init` makes each run's page from it, and its `refresh` puts a changed

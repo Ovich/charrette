@@ -10,7 +10,7 @@ once, there, and each slice carries its part of it verbatim, narrowed to its sco
 
 **No code in the repository for the thing being planned until the plan is approved.**
 
-1. **Open `YYYY-MM-DD-<topic>.plan.md` before the first question**, through the `aiview` skill: kind `plan`, tags = project + topic, in the group aiview gives a plan, shared with its slices. With a roadmap, the slot's slug is a tag. Its two parts, Design and Execution, are `references/skeleton.md`, read before writing the first section. A board on the topic is the starting point: its agreed decisions become rows and are not asked again.
+1. **Open `YYYY-MM-DD-<topic>.plan.md` before the first question**, through the `aiview` skill: kind `plan`, tags = topic, in the group aiview gives a plan, shared with its slices. With a roadmap, the slot's slug is a tag. Its two parts, Design and Execution, are `references/skeleton.md`, read before writing the first section. A board on the topic is the starting point: its agreed decisions become rows and are not asked again.
 2. **Run the `interview` skill** on the decisions table, and write each section as its decisions land. A request that is several independent systems is split first, one plan each. One plan per increment: it stops where the next increment would begin.
 3. **Every major area is a deep module**, designed as the `deepen-module` skill says, in the plan's modules section. A module the interview cannot settle there gets its own `module` document, and the plan quotes its entry.
 4. **When no row is open, ask once what else this should cover.**

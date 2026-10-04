@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Search, Star } from "lucide-react";
 import type { DocumentWithState } from "../../lib/api.ts";
 import { ALL_PROJECTS, type ConnectionState } from "../../hooks/useDocuments.ts";
@@ -10,6 +11,9 @@ import { KindChip } from "../docs/KindChip.tsx";
 import { DocItem } from "../docs/DocItem.tsx";
 import { DocGroup } from "../docs/DocGroup.tsx";
 import { LiveIndicator } from "../docs/LiveIndicator.tsx";
+
+/** How many tags show before the rest fold behind "+ n more": the most recent ones. */
+export const TAGS_SHOWN = 12;
 
 function FilterLabel({ children }: { children: string }) {
   return (
@@ -45,6 +49,10 @@ export function Sidebar({
   // grouping happens after filtering, so a container shows only its matching members
   const entries = sidebarEntries(f.shown, groups);
   const scoped = activeProject !== ALL_PROJECTS;
+  // The most recent tags, and any chosen one further down, so a filter in force stays in sight.
+  const [allTagsOpen, setAllTagsOpen] = useState(false);
+  const hidden = Math.max(0, f.allTags.length - TAGS_SHOWN);
+  const tagsShown = allTagsOpen ? f.allTags : f.allTags.filter((t, i) => i < TAGS_SHOWN || f.tags.has(t));
   return (
     <aside
       data-component="Sidebar"
@@ -85,11 +93,21 @@ export function Sidebar({
         </div>
         <FilterLabel>Tags</FilterLabel>
         <div className="flex flex-wrap gap-1" data-component="TagChips">
-          {f.allTags.map((t) => (
+          {tagsShown.map((t) => (
             <Badge key={t} active={f.tags.has(t)} onClick={() => f.toggleTag(t)} role="button" className="cursor-pointer">
               {t}
             </Badge>
           ))}
+          {hidden > 0 && (
+            <button
+              type="button"
+              data-component="TagsMore"
+              className="cursor-pointer px-1 text-[11px] text-muted-foreground hover:text-foreground"
+              onClick={() => setAllTagsOpen((o) => !o)}
+            >
+              {allTagsOpen ? "fewer" : `+ ${hidden} more`}
+            </button>
+          )}
         </div>
       </div>
 

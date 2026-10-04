@@ -1,7 +1,7 @@
 # What the person sees
 
 **Left, the sidebar.** Documents newest-activity first: a search field, kind chips (one
-colour per kind, click to filter), tag chips (multi-select), grouped documents inside
+colour per kind, click to filter), tag chips (multi-select; the most recently active first, twelve shown and the rest behind "+ n more", a chosen one always in sight, the active project's own slug left out), grouped documents inside
 collapsible containers (display title and member count, members in reading order),
 ungrouped documents flat, missing files struck through. The active project scopes the
 list; the selector at the top switches it, and the agent's `use` does the same.

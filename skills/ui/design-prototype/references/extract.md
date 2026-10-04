@@ -13,4 +13,4 @@
 | Existing mockups for this project (`aiview list --kind mockup --tag <project>`) | what has already been proposed and accepted or rejected |
 
 - **Write it as the template in `design-language-template.md`, beside this file**: tokens (as CSS custom properties, light and dark), type scale, spacing, radius and shadow, the UI libraries with versions, component vocabulary (name, purpose, where defined), layout patterns, states and feedback, voice, and an explicit "don't" list. Only what a designer needs to draw a native screen.
-- **Register it via the `aiview` skill**: kind `reference`, tags = project + design.
+- **Register it via the `aiview` skill**: kind `reference`, tags = design.

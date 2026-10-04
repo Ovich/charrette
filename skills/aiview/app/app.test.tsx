@@ -202,6 +202,41 @@ describe("shouldLoad — the reading pane's fetch rule", () => {
   });
 });
 
+describe("tag chips", () => {
+  const at = (day: number) => `2026-09-${String(day).padStart(2, "0")}T10:00:00Z`;
+
+  test("the most recently active tags come first, and the project's own slug is left out", async () => {
+    const { recentTags } = await import("./hooks/useFilters.ts");
+    const docs = [
+      doc({ id: 1, tags: ["JOBS", "old", "shared"], updated_at: at(1) }),
+      doc({ id: 2, tags: ["jobs", "new"], updated_at: at(9) }),
+      doc({ id: 3, tags: ["shared"], updated_at: at(5) }),
+    ];
+    expect(recentTags(docs, "JOBS")).toEqual(["new", "shared", "old"]);
+    expect(recentTags(docs)).toEqual(["jobs", "new", "shared", "JOBS", "old"]);
+  });
+
+  test("past the first twelve the rest fold behind a count, and a chosen tag stays in sight", async () => {
+    const { TAGS_SHOWN } = await import("./components/shell/Sidebar.tsx");
+    const docs = Array.from({ length: TAGS_SHOWN + 3 }, (_, i) =>
+      doc({ id: i + 1, tags: [`t${i}`], updated_at: at(i + 1) }),
+    );
+    render(
+      <Sidebar docs={docs} groups={{}} projects={{ JOBS: "JOBS" }} activeProject="JOBS"
+        connection="live" currentId={null} onOpen={() => {}} onPickProject={() => {}} />,
+    );
+    const chips = () => [...document.querySelectorAll('[data-component="TagChips"] [role="button"]')].map((b) => b.textContent);
+    expect(chips()).toHaveLength(TAGS_SHOWN);
+    expect(chips()[0]).toBe(`t${TAGS_SHOWN + 2}`);
+    fireEvent.click(screen.getByText("+ 3 more"));
+    expect(chips()).toHaveLength(TAGS_SHOWN + 3);
+    fireEvent.click(screen.getByText("t0"));
+    fireEvent.click(screen.getByText("fewer"));
+    expect(chips()).toHaveLength(TAGS_SHOWN + 1);
+    expect(chips()).toContain("t0");
+  });
+});
+
 describe("sidebar ordering", () => {
   const g = { "aiview-webapp": "aiview web app", "project-selector": "aiview project selector" };
   // The regression: four old documents were MOVED, which stamped last_seen_at to now.

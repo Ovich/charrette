@@ -21,7 +21,7 @@ description: "Use when a project has no verification skill of its own and its us
 
 ## The map
 
-**One `feature-map` document per project, opened in aiview on creation**: kind `feature-map` from the filename `YYYY-MM-DD-<project>.feature-map.md`, tags = project + `verification`, no group, started when the reading began. Tell the person the URL.
+**One `feature-map` document per project, opened in aiview on creation**: kind `feature-map` from the filename `YYYY-MM-DD-<project>.feature-map.md`, tags = `verification`, no group, started when the reading began. Tell the person the URL.
 
 Its sections, in this order, every one read by the verify skill and by `verification-skill-maintain`:
 

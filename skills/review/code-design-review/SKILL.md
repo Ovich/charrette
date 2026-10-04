@@ -33,7 +33,7 @@ description: "Use when reviewing program design quality on a pull request, a dif
 
 - **Per finding**: `file:line` · **principle** · one-line issue · the concrete cost · the fix. Grouped by lens, ranked by cost, no code restated.
 - **A one-line verdict last**: `9 findings: 3 dependencies, 4 responsibility, 2 simplicity (1 blocking)`. Clean code gets "clean".
-- **A diff review is answered in chat.** A path or whole-codebase review is `YYYY-MM-DD-<scope>.report.md` through the `aiview` skill, kind `report`, tags = project + review.
+- **A diff review is answered in chat.** A path or whole-codebase review is `YYYY-MM-DD-<scope>.report.md` through the `aiview` skill, kind `report`, tags = review.
 - **With `--fix`**, apply the safe findings afterward, nothing that changes behaviour or reaches outside the scope, then run the project's own typecheck, lint and tests.
 
 ## Diagrams

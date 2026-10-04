@@ -6,7 +6,7 @@ description: "Use when a person wants to think an idea through and keep the disc
 # Brainstorm
 
 **The discussion lives in one Markdown file from the first question, never in chat.**
-`YYYY-MM-DD-<topic>.brainstorm.md`, through the `aiview` skill: kind `brainstorm`, tags = project + topic, group = the topic. With a
+`YYYY-MM-DD-<topic>.brainstorm.md`, through the `aiview` skill: kind `brainstorm`, tags = topic, group = the topic. With a
 roadmap, the slot's slug is a tag. A resuming
 session reads the board before asking anything again.
 

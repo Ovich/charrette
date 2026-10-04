@@ -26,7 +26,7 @@ description: "Use when the same remark keeps being made in a repository's pull r
 
 ## The report
 
-**One `report` document, opened in aiview when the reading starts**: kind `report` from the filename `YYYY-MM-DD-review-findings.report.md`, tags = project + `review-findings`, started when the reading began. Tell the person the URL.
+**One `report` document, opened in aiview when the reading starts**: kind `report` from the filename `YYYY-MM-DD-review-findings.report.md`, tags = `review-findings`, started when the reading began. Tell the person the URL.
 
 Per finding, a section: the person's words, the occurrences linked, the cost, the rung with its criterion met, the artefact drafted in full (the rule text in the shape `write-conventions` asks, the lint configuration, the test, the sentence for the skill, the design change as a paragraph and the modules it creates), and one line saying what stays with a human after it. A recommendation first where two rungs compete. The close: a table of finding, rung, cost, and the ones dropped with why.
 

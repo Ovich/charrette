@@ -30,7 +30,7 @@ description: Use when reviewing the quality of React code, readability, organisa
 1. **Skip a lens whose files are not in scope**: no route files, no lazy-route check.
 2. **Fan out in one message**: on a diff or one folder, one agent per lens; on `all` or many folders, one agent per feature folder running all four. Each gets the file list, its lens section from `checklist.md` and the output contract.
 3. **Merge**: dedup on the same line or mechanism, drop what the project's linter already flags, rank by impact.
-4. **Report grouped by lens.** A diff: in chat, no diagrams. `all` or a folder: `YYYY-MM-DD-<scope>.report.md` through the `aiview` skill, kind `report`, tags = project + review.
+4. **Report grouped by lens.** A diff: in chat, no diagrams. `all` or a folder: `YYYY-MM-DD-<scope>.report.md` through the `aiview` skill, kind `report`, tags = review.
 5. **With `--fix`**, apply the safe findings, nothing that changes behaviour or reaches outside the scope, then run the project's typecheck and lint and name the commands run.
 
 ## Output contract
