@@ -5,7 +5,7 @@ Short, as a proven project skill is: an agent arriving cold reads it in a minute
 ```markdown
 ---
 name: verify-<app>
-description: Use when what was delivered in <app> must be judged for product quality by the agent alone, before a person sees it (done as specified, usable, finished), and whenever the app must run in this repository. Produces one verification document per run in aiview. Not for code quality or tests.
+description: Use whenever execute-plan runs, whenever the app must run in this repository, and when what was delivered in <app> must be judged for product quality by the agent alone, before a person sees it (done as specified, usable, finished). Produces one verification document per run in aiview. Not for code quality or tests.
 ---
 
 # Verify <app>
