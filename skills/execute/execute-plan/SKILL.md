@@ -23,7 +23,8 @@ description: Use when carrying out an implementation plan the person has already
 
 ## What stays in this session
 
-- **The tracker, the briefs, the verification, the merges, the README, the plan's decisions.** A subagent never edits any of them.
+- **The tracker, the briefs, the verification, the README, the plan's decisions.** A subagent never edits any of them.
+- **A slice's worktree is merged by a subagent, not here.** Its brief: the worktree's branch, the project branch to merge it into, the check to run on the result, and to stop and report on a conflict rather than resolve one. This session reads its return, re-runs the check, and ticks; the worktree is removed once the tick stands.
 - **Verifies every return**: a tick rests on what this session re-ran: the slice's check, and what the brief's `tests` line owed.
 - **Checks blockers before every dispatch.**
 - **A subagent that stops on a finding is done.** Fix the plan or the slice document; never re-brief it past what it found.
