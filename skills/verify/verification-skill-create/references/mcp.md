@@ -1,39 +1,19 @@
 # Harness: an MCP server
 
-**The consumer is an agent. Drive the server through a real MCP client over the transport it ships with, and judge the result by what the agent would see.**
+**The tool**: a real MCP client over the transport the server ships with (its documented stdio command, or its HTTP URL): the repository's own, a small script on the official SDK, or the MCP inspector's CLI mode. Never its handlers imported directly. Initialise, then list its tools, resources and prompts: the surface an agent gets.
 
-## Setup
+**The starting state**: configuration and credentials exactly as its install documents, isolated from the person's.
 
-- **The transport the server declares**: stdio launched with its documented command, or streamable HTTP at the URL the skill names. Never the server's handler functions imported directly.
-- **A real client**: the repository's own when it has one, otherwise a small script on the official MCP SDK under the scratch directory, or the MCP inspector's CLI mode. Initialise, then `tools/list`, `resources/list`, `prompts/list` as the first observation: the surface the agent gets.
-- **Configuration and credentials** exactly as the documented install says, in an environment isolated from the person's.
-
-## Driving
-
-- **A journey is what an agent would do for one outcome**: read a resource, call a tool with the arguments its schema declares, call the next with the result. A tool called with arguments the schema forbids tests robustness, a different journey.
-- **Arguments from the schema, never from the implementation.** A required argument the schema does not declare is a finding.
-- **Concurrency and sessions** when the design promises them: two clients, or one client's two calls in flight.
-
-## Observing
-
-- **The response as the agent receives it**: content blocks, `isError`, structured content when declared. An error inside a successful envelope is an error.
-- **The outcome beyond the response**: the file the tool wrote, the record it created, read back through another tool or resource the server offers, or through the system the tool acts on.
-- **Notifications** the server emits, list-changed and progress, when the design names them.
-- **Evidence**: the initialise handshake, every request and response verbatim, the server's stderr.
+**What to observe**: each response as the agent receives it (content blocks, `isError`, structured content); the outcome beyond it, read back through another tool or the system it acts on; its notifications; its stderr.
 
 ## The roles of this surface
 
-Written into the role prompt the skill opens on, each in the product's own terms, with what it answers for:
+Written into the role prompt, in the product's terms, each with what it answers for:
 
-- **The agent as consumer** answers for names and descriptions that say when to call a tool and what it does, and errors that tell it what to change.
-- **Its tool designer** answers for results sized for a context window and shaped for acting on.
-
-## Cleanup
-
-- **Close the client and end the server process** you launched, by handle. Delete what the tools created during the run when the journey does not already end by deleting it.
+- **The agent as consumer**: names and descriptions that say when to call a tool and what it does, errors that say what to change.
+- **Its tool designer**: results sized for a context window and shaped for acting on.
 
 ## Gotchas
 
-- **stdio servers write logs to stdout** by mistake and break the protocol. That is a blocker.
-- **A tool description is a promise to the agent.** A tool that does more or less than its description says is a design finding even when the call succeeds.
-- **Large results** may be truncated by the client. Judge the server's response, not the client's rendering.
+- **A stdio server logging to stdout** breaks the protocol: a blocker.
+- **Large results** may be cut by the client: judge the server's response, not the client's rendering.
