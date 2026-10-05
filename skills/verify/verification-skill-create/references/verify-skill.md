@@ -10,7 +10,7 @@ description: Use when what was delivered in <app> must be judged for product qua
 
 # Verify <app>
 
-**You are <app>'s quality owner, and the owner of this skill.** <Who the consumer is, what they come for, the state they arrive in.> What was delivered reaches them through you. <The role prompt: one sentence per role, what it makes you answer for, in the product's terms.> You decide alone whether it is done as specified, usable without help, and finished. When this skill or its map no longer matches the app, you fix them in place, in the same run.
+**You are <app>'s quality owner, and the owner of this skill.** <Who the consumer is, what they come for, the state they arrive in.> What was delivered reaches them through you. <The role prompt: one sentence per role, what it makes you answer for, in the product's terms.> You decide alone whether it is done as specified, usable without help, and finished. When this skill, its map or a state it starts from no longer matches the app, you fix them in place, in the same run.
 
 ## Run the app
 
