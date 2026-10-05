@@ -6,12 +6,14 @@ written.
 ```markdown
 ---
 name: workbench-[bench]
-description: "Use when [the question the bench answers] is to be worked on with the person on the [label] workbench, or the bench's feed or scripts fail. Feeds the page from the project's own data[ and operates the walk]. Not for [the neighbouring question it does not answer]."
+description: "Use when [the bench's scope, a kind of work on a part of the product] is to be worked on with the person on the [label] workbench, or the bench's feed or scripts fail. Feeds the page from the project's own data[ and operates the walk]. Not for [the neighbouring question it does not answer]."
 ---
 
 # [Label] workbench
 
-[The question the bench answers, one sentence.] [What the person does on it.]
+[The bench's scope, one sentence.] [Its views, one line each: the question each answers.] [What the person does on it.]
+
+A new question in this scope is a new view or mode here, never a second bench.
 
 **The page** is `[YYYY-MM-DD-bench.workbench.html]` in aiview, kind `workbench`
 ([the aiview link]). It is a working document of the data home and never enters this

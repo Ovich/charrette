@@ -15,8 +15,10 @@ was not seen.
 
 ## Before building
 
-- **A `workbench-<bench>` skill exists for this question** in the project's local skill
-  folder: read it and its page, and change both. Never a second bench for one question.
+- **A `workbench-<bench>` skill's scope covers this question** in the project's local
+  skill folder: read it and its page, and add the question to both as a view or a mode.
+  Never a second bench for one scope: one bench per question and the project's local
+  skills grow with every plan.
 - **Read the sources before asking**: the files the project produces that the bench will
   show (recordings, requests as sent, fixtures, templates), where they live, their exact
   shape, and the code that writes them.
@@ -29,7 +31,9 @@ was not seen.
 
 Each answer is written into the bench skill's head as it lands.
 
-1. **The question the bench answers**, one sentence, and the bench's label.
+1. **The bench's scope**: a kind of work on a part of the product (any model call, any
+   agent walk, one family of screens), as wide as its sources allow, and the bench's
+   label. The question at hand is its first view.
 2. **The sources**, each file or call, as the project produces it.
 3. **The feed's kind.** *Derived*: the block is rebuilt from the sources on every run.
    *Log*: entries are appended and never rewritten, for data the project cannot produce

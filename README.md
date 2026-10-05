@@ -12,7 +12,7 @@ Agent skills that settle what gets built before code is written. They sharpen th
 
 Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Charrette brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
 
-Twenty-three skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
+Twenty-four skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
 
 ## The loop
 
@@ -27,10 +27,12 @@ flowchart LR
   P["write-plan<br/>one document, written while interviewing"] --> WS["write-slice<br/>one document per slice"]
   WS --> E["execute-plan<br/>one agent per slice"]
   E --> R["pr-review"]
+  E -.->|"recommended"| V["validate-delivery<br/>with the person, live"]
+  V --> R
   R --> M["merge"]
 ```
 
-A plan starts from whatever exists: an idea said in chat, a board, an agreed module, the roadmap's next slot. `interview` resolves the decisions along the way and `write-diagrams` draws them. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it.
+A plan starts from whatever exists: an idea said in chat, a board, an agreed module, the roadmap's next slot. `interview` resolves the decisions along the way and `write-diagrams` draws them. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it. When the plan has delivered something a person looks at, its close recommends `validate-delivery`: the setup made ready first, then the person and the agent try the delivery and rework it live, in the watched browser and the project's workbenches.
 
 ## Iterate the loop
 
@@ -83,6 +85,8 @@ Some work keeps coming back during development and is done by hand with an agent
 `create-workbench` turns that into a reusable tool, for any project and any kind of data. The best moment to run it is at the end of the session that did the work, with the agent that did it: the sources, the shape of the data and what the person kept looking at are all in its context, so the definition is mostly already answered and the interview confirms it instead of discovering it. A workbench defined cold, from a description, guesses the very things that session learned.
 
 What it leaves is a page in aiview of kind `workbench`, fed with the project's data exactly as the project produces it, and a `workbench-<bench>` skill in the project holding the feed, the scripts and the steps to operate it. The next session, and the next agent, start from that skill, and it tells them to adapt the bench when the project's data moves on.
+
+A bench serves a scope, a kind of work on a part of the product, never one question: any model call, any agent walk, one family of screens. A new question becomes a view on the bench that covers it, so a project's benches do not multiply with every plan. `validate-delivery` opens them when a delivery is tried with the person, and extends one before making another.
 
 An agent trace bench: a support assistant walked call by call, each step with the request as the app sent it, the reply, and a verdict that quotes the prompt's own rule. Step 3 refunded a whole order unasked; the prompt was changed and the call replayed as step 4.
 
@@ -160,12 +164,13 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 |---|---|---|
 | [verification-skill-create](skills/verify/verification-skill-create/SKILL.md) | A project's user stories should be shown to work end to end, through the interface their consumer uses, and it has no verification skill yet | *"Create the verification skill for this app."* The consumer, the interface and the harness read from the repository, a project-local `verify-<app>` skill written, the feature map drawn in aiview, one story proven. execute-plan offers it when a plan starts. |
 | [verification-skill-maintain](skills/verify/verification-skill-maintain/SKILL.md) | The application changed and its verify skill or feature map must follow, from a slice, a commit range or a date | *"Maintain the verification skill since the last slice."* Only what the diff moved is changed, the affected stories re-proven. execute-plan runs it once, at the slot's end. |
+| [validate-delivery](skills/verify/validate-delivery/SKILL.md) | A plan has delivered and you want to try it and rework it with the agent, live, before moving on | *"Let's walk what we delivered together."* The setup made first: the app on the state to look at, recordings current, the right workbenches found, extended or made, all open in the watched browser. Then you point, the agent changes, the tool shows it. Nothing written up. execute-plan recommends it at its close. |
 
 ### Workbench
 
 | Skill | Use case | Example ask |
 |---|---|---|
-| [create-workbench](skills/workbench/create-workbench/SKILL.md) | A recurring piece of development work should become a dedicated development tool, built with you, fed by the project's own data, with the steps to run it again | *"We keep diffing the API's responses before and after each refactor: make it a workbench."* Or a migration's dry run checked table by table, a parser's output against its fixtures, a background job's runs and where they failed, an LLM agent's calls stepped through one by one. Best run at the end of the session that did the work by hand. Defined through the interview, built live in a browser you watch, one change at a time. The page lives in aiview as a `workbench`; the project gets a `workbench-<bench>` skill with the feed that fills the page, the scripts to operate it, and the order to adapt the bench when the project's data moves on. |
+| [create-workbench](skills/workbench/create-workbench/SKILL.md) | A recurring piece of development work should become a dedicated development tool, built with you, fed by the project's own data, with the steps to run it again | *"We keep diffing the API's responses before and after each refactor: make it a workbench."* Or a migration's dry run checked table by table, a parser's output against its fixtures, a background job's runs and where they failed, an LLM agent's calls stepped through one by one. Best run at the end of the session that did the work by hand. One bench per scope: a new question becomes a view on the bench that already covers it. Defined through the interview, built live in a browser you watch, one change at a time. The page lives in aiview as a `workbench`; the project gets a `workbench-<bench>` skill with the feed that fills the page, the scripts to operate it, and the order to adapt the bench when the project's data moves on. |
 
 ### Review
 
@@ -190,7 +195,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 
 | Root | Holds | Versioned |
 |---|---|---|
-| The checkout, or the plugin cache | `skills/<group>/<name>/SKILL.md`, one folder per skill under its group: the loop's phases `architecture`, `ui`, `plan`, `execute`, `review`, `project` for what a project has once and keeps, `verify` for its verification skill, `workbench` for the pages worked on during development; `interview` and `whiteboard-defense` at the root; supporting files alongside. `skills/aiview/`: CLI, server and UI, outside the groups | Yes, rebuildable |
+| The checkout, or the plugin cache | `skills/<group>/<name>/SKILL.md`, one folder per skill under its group: the loop's phases `architecture`, `ui`, `plan`, `execute`, `review`, `project` for what a project has once and keeps, `verify` for its verification skill and the validation with the person, `workbench` for the pages worked on during development; `interview` and `whiteboard-defense` at the root; supporting files alongside. `skills/aiview/`: CLI, server and UI, outside the groups | Yes, rebuildable |
 | The data home, `$CHARRETTE_HOME` or `charrette_appdata` in your OS home directory | `docs/<project>/*.md, *.html, *.pdf`, among them the project's roadmap and its foundation reference, and `aiview.sqlite`, the index and the active project | Never in a project repo. May be its own git repo, to sync between machines |
 | Your project repository | `AGENTS.md`, grown by write-conventions. README and architecture docs, written by technical-writing | Yes, by you |
 

@@ -79,7 +79,7 @@ Stop for exactly three things:
 - **A subagent's return is read, never pasted into a step**: each line of it has a home, listed in `references/tracker.md`.
 - **Overwrite the state node's fields; never append.**
 - **An amended mandate overwrites its field too**, in the plan's *Mandate* section and in the line under the tracker, as `references/orchestrator-mandate.md` says.
-- **The last step says so upward.** With a roadmap, the close says the plan finished and the roadmap may need redrawing. The person confirms the slot landed, with evidence; the plan does not.
+- **The last step says so upward.** With a roadmap, the close says the plan finished and the roadmap may need redrawing. The person confirms the slot landed, with evidence; the plan does not. When the plan delivered something a person looks at, the close recommends validating it with them through the `validate-delivery` skill; the person decides.
 
 ## Anti-patterns
 
