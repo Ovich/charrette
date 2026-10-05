@@ -12,7 +12,7 @@ Agent skills that settle what gets built before code is written. They sharpen th
 
 Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Charrette brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
 
-Twenty-four skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
+Twenty-three skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
 
 ## The loop
 
@@ -32,7 +32,7 @@ flowchart LR
   R --> M["merge"]
 ```
 
-A plan starts from whatever exists: an idea said in chat, a board, an agreed module, the roadmap's next slot. `interview` resolves the decisions along the way and `write-diagrams` draws them. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it. When the plan has delivered something a person looks at, its close recommends `validate-delivery`: the setup made ready first, then the person and the agent try the delivery and rework it live, in the watched browser and the project's workbenches.
+A plan starts from whatever exists: an idea said in chat, a board, an agreed module, the roadmap's next slot. `interview` resolves the decisions along the way and `write-diagrams` draws them. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it. When the project has a verify skill, the agent judges each delivery's product quality alone, as its quality owner: done as specified, usable, finished. When the plan has delivered something a person looks at, its close recommends `validate-delivery`: the setup made ready first, then the person and the agent try the delivery and rework it live, in the watched browser and the project's workbenches.
 
 ## Iterate the loop
 
@@ -162,8 +162,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 
 | Skill | Use case | Example ask |
 |---|---|---|
-| [verification-skill-create](skills/verify/verification-skill-create/SKILL.md) | A project's user stories should be shown to work end to end, through the interface their consumer uses, and it has no verification skill yet | *"Create the verification skill for this app."* The consumer, the interface and the harness read from the repository, a project-local `verify-<app>` skill written, the feature map drawn in aiview, one story proven. execute-plan offers it when a plan starts. |
-| [verification-skill-maintain](skills/verify/verification-skill-maintain/SKILL.md) | The application changed and its verify skill or feature map must follow, from a slice, a commit range or a date | *"Maintain the verification skill since the last slice."* Only what the diff moved is changed, the affected stories re-proven. execute-plan runs it once, at the slot's end. |
+| [verification-skill-create](skills/verify/verification-skill-create/SKILL.md) | An agent should judge, alone, the product quality of what is delivered (done as specified, usable, finished) before a person sees it, and the project has no verification skill yet | *"Create the verification skill for this app."* The consumer, the interface, the harness and where the specification lives read from the repository. A project-local `verify-<app>` skill that opens on a role prompt written for the product (its quality owner, wearing its product owner, its first-time consumer, its editor, its skeptic, its surface's roles and its domain's), with the tooling to reach, drive and observe every part, fast and easy for an agent; the navigation map drawn in aiview, hidden parts included; proven by one complete quality pass. The agent that runs it owns it: it keeps the skill, its scripts and its map true as the application moves. execute-plan offers it when a plan starts. |
 | [validate-delivery](skills/verify/validate-delivery/SKILL.md) | A plan has delivered and you want to try it and rework it with the agent, live, before moving on | *"Let's walk what we delivered together."* The setup made first: the app on the state to look at, recordings current, the right workbenches found, extended or made, all open in the watched browser. Then you point, the agent changes, the tool shows it. Nothing written up. execute-plan recommends it at its close. |
 
 ### Workbench

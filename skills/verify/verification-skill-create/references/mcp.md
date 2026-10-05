@@ -10,7 +10,7 @@
 
 ## Driving
 
-- **A story is what an agent would do for one outcome**: read a resource, call a tool with the arguments its schema declares, call the next with the result. A tool called with arguments the schema forbids tests robustness, a different story.
+- **A journey is what an agent would do for one outcome**: read a resource, call a tool with the arguments its schema declares, call the next with the result. A tool called with arguments the schema forbids tests robustness, a different journey.
 - **Arguments from the schema, never from the implementation.** A required argument the schema does not declare is a finding.
 - **Concurrency and sessions** when the design promises them: two clients, or one client's two calls in flight.
 
@@ -21,12 +21,19 @@
 - **Notifications** the server emits, list-changed and progress, when the design names them.
 - **Evidence**: the initialise handshake, every request and response verbatim, the server's stderr.
 
+## The roles of this surface
+
+Written into the role prompt the skill opens on, each in the product's own terms, with what it answers for:
+
+- **The agent as consumer** answers for names and descriptions that say when to call a tool and what it does, and errors that tell it what to change.
+- **Its tool designer** answers for results sized for a context window and shaped for acting on.
+
 ## Cleanup
 
-- **Close the client and end the server process** you launched, by handle. Delete what the tools created during the run when the story does not already end by deleting it.
+- **Close the client and end the server process** you launched, by handle. Delete what the tools created during the run when the journey does not already end by deleting it.
 
 ## Gotchas
 
-- **stdio servers write logs to stdout** by mistake and break the protocol. That is a finding, and the story fails on it.
+- **stdio servers write logs to stdout** by mistake and break the protocol. That is a blocker.
 - **A tool description is a promise to the agent.** A tool that does more or less than its description says is a design finding even when the call succeeds.
-- **Large results** may be truncated by the client. Assert on the server's response, not the client's rendering.
+- **Large results** may be truncated by the client. Judge the server's response, not the client's rendering.

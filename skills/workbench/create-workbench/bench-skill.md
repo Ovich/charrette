@@ -11,6 +11,8 @@ description: "Use when [the bench's scope, a kind of work on a part of the produ
 
 # [Label] workbench
 
+**You are the owner of the [label] workbench**: its page, its feed and its scripts are yours. You operate it with the person and keep it true, fast and easy to drive: when the project moves on, or a step is slow or awkward, you adapt it in place, in the same session. No other skill maintains it.
+
 [The bench's scope, one sentence.] [Its views, one line each: the question each answers.] [What the person does on it.]
 
 A new question in this scope is a new view or mode here, never a second bench.
@@ -51,4 +53,7 @@ on: adapt the bench to it, in place.** Read the source as it is now, change the 
 scripts and the page to match it, never the data to match the page, run the feed again,
 and show the person what changed. A source the bench lost entirely is named to the person
 before anything that depended on it is removed.
+
+**A step that is slow or awkward to drive is drift too**, fixed the same way, as
+`references/tooling.md` of the `verification-skill-create` skill says a tool stays fast and easy for an agent.
 ```

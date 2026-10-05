@@ -29,7 +29,7 @@ last one.
 Two kinds of document.
 
 **Every slice that is not the test slice.** Its acceptance criteria open with the proof
-that stands in for its tests: a story of the verify skill, a walk of the screen, or a
+that stands in for its tests: a pass of the verify skill over the slice, a walk of the screen, or a
 command with the output expected of it. No criterion says a test passes. Its check is
 format, lint and types. Its seams under test stay, designed as the `write-slice` skill
 says and headed *owed to `<the test slice's node id>`*. Test support gets no block.

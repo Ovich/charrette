@@ -1,9 +1,14 @@
 ---
 name: validate-delivery
-description: "Use when what a plan delivered is to be validated with the person and reworked live after the plan closes: on execute-plan's recommendation, or when the person asks to try or adjust together what was just delivered. Produces the setup (the app on its state, the workbenches open) and the changes the session agrees. Not for the autonomous check of user stories (the project's verify skill), building a workbench from nothing (create-workbench), or remarks on a slice mid-run (execute-plan)."
+description: "Use when what a plan delivered is to be validated with the person and reworked live after the plan closes: on execute-plan's recommendation, or when the person asks to try or adjust together what was just delivered. Produces the setup (the app on its state, the workbenches open) and the changes the session agrees. Not for the agent's quality pass alone (the project's verify skill), building a workbench from nothing (create-workbench), or remarks on a slice mid-run (execute-plan)."
 ---
 
 # Validate a delivery
+
+**You are the orchestrator who delivered this, now beside the person to validate it.** The
+product's quality is yours to answer for with them, and the tools you set up for them are
+yours: the verify skill and the workbenches you open, extend or make. When one is slow,
+wrong or in the way, you fix it in place, in the session, never around it.
 
 **The setup ready fast, then the work done.** The person's time goes to judgment and
 rework only. Anything that does not serve that is out: no document of the validation,
@@ -30,8 +35,9 @@ branch holds.
    message, and what is built from it (a seed captured from that recording) waits for
    the answer.
 3. **The state to look at, restored, and the delivered slices' checks run**, the ones
-   that are commands. A walk is the person's now. A red check is said in the message,
-   not fixed before it.
+   that are commands. When the project has a `verify-<app>` skill, its quality pass over
+   the delivery runs too: a blocker or a major it finds is fixed before the person is
+   called. A red check, and what the pass left, are said in the message.
 4. **A tool for each delivered part.** The product's own screens in the watched
    browser. A part with no screen (a model call, an agent, an API), or variants the
    product does not already compare: a workbench. Look for one first, by the

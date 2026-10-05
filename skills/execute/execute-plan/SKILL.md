@@ -19,8 +19,7 @@ description: Use when carrying out an implementation plan the person has already
 
 **When the project has a `verify-<app>` skill**, and only then:
 
-- **Verification runs that skill**, per slice or per slot as the mandate says, anchored on that merge range, its document in the plan's group. A story that fails on the application is a pause.
-- **Maintenance runs `verification-skill-maintain`, once, at the slot's end**, anchored on the plan's whole range, before the slot's own verification when the mandate has one. It updates the verify skill and the feature map; it verifies nothing for the plan.
+- **Verification runs that skill**, per slice or per slot as the mandate says, anchored on that merge range, its scope the slice or the plan, its document in the plan's group. The agent running it keeps the skill and its map true as it goes, as the skill says. Its verdict is acted on before the tick: a blocker or a major is fixed, drawn as a deviation; one whose fix would change a decision is a pause; minors go to the person at the close.
 
 ## What stays in this session
 

@@ -9,6 +9,12 @@ description: "Use when a page is wanted to work on something with the person dur
 in the data home like every document, and the project's `workbench-<bench>` skill, which
 holds the feed that fills the page and the steps to operate it.
 
+**The bench's skill makes the agent operating it the bench's owner**, by its role: that agent
+keeps the page, the feed and the scripts true, fast and easy to drive, adapting them in place
+when the project moves on. No other skill maintains them. Its scripts are run at every use:
+`references/tooling.md` of the `verification-skill-create` skill, read before the first
+script, says how they stay fast and easy for an agent.
+
 **The person is in the build.** Every change is shown in the watched browser before the
 next question, as the `design-prototype` skill paces a mockup. A bench described in chat
 was not seen.
