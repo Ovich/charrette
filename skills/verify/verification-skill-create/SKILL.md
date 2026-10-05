@@ -21,7 +21,7 @@ description: "Use when a project has no verification skill and an agent should f
 
 ## The skill
 
-**`verify-<app>/SKILL.md` in the folder the project already uses for local skills**, `.claude/skills/` when it has none and is worked with Claude Code, asked otherwise. Written to the shape in `references/verify-skill.md`, read before the first line: the sentences outside its brackets are the protocol and are carried as written.
+**`verify-<app>/SKILL.md` in the folder the project already uses for local skills**, `.claude/skills/` when it has none and is worked with Claude Code, asked otherwise. Written to the shape in `references/verify-skill.md`, read before the first line: short, as a proven project skill is. When the project already has a skill that runs the app, it is the base: its words are kept as they are, wrapped with the role prompt, the map and the judgment, and it is removed once the verify skill holds all of it.
 
 ## The map
 
@@ -29,7 +29,7 @@ description: "Use when a project has no verification skill and an agent should f
 
 ## Prove it
 
-**Never hand over an unproven skill.** Run one quality pass through the generated skill on a real scope, a feature at least, its specification read, the anchor being the current commit. The skill is proven when the pass is complete: every part of the scope reached along the map, judged on the three counts, the verdict and the findings in the verification document with their evidence shown, the cleanup done, and the tooling within the budget `references/tooling.md` has it measure. A `not ready` verdict proves the skill as well as `ready` does. What the pass finds on the application is reported as its findings, never fixed inside this skill and never softened. A pass that could not reach or judge part of its scope fails on the skill or the map: fix them, run the cleanup, retry from a clean state.
+**Never hand over an unproven skill.** Run one quality pass through the generated skill on a real scope, a feature at least, its specification read, the anchor being the current commit. The skill is proven when the pass is complete: every part of the scope reached along the map, judged on the three counts, the verdict and the findings in the verification document with their evidence shown, the cleanup done. A `not ready` verdict proves the skill as well as `ready` does. What the pass finds on the application is reported as its findings, never fixed inside this skill and never softened. A pass that could not reach or judge part of its scope fails on the skill or the map: fix them, run the cleanup, retry from a clean state.
 
 Write the commit the pass ran against into `proven at`.
 
