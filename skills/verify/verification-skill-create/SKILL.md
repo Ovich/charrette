@@ -19,7 +19,7 @@ description: "Use when a project has no verification skill and an agent should f
 
 ## The skill and the map
 
-**`verify-<app>/SKILL.md`** in the project's local skill folder, written to the shape in `references/verify-skill.md`, read before the first line.
+**`verify-<app>/SKILL.md`** in the project's local skill folder, written to the shape in `references/verify-skill.md`, read before the first line. Its description opens on the template's trigger, word for word: whenever execute-plan runs and its executor's mandate includes verification, whenever the app must run in the repository. Reworded, the skill stops loading when a plan runs.
 
 **One `feature-map` document per project** in aiview, `YYYY-MM-DD-<project>.feature-map.md`, tags `verification`, its sections in `references/feature-map.md`: how the consumer reaches every feature and its hidden parts, and the journeys across them. Tell the person the URL.
 
