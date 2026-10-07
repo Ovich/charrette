@@ -20,7 +20,9 @@ export type HookInput = {
   tool_name: string;
   tool_input: Record<string, unknown>;
 };
-type PreOutput = { hookSpecificOutput: { hookEventName: "PreToolUse"; permissionDecision: "deny"; permissionDecisionReason: string } };
+type PreOutput =
+  | { hookSpecificOutput: { hookEventName: "PreToolUse"; permissionDecision: "deny"; permissionDecisionReason: string } }
+  | { hookSpecificOutput: { hookEventName: "PreToolUse"; additionalContext: string } };
 type PostOutput = { hookSpecificOutput: { hookEventName: "PostToolUse"; additionalContext: string } };
 
 const EDITS = new Set(["Edit", "Write", "NotebookEdit"]);
@@ -76,7 +78,8 @@ function pre(board: Board, input: HookInput): PreOutput | null {
   const p = board.identify({ ...who, worktree: input.cwd });
   if (!p) return null;
   const verdict = board.checkEdit(p, path.resolve(input.cwd || ".", file));
-  if (verdict.allowed) return null;
+  // a shared file: the edit goes through, the other holders named once (D40)
+  if (verdict.allowed) return verdict.notice ? { hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: `swarm board: ${verdict.notice}` } } : null;
   return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: verdict.refusal } };
 }
 
@@ -91,7 +94,7 @@ function post(board: Board, input: HookInput): PostOutput | null {
   return {
     hookSpecificOutput: {
       hookEventName: "PostToolUse",
-      additionalContext: `swarm board (you are ${p.name}; full text of a line: swarm read <n>):\n${text}`,
+      additionalContext: `swarm board (you are ${p.name}, ${p.nick}; full text of a line: swarm read <n>):\n${text}`,
     },
   };
 }

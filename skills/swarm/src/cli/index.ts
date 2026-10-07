@@ -15,7 +15,8 @@ const asJson = args.has("--json");
 
 const USAGE = [
   "usage: swarm <verb> [--json]",
-  "  open    --plan <slug> --title <t> --slices <file.json>          # opens a run, prints its id then the page's URL (orchestrator)",
+  "  open    --plan <slug> --title <t> --slices <file.json> [--link <url>]   # opens a run, prints its id then the page's URL (orchestrator)",
+  '          # the slices file: [{"id", "title", "blockers": [...], "link"?: "<slice document URL>"}]',
   "  slice   <id> --run <id> --state ready|running|done|blocked      # (orchestrator)",
   "  close   --run <id>                                              # (orchestrator)",
   '  join    --run <id> --slice <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # prints the roster',
@@ -124,7 +125,9 @@ function caller(board: Board): Participant {
 
 const rosterLine = (r: RosterEntry): string => {
   const files = r.files.map((f) => (f.interface ? `${f.path} (interface)` : f.path)).join(", ");
-  return `${r.name}${r.stale ? " (stale)" : ""}  run ${r.run}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}`;
+  // the funny name beside the runner (D43); an orchestrator is its name alone
+  const who = r.slice === "orchestrator" ? r.name : `${r.nick} · ${r.name}`;
+  return `${who}${r.stale ? " (stale)" : ""}  run ${r.run}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}`;
 };
 
 const printDelivery = (d: Delivery): void => {
@@ -147,9 +150,14 @@ function readSlices(file: string): SliceSpec[] {
   }
   const list = Array.isArray(raw) ? raw : (raw as { slices?: unknown }).slices;
   if (!Array.isArray(list)) return fail(`${file}: expected an array of {id, title, blockers}`);
-  return list.map((s: { id?: unknown; title?: unknown; blockers?: unknown }) => {
+  return list.map((s: { id?: unknown; title?: unknown; blockers?: unknown; link?: unknown }) => {
     if (typeof s.id !== "string") fail(`${file}: a slice without an id`);
-    return { id: String(s.id), title: String(s.title ?? s.id), blockers: Array.isArray(s.blockers) ? s.blockers.map(String) : [] };
+    return {
+      id: String(s.id),
+      title: String(s.title ?? s.id),
+      blockers: Array.isArray(s.blockers) ? s.blockers.map(String) : [],
+      link: typeof s.link === "string" && s.link ? s.link : null,
+    };
   });
 }
 
@@ -157,7 +165,7 @@ async function main(board: Board): Promise<void> {
   switch (args.verb) {
     case "open": {
       const plan = need("--plan");
-      const run = board.openRun({ repo: repoOf(process.cwd()), plan, title: need("--title"), slices: readSlices(need("--slices")) });
+      const run = board.openRun({ repo: repoOf(process.cwd()), plan, title: need("--title"), link: args.flag("--link") ?? null, slices: readSlices(need("--slices")) });
       // the person watches the run on the page: start it when none runs (US1, US6)
       const port = ensureServer();
       const url = port === null ? null : pageUrl(port);
@@ -187,8 +195,8 @@ async function main(board: Board): Promise<void> {
         files: [...args.list("--files"), ...args.flags("--file")].map(parseFile),
         worktree: worktreeOf(process.cwd()) ?? undefined,
       });
-      emit({ runner: runner.name, roster }, () => {
-        console.log(`you are ${runner.name}`);
+      emit({ runner: runner.name, nick: runner.nick, roster }, () => {
+        console.log(`you are ${runner.name}, ${runner.nick}: @${runner.slice} or @${runner.nick.replace(/\s+/g, "")} mentions you`);
         for (const r of roster) console.log(rosterLine(r));
       });
       break;

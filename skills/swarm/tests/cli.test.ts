@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { openBoard } from "../src/board/board.ts";
 import { freePort, stopServer } from "./support/page-server.ts";
 
 const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "cli", "index.ts");
@@ -80,6 +81,26 @@ test("open then join prints the roster", () => {
   assert.match(r.stdout, /you are review-tool\/S3/);
   assert.match(r.stdout, /review-tool\/S3 {2}run \d+ {2}doing: the page {2}files: src\/page\.ts \(interface\), src\/a\.ts/);
   assert.match(r.stdout, /review-tool\/orchestrator/);
+});
+
+test("the roster shows a runner's funny name beside it; open keeps the links (D43, D44)", async () => {
+  const slices = path.join(toolRoot, "linked.json");
+  fs.writeFileSync(slices, JSON.stringify([{ id: "S3", title: "the page", blockers: [], link: "http://localhost:4321/d/7" }]));
+  const opened = run("open", "--plan", "review-tool", "--title", "A plan", "--slices", slices, "--link", "http://localhost:4321/d/6", "--json");
+  assert.equal(opened.status, 0, opened.stderr);
+  const id = String(JSON.parse(opened.stdout).run);
+  const joined = JSON.parse(run("join", "--run", id, "--slice", "S3", "--doing", "the page", "--json").stdout);
+  assert.match(joined.nick, /^[A-Z][a-z]+ [A-Z][a-z]+$/);
+  const roster = run("roster").stdout;
+  assert.ok(roster.includes(`${joined.nick} · review-tool/S3  run ${id}`), roster);
+  assert.match(roster, /^review-tool\/orchestrator {2}run/m);
+  const board = await openBoard(path.join(toolRoot, "swarm.sqlite"));
+  try {
+    const r = board.runs()[0];
+    assert.deepEqual([r.link, r.slices[0].link], ["http://localhost:4321/d/6", "http://localhost:4321/d/7"]);
+  } finally {
+    board.close();
+  }
 });
 
 test("--json on every verb parses", () => {

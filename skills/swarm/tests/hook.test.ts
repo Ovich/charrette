@@ -90,7 +90,7 @@ afterEach(() => {
   }
 });
 
-test("pre denies with the holder, the note, wait and post", () => {
+test("pre holds the first edit of a shared file with the holder, the note and the post to make (D41)", () => {
   running();
   const r = hook("pre", { cwd: wtB, agent_id: "agent-b", tool_name: "Edit", tool_input: { file_path: path.join(wtB, "src", "a.ts") } });
   assert.equal(r.status, 0);
@@ -99,11 +99,23 @@ test("pre denies with the holder, the note, wait and post", () => {
   assert.equal(out.permissionDecision, "deny");
   assert.match(out.permissionDecisionReason, /review-tool\/S3/);
   assert.match(out.permissionDecisionReason, /the page/);
-  assert.match(out.permissionDecisionReason, /swarm wait/);
-  assert.match(out.permissionDecisionReason, /swarm post "@review-tool\/S3 …"/);
+  assert.match(out.permissionDecisionReason, /`swarm post "@review-tool\/S3 …" --about src\/a\.ts`, then retry the edit\./);
   // the holder's own edit, and a free file, pass with nothing printed
   assert.equal(hook("pre", { cwd: wtA, tool_name: "Write", tool_input: { file_path: path.join(wtA, "src", "a.ts") } }).stdout, "");
   assert.equal(hook("pre", { cwd: wtB, tool_name: "NotebookEdit", tool_input: { notebook_path: path.join(wtB, "n.ipynb") } }).stdout, "");
+});
+
+test("pre allows a shared file after the post, the other holder named once in its context", () => {
+  running();
+  const edit = (cwd: string) => hook("pre", { cwd, tool_name: "Edit", tool_input: { file_path: path.join(cwd, "src", "a.ts") } });
+  assert.equal(edit(wtB).json.hookSpecificOutput.permissionDecision, "deny");
+  cli(wtB, "post", "@S3 I add isExpired() at the end", "--about", "src/a.ts");
+  const allowed = edit(wtB).json.hookSpecificOutput;
+  assert.deepEqual(allowed, { hookEventName: "PreToolUse", additionalContext: "swarm board: src/a.ts is also held by review-tool/S3: the page" });
+  assert.equal(edit(wtB).stdout, "", "told once");
+  // the holder, on its next edit, hears of the newcomer once, and is never held
+  assert.match(edit(wtA).json.hookSpecificOutput.additionalContext, /src\/a\.ts is also held by review-tool\/S5: the skill/);
+  assert.equal(edit(wtA).stdout, "");
 });
 
 test("pre maps agent_id on swarm join", () => {
