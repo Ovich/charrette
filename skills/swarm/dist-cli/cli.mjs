@@ -460,6 +460,11 @@ async function openBoard(dbPath = SQLITE_PATH) {
       slice TEXT NOT NULL,
       at TEXT NOT NULL
     );
+    -- when a hook last ran past its fast exit: proof the plugin's hooks are loaded (D46)
+    CREATE TABLE IF NOT EXISTS hook_seen (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      at TEXT NOT NULL
+    );
   `);
   const upkeep = (table, column, ddl) => {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
@@ -1140,6 +1145,13 @@ async function openBoard(dbPath = SQLITE_PATH) {
         }
       };
     },
+    hookSeen() {
+      db.prepare("INSERT OR REPLACE INTO hook_seen (id, at) VALUES (1, ?)").run(now());
+    },
+    lastHook() {
+      const r = db.prepare("SELECT at FROM hook_seen WHERE id = 1").get();
+      return r ? String(r.at) : null;
+    },
     close() {
       watching?.close();
       watching = null;
@@ -1247,6 +1259,7 @@ async function runHook(kind) {
     if (!active && call?.verb !== "open") return;
     if (kind === "pre" && input.tool_name === "Bash" && !call) return;
     board = await openBoard();
+    board.hookSeen();
     const out = kind === "pre" ? pre(board, input) : post(board, input);
     if (out) process.stdout.write(JSON.stringify(out));
   } catch {
@@ -1332,7 +1345,7 @@ var USAGE = [
   "  end     [--as <runner>]                                         # releases your claims and the lock",
   "  hook    pre|post                                                # Claude Code's hooks: hook JSON on stdin",
   "  serve   [--port <p>] [--open] [--detach]                        # the page, on :4322 (SWARM_PORT)",
-  "  status                                                          # data home, the page's server, open runs",
+  "  status                                                          # data home, the page's server, when a hook last ran, open runs",
   "a runner is <plan>/<slice>, the orchestrator <plan>/orchestrator; without --as, the runner joined from this worktree"
 ].join("\n");
 var CliError = class extends Error {
@@ -1556,12 +1569,14 @@ ${USAGE}`);
     case "status": {
       const runs = board.runs();
       const server = readServerStatus();
-      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, runs: runs.length }, () => {
+      const hooks = board.lastHook();
+      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, hooks, runs: runs.length }, () => {
         console.log(`home    ${DATA_ROOT}`);
         console.log(`sqlite  ${SQLITE_PATH}`);
         console.log(
           server.running ? `page    running  pid ${server.pid}  ${pageUrl(server.port)}` : `page    not running${server.stale ? " (stale pid file)" : ""}: swarm serve --detach`
         );
+        console.log(hooks ? `hooks   last seen ${hooks}` : "hooks   never seen: restart Claude Code after installing the plugin");
         if (!runs.length) console.log("no open run");
         for (const r of runs) {
           console.log(`run ${r.id}  ${r.plan}  ${r.title}  ${r.repo}`);
