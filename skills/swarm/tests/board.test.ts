@@ -128,7 +128,7 @@ test("wait resolves within 100 ms of a post for it", async () => {
     posted = Date.now();
     poster.post(s3There, "@S5 done with src/a.ts");
   }, 300);
-  const d = await board.wait(s5, 5000);
+  const d = await board.wait(s5, { timeoutMs: 5000 });
   const latency = Date.now() - posted;
   assert.equal(d.full.length, 1);
   assert.ok(latency < 100, `woke after ${latency} ms`);
@@ -137,9 +137,65 @@ test("wait resolves within 100 ms of a post for it", async () => {
 test("wait resolves empty on timeout", async () => {
   const { s5 } = twoRunners();
   const t0 = Date.now();
-  const d = await board.wait(s5, 150);
+  const d = await board.wait(s5, { timeoutMs: 150 });
   assert.deepEqual(d, { full: [], lines: [] });
   assert.ok(Date.now() - t0 >= 140);
+});
+
+test("a mentions-only wait: a one-line event does not end it, a mention does; the event stays for deliver", async () => {
+  const { s3, s5 } = twoRunners();
+  const poster = await another();
+  const s3There = poster.participant(s3.name)!;
+  const waiting = board.wait(s5, { timeoutMs: 5000, mentionsOnly: true });
+  let done = false;
+  void waiting.then(() => (done = true));
+  await new Promise((r) => setTimeout(r, 100));
+  poster.setDoing(s3There, "the sidebar"); // an event: one line for S5
+  poster.post(s3There, "@S1 not for S5"); // a message for someone else: one line for S5
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(done, false, "a line ended a mentions-only wait");
+  poster.post(s3There, "@S5 your turn");
+  const d = await waiting;
+  assert.deepEqual(
+    d.full.map((m) => m.body),
+    ["@S5 your turn"],
+  );
+  assert.deepEqual(d.lines, []);
+  // what the wait did not return is still undelivered
+  const rest = board.deliver(s5);
+  assert.equal(rest.full.length, 0);
+  assert.equal(rest.lines.length, 2);
+  assert.match(rest.lines.join("\n"), /doing: the sidebar/);
+  assert.match(rest.lines.join("\n"), /@S1 not for S5/);
+});
+
+test("a mentions-only wait ends on an urgent post that does not mention it", async () => {
+  const { s5, orchestrator } = twoRunners();
+  const poster = await another();
+  setTimeout(() => poster.post(poster.participant(orchestrator.name)!, "stop: main is red", { kind: "urgent" }), 100);
+  const d = await board.wait(s5, { timeoutMs: 5000, mentionsOnly: true });
+  assert.equal(d.full.length + d.lines.length, 1);
+  assert.match([...d.full.map((m) => m.body), ...d.lines].join("\n"), /main is red/);
+});
+
+test("without mentionsOnly, a wait still ends on any delivery", async () => {
+  const { s3, s5 } = twoRunners();
+  const poster = await another();
+  setTimeout(() => poster.setDoing(poster.participant(s3.name)!, "the sidebar"), 100);
+  const d = await board.wait(s5, { timeoutMs: 5000 });
+  assert.equal(d.lines.length, 1);
+});
+
+test("end releases a pending wait of that runner, empty, at once", async () => {
+  const { s5 } = twoRunners();
+  const other = await another(); // end from a second connection, as the runner's next call would
+  const waiting = board.wait(s5, { timeoutMs: 10_000, mentionsOnly: true });
+  await new Promise((r) => setTimeout(r, 100));
+  const t0 = Date.now();
+  other.end(other.participant(s5.name)!);
+  const d = await waiting;
+  assert.deepEqual(d, { full: [], lines: [] });
+  assert.ok(Date.now() - t0 < 1000, `released after ${Date.now() - t0} ms`);
 });
 
 test("post by an ended runner throws", () => {
@@ -455,7 +511,7 @@ test("a snapshot shows two plans on one repository", () => {
 
 test("a runner's state: ended, done, waiting", async () => {
   const { run, s3, s5 } = claimed();
-  const waiting = board.wait(s5, 400);
+  const waiting = board.wait(s5, { timeoutMs: 400 });
   const watcher = await another();
   assert.equal(watcher.snapshot(REPO).roster.find((r) => r.runner === s5.name)!.state, "waiting");
   await waiting;
@@ -464,6 +520,30 @@ test("a runner's state: ended, done, waiting", async () => {
   const by = Object.fromEntries(board.snapshot(REPO).roster.map((r) => [r.runner, r.state]));
   assert.equal(by[s5.name], "ended");
   assert.equal(by[s3.name], "done");
+});
+
+test("a pending mentions-only wait is listening, the state still working; a plain wait is waiting", async () => {
+  const { s5 } = twoRunners();
+  const watcher = await another();
+  const s5Of = () => watcher.snapshot(REPO).roster.find((r) => r.runner === s5.name)!;
+  assert.equal(s5Of().listening, false);
+  const listening = board.wait(s5, { timeoutMs: 300, mentionsOnly: true });
+  assert.deepEqual([s5Of().state, s5Of().listening], ["working", true]);
+  await listening;
+  assert.equal(s5Of().listening, false);
+  const waiting = board.wait(s5, { timeoutMs: 300 });
+  assert.deepEqual([s5Of().state, s5Of().listening], ["waiting", false]);
+  await waiting;
+  assert.equal(s5Of().state, "working");
+});
+
+test("the snapshot carries when a hook was last seen", () => {
+  twoRunners();
+  assert.equal(board.snapshot(REPO).hooksSeen, null);
+  board.hookSeen();
+  const seen = board.snapshot(REPO).hooksSeen;
+  assert.ok(seen && Date.now() - Date.parse(seen) < 5000, `hooksSeen ${seen}`);
+  assert.equal(seen, board.lastHook());
 });
 
 test("a closed run stays in repos() among the last ten", () => {

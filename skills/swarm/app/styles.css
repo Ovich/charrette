@@ -198,6 +198,8 @@ a.doc:hover { text-decoration-color: var(--accent); }
 .state.merging i { background: var(--foreground); }
 .state.watching i { background: var(--faint-foreground); }
 .state.done i, .state.ended i { background: var(--border); }
+.listen { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; font-size: 10.5px; color: var(--faint-foreground); }
+.listen svg { width: 11px; height: 11px; }
 .state.stale { color: var(--faint-foreground); }
 .state.stale i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint-foreground); animation: none; }
 @keyframes pulse { 50% { opacity: .35; } }

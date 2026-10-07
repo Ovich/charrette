@@ -45,6 +45,7 @@ const runner = (
     files: files.map(([path, iface]) => ({ path, interface: !!iface, shared: false })),
     joined: at(joined),
     calls,
+    listening: false,
   };
 };
 
@@ -123,6 +124,7 @@ export const LIVE: BoardSnapshot = {
   queues: { [RT]: queue(RT, RT_SLICES), [AL]: queue(AL, AL_SLICES) },
   files: [],
   flags: [],
+  hooksSeen: null,
 };
 // the FileMap's rows, as the Board derives them from the claims: one holder each here
 LIVE.files = LIVE.roster.flatMap((r) => r.files.map((f) => ({ path: f.path, holders: [r.runner], interface: f.interface })));

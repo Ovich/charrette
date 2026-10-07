@@ -32,7 +32,7 @@ describe("the regions render their copy from the live snapshot", () => {
     expect(screen.getByRole("button", { name: /charrette-app/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /billing-service/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /4 running.*Sessions with refresh tokens.*2 of 7 merged/ })).toBeTruthy();
-    expect(screen.getByText("3 runs open · swarm.sqlite · :4322")).toBeTruthy();
+    expect(screen.getByText("3 runs open · hooks never seen · :4322")).toBeTruthy();
     // TopBar with MergeLock
     expect(screen.getByText("The thread")).toBeTruthy();
     expect(screen.getByText("merge lock free")).toBeTruthy();
@@ -80,6 +80,24 @@ describe("the regions render their copy from the live snapshot", () => {
     expect(screen.getByRole("button", { name: /docs-site/ })).toBeTruthy();
     expect(screen.getByText("0 runs open · swarm.sqlite · :4322")).toBeTruthy();
     expect(screen.queryByText("Who is there")).toBeNull();
+  });
+});
+
+describe("the background listener (D49)", () => {
+  test("a listening runner's card says so under its tag, its state still working; a waiting one stays waiting", () => {
+    const roster = LIVE.roster.map((r) =>
+      r.runner === "refresh-tokens/S3" ? { ...r, listening: true } : r.runner === "refresh-tokens/S4" ? { ...r, state: "waiting" as const } : r,
+    );
+    show(liveState({ roster }));
+    expect(card(/Adding refreshToken to Session/).textContent).toMatch(/RT·S3working\s*listening.*joined 14:02/);
+    expect(card(/Writing POST \/auth\/refresh/).textContent).toMatch(/waiting/);
+    expect(card(/Writing POST \/auth\/refresh/).textContent).not.toMatch(/listening/);
+    expect(screen.getAllByText("listening")).toHaveLength(1);
+  });
+
+  test("the sidebar footer says when a hook was last seen", () => {
+    show(liveState({ hooksSeen: new Date(Date.now() - 12_000).toISOString() }));
+    expect(screen.getByText("3 runs open · hooks seen 12 s ago · :4322")).toBeTruthy();
   });
 });
 

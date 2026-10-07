@@ -35,6 +35,15 @@ function RunnerCard({
           {label}
         </span>
       </span>
+      {p.listening && !orch && (p.state === "working" || p.state === "waiting") && (
+        <span className="listen" title="a background listener wakes it when someone talks to it" data-component="Listening">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+            <path d="M4 9a4 4 0 018 0M2 9a6 6 0 0112 0" />
+            <circle cx="8" cy="10" r="1.2" fill="currentColor" />
+          </svg>
+          listening
+        </span>
+      )}
       <span className="plan">{planTitle}</span>
       <span className="slice">{orch ? "Feeds the swarm" : p.title}</span>
       <span className="doing">{p.doing}</span>

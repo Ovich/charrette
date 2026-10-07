@@ -81,6 +81,8 @@ export type SnapshotRunner = {
   files: (Declared & { shared: boolean })[]; // shared: another live runner holds it too (D40)
   joined: string;
   calls: number;
+  /** A background `wait --mentions` is pending: the runner hears the board while it works (D49). */
+  listening: boolean;
 };
 export type SnapshotEvent = { seq: number; at: string; kind: MessageKind; from: string; body: string; about: string | null };
 export type QueueSlice = { slice: string; title: string; link: string | null; state: string; blockers: string[]; runner: string | null };
@@ -98,6 +100,8 @@ export type BoardSnapshot = {
   events: SnapshotEvent[];
   queues: Record<string, QueueSlice[]>;
   files: SnapshotFile[];
+  /** When a hook last ran past its fast exit (ISO), or null: the sidebar footer's "hooks seen" (D46). */
+  hooksSeen: string | null;
   flags: { path: string; runner: string }[];
 };
 
@@ -129,7 +133,10 @@ export interface Board {
   post(p: Participant, body: string, opts?: { about?: string; kind?: MessageKind }): Message;
   read(seq: number): Message;
   deliver(p: Participant): Delivery; // undelivered since last time; marks them delivered; stamps the last call
-  wait(p: Participant, timeoutMs?: number): Promise<Delivery>; // the first delivery, or empty on timeout
+  /** The first delivery, or empty on timeout or once `p` has ended (D49). `mentionsOnly`: only a
+   *  message that mentions `p` or is urgent ends it, and only those are marked delivered; the rest
+   *  stays for the next `deliver`. */
+  wait(p: Participant, opts?: { timeoutMs?: number; mentionsOnly?: boolean }): Promise<Delivery>;
 
   /** An edit to `path` (absolute, or repository-relative). Free: claimed, silently. Held by
    *  others (D40, D41): `p`'s first edit is held until `p` has posted about the path mentioning
@@ -166,6 +173,8 @@ const ORCHESTRATOR = "orchestrator";
 const WAIT_POLL_MS = 1000;
 const LINE_WIDTH = 100;
 const STALE_MS = 10 * 60 * 1000;
+/** The page is told a hook ran at most this often; its footer ticks the relative time between. */
+const HOOK_SEEN_TOLD_MS = 60 * 1000;
 /** The page lists the machine's last this many closed runs (D34). */
 const CLOSED_LISTED = 10;
 /** The page shows the last this many messages of a thread. */
@@ -303,6 +312,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   upkeep("participants", "last_call", "last_call TEXT");
   upkeep("participants", "calls", "calls INTEGER NOT NULL DEFAULT 0");
   upkeep("participants", "waiting", "waiting INTEGER NOT NULL DEFAULT 0");
+  // 1 while a `wait --mentions` is pending: a listener, not a wait (D49)
+  upkeep("participants", "listening", "listening INTEGER NOT NULL DEFAULT 0");
   upkeep("participants", "nick", "nick TEXT");
   // 1: written by the board itself in a runner's name (a flag, a merge notice), never a runner's own word
   upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
@@ -561,18 +572,21 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     clearFlags();
     if (owner && claims + locks > 0) bump(String(owner.repo));
   };
-  /** A runner inside a `wait` shows `waiting` on the page. */
-  const setWaiting = (p: Participant, on: boolean): void =>
+  /** A runner inside a `wait` shows `waiting` on the page; inside a `wait --mentions`, `listening`
+   *  beside its state: a background listener is pending almost all the time, the runner working. */
+  const setWaiting = (p: Participant, on: boolean, column: "waiting" | "listening"): void =>
     transaction(() => {
-      const r = db.prepare("UPDATE participants SET waiting = ? WHERE id = ? AND waiting != ?").run(on ? 1 : 0, p.id, on ? 1 : 0);
+      const r = db.prepare(`UPDATE participants SET ${column} = ? WHERE id = ? AND ${column} != ?`).run(on ? 1 : 0, p.id, on ? 1 : 0);
       if (Number(r.changes) > 0) bump(participantById(p.id).repo);
     });
 
-  /** `fromWait`: a wait's own look is not a tool call of its own, so it counts no call. */
-  const deliverTo = (p: Participant, fromWait: boolean): Delivery => {
+  /** `fromWait`: a wait's own look is not a tool call of its own, so it counts no call.
+   *  `mentionsOnly`: only what mentions `p` or is urgent is taken and marked; the rest stays. */
+  const deliverTo = (p: Participant, fromWait: boolean, mentionsOnly = false): Delivery => {
     const me = participantById(p.id);
+    const named = (m: Message): boolean => m.mentions.includes(me.name) || m.mentions.includes(`${me.plan}/*`);
     const messages = transaction(() => {
-      const rows = db
+      const unseen = db
         .prepare(
           `SELECT m.* FROM messages m
            WHERE m.repo = ? AND m.seq > ? AND m.author != ?
@@ -580,6 +594,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
            ORDER BY m.seq`,
         )
         .all(me.repo, Number((db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id) as Row).since_seq), me.id, me.id) as Row[];
+      const rows = mentionsOnly ? unseen.filter((r) => r.kind === "urgent" || named(toMessage(r))) : unseen;
       const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
       for (const r of rows) mark.run(me.id, Number(r.seq));
       // the post hook delivers after every tool call: this is the runner's last call (D31)
@@ -592,11 +607,15 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       }
       return rows.map(toMessage);
     });
-    const named = (m: Message): boolean => m.mentions.includes(me.name) || m.mentions.includes(`${me.plan}/*`);
     return {
       full: messages.filter(named),
       lines: messages.filter((m) => !named(m)).map(messageLine),
     };
+  };
+
+  const lastHookAt = (): string | null => {
+    const r = db.prepare("SELECT at FROM hook_seen WHERE id = 1").get() as Row | undefined;
+    return r ? String(r.at) : null;
   };
 
   // The page's view (D34, D39): open runs and the machine's last ten closed ones.
@@ -822,9 +841,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       return deliverTo(p, false);
     },
 
-    wait(p, timeoutMs) {
+    wait(p, opts = {}) {
+      const { timeoutMs, mentionsOnly = false } = opts;
       participantById(p.id);
-      setWaiting(p, true);
+      const column = mentionsOnly ? "listening" : "waiting";
+      setWaiting(p, true, column);
       return new Promise<Delivery>((resolve, reject) => {
         let settled = false;
         let watcher: fs.FSWatcher | undefined;
@@ -837,7 +858,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           clearInterval(poll);
           clearTimeout(timer);
           try {
-            setWaiting(p, false);
+            setWaiting(p, false, column);
           } catch {}
           if (d instanceof Error) reject(d);
           else resolve(d);
@@ -845,7 +866,9 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         const check = (): void => {
           if (settled) return;
           try {
-            const d = deliverTo(p, true);
+            // `end`, from this process or another, releases a pending wait of that runner
+            if (participantById(p.id).ended) return finish({ full: [], lines: [] });
+            const d = deliverTo(p, true, mentionsOnly);
             if (d.full.length || d.lines.length) finish(d);
           } catch (e) {
             finish(e as Error);
@@ -1067,6 +1090,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           files: (claimsOf.all(id) as Row[]).map((c) => ({ path: String(c.path), interface: c.kind === "interface", shared: sharedBy(String(c.path), id) })),
           joined: String(r.joined_at),
           calls: Number(r.calls ?? 0),
+          listening: !ended && Number(r.listening) === 1,
         };
       });
 
@@ -1107,6 +1131,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         queues,
         files: [...files.values()],
         flags,
+        hooksSeen: lastHookAt(),
       };
     },
 
@@ -1142,13 +1167,17 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     },
 
     hookSeen() {
-      // no change event: nothing the page draws moves
+      const before = lastHookAt();
       db.prepare("INSERT OR REPLACE INTO hook_seen (id, at) VALUES (1, ?)").run(now());
+      // the page's footer says when a hook was last seen; a hook runs at every tool call, so the
+      // page is told at most once a minute, its relative time ticking on its own between
+      if (before === null || Date.now() - Date.parse(before) >= HOOK_SEEN_TOLD_MS) {
+        for (const r of db.prepare("SELECT DISTINCT repo FROM runs WHERE state = 'open'").all() as Row[]) bump(String(r.repo));
+      }
     },
 
     lastHook() {
-      const r = db.prepare("SELECT at FROM hook_seen WHERE id = 1").get() as Row | undefined;
-      return r ? String(r.at) : null;
+      return lastHookAt();
     },
 
     close() {

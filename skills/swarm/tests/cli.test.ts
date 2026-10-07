@@ -161,6 +161,68 @@ test("wait in a child process wakes on a post from another", async () => {
   assert.ok(Date.now() - t0 < 5000, "wait did not wake on the post");
 });
 
+test("wait prints, before the message, the line that re-arms it with the exact command, --as included", () => {
+  const id = String(openRun());
+  run("join", "--run", id, "--slice", "S3", "--doing", "x");
+  run("join", "--run", id, "--slice", "S5", "--doing", "y");
+  run("deliver", "--as", "review-tool/S5");
+  run("post", "--as", "review-tool/S3", "@S5 your turn");
+  const r = run("wait", "--as", "review-tool/S5", "--mentions", "--timeout", "5000");
+  assert.equal(r.status, 0, r.stderr);
+  const [hint, ...message] = r.stdout.trimEnd().split("\n");
+  const script = CLI.replace(/\\/g, "/");
+  assert.equal(
+    hint,
+    `answer on the thread if needed, then start this listener again in the background: node ${script} wait --mentions --as review-tool/S5 --timeout 5000`,
+  );
+  assert.match(message.join("\n"), /review-tool\/S3[^\n]*\n@S5 your turn/);
+  // the command it names runs as written: nothing more for S5, so it times out, silent
+  const again = run("wait", "--as", "review-tool/S5", "--mentions", "--timeout", "50");
+  assert.equal(again.status, 0, again.stderr);
+  assert.equal(again.stdout, "");
+});
+
+test("a mentions-only wait in a child process sleeps through a join and wakes on a mention", async () => {
+  const id = String(openRun());
+  run("join", "--run", id, "--slice", "S5", "--doing", "y");
+  run("deliver", "--as", "review-tool/S5");
+  const child = spawn(process.execPath, [CLI, "wait", "--mentions", "--as", "review-tool/S5", "--timeout", "15000"], { cwd: repo, env: env() });
+  let out = "";
+  child.stdout.on("data", (b) => (out += b));
+  let exitedAt = 0;
+  const exited = new Promise<number | null>((resolve) =>
+    child.on("exit", (c) => {
+      exitedAt = Date.now();
+      resolve(c);
+    }),
+  );
+  await new Promise((r) => setTimeout(r, 1500)); // the child is up and watching
+  run("join", "--run", id, "--slice", "S3", "--doing", "x"); // a roster line: not a mention
+  await new Promise((r) => setTimeout(r, 800));
+  assert.equal(exitedAt, 0, `a join line woke the listener: ${out}`);
+  run("post", "--as", "review-tool/S3", "@S5 your turn");
+  assert.equal(await exited, 0);
+  assert.match(out, /^answer on the thread if needed[^\n]*wait --mentions --as review-tool\/S5 --timeout 15000\n/);
+  assert.match(out, /@S5 your turn/);
+  assert.doesNotMatch(out, /joined/);
+});
+
+test("end releases a runner's pending wait in another process", async () => {
+  const id = String(openRun());
+  run("join", "--run", id, "--slice", "S5", "--doing", "y");
+  const child = spawn(process.execPath, [CLI, "wait", "--mentions", "--as", "review-tool/S5", "--timeout", "15000"], { cwd: repo, env: env() });
+  let out = "";
+  child.stdout.on("data", (b) => (out += b));
+  const exited = new Promise<number | null>((resolve) => child.on("exit", resolve));
+  await new Promise((r) => setTimeout(r, 1500));
+  const ended = run("end", "--as", "review-tool/S5");
+  assert.equal(ended.status, 0, ended.stderr);
+  const t0 = Date.now();
+  assert.equal(await exited, 0);
+  assert.ok(Date.now() - t0 < 5000, "end did not release the wait");
+  assert.equal(out, "");
+});
+
 test("two worktrees of one repository share one thread", () => {
   const a = path.join(toolRoot, "wt-a");
   const b = path.join(toolRoot, "wt-b");

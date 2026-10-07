@@ -25,7 +25,8 @@ const USAGE = [
   "  agree   [--as <runner>] <terms> [--about <path>]                # prints the seq",
   "  read    <seq>",
   "  deliver [--as <runner>]                                         # what you have not had: mentions in full, the rest one line",
-  "  wait    [--as <runner>] [--timeout <ms>]                        # blocks until a message for you; nothing on timeout",
+  "  wait    [--as <runner>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end",
+  "          # --mentions: only a mention of you or an urgent post ends it; the rest stays for deliver",
   "  roster  [--repo <path>]",
   "  release [--as <runner>] <path>                                  # gives up a claim",
   "  merge-lock [--as <runner>]                                      # one merge at a time per repository",
@@ -135,6 +136,9 @@ const printDelivery = (d: Delivery): void => {
   for (const l of d.lines) console.log(l);
 };
 
+/** A word of a POSIX command line, double-quoted when it holds anything else than plain characters. */
+const shellWord = (w: string): string => (/^[\w@%+=:,./-]+$/.test(w) ? w : `"${w.replace(/(["\\$`])/g, "\\$1")}"`);
+
 /** `<path>`, `<path>:inside` or `<path>:interface`. */
 function parseFile(spec: string): Declared {
   const m = spec.match(/^(.*):(interface|inside)$/);
@@ -234,8 +238,25 @@ async function main(board: Board): Promise<void> {
       const raw = args.flag("--timeout");
       const timeout = raw === undefined ? undefined : Number(raw);
       if (timeout !== undefined && !(timeout >= 0)) fail(`--timeout takes milliseconds, got ${raw}`);
-      const d = await board.wait(p, timeout);
-      emit(d, () => printDelivery(d));
+      const mentionsOnly = args.has("--mentions");
+      const d = await board.wait(p, { timeoutMs: timeout, mentionsOnly });
+      if (!d.full.length && !d.lines.length) {
+        emit(d, ""); // a timeout, or the runner ended: nothing to answer, nothing to re-arm
+        break;
+      }
+      // the runner's next step, before the message: the exact command that re-arms this listener (D49)
+      // `node <skill-dir>/swarm.mjs`, as the skill writes it and the allow rule matches it; forward
+      // slashes, which Node takes on Windows too and no shell eats
+      const again = ["node", shellWord(process.argv[1].replace(/\\/g, "/")), "wait"];
+      if (mentionsOnly) again.push("--mentions");
+      if (args.flag("--as")) again.push("--as", shellWord(args.flag("--as")!));
+      if (raw !== undefined) again.push("--timeout", raw);
+      if (asJson) again.push("--json");
+      const next = `answer on the thread if needed, then start this listener again in the background: ${again.join(" ")}`;
+      emit({ next, ...d }, () => {
+        console.log(next);
+        printDelivery(d);
+      });
       break;
     }
     case "roster": {
