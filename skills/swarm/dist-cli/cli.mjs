@@ -347,6 +347,7 @@ var ORCHESTRATOR = "orchestrator";
 var WAIT_POLL_MS = 1e3;
 var LINE_WIDTH = 100;
 var STALE_MS = 10 * 60 * 1e3;
+var HOOK_SEEN_TOLD_MS = 60 * 1e3;
 var CLOSED_LISTED = 10;
 var EVENTS_SHOWN = 500;
 var CASELESS = process.platform === "win32";
@@ -474,6 +475,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
   upkeep("participants", "last_call", "last_call TEXT");
   upkeep("participants", "calls", "calls INTEGER NOT NULL DEFAULT 0");
   upkeep("participants", "waiting", "waiting INTEGER NOT NULL DEFAULT 0");
+  upkeep("participants", "listening", "listening INTEGER NOT NULL DEFAULT 0");
   upkeep("participants", "nick", "nick TEXT");
   upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
   upkeep("runs", "link", "link TEXT");
@@ -669,19 +671,21 @@ async function openBoard(dbPath = SQLITE_PATH) {
     clearFlags();
     if (owner && claims + locks > 0) bump(String(owner.repo));
   };
-  const setWaiting = (p, on) => transaction(() => {
-    const r = db.prepare("UPDATE participants SET waiting = ? WHERE id = ? AND waiting != ?").run(on ? 1 : 0, p.id, on ? 1 : 0);
+  const setWaiting = (p, on, column) => transaction(() => {
+    const r = db.prepare(`UPDATE participants SET ${column} = ? WHERE id = ? AND ${column} != ?`).run(on ? 1 : 0, p.id, on ? 1 : 0);
     if (Number(r.changes) > 0) bump(participantById(p.id).repo);
   });
-  const deliverTo = (p, fromWait) => {
+  const deliverTo = (p, fromWait, mentionsOnly = false) => {
     const me = participantById(p.id);
+    const named = (m) => m.mentions.includes(me.name) || m.mentions.includes(`${me.plan}/*`);
     const messages = transaction(() => {
-      const rows = db.prepare(
+      const unseen = db.prepare(
         `SELECT m.* FROM messages m
            WHERE m.repo = ? AND m.seq > ? AND m.author != ?
              AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.participant = ? AND d.seq = m.seq)
            ORDER BY m.seq`
       ).all(me.repo, Number(db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id).since_seq), me.id, me.id);
+      const rows = mentionsOnly ? unseen.filter((r) => r.kind === "urgent" || named(toMessage(r))) : unseen;
       const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
       for (const r of rows) mark.run(me.id, Number(r.seq));
       db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(now(), me.id);
@@ -692,11 +696,14 @@ async function openBoard(dbPath = SQLITE_PATH) {
       }
       return rows.map(toMessage);
     });
-    const named = (m) => m.mentions.includes(me.name) || m.mentions.includes(`${me.plan}/*`);
     return {
       full: messages.filter(named),
       lines: messages.filter((m) => !named(m)).map(messageLine)
     };
+  };
+  const lastHookAt = () => {
+    const r = db.prepare("SELECT at FROM hook_seen WHERE id = 1").get();
+    return r ? String(r.at) : null;
   };
   const listedRuns = () => db.prepare(
     `SELECT * FROM runs WHERE state = 'open'
@@ -879,9 +886,11 @@ async function openBoard(dbPath = SQLITE_PATH) {
     deliver(p) {
       return deliverTo(p, false);
     },
-    wait(p, timeoutMs) {
+    wait(p, opts = {}) {
+      const { timeoutMs, mentionsOnly = false } = opts;
       participantById(p.id);
-      setWaiting(p, true);
+      const column = mentionsOnly ? "listening" : "waiting";
+      setWaiting(p, true, column);
       return new Promise((resolve, reject) => {
         let settled = false;
         let watcher;
@@ -894,7 +903,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
           clearInterval(poll);
           clearTimeout(timer);
           try {
-            setWaiting(p, false);
+            setWaiting(p, false, column);
           } catch {
           }
           if (d instanceof Error) reject(d);
@@ -903,7 +912,8 @@ async function openBoard(dbPath = SQLITE_PATH) {
         const check = () => {
           if (settled) return;
           try {
-            const d = deliverTo(p, true);
+            if (participantById(p.id).ended) return finish({ full: [], lines: [] });
+            const d = deliverTo(p, true, mentionsOnly);
             if (d.full.length || d.lines.length) finish(d);
           } catch (e) {
             finish(e);
@@ -1084,7 +1094,8 @@ async function openBoard(dbPath = SQLITE_PATH) {
           stale: !ended && !orchestrator && Date.parse(String(r.last_call ?? r.joined_at)) < cutoff,
           files: claimsOf.all(id).map((c) => ({ path: String(c.path), interface: c.kind === "interface", shared: sharedBy(String(c.path), id) })),
           joined: String(r.joined_at),
-          calls: Number(r.calls ?? 0)
+          calls: Number(r.calls ?? 0),
+          listening: !ended && Number(r.listening) === 1
         };
       });
       const events = db.prepare("SELECT * FROM (SELECT * FROM messages WHERE repo = ? ORDER BY seq DESC LIMIT ?) ORDER BY seq").all(repo, EVENTS_SHOWN).map((r) => {
@@ -1113,7 +1124,8 @@ async function openBoard(dbPath = SQLITE_PATH) {
         events,
         queues,
         files: [...files.values()],
-        flags
+        flags,
+        hooksSeen: lastHookAt()
       };
     },
     onChange(listener) {
@@ -1146,11 +1158,14 @@ async function openBoard(dbPath = SQLITE_PATH) {
       };
     },
     hookSeen() {
+      const before = lastHookAt();
       db.prepare("INSERT OR REPLACE INTO hook_seen (id, at) VALUES (1, ?)").run(now());
+      if (before === null || Date.now() - Date.parse(before) >= HOOK_SEEN_TOLD_MS) {
+        for (const r of db.prepare("SELECT DISTINCT repo FROM runs WHERE state = 'open'").all()) bump(String(r.repo));
+      }
     },
     lastHook() {
-      const r = db.prepare("SELECT at FROM hook_seen WHERE id = 1").get();
-      return r ? String(r.at) : null;
+      return lastHookAt();
     },
     close() {
       watching?.close();
@@ -1337,7 +1352,8 @@ var USAGE = [
   "  agree   [--as <runner>] <terms> [--about <path>]                # prints the seq",
   "  read    <seq>",
   "  deliver [--as <runner>]                                         # what you have not had: mentions in full, the rest one line",
-  "  wait    [--as <runner>] [--timeout <ms>]                        # blocks until a message for you; nothing on timeout",
+  "  wait    [--as <runner>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end",
+  "          # --mentions: only a mention of you or an urgent post ends it; the rest stays for deliver",
   "  roster  [--repo <path>]",
   "  release [--as <runner>] <path>                                  # gives up a claim",
   "  merge-lock [--as <runner>]                                      # one merge at a time per repository",
@@ -1427,6 +1443,7 @@ var printDelivery = (d) => {
   for (const m of d.full) console.log(fullText(m));
   for (const l of d.lines) console.log(l);
 };
+var shellWord = (w) => /^[\w@%+=:,./-]+$/.test(w) ? w : `"${w.replace(/(["\\$`])/g, "\\$1")}"`;
 function parseFile(spec) {
   const m = spec.match(/^(.*):(interface|inside)$/);
   return m ? { path: m[1], interface: m[2] === "interface" } : { path: spec, interface: false };
@@ -1524,8 +1541,22 @@ ${USAGE}`);
       const raw = args.flag("--timeout");
       const timeout = raw === void 0 ? void 0 : Number(raw);
       if (timeout !== void 0 && !(timeout >= 0)) fail(`--timeout takes milliseconds, got ${raw}`);
-      const d = await board.wait(p, timeout);
-      emit(d, () => printDelivery(d));
+      const mentionsOnly = args.has("--mentions");
+      const d = await board.wait(p, { timeoutMs: timeout, mentionsOnly });
+      if (!d.full.length && !d.lines.length) {
+        emit(d, "");
+        break;
+      }
+      const again = ["node", shellWord(process.argv[1].replace(/\\/g, "/")), "wait"];
+      if (mentionsOnly) again.push("--mentions");
+      if (args.flag("--as")) again.push("--as", shellWord(args.flag("--as")));
+      if (raw !== void 0) again.push("--timeout", raw);
+      if (asJson) again.push("--json");
+      const next = `answer on the thread if needed, then start this listener again in the background: ${again.join(" ")}`;
+      emit({ next, ...d }, () => {
+        console.log(next);
+        printDelivery(d);
+      });
       break;
     }
     case "roster": {
