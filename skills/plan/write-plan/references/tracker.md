@@ -39,6 +39,7 @@ done when: <the command that exits 0, or what is observed>
 - **A fork is between slices, never inside one**: arrows leaving one node and joining at a later one, each labeled with its area.
 - **Arms are disjoint**: different files, and neither needs the other's result before the join. Two slices sharing a file, a cloud account, an environment, a database or a registry are one arm.
 - **The join's done-when covers what the arms produced together.**
+- **A plan in swarm mode draws every slice as an arm from one start**, not proved apart: `references/swarm.md`.
 
 ## The state node
 

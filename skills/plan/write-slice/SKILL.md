@@ -7,6 +7,8 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 **Cutting a plan's increment into slices**: read `references/cutting.md`. The rest of this skill is one slice's document.
 
+**A plan whose mandate says `mode: swarm`**: read `references/swarm.md` before the cut or the document.
+
 **One document per slice, the whole design one agent needs.** The mandate (when tests are written, the pull request, the boundaries) is not in it: it reaches the agent through the brief at dispatch (the `orchestrate-plan` skill).
 
 ## Before writing

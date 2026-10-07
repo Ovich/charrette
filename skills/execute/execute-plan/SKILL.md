@@ -14,6 +14,7 @@ description: Use when carrying out an implementation plan the person has already
 - **Open the plan in aiview every session** and give the person the URL.
 - **Do not start** if the plan has no tracker, a slice has no slice document (the test slice of `tests: at the plan end` excepted, written once the others are done), or a slice's check is not a command. Say so and finish the plan first.
 - **Reconcile a tracker the repository has moved past** before starting; say what you found.
+- **The mode is the mandate's.** `mode: swarm` runs through the `orchestrate-plan` skill's swarm branch.
 
 ## Keeping the plan and its tracker
 
