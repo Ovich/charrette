@@ -5,15 +5,18 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { freePort, stopServer } from "./support/page-server.ts";
 
 const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "cli", "index.ts");
 
 let toolRoot: string;
 let repo: string;
+let port: number;
 
 // SWARM_ROOT = where the code would be; CHARRETTE_HOME = where the data goes.
 // The suite points both at one temp dir so a run leaves nothing in the real home.
-const env = () => ({ ...process.env, SWARM_ROOT: toolRoot, CHARRETTE_HOME: toolRoot });
+// SWARM_PORT: `open` starts the page's server; each test on a port of its own.
+const env = () => ({ ...process.env, SWARM_ROOT: toolRoot, CHARRETTE_HOME: toolRoot, SWARM_PORT: String(port) });
 
 const runIn = (cwd: string, ...argv: string[]) => spawnSync(process.execPath, [CLI, ...argv], { cwd, encoding: "utf8", env: env() });
 const run = (...argv: string[]) => runIn(repo, ...argv);
@@ -33,10 +36,11 @@ const openRun = (plan = "review-tool", cwd = repo): number => {
   fs.writeFileSync(slices, SLICES);
   const r = runIn(cwd, "open", "--plan", plan, "--title", "A plan", "--slices", slices);
   assert.equal(r.status, 0, r.stderr);
-  return Number(r.stdout.trim());
+  return Number(r.stdout.split("\n")[0].trim()); // the run id, then the page's URL
 };
 
-beforeEach(() => {
+beforeEach(async () => {
+  port = await freePort();
   toolRoot = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-cli-"));
   repo = path.join(toolRoot, "repo");
   fs.mkdirSync(repo);
@@ -45,6 +49,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopServer(toolRoot);
   // Windows may briefly hold handles of a just-ended child; a leaked temp dir
   // must not fail the suite.
   for (let i = 0; ; i++) {
@@ -81,7 +86,7 @@ test("--json on every verb parses", () => {
   const slices = path.join(toolRoot, "s.json");
   fs.writeFileSync(slices, SLICES);
   const opened = JSON.parse(run("open", "--plan", "review-tool", "--title", "T", "--slices", slices, "--json").stdout);
-  assert.deepEqual(Object.keys(opened).sort(), ["plan", "repo", "run"]);
+  assert.deepEqual(Object.keys(opened).sort(), ["plan", "repo", "run", "url"]);
   const id = String(opened.run);
   const as = ["--as", "review-tool/S3"];
   const verbs: string[][] = [
@@ -186,4 +191,53 @@ test("the launcher prints the build command when dist-cli is absent", () => {
   const r = spawnSync(process.execPath, [path.join(fake, "swarm.mjs"), "status"], { encoding: "utf8", env: env() });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /not built\. Run: npm install && npm run build/);
+});
+
+// ── the page's server (Slice 3) ──────────────────────────────────────────────────
+
+const status = () => JSON.parse(run("status", "--json").stdout);
+
+test("serve --detach starts the server, status reports it, a second reports the one running", () => {
+  assert.deepEqual(status().server, { running: false, pid: null, port: null, stale: false });
+  const first = run("serve", "--detach", "--json");
+  assert.equal(first.status, 0, first.stderr);
+  const up = JSON.parse(first.stdout);
+  assert.equal(up.server.running, true);
+  assert.equal(up.server.port, port);
+  assert.equal(up.url, `http://localhost:${port}/`);
+  assert.equal(fs.readFileSync(path.join(toolRoot, "swarm.port"), "utf8"), String(port));
+  assert.equal(Number(fs.readFileSync(path.join(toolRoot, "swarm.pid"), "utf8")), up.server.pid);
+
+  const st = status();
+  assert.equal(st.server.running, true);
+  assert.equal(st.server.pid, up.server.pid);
+  assert.equal(st.runs, 0);
+
+  const second = run("serve", "--detach");
+  assert.equal(second.status, 0, second.stderr);
+  assert.match(second.stdout, new RegExp(`already running on http://localhost:${port}/ \\(pid ${up.server.pid}\\)`));
+  assert.equal(status().server.pid, up.server.pid, "no second server");
+});
+
+test("serve --detach --port takes the port asked for", async () => {
+  const other = await freePort();
+  const r = run("serve", "--detach", "--port", String(other), "--json");
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(r.stdout).server.port, other);
+});
+
+test("open starts the server when none runs and prints the page's URL", async () => {
+  const slices = path.join(toolRoot, "s.json");
+  fs.writeFileSync(slices, SLICES);
+  const r = run("open", "--plan", "review-tool", "--title", "T", "--slices", slices);
+  assert.equal(r.status, 0, r.stderr);
+  const [id, url] = r.stdout.trim().split("\n");
+  assert.ok(Number(id) > 0);
+  assert.equal(url, `http://localhost:${port}/`);
+  assert.equal(status().server.running, true);
+  const repos = (await (await fetch(`http://127.0.0.1:${port}/api/repos`)).json()) as { runs: { run: number }[] }[];
+  assert.equal(repos[0].runs[0].run, Number(id));
+  // a second run reuses the server
+  const again = run("open", "--plan", "swarm", "--title", "T", "--slices", slices, "--json");
+  assert.equal(JSON.parse(again.stdout).url, url);
 });

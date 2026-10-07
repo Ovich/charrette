@@ -6,6 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { freePort, stopServer } from "./support/page-server.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.resolve(HERE, "..", "src", "cli", "index.ts");
@@ -15,8 +16,10 @@ let home: string;
 let repo: string;
 let wtA: string;
 let wtB: string;
+let port: number;
 
-const env = () => ({ ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home });
+// SWARM_PORT: `open` starts the page's server (Slice 3); each test on a port of its own.
+const env = () => ({ ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home, SWARM_PORT: String(port) });
 const cli = (cwd: string, ...argv: string[]) => {
   const r = spawnSync(process.execPath, [CLI, ...argv], { cwd, encoding: "utf8", env: env() });
   assert.equal(r.status, 0, `${argv.join(" ")}: ${r.stderr}`);
@@ -51,7 +54,7 @@ const SLICES = JSON.stringify([
 const running = (): string => {
   const slices = path.join(home, "slices.json");
   fs.writeFileSync(slices, SLICES);
-  const id = cli(repo, "open", "--plan", "review-tool", "--title", "T", "--slices", slices).trim();
+  const id = cli(repo, "open", "--plan", "review-tool", "--title", "T", "--slices", slices).split("\n")[0].trim(); // the run id, then the page's URL
   cli(wtA, "join", "--run", id, "--slice", "S3", "--doing", "the page", "--files", "src/a.ts:inside,src/api.ts:interface");
   cli(wtB, "join", "--run", id, "--slice", "S5", "--doing", "the skill");
   cli(wtA, "deliver");
@@ -59,7 +62,8 @@ const running = (): string => {
   return id;
 };
 
-beforeEach(() => {
+beforeEach(async () => {
+  port = await freePort();
   home = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-hook-"));
   repo = path.join(home, "repo");
   fs.mkdirSync(path.join(repo, "src"), { recursive: true });
@@ -74,6 +78,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopServer(home);
   for (let i = 0; ; i++) {
     try {
       fs.rmSync(home, { recursive: true, force: true });
@@ -104,7 +109,7 @@ test("pre denies with the holder, the note, wait and post", () => {
 test("pre maps agent_id on swarm join", () => {
   const slices = path.join(home, "slices.json");
   fs.writeFileSync(slices, SLICES);
-  const id = cli(repo, "open", "--plan", "review-tool", "--title", "T", "--slices", slices).trim();
+  const id = cli(repo, "open", "--plan", "review-tool", "--title", "T", "--slices", slices).split("\n")[0].trim(); // the run id, then the page's URL
   cli(wtA, "join", "--run", id, "--slice", "S3", "--doing", "the page");
   const command = `node "${LAUNCHER}" join --run ${id} --slice S5 --doing "the skill"`;
   const seen = hook("pre", { cwd: wtB, agent_id: "agent-b", tool_name: "Bash", tool_input: { command } });
@@ -125,7 +130,7 @@ test("pre maps session_id on swarm open", () => {
   fs.writeFileSync(slices, SLICES);
   const command = `swarm open --plan review-tool --title T --slices ${slices}`;
   assert.equal(hook("pre", { cwd: repo, session_id: "session-orc", tool_name: "Bash", tool_input: { command } }).stdout, "");
-  const id = cli(repo, "open", "--plan", "review-tool", "--title", "T", "--slices", slices).trim();
+  const id = cli(repo, "open", "--plan", "review-tool", "--title", "T", "--slices", slices).split("\n")[0].trim(); // the run id, then the page's URL
   cli(wtA, "join", "--run", id, "--slice", "S3", "--doing", "the page");
   cli(wtA, "post", "@orchestrator S3 needs a decision");
   const r = hook("post", { cwd: home, session_id: "session-orc", tool_name: "Read", tool_input: {} });

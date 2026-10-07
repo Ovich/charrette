@@ -1,11 +1,12 @@
 // CLI dispatch — the agent-facing surface of the board. Human output is short lines an
 // agent reads; --json prints the same data as one object; errors go to stderr, exit 1.
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { openBoard, type Board, type Declared, type Delivery, type Participant, type RosterEntry, type SliceSpec, type SliceState } from "../board/board.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
 import { runHook } from "../hook/hook.ts";
+import { portFrom, PORT_FILE, readServerStatus } from "../server/state.ts";
 import { parseArgs } from "./args.ts";
 import { fullText } from "./format.ts";
 
@@ -14,7 +15,7 @@ const asJson = args.has("--json");
 
 const USAGE = [
   "usage: swarm <verb> [--json]",
-  "  open    --plan <slug> --title <t> --slices <file.json>          # opens a run, prints its id (orchestrator)",
+  "  open    --plan <slug> --title <t> --slices <file.json>          # opens a run, prints its id then the page's URL (orchestrator)",
   "  slice   <id> --run <id> --state ready|running|done|blocked      # (orchestrator)",
   "  close   --run <id>                                              # (orchestrator)",
   '  join    --run <id> --slice <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # prints the roster',
@@ -30,7 +31,8 @@ const USAGE = [
   "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase",
   "  end     [--as <runner>]                                         # releases your claims and the lock",
   "  hook    pre|post                                                # Claude Code's hooks: hook JSON on stdin",
-  "  status                                                          # data home, open runs",
+  "  serve   [--port <p>] [--open] [--detach]                        # the page, on :4322 (SWARM_PORT)",
+  "  status                                                          # data home, the page's server, open runs",
   "a runner is <plan>/<slice>, the orchestrator <plan>/orchestrator; without --as, the runner joined from this worktree",
 ].join("\n");
 
@@ -68,6 +70,39 @@ function worktreeOf(dir: string): string | null {
   const top = git(dir, "rev-parse", "--show-toplevel");
   return top ? path.resolve(top) : null;
 }
+
+/** Starts the page's server detached and waits for its port file (aiview's shape, copied).
+ *  The port it listens on, or null when it did not come up. */
+function spawnDetachedServer(port: number): number | null {
+  try {
+    fs.rmSync(PORT_FILE, { force: true });
+  } catch {}
+  // re-invoke the current entry: swarm.mjs in real use, the TS source under test
+  const child = spawn(process.execPath, [process.argv[1], "serve", "--port", String(port)], {
+    detached: true,
+    stdio: "ignore",
+    cwd: DATA_ROOT,
+  });
+  child.unref();
+  const t0 = Date.now();
+  for (;;) {
+    const st = readServerStatus();
+    if (st.running && st.port !== null) return st.port;
+    if (Date.now() - t0 > 10_000) return null;
+    // a synchronous CLI: a short blocking poll
+    spawnSync(process.execPath, ["-e", "setTimeout(()=>{},120)"]);
+  }
+}
+
+/** The running page server's port, starting one when none runs; null when it would not start. */
+function ensureServer(): number | null {
+  const st = readServerStatus();
+  if (st.running && st.port !== null) return st.port;
+  fs.mkdirSync(DATA_ROOT, { recursive: true });
+  return spawnDetachedServer(portFrom(args.flag("--port")));
+}
+
+const pageUrl = (port: number): string => `http://localhost:${port}/`;
 
 const need = (flag: string): string => args.flag(flag) ?? fail(`${flag} is required\n${USAGE}`);
 
@@ -123,7 +158,11 @@ async function main(board: Board): Promise<void> {
     case "open": {
       const plan = need("--plan");
       const run = board.openRun({ repo: repoOf(process.cwd()), plan, title: need("--title"), slices: readSlices(need("--slices")) });
-      emit({ run: run.id, repo: run.repo, plan: run.plan }, String(run.id));
+      // the person watches the run on the page: start it when none runs (US1, US6)
+      const port = ensureServer();
+      const url = port === null ? null : pageUrl(port);
+      if (url === null) console.error(`swarm: the page did not start (port ${portFrom(args.flag("--port"))} may be in use; swarm serve --detach --port <n>). The run is open.`);
+      emit({ run: run.id, repo: run.repo, plan: run.plan, url }, url ? `${run.id}\n${url}` : String(run.id));
       break;
     }
     case "slice": {
@@ -231,9 +270,13 @@ async function main(board: Board): Promise<void> {
     }
     case "status": {
       const runs = board.runs();
-      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, runs }, () => {
+      const server = readServerStatus();
+      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, runs: runs.length }, () => {
         console.log(`home    ${DATA_ROOT}`);
         console.log(`sqlite  ${SQLITE_PATH}`);
+        console.log(
+          server.running ? `page    running  pid ${server.pid}  ${pageUrl(server.port as number)}` : `page    not running${server.stale ? " (stale pid file)" : ""}: swarm serve --detach`,
+        );
         if (!runs.length) console.log("no open run");
         for (const r of runs) {
           console.log(`run ${r.id}  ${r.plan}  ${r.title}  ${r.repo}`);
@@ -254,6 +297,20 @@ if (!args.verb) {
 if (args.verb === "hook") {
   // before the store opens: the hook decides whether it needs it at all
   await runHook(args.positional[0]);
+} else if (args.verb === "serve" && args.has("--detach")) {
+  const st = readServerStatus();
+  const port = st.running && st.port !== null ? st.port : (fs.mkdirSync(DATA_ROOT, { recursive: true }), spawnDetachedServer(portFrom(args.flag("--port"))));
+  if (port === null) {
+    console.error(`swarm: the server did not come up within 10 s (port ${portFrom(args.flag("--port"))} may be in use; retry with --port <n>)`);
+    process.exitCode = 1;
+  } else {
+    const server = readServerStatus();
+    emit({ server, url: pageUrl(port), already: st.running }, st.running ? `swarm's page already running on ${pageUrl(port)} (pid ${server.pid})` : `swarm's page up on ${pageUrl(port)}`);
+  }
+} else if (args.verb === "serve") {
+  // the server holds its Board for its whole life
+  const { startServer } = await import("../server/index.ts");
+  startServer(await openBoard(), { port: portFrom(args.flag("--port")), open: args.has("--open") });
 } else {
   const board = await openBoard();
   try {
