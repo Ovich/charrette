@@ -1142,7 +1142,8 @@ var VALUE_FLAGS = /* @__PURE__ */ new Set([
   "--about",
   "--timeout",
   "--repo",
-  "--port"
+  "--port",
+  "--onto"
 ]);
 var LIST_FLAGS = /* @__PURE__ */ new Set(["--files"]);
 function parseArgs(argv) {
@@ -1203,7 +1204,7 @@ var USAGE = [
   "  roster  [--repo <path>]",
   "  claim   [--as <runner>] <path> [--interface]                    # before editing a file: exit 0 claimed, 3 held until you post about it",
   "  release [--as <runner>] <path>                                  # gives up a claim",
-  "  merge-lock [--as <runner>]                                      # one merge at a time per repository",
+  "  merge-lock --onto <branch> [--as <runner>]                      # one merge at a time per repository; claims or flags what your branch wrote unclaimed",
   "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase",
   "  end     [--as <runner>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
   "  serve   [--port <p>] [--open] [--detach]                        # the page, on :4322 (SWARM_PORT)",
@@ -1252,6 +1253,17 @@ function changedIn(worktree) {
   }
   return out;
 }
+function branchChangedIn(worktree, onto) {
+  const base = git(worktree, "merge-base", onto, "HEAD") ?? fail(`no merge base between ${onto} and HEAD in ${worktree}: is --onto the branch you merge into?`);
+  const r = spawnSync("git", ["diff", "--name-only", "-z", "--no-renames", `${base}..HEAD`], { cwd: worktree, encoding: "utf8" });
+  if (r.status !== 0) return fail(`git diff failed in ${worktree}: ${r.stderr.trim()}`);
+  const committed = r.stdout.split("\0").filter(Boolean);
+  return [.../* @__PURE__ */ new Set([...committed, ...changedIn(worktree)])];
+}
+var printReconciled = (reconciled, flags) => {
+  for (const file of reconciled) console.log(`reconciled ${file}`);
+  for (const f of flags) console.log(`#${f.seq} flagged: you wrote ${f.path} outside your claim; ${f.holder} holds it. Settle it with @${f.holder} on the thread.`);
+};
 function spawnDetachedServer(port) {
   try {
     fs4.rmSync(PORT_FILE, { force: true });
@@ -1447,11 +1459,14 @@ ${USAGE}`);
     }
     case "merge-lock": {
       const p = caller(board);
+      const onto = need("--onto");
+      const reconciled = p.worktree ? branchChangedIn(p.worktree, onto) : [];
+      const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
       const r = board.lockMerge(p);
-      emit(
-        { runner: p.name, ...r },
-        r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait for its merged event`
-      );
+      emit({ runner: p.name, ...r, reconciled, flags }, () => {
+        printReconciled(reconciled, flags);
+        console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait for its merged event`);
+      });
       break;
     }
     case "merged": {
@@ -1468,8 +1483,7 @@ ${USAGE}`);
       const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
       board.end(p);
       emit({ runner: p.name, ended: true, reconciled, flags }, () => {
-        for (const file of reconciled) console.log(`reconciled ${file}`);
-        for (const f of flags) console.log(`#${f.seq} flagged: you wrote ${f.path} outside your claim; ${f.holder} holds it. Settle it with @${f.holder} on the thread.`);
+        printReconciled(reconciled, flags);
         console.log(`${p.name} ended`);
       });
       break;

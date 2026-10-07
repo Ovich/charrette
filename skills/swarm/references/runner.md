@@ -66,8 +66,8 @@ formatter, a move) is claimed before the command.
    gives up): `$S agree "<the terms>" --about <path>`. What you both agreed goes.
 4. **From then on your claims pass**; you are told once of each other holder.
 
-**A flag** is a file you wrote without claiming it while another runner holds it, found by `end`
-and posted on the thread to you both. Claim before you edit and there is none.
+**A flag** is a file you wrote without claiming it while another runner holds it, found by
+`merge-lock` or `end` and posted on the thread to you both. Claim before you edit and there is none.
 
 ## Waiting
 
@@ -79,8 +79,10 @@ listener wakes you when it comes. Never poll with sleep.
 **One merge at a time per repository.** At your slice's end, and early when a file you declared
 *interface* changed in a way other slices import:
 
-1. **`$S merge-lock`.** Held by another: a foreground `$S wait --timeout <ms>` for its merged
-   event (your listener sleeps through events), then ask again.
+1. **`$S merge-lock --onto <the branch your brief names>`.** It first claims, or flags, every
+   file your branch changed since it left that branch, committed or not, and lists them. Held by
+   another: a foreground `$S wait --timeout <ms>` for its merged event (your listener sleeps
+   through events), then ask again.
 2. **Commit, then rebase onto the branch your brief names.** A conflict there is yours to
    resolve: you merge second. Post to the runner whose change you meet, `@<them>` about the path,
    and settle it on the thread.

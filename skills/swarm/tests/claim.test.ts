@@ -55,7 +55,7 @@ beforeEach(async () => {
   fs.mkdirSync(path.join(repo, "src"), { recursive: true });
   fs.writeFileSync(path.join(repo, "src", "old.ts"), "export {};\n");
   fs.writeFileSync(path.join(repo, "src", "a.ts"), "export {};\n");
-  git(repo, "init", "-q");
+  git(repo, "init", "-q", "-b", "main");
   git(repo, "add", ".");
   git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "root");
   wtA = path.join(home, "wt-a");
@@ -160,4 +160,56 @@ test("end lists what it reconciled, then the end", () => {
   assert.deepEqual(out.filter((l) => l.startsWith("reconciled ")).sort(), ["reconciled src/a.ts", "reconciled src/new.ts"]);
   assert.ok(out.some((l) => /^#\d+ flagged: you wrote src\/a\.ts outside your claim; review-tool\/S3 holds it/.test(l)), out.join("\n"));
   assert.ok(out.includes("review-tool/S5 ended"));
+});
+
+const commit = (cwd: string, msg: string): void => {
+  git(cwd, "add", "-A");
+  git(cwd, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", msg);
+};
+
+test("merge-lock reconciles the branch's commits against --onto: a never-claimed file claimed, the lock granted (D59)", () => {
+  running();
+  fs.writeFileSync(path.join(wtB, "src", "new.ts"), "export const x = 1;\n");
+  commit(wtB, "new");
+  const out = cli(wtB, "merge-lock", "--onto", "main").split("\n");
+  assert.deepEqual(out.filter((l) => l.startsWith("reconciled ")), ["reconciled src/new.ts"]);
+  assert.ok(out.some((l) => l.startsWith("granted: ")), out.join("\n"));
+  // claimed: another runner is now held on it
+  assert.equal(swarm(wtA, "claim", "src/new.ts").status, 3);
+});
+
+test("merge-lock flags a committed file another runner holds, mentioning both, and still grants the lock (D59)", () => {
+  running();
+  fs.writeFileSync(path.join(wtB, "src", "a.ts"), "// S3's\n");
+  commit(wtB, "a");
+  const r = JSON.parse(cli(wtB, "merge-lock", "--onto", "main", "--json"));
+  assert.equal(r.granted, true);
+  assert.deepEqual(r.reconciled, ["src/a.ts"]);
+  assert.deepEqual(
+    r.flags.map((f: { path: string; holder: string }) => [f.path, f.holder]),
+    [["src/a.ts", "review-tool/S3"]],
+  );
+  const forS3 = JSON.parse(cli(wtA, "deliver", "--json"));
+  const flag = forS3.full.find((m: { body: string }) => /flag:/.test(m.body));
+  assert.ok(flag, JSON.stringify(forS3));
+  assert.deepEqual([...flag.mentions].sort(), ["review-tool/S3", "review-tool/S5"]);
+});
+
+test("merge-lock claims both paths of a committed rename, and an uncommitted write beside it (D59)", () => {
+  running();
+  git(wtB, "mv", "src/old.ts", "src/renamed.ts");
+  commit(wtB, "rename");
+  fs.writeFileSync(path.join(wtB, "src", "wip.ts"), "export {};\n");
+  const r = JSON.parse(cli(wtB, "merge-lock", "--onto", "main", "--json"));
+  assert.equal(r.granted, true);
+  assert.deepEqual([...r.reconciled].sort(), ["src/old.ts", "src/renamed.ts", "src/wip.ts"]);
+  for (const f of ["src/old.ts", "src/renamed.ts", "src/wip.ts"]) assert.equal(swarm(wtA, "claim", f).status, 3, f);
+});
+
+test("merge-lock without --onto says it is required and grants nothing (D59)", () => {
+  running();
+  const r = swarm(wtB, "merge-lock");
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /--onto is required/);
+  assert.ok(cli(wtA, "merge-lock", "--onto", "main").includes("granted: "), "the lock is still free");
 });

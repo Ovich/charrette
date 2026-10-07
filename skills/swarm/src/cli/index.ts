@@ -3,7 +3,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { openBoard, type Board, type Declared, type Delivery, type Participant, type RosterEntry, type SliceSpec, type SliceState } from "../board/board.ts";
+import { openBoard, type Board, type Declared, type Delivery, type Flag, type Participant, type RosterEntry, type SliceSpec, type SliceState } from "../board/board.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
 import { portFrom, PORT_FILE, readServerStatus } from "../server/state.ts";
 import { parseArgs } from "./args.ts";
@@ -29,7 +29,7 @@ const USAGE = [
   "  roster  [--repo <path>]",
   "  claim   [--as <runner>] <path> [--interface]                    # before editing a file: exit 0 claimed, 3 held until you post about it",
   "  release [--as <runner>] <path>                                  # gives up a claim",
-  "  merge-lock [--as <runner>]                                      # one merge at a time per repository",
+  "  merge-lock --onto <branch> [--as <runner>]                      # one merge at a time per repository; claims or flags what your branch wrote unclaimed",
   "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase",
   "  end     [--as <runner>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
   "  serve   [--port <p>] [--open] [--detach]                        # the page, on :4322 (SWARM_PORT)",
@@ -86,6 +86,22 @@ function changedIn(worktree: string): string[] {
   }
   return out;
 }
+
+/** Paths the worktree's branch changed since it left `onto`, committed or not; a rename gives both (D59). */
+function branchChangedIn(worktree: string, onto: string): string[] {
+  const base = git(worktree, "merge-base", onto, "HEAD") ?? fail(`no merge base between ${onto} and HEAD in ${worktree}: is --onto the branch you merge into?`);
+  // --no-renames: a rename is its deletion and its addition, both paths
+  const r = spawnSync("git", ["diff", "--name-only", "-z", "--no-renames", `${base}..HEAD`], { cwd: worktree, encoding: "utf8" });
+  if (r.status !== 0) return fail(`git diff failed in ${worktree}: ${r.stderr.trim()}`);
+  const committed = r.stdout.split("\0").filter(Boolean);
+  return [...new Set([...committed, ...changedIn(worktree)])];
+}
+
+/** The reconcile's lines: each file, then each flag on the thread (D58, D59). */
+const printReconciled = (reconciled: string[], flags: Flag[]): void => {
+  for (const file of reconciled) console.log(`reconciled ${file}`);
+  for (const f of flags) console.log(`#${f.seq} flagged: you wrote ${f.path} outside your claim; ${f.holder} holds it. Settle it with @${f.holder} on the thread.`);
+};
 
 /** Starts the page's server detached and waits for its port file (aiview's shape, copied).
  *  The port it listens on, or null when it did not come up. */
@@ -306,11 +322,16 @@ async function main(board: Board): Promise<void> {
     }
     case "merge-lock": {
       const p = caller(board);
+      // the branch merged into: a worktree does not say which branch it left, so the runner names it (D59)
+      const onto = need("--onto");
+      // what the branch wrote without a claim, committed or not, before the lock; a flag informs, never blocks
+      const reconciled = p.worktree ? branchChangedIn(p.worktree, onto) : [];
+      const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
       const r = board.lockMerge(p);
-      emit(
-        { runner: p.name, ...r },
-        r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait for its merged event`,
-      );
+      emit({ runner: p.name, ...r, reconciled, flags }, () => {
+        printReconciled(reconciled, flags);
+        console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait for its merged event`);
+      });
       break;
     }
     case "merged": {
@@ -328,8 +349,7 @@ async function main(board: Board): Promise<void> {
       const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
       board.end(p);
       emit({ runner: p.name, ended: true, reconciled, flags }, () => {
-        for (const file of reconciled) console.log(`reconciled ${file}`);
-        for (const f of flags) console.log(`#${f.seq} flagged: you wrote ${f.path} outside your claim; ${f.holder} holds it. Settle it with @${f.holder} on the thread.`);
+        printReconciled(reconciled, flags);
         console.log(`${p.name} ended`);
       });
       break;
