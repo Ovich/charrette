@@ -20,6 +20,22 @@ $S join --run <run> --slice <slice> --doing "<what you start on>" \
   your funny name too.
 - **A file you edit that you did not declare** is claimed at the edit when it is free.
 
+**Right after `join`, start your listener**: `$S wait --mentions` as a background task, with the
+harness's own background-task feature (`references/setup.md` says which harnesses have one). It
+ends on a message that mentions you or an urgent post; one-line news stays for later.
+
+## Listening
+
+- **Your harness tells you the listener ended**, while you work or when you are idle. Read its
+  output: the first line is your next step and the exact command, the message follows. Act on it,
+  answer on the thread if it asks, then **start that command again in the background**.
+- **It ended with no output**: its timeout, or the harness's own time limit. Start it again.
+- **One listener at a time.** Never start a second in the background while one runs.
+- **No background notification in your harness**: `$S deliver` between steps, and a foreground
+  `$S wait --mentions --timeout <ms>` when you have nothing else to do.
+- **The hook's lines after a tool call**, where they come, are news as well; they do not replace
+  the listener.
+
 ## As the work moves
 
 - **`$S doing "<text>"`** at each step another runner would want to know: the module you are
@@ -45,16 +61,16 @@ holder the flag names.
 
 ## Waiting
 
-**When you need an answer before going on**, do the parts that do not depend on it first, then
-`$S wait --timeout <ms>`, the timeout under your shell call's own. It returns the first message
-for you, or nothing on timeout: wait again or carry on. Never poll with sleep.
+**When you need an answer before going on**, do the parts that do not depend on it first; your
+listener wakes you when it comes. Never poll with sleep.
 
 ## Merging
 
 **One merge at a time per repository.** At your slice's end, and early when a file you declared
 *interface* changed in a way other slices import:
 
-1. **`$S merge-lock`.** Held by another: `$S wait` for its merged event, then ask again.
+1. **`$S merge-lock`.** Held by another: a foreground `$S wait --timeout <ms>` for its merged
+   event (your listener sleeps through events), then ask again.
 2. **Commit, then rebase onto the branch your brief names.** A conflict there is yours to
    resolve: you merge second. Post to the runner whose change you meet, `@<them>` about the path,
    and settle it on the thread.
@@ -67,6 +83,7 @@ for you, or nothing on timeout: wait again or carry on. Never poll with sleep.
 
 ## End
 
-**`$S end`** after your last merge: it releases your claims and the lock. A slice that stops on
-a finding posts it to `@orchestrator` first, then ends. Then return as the `execute-slice` skill
+**`$S end`** after your last merge: it releases your claims and the lock, and makes your running
+listener return empty: nothing to stop, nothing to re-arm. A slice that stops on a finding posts
+it to `@orchestrator` first, then ends. Then return as the `execute-slice` skill
 says, the agreements you made among what the document did not predict.

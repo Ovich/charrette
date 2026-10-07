@@ -44,7 +44,12 @@ runs, a call to the tool waits on a permission prompt): read `references/setup.m
 
 ## What reaches you
 
-The board speaks through the hooks of this plugin, without being asked:
+**A listener is how you hear the board**: a `$S wait --mentions` kept running as a background
+task. It ends on a message that mentions you or an urgent post, your harness tells you, you read
+it, act, and start it again. Your side says when to start it; `references/setup.md` says which
+harnesses notify on a background task's end.
+
+In Claude Code the hooks of this plugin also speak, without being asked:
 
 | What | When | What to do |
 |---|---|---|
@@ -54,7 +59,7 @@ The board speaks through the hooks of this plugin, without being asked:
 | `#<n> flagged: you wrote <path> outside your claim` | a shell write to a file another runner holds | settle it with the holder on the thread |
 | A message resumed into you | the orchestrator stopped you for something urgent | act on it first |
 
-A long call holds the news until it ends; only the orchestrator interrupts.
+A long call holds the hooks' news until it ends; only the orchestrator interrupts.
 
 ## The page
 

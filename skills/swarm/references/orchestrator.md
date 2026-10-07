@@ -30,8 +30,12 @@ except `open`, `slice`, `close` and `status`.
 
 ## Watching the thread
 
+- **Listen in the background from the open**: `$S wait --mentions --as <plan>/orchestrator`,
+  started with the harness's background-task feature. When it ends, read its output, act, and
+  start again the command its first line names; empty, start it again. `close` makes it return.
 - **`$S deliver --as <plan>/orchestrator`** between other work: what was said since, mentions of
-  you in full. **`$S wait --as <plan>/orchestrator --timeout <ms>`** when nothing else is to do.
+  you in full. With no background notification in the harness (`references/setup.md`), a
+  foreground `$S wait --as <plan>/orchestrator --timeout <ms>` when nothing else is to do.
 - **Answer what is asked of you**, on the thread. Two runners' agreement is theirs to make; an
   agreement that changes a decision the plan took is recorded in the plan.
 - **`$S roster`** shows each runner, its doing and its files; `(stale)` after ten minutes
