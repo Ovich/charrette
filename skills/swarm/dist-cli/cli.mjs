@@ -242,11 +242,15 @@ function planCode(plan) {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 var MENTION = /(?<![\w@])@([A-Za-z0-9][\w.\-]*(?:[\/·][A-Za-z0-9][\w.\-]*)?)/g;
-function parseMentions(body, senderPlan, plans) {
+var nameHandle = (nick) => nick.replace(/\s+/g, "").toLowerCase();
+function parseMentions(body, senderPlan, plans, names) {
   const out = /* @__PURE__ */ new Set();
   for (const m of body.matchAll(MENTION)) {
     const token = m[1].replace(/[.\-]+$/, "");
-    if (token.includes("/")) {
+    const named = names?.get(token.toLowerCase());
+    if (named) {
+      out.add(named);
+    } else if (token.includes("/")) {
       const [plan, slice] = token.split("/");
       out.add(`${plan}/${slice === "all" ? "*" : slice}`);
     } else if (token.includes("\xB7")) {
@@ -259,6 +263,82 @@ function parseMentions(body, senderPlan, plans) {
     }
   }
   return [...out];
+}
+
+// src/board/names.ts
+var ADJECTIVES = [
+  "Sleepy",
+  "Grumpy",
+  "Brave",
+  "Clumsy",
+  "Dizzy",
+  "Fuzzy",
+  "Gentle",
+  "Hasty",
+  "Jolly",
+  "Lucky",
+  "Mighty",
+  "Nimble",
+  "Plucky",
+  "Quiet",
+  "Rusty",
+  "Sneaky",
+  "Tidy",
+  "Witty",
+  "Zesty",
+  "Bouncy",
+  "Cheeky",
+  "Dapper",
+  "Eager",
+  "Fancy",
+  "Giddy",
+  "Humble",
+  "Lofty",
+  "Merry",
+  "Peppy",
+  "Snappy"
+];
+var ANIMALS = [
+  "Otter",
+  "Badger",
+  "Walrus",
+  "Penguin",
+  "Llama",
+  "Ferret",
+  "Puffin",
+  "Wombat",
+  "Gecko",
+  "Moose",
+  "Panda",
+  "Lemur",
+  "Narwhal",
+  "Hedgehog",
+  "Koala",
+  "Yak",
+  "Toucan",
+  "Beaver",
+  "Platypus",
+  "Raccoon",
+  "Alpaca",
+  "Bison",
+  "Capybara",
+  "Dingo",
+  "Emu",
+  "Flamingo",
+  "Gibbon",
+  "Heron",
+  "Ibis",
+  "Jackal"
+];
+function funnyName(taken, random = Math.random) {
+  const used = new Set([...taken].map((t) => t.toLowerCase()));
+  const pick = (xs) => xs[Math.floor(random() * xs.length) % xs.length];
+  const free = ADJECTIVES.flatMap((a) => ANIMALS.map((b) => `${a} ${b}`)).filter((n) => !used.has(n.toLowerCase()));
+  if (free.length) return pick(free);
+  for (let i = 2; ; i++) {
+    const n = `${pick(ADJECTIVES)} ${pick(ANIMALS)} ${i}`;
+    if (!used.has(n.toLowerCase())) return n;
+  }
 }
 
 // src/board/board.ts
@@ -337,13 +417,23 @@ async function openBoard(dbPath = SQLITE_PATH) {
       seq INTEGER NOT NULL,
       PRIMARY KEY (participant, seq)
     );
-    -- claims are global by repository-relative path, across every run on a repository (D12, D20)
+    -- claims are global by repository-relative path, across every run on a repository (D12, D20);
+    -- a path may have several holders (D40). since_seq: the thread's last seq when it was claimed
     CREATE TABLE IF NOT EXISTS claims (
       repo TEXT NOT NULL,
       path TEXT NOT NULL,
       participant INTEGER NOT NULL,
       kind TEXT NOT NULL DEFAULT 'inside',
-      PRIMARY KEY (repo, path)
+      since_seq INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (repo, path, participant)
+    );
+    -- a holder of a shared path already told of another holder (D41): once per runner and path
+    CREATE TABLE IF NOT EXISTS notices (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      other INTEGER NOT NULL,
+      PRIMARY KEY (repo, path, participant, other)
     );
     CREATE TABLE IF NOT EXISTS merge_locks (
       repo TEXT PRIMARY KEY,
@@ -379,6 +469,28 @@ async function openBoard(dbPath = SQLITE_PATH) {
   upkeep("participants", "last_call", "last_call TEXT");
   upkeep("participants", "calls", "calls INTEGER NOT NULL DEFAULT 0");
   upkeep("participants", "waiting", "waiting INTEGER NOT NULL DEFAULT 0");
+  upkeep("participants", "nick", "nick TEXT");
+  upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
+  upkeep("runs", "link", "link TEXT");
+  upkeep("slices", "link", "link TEXT");
+  const claimKey = db.prepare("PRAGMA table_info(claims)").all().find((c) => c.name === "participant");
+  if (claimKey && claimKey.pk === 0) {
+    db.exec(`
+      BEGIN;
+      ALTER TABLE claims RENAME TO claims_before_d40;
+      CREATE TABLE claims (
+        repo TEXT NOT NULL,
+        path TEXT NOT NULL,
+        participant INTEGER NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'inside',
+        since_seq INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (repo, path, participant)
+      );
+      INSERT INTO claims (repo, path, participant, kind) SELECT repo, path, participant, kind FROM claims_before_d40;
+      DROP TABLE claims_before_d40;
+      COMMIT;
+    `);
+  }
   const marker = path2.join(path2.dirname(dbPath), path2.basename(ACTIVE_MARKER));
   const syncMarker = () => {
     const open = Number(db.prepare("SELECT COUNT(*) AS n FROM runs WHERE state = 'open'").get().n);
@@ -422,6 +534,10 @@ async function openBoard(dbPath = SQLITE_PATH) {
   };
   const clearFlags = () => {
     db.prepare("DELETE FROM flags WHERE NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = flags.repo AND c.path = flags.path)").run();
+    db.prepare(
+      `DELETE FROM notices WHERE NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = notices.repo AND c.path = notices.path AND c.participant = notices.participant)
+         OR NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = notices.repo AND c.path = notices.path AND c.participant = notices.other)`
+    ).run();
   };
   const runRow = (id) => {
     const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(id);
@@ -433,14 +549,17 @@ async function openBoard(dbPath = SQLITE_PATH) {
     repo: String(r.repo),
     plan: String(r.plan),
     title: String(r.title),
+    link: r.link == null ? null : String(r.link),
     state: r.state === "closed" ? "closed" : "open",
     slices: db.prepare("SELECT * FROM slices WHERE run = ? ORDER BY ord").all(Number(r.id)).map((s) => ({
       id: String(s.id),
       title: String(s.title),
+      link: s.link == null ? null : String(s.link),
       blockers: JSON.parse(String(s.blockers)),
       state: String(s.state)
     }))
   });
+  const nickOf = (r) => String(r.slice) === ORCHESTRATOR ? ORCHESTRATOR : r.nick == null ? String(r.slice) : String(r.nick);
   const PARTICIPANT_SQL = `SELECT p.*, r.repo, r.plan FROM participants p JOIN runs r ON r.id = p.run`;
   const toParticipant = (r) => ({
     id: Number(r.id),
@@ -449,6 +568,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
     plan: String(r.plan),
     slice: String(r.slice),
     name: `${r.plan}/${r.slice}`,
+    nick: nickOf(r),
     ended: r.ended_at != null,
     worktree: r.worktree == null ? null : String(r.worktree)
   });
@@ -465,9 +585,13 @@ async function openBoard(dbPath = SQLITE_PATH) {
   });
   const lastSeq = () => Number(db.prepare("SELECT COALESCE(MAX(seq), 0) AS s FROM messages").get().s);
   const openPlans = (repo) => db.prepare("SELECT DISTINCT plan FROM runs WHERE repo = ? AND state = 'open'").all(repo).map((r) => String(r.plan));
+  const activeNames = (repo) => {
+    const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL AND p.slice != '${ORCHESTRATOR}'`).all(repo);
+    return new Map(rows.map((r) => [nameHandle(nickOf(r)), `${r.plan}/${r.slice}`]));
+  };
   const insertMessage = (p, body, about, kind, named) => {
-    const mentions = named ?? (kind === "event" ? [] : parseMentions(body, p.plan, openPlans(p.repo)));
-    const r = db.prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(p.repo, p.id, body, about, kind, JSON.stringify(mentions), now());
+    const mentions = named ?? (kind === "event" ? [] : parseMentions(body, p.plan, openPlans(p.repo), activeNames(p.repo)));
+    const r = db.prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at, by_board) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(p.repo, p.id, body, about, kind, JSON.stringify(mentions), now(), named ? 1 : 0);
     const seq = Number(r.lastInsertRowid);
     bump(p.repo);
     return board.read(seq);
@@ -496,19 +620,43 @@ async function openBoard(dbPath = SQLITE_PATH) {
     }
     return null;
   };
-  const claimOf = (repo, rel) => {
-    const r = db.prepare("SELECT participant, kind FROM claims WHERE repo = ? AND path = ?").get(repo, rel);
-    return r ? { participant: Number(r.participant), kind: String(r.kind) } : null;
-  };
-  const take = (p, rel, kind) => transaction(() => {
-    const held = claimOf(p.repo, rel);
-    if (held && held.participant !== p.id && isLive(held.participant)) return { held, taken: false };
-    if (held?.participant === p.id && (held.kind === "interface" || kind === "inside")) return { held: null, taken: false };
-    db.prepare("INSERT OR REPLACE INTO claims (repo, path, participant, kind) VALUES (?, ?, ?, ?)").run(p.repo, rel, p.id, kind);
+  const holdersOf = (repo, rel) => db.prepare("SELECT participant, kind, since_seq FROM claims WHERE repo = ? AND path = ? ORDER BY rowid").all(repo, rel).map((r) => ({ participant: Number(r.participant), kind: String(r.kind), since: Number(r.since_seq) })).filter((c) => isLive(c.participant));
+  const hold = (p, rel, kind) => transaction(() => {
+    const r = db.prepare(
+      `INSERT INTO claims (repo, path, participant, kind, since_seq) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT (repo, path, participant) DO UPDATE SET kind = excluded.kind WHERE claims.kind = 'inside' AND excluded.kind = 'interface'`
+    ).run(p.repo, rel, p.id, kind, lastSeq());
+    if (Number(r.changes) === 0) return false;
     bump(p.repo);
-    return { held: null, taken: true };
+    return true;
   });
-  const takeUnlessHeld = (p, rel, kind) => take(p, rel, kind).held;
+  const take = (p, rel, kind) => transaction(() => {
+    const held = holdersOf(p.repo, rel).filter((c) => c.participant !== p.id);
+    if (held.length) return { held, taken: false };
+    return { held, taken: hold(p, rel, kind) };
+  });
+  const takeUnlessHeld = (p, rel, kind) => void take(p, rel, kind);
+  const doingOf = (id) => String(db.prepare("SELECT doing FROM participants WHERE id = ?").get(id).doing) || "no note";
+  const hasPostedAbout = (p, rel, holders) => {
+    const since = Math.min(...holders.map((h) => h.since));
+    const rows = db.prepare("SELECT seq, body, about, mentions FROM messages WHERE repo = ? AND author = ? AND seq > ? AND kind != 'event' AND by_board = 0").all(p.repo, p.id, since);
+    const base = rel.split("/").pop();
+    const names = (r) => {
+      const about = r.about == null ? "" : fold(slashes(String(r.about)));
+      const f = fold(rel);
+      if (about && (about === f || f.endsWith(`/${about}`))) return true;
+      const body = fold(String(r.body));
+      return body.includes(f) || body.includes(fold(base));
+    };
+    return rows.some((r) => {
+      if (!names(r)) return false;
+      const mentions = JSON.parse(String(r.mentions));
+      return holders.some((h) => {
+        const o = participantById(h.participant);
+        return Number(r.seq) > h.since && (mentions.includes(o.name) || mentions.includes(`${o.plan}/*`));
+      });
+    });
+  };
   const releaseAll = (id) => {
     const owner = db.prepare("SELECT r.repo FROM participants p JOIN runs r ON r.id = p.run WHERE p.id = ?").get(id);
     const claims = Number(db.prepare("DELETE FROM claims WHERE participant = ?").run(id).changes);
@@ -559,6 +707,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
       plan: String(r.plan),
       code: planCode(String(r.plan)),
       title: String(r.title),
+      link: r.link == null ? null : String(r.link),
       open,
       runners: open ? count(`SELECT COUNT(*) AS n FROM participants WHERE run = ? AND slice != '${ORCHESTRATOR}' AND ended_at IS NULL`) : 0,
       done: count("SELECT COUNT(*) AS n FROM slices WHERE run = ? AND state = 'done'"),
@@ -575,12 +724,12 @@ async function openBoard(dbPath = SQLITE_PATH) {
   const readVersions = () => new Map(db.prepare("SELECT repo, version FROM changes").all().map((r) => [String(r.repo), Number(r.version)]));
   const declared = (id) => JSON.parse(String(db.prepare("SELECT files FROM participants WHERE id = ?").get(id).files));
   const board = {
-    openRun({ repo, plan, title, slices }) {
+    openRun({ repo, plan, title, link, slices }) {
       const id = transaction(() => {
-        const r = db.prepare("INSERT INTO runs (repo, plan, title, opened_at) VALUES (?, ?, ?, ?)").run(repo, plan, title, now());
+        const r = db.prepare("INSERT INTO runs (repo, plan, title, link, opened_at) VALUES (?, ?, ?, ?, ?)").run(repo, plan, title, link ?? null, now());
         const run = Number(r.lastInsertRowid);
-        const ins = db.prepare("INSERT INTO slices (run, id, title, blockers, ord) VALUES (?, ?, ?, ?, ?)");
-        slices.forEach((s, i) => ins.run(run, s.id, s.title, JSON.stringify(s.blockers ?? []), i));
+        const ins = db.prepare("INSERT INTO slices (run, id, title, blockers, link, ord) VALUES (?, ?, ?, ?, ?, ?)");
+        slices.forEach((s, i) => ins.run(run, s.id, s.title, JSON.stringify(s.blockers ?? []), s.link ?? null, i));
         db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at) VALUES (?, ?, ?, ?)").run(run, ORCHESTRATOR, lastSeq(), now());
         bump(repo);
         return run;
@@ -620,17 +769,22 @@ async function openBoard(dbPath = SQLITE_PATH) {
       const where = worktree ? path2.resolve(worktree) : null;
       return transaction(() => {
         const id = transaction(() => {
-          const existing = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run, slice);
+          const existing = db.prepare("SELECT id, nick FROM participants WHERE run = ? AND slice = ?").get(run, slice);
+          const fresh = () => {
+            const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL`).all(String(r.repo));
+            return funnyName(rows.map(nickOf));
+          };
           if (existing) {
-            db.prepare("UPDATE participants SET doing = ?, files = ?, worktree = ?, ended_at = NULL WHERE id = ?").run(
+            db.prepare("UPDATE participants SET doing = ?, files = ?, worktree = ?, ended_at = NULL, nick = COALESCE(nick, ?) WHERE id = ?").run(
               doing,
               JSON.stringify(files),
               where,
+              existing.nick == null ? fresh() : null,
               Number(existing.id)
             );
             return Number(existing.id);
           }
-          const ins = db.prepare("INSERT INTO participants (run, slice, worktree, doing, files, since_seq, joined_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(run, slice, where, doing, JSON.stringify(files), lastSeq(), now());
+          const ins = db.prepare("INSERT INTO participants (run, slice, worktree, doing, files, since_seq, joined_at, nick) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(run, slice, where, doing, JSON.stringify(files), lastSeq(), now(), fresh());
           return Number(ins.lastInsertRowid);
         });
         const runner = participantById(id);
@@ -699,6 +853,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
       const cutoff = Date.now() - STALE_MS;
       return rows.map((r) => ({
         name: `${r.plan}/${r.slice}`,
+        nick: nickOf(r),
         run: Number(r.run),
         plan: String(r.plan),
         slice: String(r.slice),
@@ -758,15 +913,32 @@ async function openBoard(dbPath = SQLITE_PATH) {
     checkEdit(p, file) {
       const me = live(p);
       const rel = relPath(me.repo, file);
-      if (!rel) return { allowed: true };
-      const held = takeUnlessHeld(me, rel, "inside");
-      if (!held) return { allowed: true };
-      const holder = participantById(held.participant);
-      const note = String(db.prepare("SELECT doing FROM participants WHERE id = ?").get(holder.id).doing) || "no note";
-      return {
-        allowed: false,
-        refusal: `${rel} is held by ${holder.name} (${note}). Do not write it. Run \`swarm wait\` to hear when it is released, or settle it on the board: \`swarm post "@${holder.name} \u2026"\`.`
-      };
+      if (!rel) return { allowed: true, sharedWith: [], notice: null };
+      return transaction(() => {
+        const all = holdersOf(me.repo, rel);
+        const others = all.filter((c) => c.participant !== me.id);
+        if (!others.length) {
+          hold(me, rel, "inside");
+          return { allowed: true, sharedWith: [], notice: null };
+        }
+        const people = others.map((c) => participantById(c.participant));
+        if (!all.some((c) => c.participant === me.id)) {
+          if (!hasPostedAbout(me, rel, others)) {
+            const who = people.map((o) => `${o.name} (${o.nick}: ${doingOf(o.id)})`).join(", ");
+            const at = people.map((o) => `@${o.name}`).join(" ");
+            return {
+              allowed: false,
+              refusal: `${rel} is also held by ${who}. You may share it, but first tell ${people.length > 1 ? "them" : "its holder"} what you change in it: \`swarm post "${at} \u2026" --about ${rel}\`, then retry the edit.`
+            };
+          }
+          hold(me, rel, "inside");
+        }
+        const sharedWith = people.map((o) => ({ runner: o.name, doing: doingOf(o.id) }));
+        const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
+        const fresh = people.filter((o) => Number(told.run(me.repo, rel, me.id, o.id).changes) > 0);
+        const notice = fresh.length ? fresh.map((o) => `${rel} is also held by ${o.name}: ${doingOf(o.id)}`).join("; ") : null;
+        return { allowed: true, sharedWith, notice };
+      });
     },
     reconcileWrites(p, changed) {
       const me = live(p);
@@ -776,10 +948,14 @@ async function openBoard(dbPath = SQLITE_PATH) {
         for (const file of changed) {
           const rel = relPath(me.repo, file);
           if (!rel) continue;
-          const { held, taken } = take(me, rel, "inside");
-          if (taken || held) flag.run(me.repo, rel, me.id);
-          if (!held) continue;
-          const holder = participantById(held.participant);
+          if (holdersOf(me.repo, rel).some((c) => c.participant === me.id)) {
+            take(me, rel, "inside");
+            continue;
+          }
+          const { held: others, taken } = take(me, rel, "inside");
+          if (taken || others.length) flag.run(me.repo, rel, me.id);
+          if (!others.length) continue;
+          const holder = participantById(others[0].participant);
           const m = insertMessage(
             me,
             `@${holder.name} @${me.name} flag: ${me.name} wrote ${rel} outside its claim; ${holder.name} holds it. Settle it here.`,
@@ -831,10 +1007,10 @@ async function openBoard(dbPath = SQLITE_PATH) {
           db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
         });
         for (const rel of rels) {
-          const c = claimOf(me.repo, rel);
-          if (!c) continue;
-          if (c.kind === "interface") iface.add(rel);
-          if (c.participant !== me.id && isLive(c.participant)) told.add(participantById(c.participant).name);
+          for (const c of holdersOf(me.repo, rel)) {
+            if (c.kind === "interface") iface.add(rel);
+            if (c.participant !== me.id) told.add(participantById(c.participant).name);
+          }
         }
         const everyone = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL`).all(me.repo);
         for (const o of everyone) {
@@ -876,6 +1052,15 @@ async function openBoard(dbPath = SQLITE_PATH) {
       const runOpen = new Map(runRows.map((r) => [Number(r.id), r.state === "open"]));
       const cutoff = Date.now() - STALE_MS;
       const claimsOf = db.prepare("SELECT path, kind FROM claims WHERE participant = ? ORDER BY rowid");
+      const live2 = db.prepare("SELECT c.path, c.kind, c.participant, p.slice, r.plan FROM claims c JOIN participants p ON p.id = c.participant JOIN runs r ON r.id = p.run WHERE c.repo = ? ORDER BY c.rowid").all(repo).filter((c) => isLive(Number(c.participant)));
+      const files = /* @__PURE__ */ new Map();
+      for (const c of live2) {
+        const f = files.get(String(c.path)) ?? { path: String(c.path), holders: [], interface: false };
+        f.holders.push(`${c.plan}/${c.slice}`);
+        f.interface ||= c.kind === "interface";
+        files.set(f.path, f);
+      }
+      const sharedBy = (path7, id) => live2.some((c) => String(c.path) === path7 && Number(c.participant) !== id);
       const roster = people.map((r) => {
         const id = Number(r.id);
         const slice = String(r.slice);
@@ -885,13 +1070,14 @@ async function openBoard(dbPath = SQLITE_PATH) {
         const state = orchestrator ? runOpen.get(Number(r.run)) ? "watching" : "done" : s?.state === "done" ? "done" : ended ? "ended" : lockHolder === id ? "merging" : Number(r.waiting) === 1 ? "waiting" : "working";
         return {
           runner: `${r.plan}/${slice}`,
+          nick: nickOf(r),
           plan: String(r.plan),
           slice,
           title: orchestrator ? "" : String(s?.title ?? slice),
           doing: String(r.doing),
           state,
           stale: !ended && !orchestrator && Date.parse(String(r.last_call ?? r.joined_at)) < cutoff,
-          files: claimsOf.all(id).map((c) => ({ path: String(c.path), interface: c.kind === "interface" })),
+          files: claimsOf.all(id).map((c) => ({ path: String(c.path), interface: c.kind === "interface", shared: sharedBy(String(c.path), id) })),
           joined: String(r.joined_at),
           calls: Number(r.calls ?? 0)
         };
@@ -906,6 +1092,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
         queues[String(run.plan)] = sliceRows.filter((s) => Number(s.run) === Number(run.id)).map((s) => ({
           slice: String(s.id),
           title: String(s.title),
+          link: s.link == null ? null : String(s.link),
           state: String(s.state),
           blockers: JSON.parse(String(s.blockers)),
           runner: nameOf.get(`${run.id}/${s.id}`) ?? null
@@ -920,6 +1107,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
         roster,
         events,
         queues,
+        files: [...files.values()],
         flags
       };
     },
@@ -1027,7 +1215,7 @@ function pre(board, input) {
   const p = board.identify({ ...who, worktree: input.cwd });
   if (!p) return null;
   const verdict = board.checkEdit(p, path3.resolve(input.cwd || ".", file));
-  if (verdict.allowed) return null;
+  if (verdict.allowed) return verdict.notice ? { hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: `swarm board: ${verdict.notice}` } } : null;
   return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: verdict.refusal } };
 }
 function post(board, input) {
@@ -1041,7 +1229,7 @@ function post(board, input) {
   return {
     hookSpecificOutput: {
       hookEventName: "PostToolUse",
-      additionalContext: `swarm board (you are ${p.name}; full text of a line: swarm read <n>):
+      additionalContext: `swarm board (you are ${p.name}, ${p.nick}; full text of a line: swarm read <n>):
 ${text}`
     }
   };
@@ -1126,7 +1314,8 @@ var args = parseArgs(process.argv.slice(2));
 var asJson = args.has("--json");
 var USAGE = [
   "usage: swarm <verb> [--json]",
-  "  open    --plan <slug> --title <t> --slices <file.json>          # opens a run, prints its id then the page's URL (orchestrator)",
+  "  open    --plan <slug> --title <t> --slices <file.json> [--link <url>]   # opens a run, prints its id then the page's URL (orchestrator)",
+  '          # the slices file: [{"id", "title", "blockers": [...], "link"?: "<slice document URL>"}]',
   "  slice   <id> --run <id> --state ready|running|done|blocked      # (orchestrator)",
   "  close   --run <id>                                              # (orchestrator)",
   '  join    --run <id> --slice <id> --doing <t> [--files "<path>:interface,<path>:inside,\u2026"]   # prints the roster',
@@ -1218,7 +1407,8 @@ function caller(board) {
 }
 var rosterLine = (r) => {
   const files = r.files.map((f) => f.interface ? `${f.path} (interface)` : f.path).join(", ");
-  return `${r.name}${r.stale ? " (stale)" : ""}  run ${r.run}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}`;
+  const who = r.slice === "orchestrator" ? r.name : `${r.nick} \xB7 ${r.name}`;
+  return `${who}${r.stale ? " (stale)" : ""}  run ${r.run}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}`;
 };
 var printDelivery = (d) => {
   for (const m of d.full) console.log(fullText(m));
@@ -1239,14 +1429,19 @@ function readSlices(file) {
   if (!Array.isArray(list)) return fail(`${file}: expected an array of {id, title, blockers}`);
   return list.map((s) => {
     if (typeof s.id !== "string") fail(`${file}: a slice without an id`);
-    return { id: String(s.id), title: String(s.title ?? s.id), blockers: Array.isArray(s.blockers) ? s.blockers.map(String) : [] };
+    return {
+      id: String(s.id),
+      title: String(s.title ?? s.id),
+      blockers: Array.isArray(s.blockers) ? s.blockers.map(String) : [],
+      link: typeof s.link === "string" && s.link ? s.link : null
+    };
   });
 }
 async function main(board) {
   switch (args.verb) {
     case "open": {
       const plan = need("--plan");
-      const run = board.openRun({ repo: repoOf(process.cwd()), plan, title: need("--title"), slices: readSlices(need("--slices")) });
+      const run = board.openRun({ repo: repoOf(process.cwd()), plan, title: need("--title"), link: args.flag("--link") ?? null, slices: readSlices(need("--slices")) });
       const port = ensureServer();
       const url = port === null ? null : pageUrl(port);
       if (url === null) console.error(`swarm: the page did not start (port ${portFrom(args.flag("--port"))} may be in use; swarm serve --detach --port <n>). The run is open.`);
@@ -1277,8 +1472,8 @@ ${USAGE}`);
         files: [...args.list("--files"), ...args.flags("--file")].map(parseFile),
         worktree: worktreeOf(process.cwd()) ?? void 0
       });
-      emit({ runner: runner.name, roster }, () => {
-        console.log(`you are ${runner.name}`);
+      emit({ runner: runner.name, nick: runner.nick, roster }, () => {
+        console.log(`you are ${runner.name}, ${runner.nick}: @${runner.slice} or @${runner.nick.replace(/\s+/g, "")} mentions you`);
         for (const r of roster) console.log(rosterLine(r));
       });
       break;
