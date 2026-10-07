@@ -156,6 +156,163 @@ test("an agreement is a message of kind agreement", () => {
   assert.equal(board.deliver(s5).full[0].kind, "agreement");
 });
 
+// ── claims, reconcile, the merge lock (Slice 2) ──────────────────────────────────
+
+const CHECKOUT = path.resolve("/repos/one");
+const wt = (name: string): string => path.resolve(`/worktrees/${name}`);
+
+/** S3 holds src/a.ts (declared), S5 holds src/b.ts; each in its own worktree. */
+const claimed = () => {
+  const run = board.openRun({ repo: REPO, plan: "review-tool", title: "Review tool", slices: SLICES });
+  const s3 = board.join({ run: run.id, slice: "S3", doing: "the page", files: [{ path: "src/a.ts", interface: false }], worktree: wt("s3") }).runner;
+  const s5 = board.join({ run: run.id, slice: "S5", doing: "the skill", files: [{ path: "src/b.ts", interface: false }], worktree: wt("s5") }).runner;
+  board.deliver(s3);
+  board.deliver(s5);
+  return { run, s3, s5 };
+};
+
+test("refuses an edit to a path held by another runner", () => {
+  const { s3, s5 } = claimed();
+  assert.deepEqual(board.checkEdit(s3, path.join(wt("s3"), "src/a.ts")), { allowed: true });
+  const v = board.checkEdit(s5, path.join(wt("s5"), "src/a.ts"));
+  assert.equal(v.allowed, false);
+  const refusal = (v as { refusal: string }).refusal;
+  assert.match(refusal, /review-tool\/S3/);
+  assert.match(refusal, /the page/);
+  assert.match(refusal, /`swarm wait`/);
+  assert.match(refusal, /`swarm post "@review-tool\/S3 …"`/);
+});
+
+test("refuses across two runs on one repository", () => {
+  claimed();
+  const other = board.openRun({ repo: REPO, plan: "swarm", title: "B", slices: SLICES });
+  const s1 = board.join({ run: other.id, slice: "S1", doing: "board", files: [], worktree: wt("swarm-s1") }).runner;
+  const v = board.checkEdit(s1, path.join(wt("swarm-s1"), "src/b.ts"));
+  assert.equal(v.allowed, false);
+  assert.match((v as { refusal: string }).refusal, /held by review-tool\/S5 \(the skill\)/);
+  // a run on another repository holds nothing here
+  const far = board.openRun({ repo: "/repos/two/.git", plan: "far", title: "C", slices: SLICES });
+  const f1 = board.join({ run: far.id, slice: "S1", doing: "x", files: [], worktree: wt("far") }).runner;
+  assert.deepEqual(board.checkEdit(f1, path.join(wt("far"), "src/b.ts")), { allowed: true });
+});
+
+test("widens the claim on a free undeclared path", () => {
+  const { s3, s5 } = claimed();
+  assert.deepEqual(board.checkEdit(s3, path.join(wt("s3"), "src/new.ts")), { allowed: true });
+  const v = board.checkEdit(s5, path.join(wt("s5"), "src/new.ts"));
+  assert.equal(v.allowed, false);
+  assert.match((v as { refusal: string }).refusal, /src\/new\.ts is held by review-tool\/S3/);
+});
+
+test("a worktree path and the checkout path are one claim", () => {
+  const { s3, s5 } = claimed();
+  assert.equal(board.checkEdit(s5, path.join(CHECKOUT, "src", "a.ts")).allowed, false);
+  assert.equal(board.checkEdit(s5, path.join(wt("s5"), "src", "a.ts")).allowed, false);
+  assert.equal(board.checkEdit(s5, "src/a.ts").allowed, false);
+  board.checkEdit(s3, path.join(CHECKOUT, "src", "c.ts"));
+  assert.equal(board.checkEdit(s5, path.join(wt("s5"), "src", "c.ts")).allowed, false);
+  // outside every root of the repository: no claim at all
+  assert.deepEqual(board.checkEdit(s5, path.resolve("/elsewhere/src/a.ts")), { allowed: true });
+});
+
+test("end releases the claims", () => {
+  const { s3, s5 } = claimed();
+  board.end(s3);
+  assert.deepEqual(board.checkEdit(s5, path.join(wt("s5"), "src/a.ts")), { allowed: true });
+});
+
+test("slice done releases a stale runner's claims", () => {
+  const { run, s5 } = claimed();
+  board.setSliceState(run.id, "S3", "done");
+  assert.deepEqual(board.checkEdit(s5, path.join(wt("s5"), "src/a.ts")), { allowed: true });
+});
+
+test("claims a free file written outside the claim", () => {
+  const { s3, s5 } = claimed();
+  assert.deepEqual(board.reconcileWrites(s5, ["src/free.ts", "src/b.ts"]), []);
+  const v = board.checkEdit(s3, path.join(wt("s3"), "src/free.ts"));
+  assert.equal(v.allowed, false);
+  assert.match((v as { refusal: string }).refusal, /held by review-tool\/S5/);
+});
+
+test("flags a held file written outside the claim, mentioning both", () => {
+  const { s3, s5 } = claimed();
+  const flags = board.reconcileWrites(s5, ["src/a.ts"]);
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].path, "src/a.ts");
+  assert.equal(flags[0].holder, "review-tool/S3");
+  const m = board.read(flags[0].seq);
+  assert.deepEqual([...m.mentions].sort(), ["review-tool/S3", "review-tool/S5"]);
+  assert.equal(m.about, "src/a.ts");
+  assert.deepEqual(board.deliver(s3).full.map((x) => x.seq), [flags[0].seq]);
+  // the holder keeps it
+  assert.equal(board.checkEdit(s5, "src/a.ts").allowed, false);
+});
+
+test("grants the lock to one runner at a time", () => {
+  const { s3, s5 } = claimed();
+  assert.deepEqual(board.lockMerge(s3), { granted: true });
+  assert.deepEqual(board.lockMerge(s5), { granted: false, holder: "review-tool/S3" });
+  assert.deepEqual(board.lockMerge(s3), { granted: true });
+  board.merged(s3, "abc123", ["src/a.ts"]);
+  assert.deepEqual(board.lockMerge(s5), { granted: true });
+});
+
+test("merged releases the lock and mentions holders and declarers", () => {
+  const { run, s3, s5 } = claimed();
+  // S1 declares src/b.ts, which S5 holds: a declarer, not a holder
+  const s1 = board.join({ run: run.id, slice: "S1", doing: "board", files: [{ path: "src/b.ts", interface: false }], worktree: wt("s1") }).runner;
+  board.deliver(s3);
+  board.deliver(s5);
+  board.deliver(s1);
+  const merger = board.participant("review-tool/orchestrator")!;
+  assert.deepEqual(board.lockMerge(merger), { granted: true });
+  board.merged(merger, "abc123", ["src/b.ts"]);
+  assert.deepEqual(board.lockMerge(s3), { granted: true }, "the lock was released");
+
+  const forS5 = board.deliver(s5).full;
+  const forS1 = board.deliver(s1).full;
+  assert.equal(forS5.length, 1);
+  assert.equal(forS1.length, 1);
+  assert.equal(forS5[0].seq, forS1[0].seq);
+  assert.match(forS5[0].body, /rebase onto abc123/);
+  assert.deepEqual([...forS5[0].mentions].sort(), ["review-tool/S1", "review-tool/S5"]);
+  // S3 neither holds nor declared src/b.ts: one line, not in full
+  const forS3 = board.deliver(s3);
+  assert.equal(forS3.full.length, 0);
+  assert.equal(forS3.lines.length, 1);
+});
+
+test("an interface file in a merge is announced to @all", () => {
+  const run = board.openRun({ repo: REPO, plan: "review-tool", title: "A", slices: SLICES });
+  const s3 = board.join({ run: run.id, slice: "S3", doing: "api", files: [{ path: "src/api.ts", interface: true }], worktree: wt("s3") }).runner;
+  const s5 = board.join({ run: run.id, slice: "S5", doing: "x", files: [], worktree: wt("s5") }).runner;
+  const other = board.openRun({ repo: REPO, plan: "swarm", title: "B", slices: SLICES });
+  const far = board.join({ run: other.id, slice: "S1", doing: "y", files: [], worktree: wt("far") }).runner;
+  for (const p of [s3, s5, far]) board.deliver(p);
+  board.lockMerge(s3);
+  board.merged(s3, "def456", [path.join(wt("s3"), "src", "api.ts")]);
+  for (const p of [s5, far]) {
+    const d = board.deliver(p);
+    assert.equal(d.full.length, 1, `${p.name} got the announcement in full`);
+    assert.match(d.full[0].body, /@all interface changed: src\/api\.ts/);
+    assert.match(d.full[0].body, /rebase onto def456/);
+  }
+});
+
+test("identify resolves a bound agent, a bound session, then the worktree", () => {
+  const { run, s3, s5 } = claimed();
+  board.bind({ agentId: "a-5", sessionId: "main" }, { run: run.id, slice: "S5" });
+  board.bind({ sessionId: "main" }, { plan: "review-tool", slice: "orchestrator" });
+  assert.equal(board.identify({ agentId: "a-5", sessionId: "main" })?.name, s5.name);
+  assert.equal(board.identify({ sessionId: "main" })?.name, "review-tool/orchestrator");
+  // an unbound subagent of that session is not the orchestrator; its cwd decides
+  assert.equal(board.identify({ agentId: "a-x", sessionId: "main" }), null);
+  assert.equal(board.identify({ agentId: "a-x", sessionId: "main", worktree: path.join(wt("s3"), "src") })?.name, s3.name);
+  board.end(s5);
+  assert.equal(board.identify({ agentId: "a-5" }), null);
+});
+
 test("unknown run, runner and seq are named", () => {
   assert.throws(() => board.join({ run: 42, slice: "S1", doing: "x", files: [] }), /unknown run 42/);
   assert.equal(board.participant("nobody/S9"), null);

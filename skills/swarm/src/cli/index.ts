@@ -3,9 +3,11 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { openBoard, type Board, type Declared, type Delivery, type Message, type Participant, type RosterEntry, type SliceSpec, type SliceState } from "../board/board.ts";
+import { openBoard, type Board, type Declared, type Delivery, type Participant, type RosterEntry, type SliceSpec, type SliceState } from "../board/board.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
+import { runHook } from "../hook/hook.ts";
 import { parseArgs } from "./args.ts";
+import { fullText } from "./format.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
@@ -15,7 +17,7 @@ const USAGE = [
   "  open    --plan <slug> --title <t> --slices <file.json>          # opens a run, prints its id (orchestrator)",
   "  slice   <id> --run <id> --state ready|running|done|blocked      # (orchestrator)",
   "  close   --run <id>                                              # (orchestrator)",
-  "  join    --run <id> --slice <id> --doing <t> [--file <path>[:interface]]...   # prints the roster",
+  '  join    --run <id> --slice <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # prints the roster',
   "  doing   [--as <runner>] <text>",
   "  post    [--as <runner>] <body> [--about <path>]                 # prints the seq",
   "  agree   [--as <runner>] <terms> [--about <path>]                # prints the seq",
@@ -23,7 +25,11 @@ const USAGE = [
   "  deliver [--as <runner>]                                         # what you have not had: mentions in full, the rest one line",
   "  wait    [--as <runner>] [--timeout <ms>]                        # blocks until a message for you; nothing on timeout",
   "  roster  [--repo <path>]",
-  "  end     [--as <runner>]",
+  "  release [--as <runner>] <path>                                  # gives up a claim",
+  "  merge-lock [--as <runner>]                                      # one merge at a time per repository",
+  "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase",
+  "  end     [--as <runner>]                                         # releases your claims and the lock",
+  "  hook    pre|post                                                # Claude Code's hooks: hook JSON on stdin",
   "  status                                                          # data home, open runs",
   "a runner is <plan>/<slice>, the orchestrator <plan>/orchestrator; without --as, the runner joined from this worktree",
 ].join("\n");
@@ -83,13 +89,7 @@ function caller(board: Board): Participant {
 
 const rosterLine = (r: RosterEntry): string => {
   const files = r.files.map((f) => (f.interface ? `${f.path} (interface)` : f.path)).join(", ");
-  return `${r.name}  run ${r.run}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}`;
-};
-
-const fullText = (m: Message): string => {
-  const kind = m.kind === "msg" ? "" : ` (${m.kind})`;
-  const about = m.about ? ` about ${m.about}` : "";
-  return `#${m.seq} ${m.from}${kind}${about}  ${m.at}\n${m.body}`;
+  return `${r.name}${r.stale ? " (stale)" : ""}  run ${r.run}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}`;
 };
 
 const printDelivery = (d: Delivery): void => {
@@ -97,9 +97,10 @@ const printDelivery = (d: Delivery): void => {
   for (const l of d.lines) console.log(l);
 };
 
+/** `<path>`, `<path>:inside` or `<path>:interface`. */
 function parseFile(spec: string): Declared {
-  const suffix = ":interface";
-  return spec.endsWith(suffix) ? { path: spec.slice(0, -suffix.length), interface: true } : { path: spec, interface: false };
+  const m = spec.match(/^(.*):(interface|inside)$/);
+  return m ? { path: m[1], interface: m[2] === "interface" } : { path: spec, interface: false };
 }
 
 function readSlices(file: string): SliceSpec[] {
@@ -144,7 +145,7 @@ async function main(board: Board): Promise<void> {
         run: runArg(),
         slice: need("--slice"),
         doing: need("--doing"),
-        files: args.flags("--file").map(parseFile),
+        files: [...args.list("--files"), ...args.flags("--file")].map(parseFile),
         worktree: worktreeOf(process.cwd()) ?? undefined,
       });
       emit({ runner: runner.name, roster }, () => {
@@ -198,6 +199,30 @@ async function main(board: Board): Promise<void> {
       });
       break;
     }
+    case "release": {
+      const p = caller(board);
+      const file = args.positional[0] ?? fail("release: which path?");
+      board.release(p, path.resolve(file));
+      emit({ runner: p.name, released: file }, `${p.name} released ${file}`);
+      break;
+    }
+    case "merge-lock": {
+      const p = caller(board);
+      const r = board.lockMerge(p);
+      emit(
+        { runner: p.name, ...r },
+        r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait for its merged event`,
+      );
+      break;
+    }
+    case "merged": {
+      const p = caller(board);
+      const sha = args.positional[0] ?? fail("merged: which sha?");
+      const files = args.list("--files");
+      board.merged(p, sha, files.map((f) => path.resolve(f)));
+      emit({ runner: p.name, sha, files }, `merged ${sha}: lock released`);
+      break;
+    }
     case "end": {
       const p = caller(board);
       board.end(p);
@@ -226,12 +251,17 @@ if (!args.verb) {
   console.error(USAGE);
   process.exit(1);
 }
-const board = await openBoard();
-try {
-  await main(board);
-} catch (e) {
-  console.error(e instanceof CliError ? e.message : `swarm: ${(e as Error).message}`);
-  process.exitCode = 1;
-} finally {
-  board.close();
+if (args.verb === "hook") {
+  // before the store opens: the hook decides whether it needs it at all
+  await runHook(args.positional[0]);
+} else {
+  const board = await openBoard();
+  try {
+    await main(board);
+  } catch (e) {
+    console.error(e instanceof CliError ? e.message : `swarm: ${(e as Error).message}`);
+    process.exitCode = 1;
+  } finally {
+    board.close();
+  }
 }
