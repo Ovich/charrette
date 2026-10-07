@@ -1,7 +1,7 @@
 // What the page shows, as pure functions of the snapshot and the three selections App owns:
 // the run it is scoped to, the runner it follows, the filter. No child computes any of it.
 import type { BoardSnapshot, SnapshotEvent, SnapshotRunner, QueueSlice } from "../../src/board/board.ts";
-import { parseMentions, planCode } from "../../src/board/mentions.ts";
+import { nameHandle, parseMentions, planCode } from "../../src/board/mentions.ts";
 
 export const ORCHESTRATOR = "orchestrator";
 
@@ -41,10 +41,27 @@ export const basename = (p: string): string => p.split(/[\\/]/).pop() ?? p;
 
 // ── scoping to a run (a plan) ───────────────────────────────────────────────────────
 
-const plansOf = (snap: BoardSnapshot): string[] => [...new Set(snap.runs.map((r) => r.plan))];
+/** What resolving a mention needs: the plans on the repository, and the active runners'
+ *  funny names as a mention writes them (D43). */
+export type MentionCtx = { plans: string[]; names: ReadonlyMap<string, string> };
+
+export const mentionCtx = (snap: BoardSnapshot): MentionCtx => ({
+  plans: [...new Set(snap.runs.map((r) => r.plan))],
+  names: new Map(
+    snap.roster.filter((r) => r.slice !== ORCHESTRATOR && r.state !== "ended" && r.state !== "done").map((r) => [nameHandle(r.nick), r.runner]),
+  ),
+});
+
+/** Each runner's funny name (D43), by `<plan>/<slice>`; orchestrators have none. */
+export const nicksOf = (snap: BoardSnapshot): Map<string, string> =>
+  new Map(snap.roster.filter((r) => r.slice !== ORCHESTRATOR).map((r) => [r.runner, r.nick]));
 
 /** Whom a message names, resolved as the Board resolves it. */
-export const targets = (e: SnapshotEvent, plans: string[]): string[] => parseMentions(e.body, splitRunner(e.from).plan, plans);
+export const targets = (e: SnapshotEvent, ctx: MentionCtx): string[] => parseMentions(e.body, splitRunner(e.from).plan, ctx.plans, ctx.names);
+
+/** The blockers of a slice still to merge: a slice not done with any reads "after <ids>", whatever its state. */
+export const waitingOn = (s: QueueSlice, queue: QueueSlice[]): string[] =>
+  s.state === "done" ? [] : s.blockers.filter((b) => queue.find((x) => x.slice === b)?.state !== "done");
 
 /** Orchestrators first, then working, waiting, merging, then ended and done. */
 const ORDER: Record<string, number> = { working: 1, waiting: 2, merging: 3, ended: 4, done: 4 };
@@ -63,37 +80,42 @@ export interface Scoped {
   files: FileRow[];
 }
 
-export type FileRow = { path: string; runner: string; iface: boolean; flag: boolean };
+/** A held file and its holders, in claim order (D40); `flag`: written outside a claim. */
+export type FileRow = { path: string; holders: string[]; iface: boolean; flag: boolean };
 
-/** The snapshot narrowed to one plan, or whole when `plan` is null. */
+/** The snapshot narrowed to one plan, or whole when `plan` is null. A shared file's row keeps
+ *  only the scoped plan's holders. */
 export function scope(snap: BoardSnapshot, plan: string | null): Scoped {
-  const plans = plansOf(snap);
+  const ctx = mentionCtx(snap);
   const inPlan = (name: string): boolean => plan === null || splitRunner(name).plan === plan;
   const roster = orderRoster(snap.roster.filter((r) => inPlan(r.runner)));
   const events = snap.events.filter(
-    (e) => plan === null || inPlan(e.from) || targets(e, plans).some((t) => splitRunner(t).plan === plan),
+    (e) => plan === null || inPlan(e.from) || targets(e, ctx).some((t) => splitRunner(t).plan === plan),
   );
   const queues = Object.entries(snap.queues).filter(([p]) => plan === null || p === plan);
-  const held: FileRow[] = roster.flatMap((r) => r.files.map((f) => ({ path: f.path, runner: r.runner, iface: f.interface, flag: false })));
   const flagged = snap.flags.filter((f) => inPlan(f.runner));
-  for (const row of held) if (flagged.some((f) => f.path === row.path && f.runner === row.runner)) row.flag = true;
-  const extra = flagged.filter((f) => !held.some((h) => h.path === f.path && h.runner === f.runner)).map((f) => ({ path: f.path, runner: f.runner, iface: false, flag: true }));
+  const held: FileRow[] = snap.files
+    .map((f) => ({ path: f.path, holders: f.holders.filter(inPlan), iface: f.interface, flag: flagged.some((x) => x.path === f.path) }))
+    .filter((f) => f.holders.length > 0);
+  const extra = [...new Set(flagged.map((f) => f.path))]
+    .filter((p) => !held.some((h) => h.path === p))
+    .map((p) => ({ path: p, holders: flagged.filter((f) => f.path === p).map((f) => f.runner), iface: false, flag: true }));
   return { roster, events, queues, files: [...held, ...extra] };
 }
 
 // ── following a runner ──────────────────────────────────────────────────────────────
 
 /** A message from the runner, or naming it (by name, or its plan's `@all`). */
-export function involves(e: SnapshotEvent, runner: string | null, plans: string[]): boolean {
+export function involves(e: SnapshotEvent, runner: string | null, ctx: MentionCtx): boolean {
   if (!runner) return true;
   if (e.from === runner) return true;
   const { plan } = splitRunner(runner);
-  return targets(e, plans).some((t) => t === runner || t === `${plan}/*`);
+  return targets(e, ctx).some((t) => t === runner || t === `${plan}/*`);
 }
 
 /** Lit with the accent stripe: another's message that names the followed runner. */
-export const lit = (e: SnapshotEvent, runner: string | null, plans: string[]): boolean =>
-  !!runner && e.kind !== "event" && e.from !== runner && involves(e, runner, plans);
+export const lit = (e: SnapshotEvent, runner: string | null, ctx: MentionCtx): boolean =>
+  !!runner && e.kind !== "event" && e.from !== runner && involves(e, runner, ctx);
 
 // ── the filters ─────────────────────────────────────────────────────────────────────
 
@@ -117,12 +139,11 @@ export function filters(events: SnapshotEvent[]): Filter[] {
 }
 
 /** The feed: scoped events through the filter, then through the runner followed. */
-export function feed(events: SnapshotEvent[], filter: string, runner: string | null, plans: string[]): SnapshotEvent[] {
+export function feed(events: SnapshotEvent[], filter: string, runner: string | null, ctx: MentionCtx): SnapshotEvent[] {
   const f = filters(events).find((x) => x.id === filter) ?? filters(events)[0];
-  return events.filter(f.test).filter((e) => involves(e, runner, plans));
+  return events.filter(f.test).filter((e) => involves(e, runner, ctx));
 }
 
-export { plansOf };
 
 // ── a board event's line ────────────────────────────────────────────────────────────
 

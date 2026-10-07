@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
 import { planCode } from "../../src/board/mentions.ts";
 import { runnerColor, runnerLabel } from "../lib/view.ts";
 
@@ -10,6 +10,25 @@ export function RunnerTag({ name, plan = true }: { name: string; plan?: boolean 
     <span className="who" style={{ "--h": h, "--s": s } as CSSProperties} data-component="RunnerTag">
       {plan && <span className="pc">{code}·</span>}
       {slice}
+    </span>
+  );
+}
+
+/** Each runner's funny name by `<plan>/<slice>` (D43), provided by App from the snapshot. */
+export const NicksContext = createContext<ReadonlyMap<string, string>>(new Map());
+
+/** A runner wherever the page shows one: its funny name, then its tag, "Sleepy Otter · RT·S3".
+ *  An orchestrator, or a runner with no name, is its tag alone. */
+export function RunnerName({ name, plan = true }: { name: string; plan?: boolean }) {
+  const nick = useContext(NicksContext).get(name);
+  if (!nick) return <RunnerTag name={name} plan={plan} />;
+  return (
+    <span className="rname" data-component="RunnerName">
+      <span className="nick">{nick}</span>
+      <span className="dot" aria-hidden="true">
+        ·
+      </span>
+      <RunnerTag name={name} plan={plan} />
     </span>
   );
 }

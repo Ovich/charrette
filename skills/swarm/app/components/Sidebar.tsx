@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { RunSummary } from "../../src/board/board.ts";
 import type { Connection, RepoView } from "../hooks/useBoard.ts";
 import { PlanCode } from "./chips.tsx";
@@ -20,52 +21,91 @@ function Chevron() {
   );
 }
 
+/** A run: the whole row selects it; its title opens the plan's document when it has a link (D44). */
 function RunItem({ run, current, onSelect }: { run: RunSummary; current: boolean; onSelect: () => void }) {
   const pct = run.of ? Math.round((run.done / run.of) * 100) : 0;
+  const state = run.open ? `${run.runners} running` : "closed";
   return (
-    <button className={run.open ? "run" : "run closed"} aria-current={current} onClick={onSelect} data-component="RunItem">
+    <div className={run.open ? "run" : "run closed"} aria-current={current} data-component="RunItem">
+      {/* a link may not sit inside a button: the button lies under the row, the link above it */}
+      <button className="run-sel" aria-current={current} aria-label={`${run.code} ${state} ${run.title} ${run.done} of ${run.of} merged`} onClick={onSelect} />
       <span className="l1">
         <PlanCode plan={run.plan} />
-        {run.open ? `${run.runners} running` : "closed"}
+        {state}
       </span>
-      <span className="l2">{run.title}</span>
+      <span className="l2">
+        {run.link ? (
+          <a className="doc" href={run.link} target="_blank" rel="noopener noreferrer">
+            {run.title}
+          </a>
+        ) : (
+          run.title
+        )}
+      </span>
       <span className="l3">
         <span className="bar">
           <i style={{ width: `${pct}%` }} />
         </span>
         {run.done} of {run.of} merged
       </span>
-    </button>
+    </div>
   );
 }
 
+/** A repository (D45): expanded while it has an open run, its open runs first and its closed
+ *  ones under a collapsed "N closed" row; collapsed when all its runs are closed. The person's
+ *  own toggles (`expanded`, `closedShown`) win until the page reloads. */
 function RepoGroup({
   repo,
-  open,
+  current,
+  expanded,
+  closedShown,
   runSel,
   onRepo,
+  onToggle,
+  onToggleClosed,
   onRun,
 }: {
   repo: RepoView;
-  open: boolean;
+  current: boolean;
+  expanded: boolean;
+  closedShown: boolean;
   runSel: string | null;
   onRepo: () => void;
+  onToggle: () => void;
+  onToggleClosed: () => void;
   onRun: (plan: string) => void;
 }) {
-  const active = repo.runs.filter((r) => r.open).length;
-  const unread = repo.unread > 0 && !open;
+  const open = repo.runs.filter((r) => r.open);
+  const closed = repo.runs.filter((r) => !r.open);
+  const unread = repo.unread > 0 && !current;
+  const item = (run: RunSummary) => <RunItem key={run.run} run={run} current={current && runSel === run.plan} onSelect={() => onRun(run.plan)} />;
   return (
-    <div className="repo" data-open={open} data-component="RepoGroup">
-      <button className="repo-h" aria-current={open && !runSel} aria-expanded={open} onClick={onRepo} title={repo.repo}>
-        <Chevron />
-        <b>{repo.name}</b>
-        <span className={unread ? "pill unread" : "pill"}>{unread ? `${repo.unread} new` : active ? `${active} ${active === 1 ? "run" : "runs"}` : "idle"}</span>
-      </button>
-      <div className="runs">
-        {repo.runs.map((run) => (
-          <RunItem key={run.run} run={run} current={open && runSel === run.plan} onSelect={() => onRun(run.plan)} />
-        ))}
+    <div className="repo" data-open={expanded} data-component="RepoGroup">
+      <div className="repo-h" aria-current={current && !runSel}>
+        <button className="tog" aria-expanded={expanded} aria-label={expanded ? "Hide runs" : "Show runs"} onClick={onToggle}>
+          <Chevron />
+        </button>
+        <button className="sel" onClick={onRepo} title={repo.repo}>
+          <b>{repo.name}</b>
+          <span className={unread ? "pill unread" : "pill"}>{unread ? `${repo.unread} new` : open.length ? `${open.length} ${open.length === 1 ? "run" : "runs"}` : "idle"}</span>
+        </button>
       </div>
+      {expanded && (
+        <div className="runs">
+          {open.map(item)}
+          {closed.length > 0 && open.length === 0 && closed.map(item)}
+          {closed.length > 0 && open.length > 0 && (
+            <>
+              <button className="closed-h" aria-expanded={closedShown} onClick={onToggleClosed}>
+                <Chevron />
+                {closed.length} closed
+              </button>
+              {closedShown && closed.map(item)}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -88,6 +128,10 @@ export function Sidebar({
   onRun: (repo: string, plan: string) => void;
 }) {
   const openRuns = repos.reduce((n, r) => n + r.runs.filter((x) => x.open).length, 0);
+  // the person's own expand and collapse, by repository; until reload (D45)
+  const [expandedBy, setExpandedBy] = useState<Record<string, boolean>>({});
+  const [closedBy, setClosedBy] = useState<Record<string, boolean>>({});
+  const isExpanded = (r: RepoView): boolean => expandedBy[r.repo] ?? r.runs.some((x) => x.open);
   return (
     <aside className="sidebar" data-component="Sidebar" aria-label="Repositories and runs">
       <div className="brand">
@@ -102,7 +146,18 @@ export function Sidebar({
       </p>
       <nav className="repos" data-component="RepoList">
         {repos.map((r) => (
-          <RepoGroup key={r.repo} repo={r} open={r.repo === repo} runSel={runSel} onRepo={() => onRepo(r.repo)} onRun={(plan) => onRun(r.repo, plan)} />
+          <RepoGroup
+            key={r.repo}
+            repo={r}
+            current={r.repo === repo}
+            expanded={isExpanded(r)}
+            closedShown={closedBy[r.repo] ?? false}
+            runSel={runSel}
+            onRepo={() => onRepo(r.repo)}
+            onToggle={() => setExpandedBy((m) => ({ ...m, [r.repo]: !isExpanded(r) }))}
+            onToggleClosed={() => setClosedBy((m) => ({ ...m, [r.repo]: !(m[r.repo] ?? false) }))}
+            onRun={(plan) => onRun(r.repo, plan)}
+          />
         ))}
       </nav>
       <div className="sfoot" data-component="SidebarFooter">

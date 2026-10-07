@@ -1,6 +1,6 @@
 import type { SnapshotEvent } from "../../src/board/board.ts";
 import { eventLine, hhmm, type Filter } from "../lib/view.ts";
-import { RichText, RunnerTag } from "./chips.tsx";
+import { RichText, RunnerName, RunnerTag } from "./chips.tsx";
 
 function FeedFilters({
   chips,
@@ -44,7 +44,7 @@ const When = ({ at }: { at: string }) => (
 function Head({ e, urgent = false }: { e: SnapshotEvent; urgent?: boolean }) {
   return (
     <div className="head">
-      <RunnerTag name={e.from} />
+      <RunnerName name={e.from} />
       {e.about && <span className="about">{e.about}</span>}
       {urgent && <span className="tag strong">urgent · stops and resumes</span>}
     </div>
@@ -57,7 +57,7 @@ function BoardEvent({ e, fresh }: { e: SnapshotEvent; fresh: boolean }) {
     <li className={fresh ? "row event new" : "row event"} data-component="BoardEvent">
       <When at={e.at} />
       <p className="body">
-        <RunnerTag name={e.from} />
+        <RunnerName name={e.from} />
         {word && <span className={strong ? "tag strong" : "tag"}>{word}</span>}
         {rest && (
           <span>

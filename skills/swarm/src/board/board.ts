@@ -82,7 +82,7 @@ export type SnapshotRunner = {
   joined: string;
   calls: number;
 };
-export type SnapshotEvent = { seq: number; at: string; kind: MessageKind; from: string; nick: string; body: string; about: string | null };
+export type SnapshotEvent = { seq: number; at: string; kind: MessageKind; from: string; body: string; about: string | null };
 export type QueueSlice = { slice: string; title: string; link: string | null; state: string; blockers: string[]; runner: string | null };
 /** A held file and every runner holding it, in claim order (D40): the FileMap's rows. */
 export type SnapshotFile = { path: string; holders: string[]; interface: boolean };
@@ -1063,7 +1063,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         db.prepare("SELECT * FROM (SELECT * FROM messages WHERE repo = ? ORDER BY seq DESC LIMIT ?) ORDER BY seq").all(repo, EVENTS_SHOWN) as Row[]
       ).map((r) => {
         const m = toMessage(r);
-        return { seq: m.seq, at: m.at, kind: m.kind, from: m.from, nick: participantById(Number(r.author)).nick, body: m.body, about: m.about };
+        return { seq: m.seq, at: m.at, kind: m.kind, from: m.from, body: m.body, about: m.about };
       });
 
       const nameOf = new Map(people.map((r) => [`${r.run}/${r.slice}`, `${r.plan}/${r.slice}`]));

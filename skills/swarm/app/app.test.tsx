@@ -3,7 +3,9 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { BoardState } from "./hooks/useBoard.ts";
-import { at1414, emptyState, LIVE, liveState } from "./fixtures.ts";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { AL_LINK, AL_S1_LINK, at1414, emptyState, LIVE, liveState } from "./fixtures.ts";
 
 const board = vi.hoisted(() => ({ state: null as unknown as BoardState }));
 vi.mock("./hooks/useBoard.ts", () => ({ useBoard: () => board.state }));
@@ -152,4 +154,111 @@ test("each filter chip shows its count and narrows the feed; an empty result say
   expect(screen.getByText(/Nothing here yet\./)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Show everything" }));
   expect(within(feed()).getAllByRole("listitem")).toHaveLength(10);
+});
+
+// ── Slice 2b: shared files, funny names, links, the sidebar, the phone ─────────────────
+
+describe("a runner shows its funny name beside its tag (D43)", () => {
+  test("on its card, on its messages, in the queue while it runs", () => {
+    show(liveState());
+    expect(card(/Adding refreshToken to Session/).textContent).toMatch(/^Sleepy Otter·RT·S3working/);
+    const fromS3 = within(feed()).getByText(/Only the new field/).closest("li")!;
+    expect(fromS3.textContent).toMatch(/Sleepy Otter·RT·S3/);
+    const joined = within(feed()).getByText("joined").closest("li")!;
+    expect(joined.textContent).toMatch(/Sleepy Otter·RT·S3/);
+    const queueRow = screen.getByText("The Session interface carries the refresh token", { selector: ".q .name" }).closest(".q")!;
+    expect(queueRow.textContent).toBe("S3The Session interface carries the refresh tokenSleepy Otter·S3");
+    // an orchestrator is its tag alone
+    expect(screen.getAllByText("Feeds the swarm")[0].closest("button")!.textContent).toMatch(/^RT·orchestratorwatching/);
+  });
+});
+
+test("a shared file: a FileMap row with both holders, a shared mark on each card", () => {
+  const [s3, s5] = [LIVE.roster[0], LIVE.roster[4]];
+  const share = (r: typeof s3) => ({ ...r, files: [...r.files.map((f) => ({ ...f })), { path: "src/auth/expiry.ts", interface: false, shared: true }] });
+  show(
+    liveState({
+      roster: LIVE.roster.map((r) => (r === s3 || r === s5 ? share(r) : r)),
+      files: [...LIVE.files, { path: "src/auth/expiry.ts", holders: [s3.runner, s5.runner], interface: false }],
+    }),
+  );
+  const row = screen.getByText("src/auth/expiry.ts").closest(".f")!;
+  expect(row.textContent).toBe("src/auth/expiry.tsSleepy Otter·RT·S3Dizzy Puffin·RT·S5");
+  expect(screen.getByText("Files held").textContent).toBe("Files held 10");
+  for (const doing of [/Adding refreshToken to Session/, /Running the client tests/]) {
+    expect(within(card(doing)).getByText("expiry.ts").textContent).toBe("expiry.ts shared");
+  }
+  expect(within(card(/Writing POST \/auth\/refresh/)).queryByText(/shared/)).toBeNull();
+});
+
+test("a slice whose blockers are not all done reads after them, whatever its state", () => {
+  const rt = LIVE.queues["refresh-tokens"].map((q) =>
+    q.slice === "S6" ? { ...q, state: "ready" } : q.slice === "S7" ? { ...q, state: "running", runner: "refresh-tokens/S7" } : q,
+  );
+  show(liveState({ queues: { ...LIVE.queues, "refresh-tokens": rt } }));
+  expect(screen.getByText("after S3, S5")).toBeTruthy();
+  expect(screen.getByText("after S4, S5")).toBeTruthy();
+  // once its blockers are merged, the state shows again
+  const merged = rt.map((q) => (["S3", "S5"].includes(q.slice) ? { ...q, state: "done", runner: null } : q));
+  cleanup();
+  show(liveState({ queues: { ...LIVE.queues, "refresh-tokens": merged } }));
+  expect(screen.queryByText("after S3, S5")).toBeNull();
+  expect(screen.getByText("Settings lists signed-in devices", { selector: ".q .name" }).closest(".q")!.textContent).toMatch(/ready$/);
+  expect(screen.getByText("after S4")).toBeTruthy();
+});
+
+test("a plan and a slice with a link open it in a new tab; without one, plain text (D44)", () => {
+  show(liveState());
+  const links = screen.getAllByRole("link", { name: "Audit log" });
+  expect(links).toHaveLength(2); // the RunItem in the sidebar and the PlanQueue header
+  for (const a of links) {
+    expect(a.getAttribute("href")).toBe(AL_LINK);
+    expect(a.getAttribute("target")).toBe("_blank");
+  }
+  expect(screen.getByRole("link", { name: "The audit table and its writer" }).getAttribute("href")).toBe(AL_S1_LINK);
+  expect(screen.queryByRole("link", { name: "Sessions with refresh tokens" })).toBeNull();
+  expect(screen.queryByRole("link", { name: "The audit page" })).toBeNull();
+  // the run's row still selects it
+  fireEvent.click(screen.getByRole("button", { name: /0 of 3 merged/ }));
+  expect(screen.getByText("2 working · 3")).toBeTruthy();
+});
+
+test("the sidebar opens the repositories with an open run, open runs first, closed ones folded (D45)", () => {
+  show(liveState());
+  const group = (name: RegExp) => screen.getByRole("button", { name }).closest("[data-component=RepoGroup]") as HTMLElement;
+  const app = group(/charrette-app/);
+  const runs = () => within(app).queryAllByRole("button", { name: /merged$/ }).map((b) => b.getAttribute("aria-label"));
+  expect(runs()).toEqual(["RT 4 running Sessions with refresh tokens 2 of 7 merged", "AL 2 running Audit log 0 of 3 merged"]);
+  const closedRow = within(app).getByRole("button", { name: "1 closed" });
+  expect(closedRow.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(closedRow);
+  expect(runs()).toEqual([
+    "RT 4 running Sessions with refresh tokens 2 of 7 merged",
+    "AL 2 running Audit log 0 of 3 merged",
+    "LP closed The login page 4 of 4 merged",
+  ]);
+  // only closed runs: folded, until the person opens it
+  const docs = group(/docs-site/);
+  expect(within(docs).queryByRole("button", { name: /Search rewrite/ })).toBeNull();
+  fireEvent.click(within(docs).getByRole("button", { name: "Show runs" }));
+  expect(within(docs).getByRole("button", { name: /Search rewrite/ })).toBeTruthy();
+  // the person's collapse wins over the open run
+  fireEvent.click(within(app).getByRole("button", { name: "Hide runs" }));
+  expect(runs()).toEqual([]);
+  expect(within(app).getByRole("button", { name: "Show runs" }).getAttribute("aria-expanded")).toBe("false");
+});
+
+test("no horizontal scroll at 390 px: the sources found in Edge are bounded (D42)", () => {
+  // jsdom lays nothing out. Measured in Edge at 390 px with long unbroken titles and paths:
+  // the aside's implicit grid column took its widest child's min-content (a plan or slice
+  // title), and the single-column shell would take the sidebar's; both are now minmax(0, 1fr).
+  const css = readFileSync(resolve(__dirname, "styles.css"), "utf8").replace(/\s+/g, " ");
+  expect(css).toMatch(/\.aside \{ display: grid; grid-template-columns: minmax\(0, 1fr\);/);
+  expect(css).toMatch(/@media \(max-width: 860px\) \{ \.shell \{ grid-template-columns: minmax\(0, 1fr\); \} \}/);
+  // and a long unbroken path or title wraps instead of pushing its box wider
+  for (const rule of [".queue-h .t", ".row .about", ".card-a > span", ".repo-h .sel b"]) {
+    const body = css.split(`${rule} {`)[1]?.split("}")[0] ?? "";
+    expect(body, rule).toContain("min-width: 0;");
+    expect(body, rule).toContain("overflow-wrap: anywhere;");
+  }
 });

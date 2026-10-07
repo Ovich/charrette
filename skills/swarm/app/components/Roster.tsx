@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { SnapshotRunner } from "../../src/board/board.ts";
 import { basename, hhmm, ORCHESTRATOR, runnerColor } from "../lib/view.ts";
-import { RunnerTag } from "./chips.tsx";
+import { RunnerName, RunnerTag } from "./chips.tsx";
 
 function RunnerCard({
   p,
@@ -29,7 +29,7 @@ function RunnerCard({
       data-component="RunnerCard"
     >
       <span className="top">
-        <RunnerTag name={p.runner} />
+        <RunnerName name={p.runner} />
         <span className={label === "stale" ? `state ${p.state} stale` : `state ${p.state}`}>
           <i />
           {label}
@@ -41,8 +41,13 @@ function RunnerCard({
       {p.files.length > 0 && (
         <span className="files">
           {p.files.map((f) => (
-            <span key={f.path} className={f.interface ? "file iface" : "file"} title={`${f.path}: ${f.interface ? "changes its interface" : "inside only"}`}>
+            <span
+              key={f.path}
+              className={f.interface ? "file iface" : "file"}
+              title={`${f.path}: ${f.interface ? "changes its interface" : "inside only"}${f.shared ? "; another runner holds it too" : ""}`}
+            >
               {basename(f.path)}
+              {f.shared && <span className="shared"> shared</span>}
             </span>
           ))}
         </span>

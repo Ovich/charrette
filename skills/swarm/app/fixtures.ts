@@ -12,6 +12,17 @@ export const APP = "/repos/charrette-app/.git";
 const RT = "refresh-tokens";
 const AL = "audit-log";
 
+/** The runners' funny names (D43), fixed here; the Board picks them at random. */
+export const NICKS: Record<string, string> = {
+  [`${RT}/S2`]: "Lucky Moose",
+  [`${RT}/S3`]: "Sleepy Otter",
+  [`${RT}/S4`]: "Brave Badger",
+  [`${RT}/S5`]: "Dizzy Puffin",
+  [`${AL}/S1`]: "Jolly Walrus",
+  [`${AL}/S2`]: "Quiet Llama",
+};
+const nickOf = (name: string): string => NICKS[name] ?? "orchestrator";
+
 const runner = (
   name: string,
   title: string,
@@ -24,13 +35,14 @@ const runner = (
   const i = name.lastIndexOf("/");
   return {
     runner: name,
+    nick: nickOf(name),
     plan: name.slice(0, i),
     slice: name.slice(i + 1),
     title,
     doing,
     state,
     stale: false,
-    files: files.map(([path, iface]) => ({ path, interface: !!iface })),
+    files: files.map(([path, iface]) => ({ path, interface: !!iface, shared: false })),
     joined: at(joined),
     calls,
   };
@@ -60,18 +72,31 @@ const AL_SLICES: [string, string, string, string[]][] = [
   ["S2", "Every auth route writes an audit entry", "running", []],
   ["S3", "The audit page", "blocked", ["S1"]],
 ];
+/** The audit-log plan and its first slice carry their documents' links (D44); the rest none. */
+export const AL_LINK = "http://localhost:4321/d/41";
+export const AL_S1_LINK = "http://localhost:4321/d/42";
 const queue = (plan: string, slices: [string, string, string, string[]][]) =>
-  slices.map(([slice, title, state, blockers]) => ({ slice, title, state, blockers, runner: state === "running" ? `${plan}/${slice}` : null }));
+  slices.map(([slice, title, state, blockers]) => ({
+    slice,
+    title,
+    link: plan === AL && slice === "S1" ? AL_S1_LINK : null,
+    state,
+    blockers,
+    runner: state === "running" ? `${plan}/${slice}` : null,
+  }));
 
 export const RUNS = [
-  { run: 1, plan: RT, code: "RT", title: "Sessions with refresh tokens", open: true, runners: 4, done: 2, of: 7 },
-  { run: 2, plan: AL, code: "AL", title: "Audit log", open: true, runners: 2, done: 0, of: 3 },
+  { run: 1, plan: RT, code: "RT", title: "Sessions with refresh tokens", link: null, open: true, runners: 4, done: 2, of: 7 },
+  { run: 2, plan: AL, code: "AL", title: "Audit log", link: AL_LINK, open: true, runners: 2, done: 0, of: 3 },
 ];
+
+/** A run of charrette-app closed earlier: the Board lists it with the open ones (D34). */
+const CLOSED_HERE = { run: 0, plan: "login-page", code: "LP", title: "The login page", link: null, open: false, runners: 0, done: 4, of: 4 };
 
 export const LIVE: BoardSnapshot = {
   repo: APP,
   name: "charrette-app",
-  runs: RUNS,
+  runs: [CLOSED_HERE, ...RUNS],
   lock: null,
   roster: [
     runner(`${RT}/S3`, "The Session interface carries the refresh token", "Adding refreshToken to Session, then its two readers", "working", [["src/auth/session.ts", true], ["src/auth/session.test.ts"]], "14:02", 31),
@@ -96,13 +121,17 @@ export const LIVE: BoardSnapshot = {
     ev("14:13", "msg", `${RT}/S3`, "@S5 yes, unchanged. Only the new field.", "src/auth/session.ts"),
   ],
   queues: { [RT]: queue(RT, RT_SLICES), [AL]: queue(AL, AL_SLICES) },
+  files: [],
   flags: [],
 };
+// the FileMap's rows, as the Board derives them from the claims: one holder each here
+LIVE.files = LIVE.roster.flatMap((r) => r.files.map((f) => ({ path: f.path, holders: [r.runner], interface: f.interface })));
+
 
 const REPOS: RepoSummary[] = [
-  { repo: APP, name: "charrette-app", runs: RUNS },
-  { repo: "/repos/billing-service/.git", name: "billing-service", runs: [{ run: 3, plan: "invoice-pdfs", code: "IP", title: "Invoice PDFs", open: true, runners: 3, done: 4, of: 6 }] },
-  { repo: "/repos/docs-site/.git", name: "docs-site", runs: [{ run: 4, plan: "search-rewrite", code: "SR", title: "Search rewrite", open: false, runners: 0, done: 5, of: 5 }] },
+  { repo: APP, name: "charrette-app", runs: LIVE.runs },
+  { repo: "/repos/billing-service/.git", name: "billing-service", runs: [{ run: 3, plan: "invoice-pdfs", code: "IP", title: "Invoice PDFs", link: null, open: true, runners: 3, done: 4, of: 6 }] },
+  { repo: "/repos/docs-site/.git", name: "docs-site", runs: [{ run: 4, plan: "search-rewrite", code: "SR", title: "Search rewrite", link: null, open: false, runners: 0, done: 5, of: 5 }] },
 ];
 
 export const liveState = (over: Partial<BoardSnapshot> = {}): BoardState => ({

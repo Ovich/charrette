@@ -3,7 +3,8 @@
 // shows is a pure function of the snapshot and those (lib/view.ts).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useBoard } from "./hooks/useBoard.ts";
-import { feed, filters, lit, plansOf, scope } from "./lib/view.ts";
+import { feed, filters, lit, mentionCtx, nicksOf, scope } from "./lib/view.ts";
+import { NicksContext } from "./components/chips.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TopBar } from "./components/TopBar.tsx";
 import { Roster } from "./components/Roster.tsx";
@@ -45,12 +46,15 @@ export function App() {
   }, [snapshot]);
 
   const view = useMemo(() => (snapshot ? scope(snapshot, runSel) : null), [snapshot, runSel]);
-  const plans = useMemo(() => (snapshot ? plansOf(snapshot) : []), [snapshot]);
+  const ctx = useMemo(() => (snapshot ? mentionCtx(snapshot) : { plans: [], names: new Map<string, string>() }), [snapshot]);
+  const nicks = useMemo(() => (snapshot ? nicksOf(snapshot) : new Map<string, string>()), [snapshot]);
   const chips = useMemo(() => (view ? filters(view.events).map((f) => ({ filter: f, count: view.events.filter(f.test).length })) : []), [view]);
   const activeFilter = chips.some((c) => c.filter.id === filter) ? filter : "all";
-  const shown = useMemo(() => (view ? feed(view.events, activeFilter, focus, plans) : []), [view, activeFilter, focus, plans]);
+  const shown = useMemo(() => (view ? feed(view.events, activeFilter, focus, ctx) : []), [view, activeFilter, focus, ctx]);
 
-  const planTitle = (plan: string): string => [...(snapshot?.runs ?? [])].reverse().find((r) => r.plan === plan)?.title ?? plan;
+  const latestRun = (plan: string) => [...(snapshot?.runs ?? [])].reverse().find((r) => r.plan === plan);
+  const planTitle = (plan: string): string => latestRun(plan)?.title ?? plan;
+  const planLink = (plan: string): string | null => latestRun(plan)?.link ?? null;
 
   const selectRepo = (id: string): void => {
     if (id !== repo) {
@@ -74,41 +78,43 @@ export function App() {
   const board = !showEmpty && snapshot && view;
 
   return (
-    <div className="shell">
-      <Sidebar repos={repos ?? []} repo={repo} runSel={runSel} connection={connection} port={port} onRepo={selectRepo} onRun={selectRun} />
-      <div className="main">
-        <TopBar
-          name={board ? snapshot.name : null}
-          title={board && runSel ? planTitle(runSel) : null}
-          lock={board ? snapshot.lock : undefined}
-        />
-        {showEmpty && <EmptyState />}
-        {board && (
-          <div className="content">
-            <Roster roster={view.roster} planTitle={planTitle} focus={focus} fresh={fresh.runners} onFollow={setFocus} />
-            <div className="cols">
-              <Thread
-                chips={chips}
-                shown={shown}
-                filter={activeFilter}
-                focus={focus}
-                isLit={(e) => lit(e, focus, plans)}
-                fresh={fresh.seqs}
-                onFilter={setFilter}
-                onUnfollow={() => setFocus(null)}
-                onShowAll={() => {
-                  setFilter("all");
-                  setFocus(null);
-                }}
-              />
-              <div className="aside">
-                <PlanQueues queues={view.queues} planTitle={planTitle} />
-                <FileMap files={view.files} focus={focus} />
+    <NicksContext.Provider value={nicks}>
+      <div className="shell">
+        <Sidebar repos={repos ?? []} repo={repo} runSel={runSel} connection={connection} port={port} onRepo={selectRepo} onRun={selectRun} />
+        <div className="main">
+          <TopBar
+            name={board ? snapshot.name : null}
+            title={board && runSel ? planTitle(runSel) : null}
+            lock={board ? snapshot.lock : undefined}
+          />
+          {showEmpty && <EmptyState />}
+          {board && (
+            <div className="content">
+              <Roster roster={view.roster} planTitle={planTitle} focus={focus} fresh={fresh.runners} onFollow={setFocus} />
+              <div className="cols">
+                <Thread
+                  chips={chips}
+                  shown={shown}
+                  filter={activeFilter}
+                  focus={focus}
+                  isLit={(e) => lit(e, focus, ctx)}
+                  fresh={fresh.seqs}
+                  onFilter={setFilter}
+                  onUnfollow={() => setFocus(null)}
+                  onShowAll={() => {
+                    setFilter("all");
+                    setFocus(null);
+                  }}
+                />
+                <div className="aside">
+                  <PlanQueues queues={view.queues} planTitle={planTitle} planLink={planLink} />
+                  <FileMap files={view.files} focus={focus} />
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </NicksContext.Provider>
   );
 }

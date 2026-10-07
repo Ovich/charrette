@@ -1,39 +1,64 @@
+import type { ReactNode } from "react";
 import type { QueueSlice } from "../../src/board/board.ts";
-import type { FileRow } from "../lib/view.ts";
-import { PlanCode, RunnerTag } from "./chips.tsx";
+import { waitingOn, type FileRow } from "../lib/view.ts";
+import { PlanCode, RunnerName } from "./chips.tsx";
 
-function PlanQueue({ plan, title, slices }: { plan: string; title: string; slices: QueueSlice[] }) {
+/** A document's link opens in a new tab when there is one (D44); plain text otherwise. */
+export function DocLink({ href, children }: { href: string | null | undefined; children: ReactNode }) {
+  return href ? (
+    <a className="doc" href={href} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  ) : (
+    <>{children}</>
+  );
+}
+
+function PlanQueue({ plan, title, link, slices }: { plan: string; title: string; link: string | null; slices: QueueSlice[] }) {
   const done = slices.filter((s) => s.state === "done").length;
   return (
     <div className="queue" data-component="PlanQueue">
       <div className="queue-h">
         <PlanCode plan={plan} />
-        {title}
+        <span className="t">
+          <DocLink href={link}>{title}</DocLink>
+        </span>
         <span className="pill">
           {done} of {slices.length}
         </span>
       </div>
-      {slices.map((s) => (
-        <div key={s.slice} className={`q ${s.state}`}>
-          <span className="id">{s.slice}</span>
-          <span className="name" title={s.title}>
-            {s.title}
-          </span>
-          <span className="st">
-            {s.state === "running" ? <RunnerTag name={s.runner ?? `${plan}/${s.slice}`} plan={false} /> : s.state === "blocked" ? `after ${s.blockers.join(", ")}` : s.state}
-          </span>
-        </div>
-      ))}
+      {slices.map((s) => {
+        const after = waitingOn(s, slices);
+        return (
+          <div key={s.slice} className={`q ${after.length ? "blocked" : s.state}`}>
+            <span className="id">{s.slice}</span>
+            <span className="name" title={s.title}>
+              <DocLink href={s.link}>{s.title}</DocLink>
+            </span>
+            <span className="st">
+              {after.length ? `after ${after.join(", ")}` : s.state === "running" ? <RunnerName name={s.runner ?? `${plan}/${s.slice}`} plan={false} /> : s.state}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-export function PlanQueues({ queues, planTitle }: { queues: [string, QueueSlice[]][]; planTitle: (plan: string) => string }) {
+export function PlanQueues({
+  queues,
+  planTitle,
+  planLink,
+}: {
+  queues: [string, QueueSlice[]][];
+  planTitle: (plan: string) => string;
+  planLink: (plan: string) => string | null;
+}) {
   return (
     <section data-component="PlanQueues">
       <p className="label">The plans</p>
       {queues.map(([plan, slices]) => (
-        <PlanQueue key={plan} plan={plan} title={planTitle(plan)} slices={slices} />
+        <PlanQueue key={plan} plan={plan} title={planTitle(plan)} link={planLink(plan)} slices={slices} />
       ))}
     </section>
   );
@@ -48,11 +73,15 @@ export function FileMap({ files, focus }: { files: FileRow[]; focus: string | nu
       <div className="filemap">
         {files.length ? (
           files.map((f) => (
-            <div key={`${f.runner}:${f.path}`} className={["f", f.flag && "flag", focus === f.runner && "lit"].filter(Boolean).join(" ")}>
+            <div key={f.path} className={["f", f.flag && "flag", focus && f.holders.includes(focus) && "lit"].filter(Boolean).join(" ")}>
               <span className={f.iface ? "path iface" : "path"} title={f.path}>
                 {f.path}
               </span>
-              <RunnerTag name={f.runner} />
+              <span className="holders">
+                {f.holders.map((h) => (
+                  <RunnerName key={h} name={h} />
+                ))}
+              </span>
             </div>
           ))
         ) : (
