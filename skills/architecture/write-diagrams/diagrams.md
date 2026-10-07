@@ -37,12 +37,12 @@ information, renders everywhere.
 flowchart LR
     student([Student]):::person
     teacher([Teacher]):::person
-    roster[["Roster: lab & group management"]]:::system
+    classroom[["Classroom: lab & group management"]]:::system
     github[("GitHub: repos, org membership")]:::external
 
-    student -->|"joins a group, submits work"| roster
-    teacher -->|"creates labs, reviews groups"| roster
-    roster -->|"creates repos, reads members (REST)"| github
+    student -->|"joins a group, submits work"| classroom
+    teacher -->|"creates labs, reviews groups"| classroom
+    classroom -->|"creates repos, reads members (REST)"| github
 
     classDef person fill:#08427b,color:#fff
     classDef system fill:#1168bd,color:#fff
@@ -60,7 +60,7 @@ flowchart LR
 ```mermaid
 flowchart TB
     teacher([Teacher])
-    subgraph roster["Roster"]
+    subgraph classroom["Classroom"]
         spa["apps/www: React SPA (Vite)"]
         api["apps/api: Hono Worker"]
         d1[("D1: SQLite")]
@@ -226,7 +226,7 @@ with protocol *and* rough latency where it matters.
 
 ```mermaid
 flowchart TD
-    routes --> handlers --> lib --> db["@roster/db"]
+    routes --> handlers --> lib --> db["@app/db"]
     www["apps/www"] -.->|"FORBIDDEN"| db
     linkStyle 3 stroke:#c00,stroke-dasharray:4
 ```

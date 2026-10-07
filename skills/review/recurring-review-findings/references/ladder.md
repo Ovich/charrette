@@ -6,7 +6,7 @@ Six rungs, highest first. A finding is tried against each from the top and takes
 
 **Criterion**: the finding names a place where the same decision is made more than once, or a state that should not exist, and one module, one type or one generator can hold it instead.
 
-**Artefacts**: a module that is the single owner ("`CurrentUser` decides where a person is sent, the guards ask it"), a type that leaves no room for the wrong value (a branded id, a discriminated union, a `never` in the switch), a generator or template the file is made from (a schematic, a scaffold command), a boundary that the wrong thing cannot cross (a mock that is a handler mounted on a route, so the client has no branch for it).
+**Artefacts**: a module that is the single owner ("one session module decides where a person is sent, the guards ask it"), a type that leaves no room for the wrong value (a branded id, a discriminated union, a `never` in the switch), a generator or template the file is made from (a schematic, a scaffold command), a boundary that the wrong thing cannot cross (a mock that is a handler mounted on a route, so the client has no branch for it).
 
 **What remains with a human**: nothing, when the module is the only way. The design change goes through a board, and the plan that follows makes the change; this skill drafts the paragraph the board opens on.
 

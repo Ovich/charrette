@@ -1,4 +1,4 @@
-# Blocks, one per concern
+# Module blocks, one per state
 
 ## Contents
 
@@ -10,12 +10,6 @@
   - ui
   - ui, a component tree
   - schema
-- Seam blocks, by what sits behind them
-  - in-process
-  - a local stand-in
-  - our own service across a network
-  - a screen
-  - a third party
 
 Each block below is the whole of what a slice document carries for that concern: shallow
 code for the contract, a line each for what the code cannot say, nothing a body would
@@ -125,60 +119,3 @@ create table "account" (…, "provider_id" text not null, "user_id" text not nul
 
 - owner: `lib/auth` through the Drizzle adapter; the file is generated and never hand-edited
 - proved through the owner's seam: the migration applies, then the linking cases
-
-## Seam blocks, by what sits behind them
-
-### in-process
-
-```
-Seam: env.ts, `env`
-behind it   the process environment, read once
-cases       each of the six keys missing → the start fails naming it   → criterion 6
-            all present                  → the object, typed           → criterion 6
-not past it process.env itself; the test sets the environment and reads `env`
-```
-
-### a local stand-in
-
-```
-Seam: lib/auth, the routes /sign-in/social and /callback/:provider
-behind it   PGlite in the suite, PostgreSQL itself in-process; the seam stays inside the module
-cases       verified email through a second provider attaches       → criterion 4, branch "match"
-            unverified email through LinkedIn is refused            → criterion 5, branch "account_not_linked"
-            Microsoft without the claim attaches                    → ID72, branch "trusted"
-not past it the account table: the answer is read through listUserAccounts
-```
-
-### our own service across a network
-
-```
-Seam: web lib/api, the RPC client
-behind it   the API over HTTP; a port at the seam, the payload-hash fetch as the production
-            adapter, an in-memory adapter answering the typed routes for the tests
-cases       a bodied POST carries x-amz-content-sha256                 → ID58
-            a 401 answer redirects to the entry route                  → criterion 3, branch "expired"
-not past it the API's handlers; they have their own seam
-```
-
-### a screen
-
-```
-Seam: shell/app-bar, rendered
-behind it   the auth client's session, stood in for at its seam (signed in as who; signed out)
-cases       signed in  → the name, the address, "signed in with Google" in the menu   → US3
-            sign out pressed → signOut fires once, the menu closes                    → US3
-            signed out → no account slot at all                                       → US3
-not past it the component's fields and its template's tags; the assertions read text
-            and press buttons the way a person does
-```
-
-### a third party
-
-```
-Seam: the providers, at their doors
-behind it   Google, Microsoft, LinkedIn; a stand-in per door, one function per address,
-            each answering one shape; the door not stood in for throws
-cases       the token endpoint answers an id token with the claims     → the linking cases above
-            LinkedIn's userinfo answers email and email_verified       → D11
-not past it the provider's own behaviour; a claim they omit is reported, not simulated
-```

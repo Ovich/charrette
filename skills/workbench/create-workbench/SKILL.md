@@ -1,6 +1,6 @@
 ---
 name: create-workbench
-description: "Use when a page is wanted to work on something with the person during development, fed the project's real data (comparing model answers, walking an agent call by call, measuring an output against its template), or when such a workbench has to change or its feed broke. Produces the page in aiview, kind `workbench`, and the project's `workbench-<bench>` skill with its feed and operating steps. Not for designing a product screen (design-prototype), judging one recorded call (prompt-review) or verifying user stories (verification-skill-create)."
+description: "Use when a page is wanted to work on something with the person during development, fed the project's real data (comparing model answers, walking an agent call by call, measuring an output against its template), or when such a workbench has to change or its feed broke. Produces the page in aiview, kind `workbench`, and the project's `workbench-<bench>` skill with its feed and operating steps. Not for designing a product screen (design-prototype) or verifying user stories (verification-skill-create)."
 ---
 
 # Create a workbench
@@ -11,9 +11,7 @@ holds the feed that fills the page and the steps to operate it.
 
 **The bench's skill makes the agent operating it the bench's owner**, by its role: that agent
 keeps the page, the feed and the scripts true, fast and easy to drive, adapting them in place
-when the project moves on. No other skill maintains them. Its scripts are run at every use:
-`references/tooling.md` of the `verification-skill-create` skill, read before the first
-script, says how they stay fast and easy for an agent.
+when the project moves on. No other skill maintains them.
 
 **The person is in the build.** Every change is shown in the watched browser before the
 next question, as the `design-prototype` skill paces a mockup. A bench described in chat

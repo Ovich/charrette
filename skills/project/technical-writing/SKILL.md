@@ -20,7 +20,7 @@ description: "Use when the work produces a document that must be understood by s
 ## Flow
 
 1. **Name the reader and the question, and choose the document type below.**
-2. **Render it through the `aiview` skill** and read it rendered. Durable documents live next to what they describe, under stable names (`README.md`, `docs/architecture.md`, `docs/runbook.md`); point-in-time material under dated names.
+2. **Write it in the repository**, never in aiview's data home, and read it rendered. Durable documents live next to what they describe, under stable names (`README.md`, `docs/architecture.md`, `docs/runbook.md`); point-in-time material under dated names.
 3. **Verify every actionable claim at writing time**: commands, paths, ports, configuration, API behaviour, procedures, versions. What cannot be verified is qualified or removed.
 4. **Cut what does not change the reader's understanding, decision or action**: repetition, history, technology inventory, unsupported adjectives, prose that duplicates a diagram.
 

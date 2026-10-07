@@ -1,13 +1,13 @@
 ---
 name: deepen-module
-description: Use when a person asks to design a new module's interface or to rework an existing module so that it hides much behind little, in any tier (backend, frontend, test support, tooling), or says a module's callers know too much about it. Produces a module document in aiview, how a caller uses it, its one public entry point as signatures, what stays outside and the gap from today, discussed with the person until agreed. Not for reviewing a whole codebase's design (code-design-review), not for writing the slice that carries the rework out (write-slice) and not for the rework itself.
+description: Use when a person asks to design a new module's interface or to rework an existing module so that it hides much behind little, in any tier (backend, frontend, test support, tooling), or says a module's callers know too much about it. Produces a module document in aiview, how a caller uses it, its one public entry point as signatures, what stays outside and the gap from today, discussed with the person until agreed. Not for writing the slice that carries the rework out (write-slice) and not for the rework itself.
 ---
 
 # Deepen a module
 
 **The goal is to hide accidental complexity**: the codebase knows the module's entry and nothing behind it, as if it were a package that has not been published.
 
-**A building block is not a deep module**: a module other modules are built from, one job, several callers, no module document of its own. It still has an entry, held to the same checklist item on entries in the `code-design-review` skill.
+**A building block is not a deep module**: a module other modules are built from, one job, several callers, no module document of its own. It still has an entry, held to the same rule as a deep module's (*The entry*, below).
 
 **One `module` document per module, written from the first finding, never in chat.** Through the `aiview` skill: kind `module`, file `YYYY-MM-DD-<module>.module.md`, tags = module name, in the plan's group when a plan waits on it. Each stage below writes its sections into it.
 

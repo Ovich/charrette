@@ -15,7 +15,7 @@ The **roadmap** is the one document above the pieces of work: what is delivered 
 
 ## The two documents
 
-- **`YYYY-MM-DD-<project>.roadmap.md`, kind `roadmap`**, dated at declaration and kept for the life of the project; the roadmap tag is dropped by aiview, so it carries the project tag only.
+- **`YYYY-MM-DD-<project>.roadmap.md`, kind `roadmap`**, dated at declaration and kept for the life of the project.
 - **`foundation.reference.md`, kind `reference`**, undated, never retiring: the technology decisions, one row each; tags project and `roadmap`.
 - **Their contents and rows: `references/documents.md`**, read before drafting or redrawing either.
 - **Both are registered and served via the `aiview` skill** in the product's group, the one its product-level boards and mockups share, created and titled after the product when none exists, the roadmap started when the declaration began.
@@ -54,7 +54,7 @@ The **roadmap** is the one document above the pieces of work: what is delivered 
 
 ## The diagram
 
-**The roadmap opens on its tracker, drawn to the tracker protocol of the `execute-plan` skill** (its `references/tracker.md`, the Slots section): one subgraph per iteration, one node per slot with the glyph of its derived state, dependency edges, the state node with the iteration, the slot in progress, next, blocked and the open rows. The coarse iterations share one subgraph, "later", their order carried by the edges alone. Parse it after every edit with `aiview mermaid-check`.
+**The roadmap opens on its tracker, drawn to the tracker protocol of the `write-plan` skill** (its `references/tracker.md`, the Slots section): one subgraph per iteration, one node per slot with the glyph of its derived state, dependency edges, the state node with the iteration, the slot in progress, next, blocked and the open rows. The coarse iterations share one subgraph, "later", their order carried by the edges alone. Parse it after every edit with `aiview mermaid-check`.
 
 ## Red flags
 

@@ -1,9 +1,9 @@
 ---
 name: design-prototype
-description: Use before building or changing any screen (a new page, dialog, panel, or a visual rework), to design it first as a mockup or prototype in the project's own design language, which the skill extracts from the codebase and writes down once. Not for implementing the screen and not for reviewing code quality (frontend-review).
+description: Use before building or changing any screen (a new page, dialog, panel, or a visual rework), to design it first as a mockup or prototype in the project's own design language, which the skill extracts from the codebase and writes down once. Not for implementing the screen and not for reviewing its code.
 ---
 
-# Frontend design
+# Design a prototype
 
 **Learn the project's design language, propose mockups in that language, iterate live, hand off to implementation.**
 
@@ -21,7 +21,7 @@ No component code, no route, no CSS in the app for the screen being designed unt
 - **Density and hierarchy over decoration.** The summary before the detail, state encoded in form (a chip, an opacity, a stripe) and not only in text, semantic colour apart from the accent.
 - **Spend boldness in one place.** One element is the memorable thing, the rest quiet. Before calling a mockup done, remove one thing.
 - **The quality floor is built in, never announced.** Responsive to the mobile preset, visible keyboard focus, `prefers-reduced-motion` respected, contrast legible in both themes, touch targets no smaller than the codebase's own buttons.
-- **Copy is design content.** Written from the person's side: things named by what people control and recognise (a teacher manages *graders*, not *lab_graders rows*), a control saying exactly what happens, the same name through the whole flow, empty states inviting the next action, errors saying what went wrong and how to fix it, no apology. Sentence case, plain verbs, the product's language.
+- **Copy is design content.** Written from the person's side: things named by what people control and recognise (a person manages *reviewers*, not *review_assignment rows*), a control saying exactly what happens, the same name through the whole flow, empty states inviting the next action, errors saying what went wrong and how to fix it, no apology. Sentence case, plain verbs, the product's language.
 - **The mockup describes the look, never the framework.** No Tailwind classes or React structure prescribed; the handoff maps to named components.
 
 ## Flow

@@ -40,7 +40,7 @@ $A open "$F" --tag <topic>
 ## Registering a document
 
 - **File name `YYYY-MM-DD-<topic>.<kind>.md`**, flat in the project's folder.
-- **Kind is mandatory**, from the filename or `--kind`: `brainstorm`, `plan`, `slice`, `module`, `reference`, `mockup`, `workbench`, `prompt`, `pr-analysis`, `report`, `pdf`, `roadmap` (one per project), `feature-map` (one per project), `verification` (one per run). A kind is a type of document; a topic is a tag.
+- **Kind is mandatory**, from the filename or `--kind`: `brainstorm`, `plan`, `slice`, `module`, `reference`, `mockup`, `workbench`, `pr-analysis`, `report`, `pdf`, `roadmap` (one per project), `feature-map` (one per project), `verification` (one per run). A kind is a type of document; a topic is a tag.
 - **One `--group <slug>` per piece of work**, titled once with `--group-title`, at most one group per document.
 - **A plan takes its own group, `<topic>-plan`**, shared with its slice documents and nothing else.
 - **`--started <ISO>` when the discussion began before the file existed.**
@@ -57,11 +57,6 @@ $A open "$F" --tag <topic>
 
 **`show <file|#id> --component <Name>... [--variant <v>]` moves every open tab to the mockup and lights those components**, dimming the rest, until the next `show`, until `show --done` sends every tab back to what the person was reading, or until the person stops it themselves. `components <file|#id>` lists every name on the page and its variants, and `show` refuses any other, listing the ones it has. It prints the link that does the same in a tab opened later, and says how many tabs heard it. When to point and how to word the question: the `point-at` skill.
 
-## Retiring the work
-
-- **Before the merge, distil what outlives the work into somewhere versioned**: durable rules into `AGENTS.md` (the `write-conventions` skill), the story of the change into the PR description.
-- **Then tag the group done**, `update #<id> --tag done` per member. The files stay on disk.
-
 ## Contract for calling skills
 
 **A skill that produces documents says "through the `aiview` skill"**, then states only its document's metadata: kind, tags, group, and a start time that predates the file. Command syntax and directories stay here.
@@ -72,6 +67,6 @@ $A open "$F" --tag <topic>
 
 | Thought | Reality |
 |---|---|
-| "I'll show it as a claude.ai artifact instead" | The user asked for local, versioned, offline. |
+| "I'll show it as a claude.ai artifact instead" | Documents stay local and offline, in the data home. |
 | "I'll run serve in a background task and watch it" | `open` and `serve --detach` daemonise; `status` finds the server. |
 | "I'll add `--path` pointing at where the documents are" | `paths` are working directories. Documents live in `docs/<slug>/`. |

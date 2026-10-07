@@ -30,8 +30,7 @@ Existing code, cited `file:line`, then the after picture. New work has the after
 only. A table of what replaces what.
 
 ## 3. Modules, after
-The module map: who imports whom, and the imports that must not exist, each with the test
-that holds it. Then one subsection per deep module: its usage, the complete code a caller
+The module map: who imports whom, and the imports that must not exist. Then one subsection per deep module: its usage, the complete code a caller
 writes, the entry as signatures without bodies, what it hides, what stays outside.
 
 ## 4. Flows
@@ -43,13 +42,10 @@ Where each piece of state lives, and every writer of it.
 ## 6. Failure modes
 What breaks, and what the person sees.
 
-## 7. The suite, after
-The testing strategy as decided. Then per seam: the cases, by name.
-
-## 8. What ran
+## 7. What ran
 The recipes the experiments handed back.
 
-## 9. Decisions
+## 8. Decisions
 | id | Kind | Decision | Status | Source | Slice |
 One series, `D1` onward, continuing the project's numbering. Kinds: purpose, module (with
 its state, as write-slice names them), architecture, contract, clarification. Open
@@ -58,12 +54,11 @@ what is owed for it.
 
 # Execution
 
-## 10. The slices
+## 9. The slices
 One heading per slice: the stories it serves, delivers, blocked by, its
-check, the tests it owes, its `tests:` where it departs from the mandate's, its mark, its
-slice document.
+check, its mark, its slice document.
 
-## 11. The mandate
+## 10. The mandate
 The orchestrator's mandate, as answered.
 
 ## Interview log

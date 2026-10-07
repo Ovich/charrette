@@ -54,6 +54,5 @@ scripts and the page to match it, never the data to match the page, run the feed
 and show the person what changed. A source the bench lost entirely is named to the person
 before anything that depended on it is removed.
 
-**A step that is slow or awkward to drive is drift too**, fixed the same way, as
-`references/tooling.md` of the `verification-skill-create` skill says a tool stays fast and easy for an agent.
+**A step that is slow or awkward to drive is drift too**, fixed the same way.
 ```

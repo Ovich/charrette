@@ -61,8 +61,7 @@ description: "Use when reviewing a pull request, branch or diff in any language,
 ## Beyond the layers
 
 - **A correctness bug hunt is the harness's own review.** When nothing runs one, the verdict says nobody checked whether the code works.
-- **`frontend-review` is chained on an explicit yes**, on a project it supports and a diff with frontend in it. Otherwise "not applicable" is written, never left out.
-- **The document records both**: "Chained: frontend-review (link). Correctness: not covered."
+- **The document records it**: "Correctness: not covered."
 
 ## Red flags
 

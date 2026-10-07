@@ -17,7 +17,7 @@ description: "Use when a project's conventions need to be written down or extend
 4. **Checkable**: a reviewer can point at a line and say yes or no.
 5. **Not tool-enforceable**: what a linter, formatter or type checker can enforce is configured there.
 
-**Never a rule**: formatting, casing, import order, line length; a restated general principle (`code-design-review` holds those); an aspiration with no test; code that does not exist yet.
+**Never a rule**: formatting, casing, import order, line length; a restated general principle; an aspiration with no test; code that does not exist yet.
 
 ## Rule shape
 
@@ -30,7 +30,7 @@ N. **MUST <imperative>.** <the cost of not doing it, or where it lives.> <option
 - **Every rule states its cost**: a rule whose reason is invisible gets rationalised away.
 
 <Good>
-`2. **MUST derive DB-row types from Drizzle, never hand-write them.** Use `typeof <table>.$inferSelect`, or the aliases exported from `@roster/db`. Hand-written copies drift from the schema silently.`
+`2. **MUST derive DB-row types from Drizzle, never hand-write them.** Use `typeof <table>.$inferSelect`, or the aliases exported from the project's db package. Hand-written copies drift from the schema silently.`
 </Good>
 
 ## Modes

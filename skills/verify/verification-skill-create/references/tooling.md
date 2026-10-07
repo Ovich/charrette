@@ -1,6 +1,6 @@
 # A tool an agent operates
 
-The scripts a skill hands an agent (a verify skill's helpers, a workbench's feed and operating scripts) run many times in every session. A second lost or a page of output to read is paid at every step.
+The verify skill's helper scripts run many times in every session. A second lost or a page of output to read is paid at every step.
 
 - **An existing driver before a script.** A browser MCP, the project's own client or CLI: the agent acts on a live state in small steps, and nothing is written per attempt.
 - **A script only for what repeats identically**: a start, a state restored, a feed. One command each, named for what it does, its arguments in its head.

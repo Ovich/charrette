@@ -3,7 +3,7 @@ name: recurring-review-findings
 description: "Use when the same remark keeps being made in a repository's pull request reviews, or when someone asks what the reviews keep catching and how to stop catching it. Groups the comment history into recurring findings and decides, for each, the rung that removes it: a design that makes it impossible, a lint or type rule, a test in CI, a convention, a fix to the skill that produced the code. Produces a report in aiview with a recommendation per finding, applied on a yes. Not for reviewing one pull request (pr-review) and not for writing a rule already decided (write-conventions)."
 ---
 
-# Eliminate findings
+# Recurring review findings
 
 **A review comment made twice is a finding about the process**: something upstream, a design, a tool, a test, a rule, a brief, let it reach a human. Find the rung where it stops.
 
