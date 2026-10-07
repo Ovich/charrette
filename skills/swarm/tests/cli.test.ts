@@ -1,0 +1,189 @@
+import { test, beforeEach, afterEach } from "node:test";
+import assert from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "cli", "index.ts");
+
+let toolRoot: string;
+let repo: string;
+
+// SWARM_ROOT = where the code would be; CHARRETTE_HOME = where the data goes.
+// The suite points both at one temp dir so a run leaves nothing in the real home.
+const env = () => ({ ...process.env, SWARM_ROOT: toolRoot, CHARRETTE_HOME: toolRoot });
+
+const runIn = (cwd: string, ...argv: string[]) => spawnSync(process.execPath, [CLI, ...argv], { cwd, encoding: "utf8", env: env() });
+const run = (...argv: string[]) => runIn(repo, ...argv);
+
+const git = (cwd: string, ...argv: string[]): void => {
+  const r = spawnSync("git", argv, { cwd, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+};
+
+const SLICES = JSON.stringify([
+  { id: "S3", title: "the page", blockers: [] },
+  { id: "S5", title: "the skill", blockers: ["S3"] },
+]);
+
+const openRun = (plan = "review-tool", cwd = repo): number => {
+  const slices = path.join(toolRoot, `${plan}.slices.json`);
+  fs.writeFileSync(slices, SLICES);
+  const r = runIn(cwd, "open", "--plan", plan, "--title", "A plan", "--slices", slices);
+  assert.equal(r.status, 0, r.stderr);
+  return Number(r.stdout.trim());
+};
+
+beforeEach(() => {
+  toolRoot = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-cli-"));
+  repo = path.join(toolRoot, "repo");
+  fs.mkdirSync(repo);
+  git(repo, "init", "-q");
+  git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "root");
+});
+
+afterEach(() => {
+  // Windows may briefly hold handles of a just-ended child; a leaked temp dir
+  // must not fail the suite.
+  for (let i = 0; ; i++) {
+    try {
+      fs.rmSync(toolRoot, { recursive: true, force: true });
+      return;
+    } catch {
+      if (i >= 5) {
+        console.warn(`cleanup: temp dir left behind: ${toolRoot}`);
+        return;
+      }
+      spawnSync(process.execPath, ["-e", "setTimeout(()=>{},200)"]);
+    }
+  }
+});
+
+test("no verb prints usage and exits 1", () => {
+  const r = run();
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /^usage: swarm <verb>/);
+});
+
+test("open then join prints the roster", () => {
+  const id = openRun();
+  assert.ok(id > 0);
+  const r = run("join", "--run", String(id), "--slice", "S3", "--doing", "the page", "--file", "src/page.ts:interface", "--file", "src/a.ts");
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /you are review-tool\/S3/);
+  assert.match(r.stdout, /review-tool\/S3 {2}run \d+ {2}doing: the page {2}files: src\/page\.ts \(interface\), src\/a\.ts/);
+  assert.match(r.stdout, /review-tool\/orchestrator/);
+});
+
+test("--json on every verb parses", () => {
+  const slices = path.join(toolRoot, "s.json");
+  fs.writeFileSync(slices, SLICES);
+  const opened = JSON.parse(run("open", "--plan", "review-tool", "--title", "T", "--slices", slices, "--json").stdout);
+  assert.deepEqual(Object.keys(opened).sort(), ["plan", "repo", "run"]);
+  const id = String(opened.run);
+  const as = ["--as", "review-tool/S3"];
+  const verbs: string[][] = [
+    ["join", "--run", id, "--slice", "S3", "--doing", "x"],
+    ["join", "--run", id, "--slice", "S5", "--doing", "y"],
+    ["doing", ...as, "still x"],
+    ["post", ...as, "@S5 hello"],
+    ["agree", ...as, "@S5 I go first", "--about", "src/a.ts"],
+    ["read", "1"],
+    ["deliver", "--as", "review-tool/S5"],
+    ["wait", "--as", "review-tool/S5", "--timeout", "50"],
+    ["roster"],
+    ["slice", "S3", "--run", id, "--state", "running"],
+    ["status"],
+    ["end", ...as],
+    ["close", "--run", id],
+  ];
+  for (const argv of verbs) {
+    const r = run(...argv, "--json");
+    assert.equal(r.status, 0, `${argv[0]}: ${r.stderr}`);
+    assert.doesNotThrow(() => JSON.parse(r.stdout), `${argv[0]} printed ${r.stdout}`);
+  }
+});
+
+test("an unknown run or runner is one line naming it, exit 1", () => {
+  const r1 = run("join", "--run", "7", "--slice", "S3", "--doing", "x");
+  assert.equal(r1.status, 1);
+  assert.match(r1.stderr, /unknown run 7/);
+  const r2 = run("post", "--as", "nope/S1", "hi");
+  assert.equal(r2.status, 1);
+  assert.match(r2.stderr, /unknown runner nope\/S1/);
+});
+
+test("wait in a child process wakes on a post from another", async () => {
+  const id = String(openRun());
+  run("join", "--run", id, "--slice", "S3", "--doing", "x");
+  run("join", "--run", id, "--slice", "S5", "--doing", "y");
+  run("deliver", "--as", "review-tool/S5");
+
+  const child = spawn(process.execPath, [CLI, "wait", "--as", "review-tool/S5", "--timeout", "15000"], { cwd: repo, env: env() });
+  let out = "";
+  child.stdout.on("data", (b) => (out += b));
+  const exited = new Promise<number | null>((resolve) => child.on("exit", resolve));
+  await new Promise((r) => setTimeout(r, 1500)); // the child is up and watching
+  const posted = run("post", "--as", "review-tool/S3", "@S5 your turn");
+  assert.equal(posted.status, 0, posted.stderr);
+  const t0 = Date.now();
+  const code = await exited;
+  assert.equal(code, 0);
+  assert.match(out, /review-tool\/S3[^\n]*\n@S5 your turn/);
+  assert.ok(Date.now() - t0 < 5000, "wait did not wake on the post");
+});
+
+test("two worktrees of one repository share one thread", () => {
+  const a = path.join(toolRoot, "wt-a");
+  const b = path.join(toolRoot, "wt-b");
+  git(repo, "worktree", "add", "-q", "-b", "a", a);
+  git(repo, "worktree", "add", "-q", "-b", "b", b);
+  const id = String(openRun());
+
+  const ja = runIn(a, "join", "--run", id, "--slice", "S3", "--doing", "x", "--json");
+  const jb = runIn(b, "join", "--run", id, "--slice", "S5", "--doing", "y", "--json");
+  assert.equal(ja.status, 0, ja.stderr);
+  assert.deepEqual(JSON.parse(jb.stdout).roster.map((r: { name: string }) => r.name).sort(), [
+    "review-tool/S3",
+    "review-tool/S5",
+    "review-tool/orchestrator",
+  ]);
+  runIn(a, "deliver");
+
+  // no --as: each worktree's runner is the one that joined from it (D28)
+  const posted = runIn(b, "post", "@S3 from the other worktree");
+  assert.equal(posted.status, 0, posted.stderr);
+  const got = runIn(a, "deliver", "--json");
+  assert.equal(got.status, 0, got.stderr);
+  const d = JSON.parse(got.stdout);
+  assert.equal(d.full.length, 1);
+  assert.equal(d.full[0].from, "review-tool/S5");
+
+  const rosters = [repo, a, b].map((cwd) => JSON.parse(runIn(cwd, "roster", "--json").stdout));
+  assert.equal(new Set(rosters.map((r) => r.repo)).size, 1);
+});
+
+test("two runs of two plans on one repository share one thread and one roster", () => {
+  const one = String(openRun("review-tool"));
+  const two = String(openRun("swarm"));
+  run("join", "--run", one, "--slice", "S3", "--doing", "x");
+  run("join", "--run", two, "--slice", "S5", "--doing", "y");
+  const roster = JSON.parse(run("roster", "--json").stdout).roster.map((r: { name: string }) => r.name);
+  assert.ok(roster.includes("review-tool/S3") && roster.includes("swarm/S5"));
+  run("deliver", "--as", "review-tool/S3");
+  run("post", "--as", "swarm/S5", "@review-tool/S3 one thread");
+  const d = JSON.parse(run("deliver", "--as", "review-tool/S3", "--json").stdout);
+  assert.equal(d.full[0].body, "@review-tool/S3 one thread");
+});
+
+test("the launcher prints the build command when dist-cli is absent", () => {
+  const fake = path.join(toolRoot, "tool");
+  fs.mkdirSync(fake);
+  const launcher = path.resolve(path.dirname(CLI), "..", "..", "swarm.mjs");
+  fs.copyFileSync(launcher, path.join(fake, "swarm.mjs"));
+  const r = spawnSync(process.execPath, [path.join(fake, "swarm.mjs"), "status"], { encoding: "utf8", env: env() });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /not built\. Run: npm install && npm run build/);
+});
