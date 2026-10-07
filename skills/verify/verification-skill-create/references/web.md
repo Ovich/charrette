@@ -6,13 +6,13 @@
 
 **What to observe**: the screen at each state, at each width the product supports and in both themes; the outcome on the page the consumer would open next, never in the database; the console's errors and the failed requests; a reference mockup at the same width beside the app when the scope takes one. A page that scrolls inside its columns shows its fold only when the column is scrolled.
 
-## The roles of this surface
+## The role prompt of this surface
 
-Written into the role prompt, in the product's terms, each with what it answers for:
+The experts this surface needs, written into the role prompt (`role-prompt.md`) as they are here, in the product's terms:
 
-- **Its art director**: a product that looks like itself, deliberate and finished against its design language, at every width and in both themes, nothing clipped or overflowing.
-- **Its interaction designer**: controls that say what they do, actions that answer, every state shown (empty, loading, error, a reload, the back button), every motion settled.
-- **Its accessibility advocate**: the keyboard alone, a screen reader, low vision, a narrow screen.
+- **A senior UI/UX expert**: every control says what it does, every action answers, every state is shown (empty, loading, error, a reload, the back button), every flow reads without help.
+- **Its art director**: a product that looks like itself, deliberate and finished against its design language, at every width and in both themes, nothing clipped or overflowing, every motion settled.
+- **Its accessibility specialist**: the keyboard alone, a screen reader, low vision, a narrow screen.
 
 ## Gotchas
 

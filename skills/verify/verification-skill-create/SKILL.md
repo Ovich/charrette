@@ -7,19 +7,21 @@ description: "Use when a project has no verification skill and an agent should f
 
 **Two things are produced, and a later agent works from them alone**: the project's `verify-<app>` skill and its feature map in aiview. The skill is short, as a proven project skill is: an agent arriving cold reads it in a minute and works.
 
-**The skill opens on its role prompt and leaves the judging to the agent.** One paragraph, written for this product, makes the agent the owner of the product's quality and of the skill itself, which it fixes in place when the app has moved. It gives, in prose and the product's own terms, each role the agent judges through and what that role answers for: those every product needs (its product owner, its consumer meeting it for the first time, its editor, its skeptic), those of its surface (its harness reference names them), and one of its domain when someone else judges what the product produces (a recruiter reading the CV it writes), taken from the plans, never invented. A role earns its sentence by what it would catch that the others would not. A checklist written into the skill becomes the agent's whole judgment.
+**The skill opens on its role prompt and leaves the judging to the agent**: one paragraph that makes the agent the product's quality owner, seen through expert roles (a web product's UI/UX expert and art director among them). Written as `references/role-prompt.md` says, read before the first line, with the surface's roles from its harness reference.
+
+**The verify skill validates the product, never the code.** It reaches and judges everything through the surface the consumer uses; reading the source is this skill's job, done once here, never the verify skill's.
 
 ## Before writing
 
 - **Stop if a `verify-<app>` skill exists**: it keeps itself true when run. Say so; never overwrite one.
 - **A project skill that already runs the app is the base.** It is proven: its words are kept as they are, wrapped with the role prompt, the map and the judgment, and it is removed once the verify skill holds all of it.
 - **Establish from the repository, never by asking**: the consumer and what they come for, the interface they use, how the app starts and signals ready, the tool the agent acts through, where the specification lives (plans and their stories, decisions, reference mockups, the `design-prototype` skill's design language), the widths, themes and inputs the product supports.
-- **The harness reference** of the interface, read for the tool to act through and the surface's roles: `references/web.md`, `api.md`, `service.md`, `cli.md` or `mcp.md`. A tool the agent operates is built as `references/tooling.md` says.
+- **The harness reference** of the interface, read for the tool to act through and the surface's expert roles: `references/web.md`, `api.md`, `service.md`, `cli.md` or `mcp.md`. A tool the agent operates is built as `references/tooling.md` says.
 - **Journeys come from the design**: the plans, the roadmap's slots, the README's promises. None: ask the person for the three to five the product exists for.
 
 ## The skill and the map
 
-**`verify-<app>/SKILL.md`** in the project's local skill folder, written to the shape in `references/verify-skill.md`, read before the first line.
+**`verify-<app>/SKILL.md`** in the project's local skill folder, written to the shape in `references/verify-skill-template.md`, read before the first line.
 
 **One `feature-map` document per project** in aiview, `YYYY-MM-DD-<project>.feature-map.md`, tags `verification`, its sections in `references/feature-map.md`: how the consumer reaches every feature and its hidden parts, and the journeys across them. Tell the person the URL.
 

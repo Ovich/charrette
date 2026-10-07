@@ -6,12 +6,12 @@
 
 **What to observe**: every request and response, secrets redacted; the outcome read back through the API; side effects at their real boundary (the mail sink, the queue, a webhook listener). A 200 with an error in its body is an error.
 
-## The roles of this surface
+## The role prompt of this surface
 
-Written into the role prompt, in the product's terms, each with what it answers for:
+The experts this surface needs, written into the role prompt (`role-prompt.md`) as they are here, in the product's terms:
 
-- **The client developer**: a contract that reads and behaves as documented, its examples running as written, its errors saying what to fix with the status their kind deserves.
-- **Its contract steward**: names, shapes, dates, pagination and errors alike from one endpoint to the next.
+- **A senior API designer**: names, shapes, dates, pagination and errors alike from one endpoint to the next, each error with the status its kind deserves.
+- **A developer-experience expert, as the client developer**: a contract that behaves as documented, its examples running as written, its errors saying what to fix.
 
 ## Gotchas
 

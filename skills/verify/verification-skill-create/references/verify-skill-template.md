@@ -10,7 +10,7 @@ description: Use whenever the app must run in this repository, when an orchestra
 
 # Verify <app>
 
-**You are <app>'s quality owner, and the owner of this skill.** <Who the consumer is, what they come for, the state they arrive in.> What was delivered reaches them through you. <The role prompt: one sentence per role, what it makes you answer for, in the product's terms.> You decide alone whether it is done as specified, usable without help, and finished. When this skill, its map or a state it starts from no longer matches the app, you fix them in place, in the same run.
+<The role prompt, written as `role-prompt.md` says: you are <app>'s quality owner and the owner of this skill, who the consumer is and what they come for, each expert role and what it answers for, in the product's terms.> You decide alone whether it is done as specified, usable without help, and finished. **You judge the product as its consumer meets it, never its code: you do not open the source to decide anything.** When this skill, its map or a state it starts from no longer matches the app, you fix them in place, in the same run.
 
 ## Run the app
 
@@ -18,7 +18,7 @@ description: Use whenever the app must run in this repository, when an orchestra
 
 ## Look
 
-<The tool the agent acts through and its main calls.> The way to each part, the hidden ones included, is the feature map in aiview (`list --kind feature-map`). A part it does not reach: find the way and add it.
+<The tool the agent acts through and its main calls.> The way to each part, the hidden ones included, is the feature map in aiview (`list --kind feature-map`). A part it does not reach: find the way through the product itself, never the source, and add it.
 
 ## Judge
 

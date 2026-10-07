@@ -6,12 +6,12 @@
 
 **What to observe**: each response as the agent receives it (content blocks, `isError`, structured content); the outcome beyond it, read back through another tool or the system it acts on; its notifications; its stderr.
 
-## The roles of this surface
+## The role prompt of this surface
 
-Written into the role prompt, in the product's terms, each with what it answers for:
+The experts this surface needs, written into the role prompt (`role-prompt.md`) as they are here, in the product's terms:
 
-- **The agent as consumer**: names and descriptions that say when to call a tool and what it does, errors that say what to change.
-- **Its tool designer**: results sized for a context window and shaped for acting on.
+- **An agent-experience expert, as the agent consuming it**: names and descriptions that say when to call a tool and what it does, errors that say what to change.
+- **A senior tool designer**: results sized for a context window and shaped for acting on.
 
 ## Gotchas
 

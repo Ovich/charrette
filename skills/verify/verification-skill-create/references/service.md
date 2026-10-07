@@ -6,11 +6,11 @@
 
 **What to observe**: the messages out, from a fresh consumer group started before the action, filtered by the correlation id; the state through the service's own read surface; what must not be emitted, by its absence within a stated bound; the dead-letter topic.
 
-## The roles of this surface
+## The role prompt of this surface
 
-Written into the role prompt, in the product's terms, each with what it answers for:
+The experts this surface needs, written into the role prompt (`role-prompt.md`) as they are here, in the product's terms:
 
-- **The integrating team**: a contract kept, nothing that surprises a consumer.
+- **A senior integration architect, for the teams that consume it**: a contract kept, nothing that surprises a consumer.
 - **Its on-call operator**: failures that land where the design says with enough to act on, and logs that follow one journey by its correlation id.
 
 ## Gotchas
