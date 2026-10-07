@@ -223,6 +223,32 @@ test("with no open run, the hook exits 0 under 100 ms", () => {
   assert.ok(pre < 100 && post < 100, `pre ${pre} ms, post ${post} ms`);
 });
 
+test("with no open run, the launcher exits before the bundle loads, except for a `swarm open` on pre (D57)", () => {
+  // a probe in place of the bundle: it says it loaded, and echoes the stdin it was handed
+  const probe = path.join(home, "probe.mjs");
+  fs.writeFileSync(probe, `let s = ""; for await (const c of process.stdin) s += c; process.stdout.write("bundle loaded: " + s);\n`);
+  const launch = (kind: "pre" | "post", input: Record<string, unknown>) => {
+    const body = JSON.stringify({ session_id: "session-orc", cwd: repo, ...input });
+    const r = spawnSync(process.execPath, [LAUNCHER, "hook", kind], { input: body, encoding: "utf8", env: { ...env(), SWARM_CLI_BUNDLE: probe }, cwd: home });
+    return { status: r.status, stdout: r.stdout, stderr: r.stderr, body };
+  };
+  const edit = { tool_name: "Edit", tool_input: { file_path: path.join(repo, "src", "a.ts") } };
+  for (const kind of ["pre", "post"] as const) {
+    const r = launch(kind, edit);
+    assert.deepEqual([r.status, r.stdout, r.stderr], [0, "", ""], `${kind}: an edit, the bundle never loaded`);
+  }
+  const open = { tool_name: "Bash", tool_input: { command: `node "${LAUNCHER}" open --plan review-tool --title T --slices s.json` } };
+  const r = launch("pre", open);
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout, `bundle loaded: ${r.body}`, "a swarm open reaches the bundle, its stdin intact");
+  assert.equal(launch("post", open).stdout, "", "post has nothing to do before a run is open");
+  assert.equal(launch("pre", { tool_name: "Bash", tool_input: { command: "git status" } }).stdout, "");
+  // the real bundle, handed the stdin the launcher read, sees the open (D46's stamp)
+  assert.equal(JSON.parse(cli(repo, "status", "--json")).hooks, null);
+  assert.equal(hook("pre", { cwd: repo, ...open }, LAUNCHER).stdout, "");
+  assert.ok(JSON.parse(cli(repo, "status", "--json")).hooks, "the bundle's pre hook ran on the open");
+});
+
 test("status says when a hook last ran: never, then on the pre hook of `swarm open` (D46)", () => {
   const seen = () => JSON.parse(cli(repo, "status", "--json")).hooks;
   assert.equal(seen(), null);
