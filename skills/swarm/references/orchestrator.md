@@ -16,10 +16,6 @@ except `open`, `slice`, `close` and `status`.
 2. **From the repository's checkout:**
    `$S open --plan <plan slug> --title "<plan title>" --slices <file> --link <plan URL>`.
    It prints the run id, then the page's URL: give the URL to the person.
-3. **`$S status`, right away.** The `hooks` line must show a time no older than the open.
-   `never seen`, or a time before it: the plugin's hooks are not loaded and the runners would
-   coordinate blind. Dispatch nothing; read `references/setup.md`, tell the person what it says,
-   and stop.
 
 ## Slice states
 
@@ -39,7 +35,7 @@ except `open`, `slice`, `close` and `status`.
 - **Answer what is asked of you**, on the thread. Two runners' agreement is theirs to make; an
   agreement that changes a decision the plan took is recorded in the plan.
 - **`$S roster`** shows each runner, its doing and its files; `(stale)` after ten minutes
-  without a tool call.
+  without a call to the board.
 
 ## Interrupt
 

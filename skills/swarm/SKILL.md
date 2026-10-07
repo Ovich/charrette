@@ -16,8 +16,8 @@ plan only as the orchestrator tells it, and nothing of aiview.
 states it; Node 22.5 or later. **`$S --help` lists every verb with its flags; every verb takes
 `--json`, preferred when parsing.** The store lives in the data home, never in a repository.
 
-**A check fails** (`$S status` shows no hook since the run opened, a verb errors before it
-runs, a call to the tool waits on a permission prompt): read `references/setup.md`.
+**A check fails** (a verb errors before it runs, a call to the tool waits on a permission
+prompt): read `references/setup.md`.
 
 ## Who is who
 
@@ -42,6 +42,19 @@ runs, a call to the tool waits on a permission prompt): read `references/setup.m
   thread, goes, an interface change included. Nobody arbitrates it.
 - **Talk is short**: what you change, what you need, what you settled.
 
+## Claiming a file
+
+**`$S claim <path>` before you edit a file, then read its answer:**
+
+| Answer | Exit | What to do |
+|---|---|---|
+| `claimed <path>` | 0 | edit it |
+| `<path> is also held by …`, with the post to make | 3 | post it, then claim again |
+| `claimed <path>, also held by …` | 0 | edit it; its holder works in it too: say what you change |
+
+Nothing stops an edit made without a claim; `end` claims or flags it on the thread, late.
+Sharing a file is the runner side's.
+
 ## What reaches you
 
 **A listener is how you hear the board**: a `$S wait --mentions` kept running as a background
@@ -49,17 +62,11 @@ task. It ends on a message that mentions you or an urgent post, your harness tel
 it, act, and start it again. Your side says when to start it; `references/setup.md` says which
 harnesses notify on a background task's end.
 
-In Claude Code the hooks of this plugin also speak, without being asked:
+**`$S deliver`** gives what you have not had: mentions in full, anything else as one line
+`#<n> …`; `$S read <n>` gives the full text.
 
-| What | When | What to do |
-|---|---|---|
-| Lines headed `swarm board (you are <plan>/<slice>, <Name>; …)` | after any tool call, when there is news | a mention is there in full, anything else as one line `#<n> …`; `read <n>` gives the full text |
-| An edit denied: `<path> is also held by …` | your first edit of a file another runner holds | the runner side says how to share it |
-| `swarm board: <path> is also held by …` | once per file and holder, on a shared file | its holder is working in it too: say what you change |
-| `#<n> flagged: you wrote <path> outside your claim` | a shell write to a file another runner holds | settle it with the holder on the thread |
-| A message resumed into you | the orchestrator stopped you for something urgent | act on it first |
-
-A long call holds the hooks' news until it ends; only the orchestrator interrupts.
+**A message resumed into you** is the orchestrator stopping you for something urgent: act on it
+first. A long call holds the listener's news until it ends; only the orchestrator interrupts.
 
 ## The page
 

@@ -6,8 +6,7 @@ everything said on the board. This file says what changes in this skill's own du
 ## Dispatch
 
 - **Every slice document exists before the run**; a missing one is written first (`write-slice`).
-- **Open the run on the board before the first dispatch**, every slice and its blockers in it,
-  and check the hooks there; a failed check dispatches nothing.
+- **Open the run on the board before the first dispatch**, every slice and its blockers in it.
 - **Every slice whose blockers are done is dispatched at once**, no cap, one subagent each, each in
   its own git worktree (`isolation: "worktree"`). A slice whose blockers land later is dispatched
   then, to a fresh subagent.

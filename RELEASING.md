@@ -87,9 +87,8 @@ Users with background marketplace refresh still need the second command and the 
 ## Notes
 
 - swarm ships as aiview does: `skills/swarm/dist/` (the page) and `skills/swarm/dist-cli/cli.mjs`
-  (the CLI, the server and the hooks) are committed, and a release that changes swarm's source
-  without its build ships the old board. Its hooks are read at startup, so the restart above is
-  what turns a swarm change on.
+  (the CLI and the server) are committed, and a release that changes swarm's source without its
+  build ships the old board.
 - `aiview mermaid-check` is its own bundle, `dist-cli/mermaid-check.mjs`, about 3.5 MB,
   built by `npm run build` with the CLI. It is versioned like the CLI bundle, for the
   same reason.
