@@ -80,7 +80,7 @@ export function App() {
   return (
     <NicksContext.Provider value={nicks}>
       <div className="shell">
-        <Sidebar repos={repos ?? []} repo={repo} runSel={runSel} connection={connection} port={port} hooksSeen={board ? snapshot.hooksSeen : undefined} onRepo={selectRepo} onRun={selectRun} />
+        <Sidebar repos={repos ?? []} repo={repo} runSel={runSel} connection={connection} port={port} onRepo={selectRepo} onRun={selectRun} />
         <div className="main">
           <TopBar
             name={board ? snapshot.name : null}

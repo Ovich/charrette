@@ -116,6 +116,7 @@ test("--json on every verb parses", () => {
     ["doing", ...as, "still x"],
     ["post", ...as, "@S5 hello"],
     ["agree", ...as, "@S5 I go first", "--about", "src/a.ts"],
+    ["claim", ...as, "src/b.ts"],
     ["read", "1"],
     ["deliver", "--as", "review-tool/S5"],
     ["wait", "--as", "review-tool/S5", "--timeout", "50"],
@@ -274,6 +275,18 @@ test("the launcher prints the build command when dist-cli is absent", () => {
   const r = spawnSync(process.execPath, [path.join(fake, "swarm.mjs"), "status"], { encoding: "utf8", env: env() });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /not built\. Run: npm install && npm run build/);
+});
+
+test("the launcher has no hook verb: usage, exit 1, and the usage never names a hook (D58)", () => {
+  const launcher = path.resolve(path.dirname(CLI), "..", "..", "swarm.mjs");
+  assert.ok(fs.existsSync(path.join(path.dirname(launcher), "dist-cli", "cli.mjs")), "build first: npm run build");
+  for (const kind of ["pre", "post"]) {
+    const r = spawnSync(process.execPath, [launcher, "hook", kind], { cwd: repo, input: "{}", encoding: "utf8", env: env() });
+    assert.equal(r.status, 1, kind);
+    assert.match(r.stderr, /^usage: swarm <verb>/);
+    assert.doesNotMatch(r.stderr, /hook/i);
+    assert.equal(r.stdout, "");
+  }
 });
 
 // ── the page's server (Slice 3) ──────────────────────────────────────────────────

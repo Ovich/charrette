@@ -5,7 +5,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { openBoard, type Board, type Declared, type Delivery, type Participant, type RosterEntry, type SliceSpec, type SliceState } from "../board/board.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
-import { runHook } from "../hook/hook.ts";
 import { portFrom, PORT_FILE, readServerStatus } from "../server/state.ts";
 import { parseArgs } from "./args.ts";
 import { fullText } from "./format.ts";
@@ -28,13 +27,13 @@ const USAGE = [
   "  wait    [--as <runner>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end",
   "          # --mentions: only a mention of you or an urgent post ends it; the rest stays for deliver",
   "  roster  [--repo <path>]",
+  "  claim   [--as <runner>] <path> [--interface]                    # before editing a file: exit 0 claimed, 3 held until you post about it",
   "  release [--as <runner>] <path>                                  # gives up a claim",
   "  merge-lock [--as <runner>]                                      # one merge at a time per repository",
   "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase",
-  "  end     [--as <runner>]                                         # releases your claims and the lock",
-  "  hook    pre|post                                                # Claude Code's hooks: hook JSON on stdin",
+  "  end     [--as <runner>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
   "  serve   [--port <p>] [--open] [--detach]                        # the page, on :4322 (SWARM_PORT)",
-  "  status                                                          # data home, the page's server, when a hook last ran, open runs",
+  "  status                                                          # data home, the page's server, open runs",
   "a runner is <plan>/<slice>, the orchestrator <plan>/orchestrator; without --as, the runner joined from this worktree",
 ].join("\n");
 
@@ -71,6 +70,21 @@ function repoOf(dir: string): string {
 function worktreeOf(dir: string): string | null {
   const top = git(dir, "rev-parse", "--show-toplevel");
   return top ? path.resolve(top) : null;
+}
+
+/** Paths `git status` shows changed in a worktree, as it gives them; a rename gives both (D31). */
+function changedIn(worktree: string): string[] {
+  const r = spawnSync("git", ["status", "--porcelain", "-z", "--untracked-files=all"], { cwd: worktree, encoding: "utf8" });
+  if (r.status !== 0) return fail(`git status failed in ${worktree}: ${r.stderr.trim()}`);
+  const parts = r.stdout.split("\0");
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const e = parts[i];
+    if (e.length < 4) continue;
+    out.push(e.slice(3));
+    if (/[RC]/.test(e.slice(0, 2)) && parts[i + 1]) out.push(parts[++i]); // -z: "R  new\0old\0"
+  }
+  return out;
 }
 
 /** Starts the page's server detached and waits for its port file (aiview's shape, copied).
@@ -267,6 +281,22 @@ async function main(board: Board): Promise<void> {
       });
       break;
     }
+    case "claim": {
+      const p = caller(board);
+      const file = args.positional[0] ?? fail("claim: which path?");
+      const verdict = board.checkEdit(p, path.resolve(file), { interface: args.has("--interface") });
+      // held (D41): exit 3, the runner posts about the path and claims again
+      if (!verdict.allowed) process.exitCode = 3;
+      emit(verdict, () => {
+        if (!verdict.allowed) return console.log(verdict.refusal);
+        // the other holders are named once per runner and path, when the board says so (D40)
+        const also = verdict.notice
+          ? verdict.sharedWith.map((o) => `${o.runner} · ${board.participant(o.runner)?.nick ?? "?"}: ${o.doing}`).join("; ")
+          : "";
+        console.log(also ? `claimed ${file}, also held by ${also}` : `claimed ${file}`);
+      });
+      break;
+    }
     case "release": {
       const p = caller(board);
       const file = args.positional[0] ?? fail("release: which path?");
@@ -293,22 +323,26 @@ async function main(board: Board): Promise<void> {
     }
     case "end": {
       const p = caller(board);
+      // what the runner wrote without claiming it, once, before its claims go (D58)
+      const reconciled = p.worktree ? changedIn(p.worktree) : [];
+      const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
       board.end(p);
-      emit({ runner: p.name, ended: true }, `${p.name} ended`);
+      emit({ runner: p.name, ended: true, reconciled, flags }, () => {
+        for (const file of reconciled) console.log(`reconciled ${file}`);
+        for (const f of flags) console.log(`#${f.seq} flagged: you wrote ${f.path} outside your claim; ${f.holder} holds it. Settle it with @${f.holder} on the thread.`);
+        console.log(`${p.name} ended`);
+      });
       break;
     }
     case "status": {
       const runs = board.runs();
       const server = readServerStatus();
-      const hooks = board.lastHook();
-      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, hooks, runs: runs.length }, () => {
+      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, runs: runs.length }, () => {
         console.log(`home    ${DATA_ROOT}`);
         console.log(`sqlite  ${SQLITE_PATH}`);
         console.log(
           server.running ? `page    running  pid ${server.pid}  ${pageUrl(server.port as number)}` : `page    not running${server.stale ? " (stale pid file)" : ""}: swarm serve --detach`,
         );
-        // D46: no hook seen since the run opened means the plugin's hooks are not loaded
-        console.log(hooks ? `hooks   last seen ${hooks}` : "hooks   never seen: restart Claude Code after installing the plugin");
         if (!runs.length) console.log("no open run");
         for (const r of runs) {
           console.log(`run ${r.id}  ${r.plan}  ${r.title}  ${r.repo}`);
@@ -326,10 +360,7 @@ if (!args.verb) {
   console.error(USAGE);
   process.exit(1);
 }
-if (args.verb === "hook") {
-  // before the store opens: the hook decides whether it needs it at all
-  await runHook(args.positional[0]);
-} else if (args.verb === "serve" && args.has("--detach")) {
+if (args.verb === "serve" && args.has("--detach")) {
   const st = readServerStatus();
   const port = st.running && st.port !== null ? st.port : (fs.mkdirSync(DATA_ROOT, { recursive: true }), spawnDetachedServer(portFrom(args.flag("--port"))));
   if (port === null) {

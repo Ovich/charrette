@@ -8,6 +8,3 @@ export const DATA_ROOT = process.env.CHARRETTE_HOME
   : path.join(os.homedir(), "charrette_appdata");
 
 export const SQLITE_PATH = path.join(DATA_ROOT, "swarm.sqlite");
-
-/** Present while a run is open anywhere on the machine; the hooks exit at once without it. */
-export const ACTIVE_MARKER = path.join(DATA_ROOT, "swarm.active");

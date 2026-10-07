@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { RunSummary } from "../../src/board/board.ts";
 import type { Connection, RepoView } from "../hooks/useBoard.ts";
-import { ago } from "../lib/view.ts";
 import { PlanCode } from "./chips.tsx";
 
 export function LiveIndicator({ connection }: { connection: Connection }) {
@@ -111,19 +110,11 @@ function RepoGroup({
   );
 }
 
-/** "N runs open · hooks seen 12 s ago · :4322"; with no repository shown, the store's name. */
-function SidebarFooter({ openRuns, hooksSeen, port }: { openRuns: number; hooksSeen: string | null | undefined; port: string }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!hooksSeen) return;
-    setNow(Date.now());
-    const tick = setInterval(() => setNow(Date.now()), 5000);
-    return () => clearInterval(tick);
-  }, [hooksSeen]);
-  const middle = hooksSeen === undefined ? "swarm.sqlite" : hooksSeen === null ? "hooks never seen" : `hooks seen ${ago(hooksSeen, now)}`;
+/** "N runs open · swarm.sqlite · :4322". */
+function SidebarFooter({ openRuns, port }: { openRuns: number; port: string }) {
   return (
     <div className="sfoot" data-component="SidebarFooter">
-      {openRuns} {openRuns === 1 ? "run" : "runs"} open · {middle} · :{port}
+      {openRuns} {openRuns === 1 ? "run" : "runs"} open · swarm.sqlite · :{port}
     </div>
   );
 }
@@ -134,7 +125,6 @@ export function Sidebar({
   runSel,
   connection,
   port,
-  hooksSeen,
   onRepo,
   onRun,
 }: {
@@ -143,8 +133,6 @@ export function Sidebar({
   runSel: string | null;
   connection: Connection;
   port: string;
-  /** The shown repository's snapshot's last hook time; undefined while no repository is shown. */
-  hooksSeen: string | null | undefined;
   onRepo: (repo: string) => void;
   onRun: (repo: string, plan: string) => void;
 }) {
@@ -181,7 +169,7 @@ export function Sidebar({
           />
         ))}
       </nav>
-      <SidebarFooter openRuns={openRuns} hooksSeen={hooksSeen} port={port} />
+      <SidebarFooter openRuns={openRuns} port={port} />
     </aside>
   );
 }

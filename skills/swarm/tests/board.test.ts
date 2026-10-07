@@ -239,7 +239,7 @@ test("the first edit of a held file is held, naming the holder and the post that
   assert.match(refusal, /review-tool\/S3/);
   assert.match(refusal, /the page/);
   assert.match(refusal, /`swarm post "@review-tool\/S3 …" --about src\/a\.ts`/);
-  assert.match(refusal, /then retry the edit\.$/);
+  assert.match(refusal, /then claim again\.$/);
 });
 
 test("a post about the path mentioning the holder opens it; both then hold it", () => {
@@ -445,17 +445,13 @@ test("an interface file in a merge is announced to @all", () => {
   }
 });
 
-test("identify resolves a bound agent, a bound session, then the worktree", () => {
-  const { run, s3, s5 } = claimed();
-  board.bind({ agentId: "a-5", sessionId: "main" }, { run: run.id, slice: "S5" });
-  board.bind({ sessionId: "main" }, { plan: "review-tool", slice: "orchestrator" });
-  assert.equal(board.identify({ agentId: "a-5", sessionId: "main" })?.name, s5.name);
-  assert.equal(board.identify({ sessionId: "main" })?.name, "review-tool/orchestrator");
-  // an unbound subagent of that session is not the orchestrator; its cwd decides
-  assert.equal(board.identify({ agentId: "a-x", sessionId: "main" }), null);
-  assert.equal(board.identify({ agentId: "a-x", sessionId: "main", worktree: path.join(wt("s3"), "src") })?.name, s3.name);
+test("identify resolves the live runner from its worktree, a subdirectory included (D28)", () => {
+  const { s3, s5 } = claimed();
+  assert.equal(board.identify({ worktree: path.join(wt("s3"), "src") })?.name, s3.name);
+  assert.equal(board.identify({ worktree: wt("s5") })?.name, s5.name);
+  assert.equal(board.identify({}), null);
   board.end(s5);
-  assert.equal(board.identify({ agentId: "a-5" }), null);
+  assert.equal(board.identify({ worktree: wt("s5") }), null);
 });
 
 test("unknown run, runner and seq are named", () => {
@@ -535,15 +531,6 @@ test("a pending mentions-only wait is listening, the state still working; a plai
   assert.deepEqual([s5Of().state, s5Of().listening], ["waiting", false]);
   await waiting;
   assert.equal(s5Of().state, "working");
-});
-
-test("the snapshot carries when a hook was last seen", () => {
-  twoRunners();
-  assert.equal(board.snapshot(REPO).hooksSeen, null);
-  board.hookSeen();
-  const seen = board.snapshot(REPO).hooksSeen;
-  assert.ok(seen && Date.now() - Date.parse(seen) < 5000, `hooksSeen ${seen}`);
-  assert.equal(seen, board.lastHook());
 });
 
 test("a closed run stays in repos() among the last ten", () => {

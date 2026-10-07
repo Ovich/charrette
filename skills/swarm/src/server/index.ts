@@ -1,5 +1,5 @@
 // The page's server: two read routes, the SSE stream and the built page, on 127.0.0.1 only.
-// It reads the Board and never writes to it; the CLI and the hooks write, in their own
+// It reads the Board and never writes to it; the CLI writes, in its own
 // processes, and the Board's onChange tells this one.
 import { spawn } from "node:child_process";
 import fs from "node:fs";

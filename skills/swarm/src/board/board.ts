@@ -5,7 +5,7 @@
 // mechanism stay in here.
 import fs from "node:fs";
 import path from "node:path";
-import { ACTIVE_MARKER, SQLITE_PATH } from "./home.ts";
+import { SQLITE_PATH } from "./home.ts";
 import { nameHandle, parseMentions, planCode } from "./mentions.ts";
 import { funnyName } from "./names.ts";
 
@@ -100,8 +100,6 @@ export type BoardSnapshot = {
   events: SnapshotEvent[];
   queues: Record<string, QueueSlice[]>;
   files: SnapshotFile[];
-  /** When a hook last ran past its fast exit (ISO), or null: the sidebar footer's "hooks seen" (D46). */
-  hooksSeen: string | null;
   flags: { path: string; runner: string }[];
 };
 
@@ -119,12 +117,8 @@ export interface Board {
     roster: RosterEntry[];
   };
   participant(name: string): Participant | null; // "<plan>/<slice>" or "<plan>/orchestrator"
-  /** Remembers who a Claude Code caller is, as the pre hook sees `swarm join` / `swarm open`:
-   *  by agent id when there is one, else by session id. The participant may not exist yet. */
-  bind(who: { agentId?: string; sessionId?: string }, as: { run?: RunId; plan?: string; slice: string }): void;
-  /** Who is calling (D28): the agent id bound at join; else, with no agent id, the session id
-   *  bound at open; else the one live runner whose worktree holds `worktree`. */
-  identify(who: { worktree?: string; agentId?: string; sessionId?: string }): Participant | null;
+  /** Who is calling (D28): the one live runner whose worktree holds `worktree`. */
+  identify(who: { worktree?: string }): Participant | null;
   setDoing(p: Participant, doing: string): void;
   /** Ends the runner and releases its claims and any merge lock it holds. */
   end(p: Participant): void;
@@ -138,10 +132,11 @@ export interface Board {
    *  stays for the next `deliver`. */
   wait(p: Participant, opts?: { timeoutMs?: number; mentionsOnly?: boolean }): Promise<Delivery>;
 
-  /** An edit to `path` (absolute, or repository-relative). Free: claimed, silently. Held by
-   *  others (D40, D41): `p`'s first edit is held until `p` has posted about the path mentioning
-   *  a holder; then `p` holds it too, and every edit goes through with the other holders named. */
-  checkEdit(p: Participant, path: string): EditAllowed | EditHeld;
+  /** A claim before an edit of `path` (absolute, or repository-relative), `swarm claim` (D58).
+   *  Free: claimed, silently. Held by others (D40, D41): `p`'s first claim is held until `p` has
+   *  posted about the path mentioning a holder; then `p` holds it too, the other holders named
+   *  once. `interface`: claimed as an interface, an `inside` claim of `p` widened. */
+  checkEdit(p: Participant, path: string, opts?: { interface?: boolean }): EditAllowed | EditHeld;
   /** Paths written outside the claim: a free one is claimed, a held one flagged on the thread. */
   reconcileWrites(p: Participant, changed: string[]): Flag[];
   release(p: Participant, path: string): void;
@@ -158,11 +153,6 @@ export interface Board {
   /** Called with the repository of every write, from this process or any other. Returns the unsubscribe. */
   onChange(listener: (repo: string) => void): () => void;
 
-  // setup (D46)
-  /** Stamps that a hook ran past its fast exit: while a run is open, or on `swarm open`. */
-  hookSeen(): void;
-  /** When a hook last ran past its fast exit (ISO), or null when none ever did. */
-  lastHook(): string | null;
   close(): void;
 }
 
@@ -173,8 +163,6 @@ const ORCHESTRATOR = "orchestrator";
 const WAIT_POLL_MS = 1000;
 const LINE_WIDTH = 100;
 const STALE_MS = 10 * 60 * 1000;
-/** The page is told a hook ran at most this often; its footer ticks the relative time between. */
-const HOOK_SEEN_TOLD_MS = 60 * 1000;
 /** The page lists the machine's last this many closed runs (D34). */
 const CLOSED_LISTED = 10;
 /** The page shows the last this many messages of a thread. */
@@ -194,7 +182,7 @@ export function messageLine(m: Message): string {
 
 export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   // node:sqlite prints an ExperimentalWarning on import; keep every other warning. Imported
-  // here, not at module load, so a hook's fast exit never pays for it.
+  // here, not at module load, so a verb that never opens the store never pays for it.
   process.removeAllListeners("warning");
   process.on("warning", (w) => {
     if (w.name !== "ExperimentalWarning") console.warn(w);
@@ -204,7 +192,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   const db = new DatabaseSync(dbPath);
   db.exec(`
     PRAGMA journal_mode = DELETE;
-    -- The CLI, the hooks and the server write concurrently; without a busy timeout a
+    -- The CLI and the server write concurrently; without a busy timeout a
     -- concurrent verb fails outright with SQLITE_BUSY.
     PRAGMA busy_timeout = 5000;
     CREATE TABLE IF NOT EXISTS runs (
@@ -289,19 +277,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       repo TEXT PRIMARY KEY,
       version INTEGER NOT NULL
     );
-    -- who a Claude Code caller is: "agent:<id>" or "session:<id>" (D28)
-    CREATE TABLE IF NOT EXISTS identities (
-      key TEXT PRIMARY KEY,
-      run INTEGER,
-      plan TEXT,
-      slice TEXT NOT NULL,
-      at TEXT NOT NULL
-    );
-    -- when a hook last ran past its fast exit: proof the plugin's hooks are loaded (D46)
-    CREATE TABLE IF NOT EXISTS hook_seen (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      at TEXT NOT NULL
-    );
+    -- the identities and hook_seen tables, left in stores from before D58, are no longer read or written
   `);
   // Schema upkeep for stores created by earlier versions: add a column when it is missing.
   const upkeep = (table: string, column: string, ddl: string): void => {
@@ -338,17 +314,6 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       COMMIT;
     `);
   }
-
-  // The active marker: present while a run is open anywhere on the machine; a hook exits at
-  // once without it. It sits beside the store.
-  const marker = path.join(path.dirname(dbPath), path.basename(ACTIVE_MARKER));
-  const syncMarker = (): void => {
-    const open = Number((db.prepare("SELECT COUNT(*) AS n FROM runs WHERE state = 'open'").get() as Row).n);
-    if (open > 0) {
-      if (!fs.existsSync(marker)) fs.writeFileSync(marker, "");
-    } else fs.rmSync(marker, { force: true });
-  };
-  syncMarker();
 
   // Waking and watching: every write moves its repository's version and touches this sibling
   // file once committed; a wait and onChange watch it (one mechanism, D39).
@@ -597,7 +562,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       const rows = mentionsOnly ? unseen.filter((r) => r.kind === "urgent" || named(toMessage(r))) : unseen;
       const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
       for (const r of rows) mark.run(me.id, Number(r.seq));
-      // the post hook delivers after every tool call: this is the runner's last call (D31)
+      // a delivery is a call to the board: the runner's last call (D31)
       db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(now(), me.id);
       if (!fromWait) {
         db.prepare("UPDATE participants SET calls = calls + 1 WHERE id = ?").run(me.id);
@@ -611,11 +576,6 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       full: messages.filter(named),
       lines: messages.filter((m) => !named(m)).map(messageLine),
     };
-  };
-
-  const lastHookAt = (): string | null => {
-    const r = db.prepare("SELECT at FROM hook_seen WHERE id = 1").get() as Row | undefined;
-    return r ? String(r.at) : null;
   };
 
   // The page's view (D34, D39): open runs and the machine's last ten closed ones.
@@ -669,7 +629,6 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         bump(repo);
         return run;
       });
-      syncMarker();
       return toRun(runRow(id));
     },
 
@@ -694,7 +653,6 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         db.prepare("UPDATE participants SET ended_at = COALESCE(ended_at, ?) WHERE run = ?").run(now(), run);
         for (const p of db.prepare("SELECT id FROM participants WHERE run = ?").all(run) as Row[]) releaseAll(Number(p.id));
       });
-      syncMarker();
     },
 
     runs() {
@@ -754,31 +712,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       return r ? toParticipant(r) : null;
     },
 
-    bind({ agentId, sessionId }, { run, plan, slice }) {
-      const key = agentId ? `agent:${agentId}` : sessionId ? `session:${sessionId}` : null;
-      if (!key) return;
-      db.prepare("INSERT OR REPLACE INTO identities (key, run, plan, slice, at) VALUES (?, ?, ?, ?, ?)").run(key, run ?? null, plan ?? null, slice, now());
-    },
-
-    identify({ worktree, agentId, sessionId }) {
-      const bound = (key: string): Participant | null => {
-        const id = db.prepare("SELECT * FROM identities WHERE key = ?").get(key) as Row | undefined;
-        if (!id) return null;
-        // bound before the participant existed: resolved now, an open run first
-        const r = (
-          id.run != null
-            ? db.prepare(`${PARTICIPANT_SQL} WHERE p.run = ? AND p.slice = ?`).get(Number(id.run), String(id.slice))
-            : db
-                .prepare(`${PARTICIPANT_SQL} WHERE r.plan = ? AND p.slice = ? AND r.state = 'open' ORDER BY r.id DESC LIMIT 1`)
-                .get(String(id.plan), String(id.slice))
-        ) as Row | undefined;
-        if (!r) return null;
-        const p = toParticipant(r);
-        return isLive(p.id) ? p : null;
-      };
-      // a subagent carries its parent's session id: a session id names only the main conversation
-      const known = agentId ? bound(`agent:${agentId}`) : sessionId ? bound(`session:${sessionId}`) : null;
-      if (known) return known;
+    identify({ worktree }) {
       if (!worktree) return null;
       const here = fold(path.resolve(worktree));
       const rows = (db.prepare(`${PARTICIPANT_SQL} WHERE p.worktree IS NOT NULL AND p.ended_at IS NULL AND r.state = 'open'`).all() as Row[]).filter(
@@ -881,7 +815,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         check();
       });
     },
-    checkEdit(p, file) {
+    checkEdit(p, file, opts = {}) {
+      const kind = opts.interface ? "interface" : "inside";
       const me = live(p);
       const rel = relPath(me.repo, file);
       if (!rel) return { allowed: true, sharedWith: [], notice: null }; // outside the repository: no claim
@@ -889,7 +824,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         const all = holdersOf(me.repo, rel);
         const others = all.filter((c) => c.participant !== me.id);
         if (!others.length) {
-          hold(me, rel, "inside"); // a free file: claimed, silently
+          hold(me, rel, kind); // a free file: claimed, silently
           return { allowed: true, sharedWith: [], notice: null };
         }
         const people = others.map((c) => participantById(c.participant));
@@ -902,11 +837,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
               allowed: false,
               refusal:
                 `${rel} is also held by ${who}. You may share it, but first tell ${people.length > 1 ? "them" : "its holder"} what you change in it: ` +
-                `\`swarm post "${at} …" --about ${rel}\`, then retry the edit.`,
+                `\`swarm post "${at} …" --about ${rel}\`, then claim again.`,
             };
           }
-          hold(me, rel, "inside");
         }
+        hold(me, rel, kind); // a new holder, or an `inside` claim widened to an interface
         const sharedWith = people.map((o) => ({ runner: o.name, doing: doingOf(o.id) }));
         // told once per runner and path
         const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
@@ -1131,7 +1066,6 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         queues,
         files: [...files.values()],
         flags,
-        hooksSeen: lastHookAt(),
       };
     },
 
@@ -1166,19 +1100,6 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       };
     },
 
-    hookSeen() {
-      const before = lastHookAt();
-      db.prepare("INSERT OR REPLACE INTO hook_seen (id, at) VALUES (1, ?)").run(now());
-      // the page's footer says when a hook was last seen; a hook runs at every tool call, so the
-      // page is told at most once a minute, its relative time ticking on its own between
-      if (before === null || Date.now() - Date.parse(before) >= HOOK_SEEN_TOLD_MS) {
-        for (const r of db.prepare("SELECT DISTINCT repo FROM runs WHERE state = 'open'").all() as Row[]) bump(String(r.repo));
-      }
-    },
-
-    lastHook() {
-      return lastHookAt();
-    },
 
     close() {
       watching?.close();

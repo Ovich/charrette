@@ -32,7 +32,7 @@ describe("the regions render their copy from the live snapshot", () => {
     expect(screen.getByRole("button", { name: /charrette-app/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /billing-service/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /4 running.*Sessions with refresh tokens.*2 of 7 merged/ })).toBeTruthy();
-    expect(screen.getByText("3 runs open · hooks never seen · :4322")).toBeTruthy();
+    expect(screen.getByText("3 runs open · swarm.sqlite · :4322")).toBeTruthy();
     // TopBar with MergeLock
     expect(screen.getByText("The thread")).toBeTruthy();
     expect(screen.getByText("merge lock free")).toBeTruthy();
@@ -95,9 +95,11 @@ describe("the background listener (D49)", () => {
     expect(screen.getAllByText("listening")).toHaveLength(1);
   });
 
-  test("the sidebar footer says when a hook was last seen", () => {
-    show(liveState({ hooksSeen: new Date(Date.now() - 12_000).toISOString() }));
-    expect(screen.getByText("3 runs open · hooks seen 12 s ago · :4322")).toBeTruthy();
+  test("the sidebar footer names the store, never the hooks (D58)", () => {
+    show(liveState());
+    const footer = document.querySelector('[data-component="SidebarFooter"]')!;
+    expect(footer.textContent).toBe("3 runs open · swarm.sqlite · :4322");
+    expect(document.body.textContent).not.toMatch(/hook/i);
   });
 });
 
