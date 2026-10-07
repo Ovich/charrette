@@ -222,3 +222,17 @@ test("with no open run, the hook exits 0 under 100 ms", () => {
   assert.equal(fs.existsSync(path.join(home, "swarm.sqlite")), false, "the store was never opened");
   assert.ok(pre < 100 && post < 100, `pre ${pre} ms, post ${post} ms`);
 });
+
+test("status says when a hook last ran: never, then on the pre hook of `swarm open` (D46)", () => {
+  const seen = () => JSON.parse(cli(repo, "status", "--json")).hooks;
+  assert.equal(seen(), null);
+  assert.match(cli(repo, "status"), /hooks {3}never seen/);
+  // no run open: an ordinary call stays on the fast exit and stamps nothing
+  hook("pre", { cwd: repo, tool_name: "Bash", tool_input: { command: "git status" } });
+  hook("post", { cwd: repo, tool_name: "Bash", tool_input: { command: "git status" } });
+  assert.equal(seen(), null);
+  hook("pre", { cwd: repo, tool_name: "Bash", tool_input: { command: "node swarm.mjs open --plan review-tool --title T --slices s.json" } });
+  const first = seen();
+  assert.ok(first && !Number.isNaN(Date.parse(first)), `a time: ${first}`);
+  assert.match(cli(repo, "status"), new RegExp(`hooks {3}last seen ${first.replace(/[.]/g, "\.")}`));
+});

@@ -114,6 +114,8 @@ export async function runHook(kind: string | undefined): Promise<void> {
     // the pre hook needs the store for an edit, or a Bash call that joins or opens; no other Bash call
     if (kind === "pre" && input.tool_name === "Bash" && !call) return;
     board = await openBoard();
+    // past the fast exit: the hooks are loaded, which `swarm status` reports (D46)
+    board.hookSeen();
     const out = kind === "pre" ? pre(board, input) : post(board, input);
     if (out) process.stdout.write(JSON.stringify(out));
   } catch {

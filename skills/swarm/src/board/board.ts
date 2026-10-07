@@ -150,6 +150,12 @@ export interface Board {
   snapshot(repo: string): BoardSnapshot;
   /** Called with the repository of every write, from this process or any other. Returns the unsubscribe. */
   onChange(listener: (repo: string) => void): () => void;
+
+  // setup (D46)
+  /** Stamps that a hook ran past its fast exit: while a run is open, or on `swarm open`. */
+  hookSeen(): void;
+  /** When a hook last ran past its fast exit (ISO), or null when none ever did. */
+  lastHook(): string | null;
   close(): void;
 }
 
@@ -280,6 +286,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       run INTEGER,
       plan TEXT,
       slice TEXT NOT NULL,
+      at TEXT NOT NULL
+    );
+    -- when a hook last ran past its fast exit: proof the plugin's hooks are loaded (D46)
+    CREATE TABLE IF NOT EXISTS hook_seen (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
       at TEXT NOT NULL
     );
   `);
@@ -1128,6 +1139,16 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           watching = null;
         }
       };
+    },
+
+    hookSeen() {
+      // no change event: nothing the page draws moves
+      db.prepare("INSERT OR REPLACE INTO hook_seen (id, at) VALUES (1, ?)").run(now());
+    },
+
+    lastHook() {
+      const r = db.prepare("SELECT at FROM hook_seen WHERE id = 1").get() as Row | undefined;
+      return r ? String(r.at) : null;
     },
 
     close() {

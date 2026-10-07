@@ -33,7 +33,7 @@ const USAGE = [
   "  end     [--as <runner>]                                         # releases your claims and the lock",
   "  hook    pre|post                                                # Claude Code's hooks: hook JSON on stdin",
   "  serve   [--port <p>] [--open] [--detach]                        # the page, on :4322 (SWARM_PORT)",
-  "  status                                                          # data home, the page's server, open runs",
+  "  status                                                          # data home, the page's server, when a hook last ran, open runs",
   "a runner is <plan>/<slice>, the orchestrator <plan>/orchestrator; without --as, the runner joined from this worktree",
 ].join("\n");
 
@@ -279,12 +279,15 @@ async function main(board: Board): Promise<void> {
     case "status": {
       const runs = board.runs();
       const server = readServerStatus();
-      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, runs: runs.length }, () => {
+      const hooks = board.lastHook();
+      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, hooks, runs: runs.length }, () => {
         console.log(`home    ${DATA_ROOT}`);
         console.log(`sqlite  ${SQLITE_PATH}`);
         console.log(
           server.running ? `page    running  pid ${server.pid}  ${pageUrl(server.port as number)}` : `page    not running${server.stale ? " (stale pid file)" : ""}: swarm serve --detach`,
         );
+        // D46: no hook seen since the run opened means the plugin's hooks are not loaded
+        console.log(hooks ? `hooks   last seen ${hooks}` : "hooks   never seen: restart Claude Code after installing the plugin");
         if (!runs.length) console.log("no open run");
         for (const r of runs) {
           console.log(`run ${r.id}  ${r.plan}  ${r.title}  ${r.repo}`);
