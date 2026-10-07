@@ -1,18 +1,238 @@
-// src/cli/index.ts
-import { spawnSync as spawnSync2 } from "node:child_process";
-import fs3 from "node:fs";
-import path4 from "node:path";
-
-// src/board/board.ts
-import fs from "node:fs";
-import path2 from "node:path";
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 
 // src/board/home.ts
 import os from "node:os";
 import path from "node:path";
-var DATA_ROOT = process.env.CHARRETTE_HOME ? path.resolve(process.env.CHARRETTE_HOME) : path.join(os.homedir(), "charrette_appdata");
-var SQLITE_PATH = path.join(DATA_ROOT, "swarm.sqlite");
-var ACTIVE_MARKER = path.join(DATA_ROOT, "swarm.active");
+var DATA_ROOT, SQLITE_PATH, ACTIVE_MARKER;
+var init_home = __esm({
+  "src/board/home.ts"() {
+    "use strict";
+    DATA_ROOT = process.env.CHARRETTE_HOME ? path.resolve(process.env.CHARRETTE_HOME) : path.join(os.homedir(), "charrette_appdata");
+    SQLITE_PATH = path.join(DATA_ROOT, "swarm.sqlite");
+    ACTIVE_MARKER = path.join(DATA_ROOT, "swarm.active");
+  }
+});
+
+// src/server/state.ts
+import fs3 from "node:fs";
+import path4 from "node:path";
+function writeServerFiles(port) {
+  fs3.mkdirSync(DATA_ROOT, { recursive: true });
+  fs3.writeFileSync(PID_FILE, String(process.pid));
+  fs3.writeFileSync(PORT_FILE, String(port));
+}
+function clearServerFiles() {
+  if (readInt(PID_FILE) !== process.pid) return;
+  try {
+    fs3.rmSync(PID_FILE, { force: true });
+    fs3.rmSync(PORT_FILE, { force: true });
+  } catch {
+  }
+}
+function readServerStatus() {
+  const pid = readInt(PID_FILE);
+  const port = readInt(PORT_FILE);
+  if (pid === null || port === null) return { running: false, pid: null, port: null, stale: pid !== null || port !== null };
+  if (!alive(pid)) return { running: false, pid, port, stale: true };
+  return { running: true, pid, port, stale: false };
+}
+var PID_FILE, PORT_FILE, DEFAULT_PORT, readInt, alive, portFrom;
+var init_state = __esm({
+  "src/server/state.ts"() {
+    "use strict";
+    init_home();
+    PID_FILE = path4.join(DATA_ROOT, "swarm.pid");
+    PORT_FILE = path4.join(DATA_ROOT, "swarm.port");
+    DEFAULT_PORT = 4322;
+    readInt = (f) => {
+      try {
+        const n = Number(fs3.readFileSync(f, "utf8").trim());
+        return Number.isInteger(n) && n > 0 ? n : null;
+      } catch {
+        return null;
+      }
+    };
+    alive = (pid) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    portFrom = (flag) => Number(flag ?? process.env.SWARM_PORT ?? DEFAULT_PORT);
+  }
+});
+
+// src/server/sse.ts
+function createSseHub(heartbeatMs = HEARTBEAT_MS) {
+  const clients = /* @__PURE__ */ new Set();
+  const drop = (res) => {
+    if (clients.delete(res)) res.destroy();
+  };
+  const send = (res, event) => {
+    if (res.writableEnded || res.destroyed) return drop(res);
+    try {
+      res.write(`data: ${JSON.stringify(event)}
+
+`, (err) => {
+        if (err) drop(res);
+      });
+    } catch {
+      drop(res);
+    }
+  };
+  const beat = setInterval(() => {
+    for (const res of [...clients]) send(res, { type: "ping" });
+  }, heartbeatMs);
+  beat.unref?.();
+  return {
+    add(res) {
+      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });
+      clients.add(res);
+      res.on("close", () => clients.delete(res));
+      res.on("error", () => drop(res));
+      send(res, { type: "hello" });
+    },
+    // the set is copied: a failed write drops its client from it
+    broadcast(event) {
+      for (const res of [...clients]) send(res, event);
+    },
+    size: () => clients.size,
+    close() {
+      clearInterval(beat);
+      for (const res of [...clients]) drop(res);
+    }
+  };
+}
+var HEARTBEAT_MS;
+var init_sse = __esm({
+  "src/server/sse.ts"() {
+    "use strict";
+    HEARTBEAT_MS = 15e3;
+  }
+});
+
+// src/server/index.ts
+var server_exports = {};
+__export(server_exports, {
+  startServer: () => startServer
+});
+import { spawn } from "node:child_process";
+import fs4 from "node:fs";
+import http from "node:http";
+import path5 from "node:path";
+function openBrowser(url) {
+  const [c, a] = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
+  try {
+    spawn(c, a, { detached: true, stdio: "ignore" }).unref();
+  } catch {
+  }
+}
+function startServer(board, options) {
+  const { port, open, toolRoot = defaultToolRoot(), writeState = true, heartbeatMs } = options;
+  const sse = createSseHub(heartbeatMs);
+  const off = board.onChange((repo) => sse.broadcast({ type: "changed", repo }));
+  const send = (res, status, body, type) => {
+    res.writeHead(status, { "content-type": type, "cache-control": "no-store" });
+    res.end(body);
+  };
+  const json = (res, obj, status = 200) => send(res, status, JSON.stringify(obj), MIME[".json"]);
+  const distDir = path5.join(toolRoot, "dist");
+  const serveStatic = (res, p) => {
+    const index = path5.join(distDir, "index.html");
+    if (!fs4.existsSync(index)) return send(res, 404, `swarm's page is not built. Run: npm install && npm run build  (in ${toolRoot})`, "text/plain; charset=utf-8");
+    const f = path5.resolve(distDir, "." + decodeURIComponent(p).replaceAll("..", ""));
+    if (f.startsWith(distDir) && fs4.existsSync(f) && fs4.statSync(f).isFile()) return send(res, 200, fs4.readFileSync(f), MIME[path5.extname(f).toLowerCase()] ?? "application/octet-stream");
+    return send(res, 200, fs4.readFileSync(index), MIME[".html"]);
+  };
+  const server = http.createServer((req, res) => {
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      res.setHeader("allow", "GET, HEAD");
+      return json(res, { error: `${req.method} is not accepted: the page only reads` }, 405);
+    }
+    const url = new URL(req.url ?? "/", "http://x");
+    const p = url.pathname;
+    try {
+      if (p === "/events") return sse.add(res);
+      if (p === "/api/repos") return json(res, board.repos());
+      if (p === "/api/board") {
+        const repo = url.searchParams.get("repo") ?? "";
+        if (!board.repos().some((r) => r.repo === repo)) return json(res, { error: `no repository ${repo}` }, 404);
+        return json(res, board.snapshot(repo));
+      }
+      if (p.startsWith("/api/")) return json(res, { error: `no route ${p}` }, 404);
+      return serveStatic(res, p);
+    } catch (e) {
+      return json(res, { error: e.message }, 500);
+    }
+  });
+  server.on("close", () => {
+    off();
+    sse.close();
+  });
+  server.on("error", (err) => {
+    console.error(err.code === "EADDRINUSE" ? `swarm: port ${port} is already in use. Retry with --port <n> or set SWARM_PORT.` : `swarm: server error: ${err.message}`);
+    process.exit(1);
+  });
+  server.listen(port, "127.0.0.1", () => {
+    const actual = server.address().port;
+    if (writeState) {
+      writeServerFiles(actual);
+      process.on("exit", clearServerFiles);
+      for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => process.exit(0));
+    }
+    const url = `http://localhost:${actual}/`;
+    console.log(`swarm  the page
+  url   ${url}`);
+    if (open) openBrowser(url);
+  });
+  return server;
+}
+var MIME, defaultToolRoot;
+var init_server = __esm({
+  "src/server/index.ts"() {
+    "use strict";
+    init_sse();
+    init_state();
+    MIME = {
+      ".html": "text/html; charset=utf-8",
+      ".js": "text/javascript; charset=utf-8",
+      ".mjs": "text/javascript; charset=utf-8",
+      ".css": "text/css; charset=utf-8",
+      ".json": "application/json; charset=utf-8",
+      ".map": "application/json; charset=utf-8",
+      ".svg": "image/svg+xml",
+      ".png": "image/png",
+      ".ico": "image/x-icon",
+      ".woff2": "font/woff2"
+    };
+    defaultToolRoot = () => process.env.SWARM_ROOT ?? path5.dirname(path5.resolve(process.argv[1] ?? "."));
+  }
+});
+
+// src/cli/index.ts
+import { spawn as spawn2, spawnSync as spawnSync2 } from "node:child_process";
+import fs5 from "node:fs";
+import path6 from "node:path";
+
+// src/board/board.ts
+init_home();
+import fs from "node:fs";
+import path2 from "node:path";
 
 // src/board/mentions.ts
 function planCode(plan) {
@@ -47,6 +267,8 @@ var ORCHESTRATOR = "orchestrator";
 var WAIT_POLL_MS = 1e3;
 var LINE_WIDTH = 100;
 var STALE_MS = 10 * 60 * 1e3;
+var CLOSED_LISTED = 10;
+var EVENTS_SHOWN = 500;
 var CASELESS = process.platform === "win32";
 function messageLine(m) {
   const first = m.body.split(/\r?\n/)[0];
@@ -128,6 +350,18 @@ async function openBoard(dbPath = SQLITE_PATH) {
       participant INTEGER NOT NULL,
       at TEXT NOT NULL
     );
+    -- a path written outside its writer's claim, by reconcileWrites; lives while a claim on it does (D39)
+    CREATE TABLE IF NOT EXISTS flags (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      PRIMARY KEY (repo, path, participant)
+    );
+    -- a version per repository, moved by every write: what onChange compares (D39)
+    CREATE TABLE IF NOT EXISTS changes (
+      repo TEXT PRIMARY KEY,
+      version INTEGER NOT NULL
+    );
     -- who a Claude Code caller is: "agent:<id>" or "session:<id>" (D28)
     CREATE TABLE IF NOT EXISTS identities (
       key TEXT PRIMARY KEY,
@@ -143,6 +377,8 @@ async function openBoard(dbPath = SQLITE_PATH) {
   };
   upkeep("participants", "worktree", "worktree TEXT");
   upkeep("participants", "last_call", "last_call TEXT");
+  upkeep("participants", "calls", "calls INTEGER NOT NULL DEFAULT 0");
+  upkeep("participants", "waiting", "waiting INTEGER NOT NULL DEFAULT 0");
   const marker = path2.join(path2.dirname(dbPath), path2.basename(ACTIVE_MARKER));
   const syncMarker = () => {
     const open = Number(db.prepare("SELECT COUNT(*) AS n FROM runs WHERE state = 'open'").get().n);
@@ -153,23 +389,39 @@ async function openBoard(dbPath = SQLITE_PATH) {
   syncMarker();
   const signal = `${dbPath}.signal`;
   if (!fs.existsSync(signal)) fs.writeFileSync(signal, "0");
-  const touch = (seq) => fs.writeFileSync(signal, String(seq));
+  let touches = 0;
+  const touch = () => fs.writeFileSync(signal, `${process.pid}:${++touches}`);
   const now = () => (/* @__PURE__ */ new Date()).toISOString();
   let depth = 0;
+  let dirty = false;
   const transaction = (fn) => {
     if (depth > 0) return fn();
     db.exec("BEGIN IMMEDIATE");
     depth++;
+    let ok = false;
     try {
       const out = fn();
       db.exec("COMMIT");
+      ok = true;
       return out;
     } catch (e) {
       db.exec("ROLLBACK");
       throw e;
     } finally {
       depth--;
+      if (dirty) {
+        dirty = false;
+        if (ok) touch();
+      }
     }
+  };
+  const bump = (repo) => {
+    db.prepare("INSERT INTO changes (repo, version) VALUES (?, 1) ON CONFLICT (repo) DO UPDATE SET version = version + 1").run(repo);
+    if (depth > 0) dirty = true;
+    else touch();
+  };
+  const clearFlags = () => {
+    db.prepare("DELETE FROM flags WHERE NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = flags.repo AND c.path = flags.path)").run();
   };
   const runRow = (id) => {
     const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(id);
@@ -217,7 +469,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
     const mentions = named ?? (kind === "event" ? [] : parseMentions(body, p.plan, openPlans(p.repo)));
     const r = db.prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(p.repo, p.id, body, about, kind, JSON.stringify(mentions), now());
     const seq = Number(r.lastInsertRowid);
-    touch(seq);
+    bump(p.repo);
     return board.read(seq);
   };
   const live = (p) => {
@@ -248,17 +500,79 @@ async function openBoard(dbPath = SQLITE_PATH) {
     const r = db.prepare("SELECT participant, kind FROM claims WHERE repo = ? AND path = ?").get(repo, rel);
     return r ? { participant: Number(r.participant), kind: String(r.kind) } : null;
   };
-  const takeUnlessHeld = (p, rel, kind) => transaction(() => {
+  const take = (p, rel, kind) => transaction(() => {
     const held = claimOf(p.repo, rel);
-    if (held && held.participant !== p.id && isLive(held.participant)) return held;
-    if (held?.participant === p.id && (held.kind === "interface" || kind === "inside")) return null;
+    if (held && held.participant !== p.id && isLive(held.participant)) return { held, taken: false };
+    if (held?.participant === p.id && (held.kind === "interface" || kind === "inside")) return { held: null, taken: false };
     db.prepare("INSERT OR REPLACE INTO claims (repo, path, participant, kind) VALUES (?, ?, ?, ?)").run(p.repo, rel, p.id, kind);
-    return null;
+    bump(p.repo);
+    return { held: null, taken: true };
   });
+  const takeUnlessHeld = (p, rel, kind) => take(p, rel, kind).held;
   const releaseAll = (id) => {
-    db.prepare("DELETE FROM claims WHERE participant = ?").run(id);
-    db.prepare("DELETE FROM merge_locks WHERE participant = ?").run(id);
+    const owner = db.prepare("SELECT r.repo FROM participants p JOIN runs r ON r.id = p.run WHERE p.id = ?").get(id);
+    const claims = Number(db.prepare("DELETE FROM claims WHERE participant = ?").run(id).changes);
+    const locks = Number(db.prepare("DELETE FROM merge_locks WHERE participant = ?").run(id).changes);
+    clearFlags();
+    if (owner && claims + locks > 0) bump(String(owner.repo));
   };
+  const setWaiting = (p, on) => transaction(() => {
+    const r = db.prepare("UPDATE participants SET waiting = ? WHERE id = ? AND waiting != ?").run(on ? 1 : 0, p.id, on ? 1 : 0);
+    if (Number(r.changes) > 0) bump(participantById(p.id).repo);
+  });
+  const deliverTo = (p, fromWait) => {
+    const me = participantById(p.id);
+    const messages = transaction(() => {
+      const rows = db.prepare(
+        `SELECT m.* FROM messages m
+           WHERE m.repo = ? AND m.seq > ? AND m.author != ?
+             AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.participant = ? AND d.seq = m.seq)
+           ORDER BY m.seq`
+      ).all(me.repo, Number(db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id).since_seq), me.id, me.id);
+      const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
+      for (const r of rows) mark.run(me.id, Number(r.seq));
+      db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(now(), me.id);
+      if (!fromWait) {
+        db.prepare("UPDATE participants SET calls = calls + 1 WHERE id = ?").run(me.id);
+        const r = db.prepare("UPDATE participants SET waiting = 0 WHERE id = ? AND waiting = 1").run(me.id);
+        if (Number(r.changes) > 0) bump(me.repo);
+      }
+      return rows.map(toMessage);
+    });
+    const named = (m) => m.mentions.includes(me.name) || m.mentions.includes(`${me.plan}/*`);
+    return {
+      full: messages.filter(named),
+      lines: messages.filter((m) => !named(m)).map(messageLine)
+    };
+  };
+  const listedRuns = () => db.prepare(
+    `SELECT * FROM runs WHERE state = 'open'
+           OR id IN (SELECT id FROM runs WHERE state = 'closed' ORDER BY closed_at DESC, id DESC LIMIT ?)
+         ORDER BY id`
+  ).all(CLOSED_LISTED);
+  const runSummary = (r) => {
+    const id = Number(r.id);
+    const count = (sql) => Number(db.prepare(sql).get(id).n);
+    const open = r.state === "open";
+    return {
+      run: id,
+      plan: String(r.plan),
+      code: planCode(String(r.plan)),
+      title: String(r.title),
+      open,
+      runners: open ? count(`SELECT COUNT(*) AS n FROM participants WHERE run = ? AND slice != '${ORCHESTRATOR}' AND ended_at IS NULL`) : 0,
+      done: count("SELECT COUNT(*) AS n FROM slices WHERE run = ? AND state = 'done'"),
+      of: count("SELECT COUNT(*) AS n FROM slices WHERE run = ?")
+    };
+  };
+  const repoName = (repo) => {
+    const base = path2.basename(repo);
+    return base.toLowerCase() === ".git" ? path2.basename(path2.dirname(repo)) : base.replace(/\.git$/i, "");
+  };
+  const listeners = /* @__PURE__ */ new Set();
+  let watching = null;
+  let versions = /* @__PURE__ */ new Map();
+  const readVersions = () => new Map(db.prepare("SELECT repo, version FROM changes").all().map((r) => [String(r.repo), Number(r.version)]));
   const declared = (id) => JSON.parse(String(db.prepare("SELECT files FROM participants WHERE id = ?").get(id).files));
   const board = {
     openRun({ repo, plan, title, slices }) {
@@ -268,6 +582,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
         const ins = db.prepare("INSERT INTO slices (run, id, title, blockers, ord) VALUES (?, ?, ?, ?, ?)");
         slices.forEach((s, i) => ins.run(run, s.id, s.title, JSON.stringify(s.blockers ?? []), i));
         db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at) VALUES (?, ?, ?, ?)").run(run, ORCHESTRATOR, lastSeq(), now());
+        bump(repo);
         return run;
       });
       syncMarker();
@@ -279,6 +594,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
       transaction(() => {
         const r = db.prepare("UPDATE slices SET state = ? WHERE run = ? AND id = ?").run(state, run, slice);
         if (Number(r.changes) === 0) throw new Error(`unknown slice ${slice} in run ${run}`);
+        bump(String(runRow(run).repo));
         if (state !== "done") return;
         const p = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run, slice);
         if (p) releaseAll(Number(p.id));
@@ -288,6 +604,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
       runRow(run);
       transaction(() => {
         db.prepare("UPDATE runs SET state = 'closed', closed_at = ? WHERE id = ?").run(now(), run);
+        bump(String(runRow(run).repo));
         db.prepare("UPDATE participants SET ended_at = COALESCE(ended_at, ?) WHERE run = ?").run(now(), run);
         for (const p of db.prepare("SELECT id FROM participants WHERE run = ?").all(run)) releaseAll(Number(p.id));
       });
@@ -301,29 +618,31 @@ async function openBoard(dbPath = SQLITE_PATH) {
       if (r.state !== "open") throw new Error(`run ${run} is closed`);
       if (slice === ORCHESTRATOR) throw new Error(`"${ORCHESTRATOR}" is not a slice`);
       const where = worktree ? path2.resolve(worktree) : null;
-      const id = transaction(() => {
-        const existing = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run, slice);
-        if (existing) {
-          db.prepare("UPDATE participants SET doing = ?, files = ?, worktree = ?, ended_at = NULL WHERE id = ?").run(
-            doing,
-            JSON.stringify(files),
-            where,
-            Number(existing.id)
-          );
-          return Number(existing.id);
-        }
-        const ins = db.prepare("INSERT INTO participants (run, slice, worktree, doing, files, since_seq, joined_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(run, slice, where, doing, JSON.stringify(files), lastSeq(), now());
-        return Number(ins.lastInsertRowid);
+      return transaction(() => {
+        const id = transaction(() => {
+          const existing = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run, slice);
+          if (existing) {
+            db.prepare("UPDATE participants SET doing = ?, files = ?, worktree = ?, ended_at = NULL WHERE id = ?").run(
+              doing,
+              JSON.stringify(files),
+              where,
+              Number(existing.id)
+            );
+            return Number(existing.id);
+          }
+          const ins = db.prepare("INSERT INTO participants (run, slice, worktree, doing, files, since_seq, joined_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(run, slice, where, doing, JSON.stringify(files), lastSeq(), now());
+          return Number(ins.lastInsertRowid);
+        });
+        const runner = participantById(id);
+        transaction(() => {
+          for (const f of files) {
+            const rel = relPath(runner.repo, f.path);
+            if (rel) takeUnlessHeld(runner, rel, f.interface ? "interface" : "inside");
+          }
+        });
+        insertMessage(runner, `joined: ${doing}`, null, "event");
+        return { runner, roster: board.roster(runner.repo) };
       });
-      const runner = participantById(id);
-      transaction(() => {
-        for (const f of files) {
-          const rel = relPath(runner.repo, f.path);
-          if (rel) takeUnlessHeld(runner, rel, f.interface ? "interface" : "inside");
-        }
-      });
-      insertMessage(runner, `joined: ${doing}`, null, "event");
-      return { runner, roster: board.roster(runner.repo) };
     },
     participant(name) {
       const i = name.lastIndexOf("/");
@@ -369,8 +688,8 @@ async function openBoard(dbPath = SQLITE_PATH) {
     },
     end(p) {
       const fresh = live(p);
-      insertMessage(fresh, "ended", null, "event");
       transaction(() => {
+        insertMessage(fresh, "ended", null, "event");
         db.prepare("UPDATE participants SET ended_at = ? WHERE id = ?").run(now(), fresh.id);
         releaseAll(fresh.id);
       });
@@ -398,27 +717,11 @@ async function openBoard(dbPath = SQLITE_PATH) {
       return toMessage(r);
     },
     deliver(p) {
-      const me = participantById(p.id);
-      const messages = transaction(() => {
-        const rows = db.prepare(
-          `SELECT m.* FROM messages m
-             WHERE m.repo = ? AND m.seq > ? AND m.author != ?
-               AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.participant = ? AND d.seq = m.seq)
-             ORDER BY m.seq`
-        ).all(me.repo, Number(db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id).since_seq), me.id, me.id);
-        const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
-        for (const r of rows) mark.run(me.id, Number(r.seq));
-        db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(now(), me.id);
-        return rows.map(toMessage);
-      });
-      const named = (m) => m.mentions.includes(me.name) || m.mentions.includes(`${me.plan}/*`);
-      return {
-        full: messages.filter(named),
-        lines: messages.filter((m) => !named(m)).map(messageLine)
-      };
+      return deliverTo(p, false);
     },
     wait(p, timeoutMs) {
       participantById(p.id);
+      setWaiting(p, true);
       return new Promise((resolve, reject) => {
         let settled = false;
         let watcher;
@@ -430,13 +733,17 @@ async function openBoard(dbPath = SQLITE_PATH) {
           watcher?.close();
           clearInterval(poll);
           clearTimeout(timer);
+          try {
+            setWaiting(p, false);
+          } catch {
+          }
           if (d instanceof Error) reject(d);
           else resolve(d);
         };
         const check = () => {
           if (settled) return;
           try {
-            const d = board.deliver(p);
+            const d = deliverTo(p, true);
             if (d.full.length || d.lines.length) finish(d);
           } catch (e) {
             finish(e);
@@ -464,27 +771,37 @@ async function openBoard(dbPath = SQLITE_PATH) {
     reconcileWrites(p, changed) {
       const me = live(p);
       const flags = [];
-      for (const file of changed) {
-        const rel = relPath(me.repo, file);
-        if (!rel) continue;
-        const held = takeUnlessHeld(me, rel, "inside");
-        if (!held) continue;
-        const holder = participantById(held.participant);
-        const m = insertMessage(
-          me,
-          `@${holder.name} @${me.name} flag: ${me.name} wrote ${rel} outside its claim; ${holder.name} holds it. Settle it here.`,
-          rel,
-          "msg",
-          [holder.name, me.name]
-        );
-        flags.push({ path: rel, holder: holder.name, seq: m.seq });
-      }
-      return flags;
+      return transaction(() => {
+        const flag = db.prepare("INSERT OR IGNORE INTO flags (repo, path, participant) VALUES (?, ?, ?)");
+        for (const file of changed) {
+          const rel = relPath(me.repo, file);
+          if (!rel) continue;
+          const { held, taken } = take(me, rel, "inside");
+          if (taken || held) flag.run(me.repo, rel, me.id);
+          if (!held) continue;
+          const holder = participantById(held.participant);
+          const m = insertMessage(
+            me,
+            `@${holder.name} @${me.name} flag: ${me.name} wrote ${rel} outside its claim; ${holder.name} holds it. Settle it here.`,
+            rel,
+            "msg",
+            [holder.name, me.name]
+          );
+          flags.push({ path: rel, holder: holder.name, seq: m.seq });
+        }
+        return flags;
+      });
     },
     release(p, file) {
       const me = live(p);
       const rel = relPath(me.repo, file);
-      if (rel) db.prepare("DELETE FROM claims WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
+      if (!rel) return;
+      transaction(() => {
+        const r = db.prepare("DELETE FROM claims WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
+        if (Number(r.changes) === 0) return;
+        clearFlags();
+        bump(me.repo);
+      });
     },
     lockMerge(p) {
       const me = live(p);
@@ -493,7 +810,9 @@ async function openBoard(dbPath = SQLITE_PATH) {
         if (r && Number(r.participant) !== me.id && isLive(Number(r.participant))) {
           return { granted: false, holder: participantById(Number(r.participant)).name };
         }
+        if (r && Number(r.participant) === me.id) return { granted: true };
         db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at) VALUES (?, ?, ?)").run(me.repo, me.id, now());
+        bump(me.repo);
         return { granted: true };
       });
     },
@@ -504,45 +823,153 @@ async function openBoard(dbPath = SQLITE_PATH) {
       const told = /* @__PURE__ */ new Set();
       const iface = /* @__PURE__ */ new Set();
       transaction(() => {
-        const lock = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo);
-        if (lock && Number(lock.participant) !== me.id && isLive(Number(lock.participant))) {
-          throw new Error(`the merge lock is held by ${participantById(Number(lock.participant)).name}, not ${me.name}`);
+        transaction(() => {
+          const lock = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo);
+          if (lock && Number(lock.participant) !== me.id && isLive(Number(lock.participant))) {
+            throw new Error(`the merge lock is held by ${participantById(Number(lock.participant)).name}, not ${me.name}`);
+          }
+          db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
+        });
+        for (const rel of rels) {
+          const c = claimOf(me.repo, rel);
+          if (!c) continue;
+          if (c.kind === "interface") iface.add(rel);
+          if (c.participant !== me.id && isLive(c.participant)) told.add(participantById(c.participant).name);
         }
-        db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
+        const everyone = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL`).all(me.repo);
+        for (const o of everyone) {
+          for (const f of declared(Number(o.id))) {
+            const rel = relPath(me.repo, f.path);
+            if (!rel || !wanted.has(rel)) continue;
+            if (f.interface) iface.add(rel);
+            if (Number(o.id) !== me.id) told.add(`${o.plan}/${o.slice}`);
+          }
+        }
+        const all = iface.size ? openPlans(me.repo).map((plan) => `${plan}/*`) : [];
+        const lines = [`merged ${sha}: rebase onto ${sha}.`];
+        if (told.size) lines.push(`${[...told].map((n) => `@${n}`).join(" ")}: you hold or declared a file it changed.`);
+        if (iface.size) lines.push(`@all interface changed: ${[...iface].join(", ")}.`);
+        lines.push(`files: ${rels.join(", ") || "-"}`);
+        insertMessage(me, lines.join("\n"), null, "event", [.../* @__PURE__ */ new Set([...told, ...all])]);
       });
-      for (const rel of rels) {
-        const c = claimOf(me.repo, rel);
-        if (!c) continue;
-        if (c.kind === "interface") iface.add(rel);
-        if (c.participant !== me.id && isLive(c.participant)) told.add(participantById(c.participant).name);
+    },
+    repos() {
+      const byRepo = /* @__PURE__ */ new Map();
+      for (const r of listedRuns()) {
+        const list = byRepo.get(String(r.repo)) ?? [];
+        list.push(runSummary(r));
+        byRepo.set(String(r.repo), list);
       }
-      const everyone = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL`).all(me.repo);
-      for (const o of everyone) {
-        for (const f of declared(Number(o.id))) {
-          const rel = relPath(me.repo, f.path);
-          if (!rel || !wanted.has(rel)) continue;
-          if (f.interface) iface.add(rel);
-          if (Number(o.id) !== me.id) told.add(`${o.plan}/${o.slice}`);
+      const latest = (runs) => Math.max(...runs.map((x) => x.run));
+      return [...byRepo.entries()].map(([repo, runs]) => ({ repo, name: repoName(repo), runs })).sort((a, b) => Number(b.runs.some((x) => x.open)) - Number(a.runs.some((x) => x.open)) || latest(b.runs) - latest(a.runs));
+    },
+    snapshot(repo) {
+      const runRows = listedRuns().filter((r) => r.repo === repo);
+      if (!runRows.length) throw new Error(`no repository ${repo}`);
+      const runIds = runRows.map((r) => Number(r.id));
+      const marks = runIds.map(() => "?").join(", ");
+      const lockRow = db.prepare("SELECT participant, at FROM merge_locks WHERE repo = ?").get(repo);
+      const lockHolder = lockRow && isLive(Number(lockRow.participant)) ? Number(lockRow.participant) : null;
+      const sliceRows = db.prepare(`SELECT * FROM slices WHERE run IN (${marks}) ORDER BY run, ord`).all(...runIds);
+      const sliceOf = new Map(sliceRows.map((s) => [`${s.run}/${s.id}`, s]));
+      const people = db.prepare(`${PARTICIPANT_SQL} WHERE p.run IN (${marks}) ORDER BY p.run, p.id`).all(...runIds);
+      const runOpen = new Map(runRows.map((r) => [Number(r.id), r.state === "open"]));
+      const cutoff = Date.now() - STALE_MS;
+      const claimsOf = db.prepare("SELECT path, kind FROM claims WHERE participant = ? ORDER BY rowid");
+      const roster = people.map((r) => {
+        const id = Number(r.id);
+        const slice = String(r.slice);
+        const orchestrator = slice === ORCHESTRATOR;
+        const s = sliceOf.get(`${r.run}/${slice}`);
+        const ended = r.ended_at != null;
+        const state = orchestrator ? runOpen.get(Number(r.run)) ? "watching" : "done" : s?.state === "done" ? "done" : ended ? "ended" : lockHolder === id ? "merging" : Number(r.waiting) === 1 ? "waiting" : "working";
+        return {
+          runner: `${r.plan}/${slice}`,
+          plan: String(r.plan),
+          slice,
+          title: orchestrator ? "" : String(s?.title ?? slice),
+          doing: String(r.doing),
+          state,
+          stale: !ended && !orchestrator && Date.parse(String(r.last_call ?? r.joined_at)) < cutoff,
+          files: claimsOf.all(id).map((c) => ({ path: String(c.path), interface: c.kind === "interface" })),
+          joined: String(r.joined_at),
+          calls: Number(r.calls ?? 0)
+        };
+      });
+      const events = db.prepare("SELECT * FROM (SELECT * FROM messages WHERE repo = ? ORDER BY seq DESC LIMIT ?) ORDER BY seq").all(repo, EVENTS_SHOWN).map((r) => {
+        const m = toMessage(r);
+        return { seq: m.seq, at: m.at, kind: m.kind, from: m.from, body: m.body, about: m.about };
+      });
+      const nameOf = new Map(people.map((r) => [`${r.run}/${r.slice}`, `${r.plan}/${r.slice}`]));
+      const queues = {};
+      for (const run of runRows) {
+        queues[String(run.plan)] = sliceRows.filter((s) => Number(s.run) === Number(run.id)).map((s) => ({
+          slice: String(s.id),
+          title: String(s.title),
+          state: String(s.state),
+          blockers: JSON.parse(String(s.blockers)),
+          runner: nameOf.get(`${run.id}/${s.id}`) ?? null
+        }));
+      }
+      const flags = db.prepare("SELECT f.path, p.slice, r.plan FROM flags f JOIN participants p ON p.id = f.participant JOIN runs r ON r.id = p.run WHERE f.repo = ? ORDER BY f.rowid").all(repo).map((f) => ({ path: String(f.path), runner: `${f.plan}/${f.slice}` }));
+      return {
+        repo,
+        name: repoName(repo),
+        runs: runRows.map(runSummary),
+        lock: lockHolder !== null ? { holder: participantById(lockHolder).name, since: String(lockRow.at) } : null,
+        roster,
+        events,
+        queues,
+        flags
+      };
+    },
+    onChange(listener) {
+      listeners.add(listener);
+      if (!watching) {
+        versions = readVersions();
+        const check = () => {
+          let next;
+          try {
+            next = readVersions();
+          } catch {
+            return;
+          }
+          const moved = [...next].filter(([repo, v]) => versions.get(repo) !== v).map(([repo]) => repo);
+          versions = next;
+          for (const repo of moved) for (const l of [...listeners]) l(repo);
+        };
+        const watcher = fs.watch(signal, check);
+        const poll = setInterval(check, WAIT_POLL_MS);
+        watcher.unref?.();
+        poll.unref?.();
+        watching = { close: () => (watcher.close(), clearInterval(poll)) };
+      }
+      return () => {
+        listeners.delete(listener);
+        if (!listeners.size && watching) {
+          watching.close();
+          watching = null;
         }
-      }
-      const all = iface.size ? openPlans(me.repo).map((plan) => `${plan}/*`) : [];
-      const lines = [`merged ${sha}: rebase onto ${sha}.`];
-      if (told.size) lines.push(`${[...told].map((n) => `@${n}`).join(" ")}: you hold or declared a file it changed.`);
-      if (iface.size) lines.push(`@all interface changed: ${[...iface].join(", ")}.`);
-      lines.push(`files: ${rels.join(", ") || "-"}`);
-      insertMessage(me, lines.join("\n"), null, "event", [.../* @__PURE__ */ new Set([...told, ...all])]);
+      };
     },
     close() {
+      watching?.close();
+      watching = null;
+      listeners.clear();
       db.close();
     }
   };
   return board;
 }
 
+// src/cli/index.ts
+init_home();
+
 // src/hook/hook.ts
 import { spawnSync } from "node:child_process";
 import fs2 from "node:fs";
 import path3 from "node:path";
+init_home();
 
 // src/cli/format.ts
 var fullText = (m) => {
@@ -644,6 +1071,9 @@ async function runHook(kind) {
   }
 }
 
+// src/cli/index.ts
+init_state();
+
 // src/cli/args.ts
 var VALUE_FLAGS = /* @__PURE__ */ new Set([
   "--plan",
@@ -657,7 +1087,8 @@ var VALUE_FLAGS = /* @__PURE__ */ new Set([
   "--as",
   "--about",
   "--timeout",
-  "--repo"
+  "--repo",
+  "--port"
 ]);
 var LIST_FLAGS = /* @__PURE__ */ new Set(["--files"]);
 function parseArgs(argv) {
@@ -695,7 +1126,7 @@ var args = parseArgs(process.argv.slice(2));
 var asJson = args.has("--json");
 var USAGE = [
   "usage: swarm <verb> [--json]",
-  "  open    --plan <slug> --title <t> --slices <file.json>          # opens a run, prints its id (orchestrator)",
+  "  open    --plan <slug> --title <t> --slices <file.json>          # opens a run, prints its id then the page's URL (orchestrator)",
   "  slice   <id> --run <id> --state ready|running|done|blocked      # (orchestrator)",
   "  close   --run <id>                                              # (orchestrator)",
   '  join    --run <id> --slice <id> --doing <t> [--files "<path>:interface,<path>:inside,\u2026"]   # prints the roster',
@@ -711,7 +1142,8 @@ var USAGE = [
   "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase",
   "  end     [--as <runner>]                                         # releases your claims and the lock",
   "  hook    pre|post                                                # Claude Code's hooks: hook JSON on stdin",
-  "  status                                                          # data home, open runs",
+  "  serve   [--port <p>] [--open] [--detach]                        # the page, on :4322 (SWARM_PORT)",
+  "  status                                                          # data home, the page's server, open runs",
   "a runner is <plan>/<slice>, the orchestrator <plan>/orchestrator; without --as, the runner joined from this worktree"
 ].join("\n");
 var CliError = class extends Error {
@@ -732,17 +1164,43 @@ var git = (cwd, ...argv) => {
 function repoOf(dir) {
   const common = git(dir, "rev-parse", "--git-common-dir");
   if (!common) fail(`not in a git repository: ${dir}`);
-  const abs = path4.resolve(dir, common);
+  const abs = path6.resolve(dir, common);
   try {
-    return fs3.realpathSync.native(abs);
+    return fs5.realpathSync.native(abs);
   } catch {
     return abs;
   }
 }
 function worktreeOf(dir) {
   const top = git(dir, "rev-parse", "--show-toplevel");
-  return top ? path4.resolve(top) : null;
+  return top ? path6.resolve(top) : null;
 }
+function spawnDetachedServer(port) {
+  try {
+    fs5.rmSync(PORT_FILE, { force: true });
+  } catch {
+  }
+  const child = spawn2(process.execPath, [process.argv[1], "serve", "--port", String(port)], {
+    detached: true,
+    stdio: "ignore",
+    cwd: DATA_ROOT
+  });
+  child.unref();
+  const t0 = Date.now();
+  for (; ; ) {
+    const st = readServerStatus();
+    if (st.running && st.port !== null) return st.port;
+    if (Date.now() - t0 > 1e4) return null;
+    spawnSync2(process.execPath, ["-e", "setTimeout(()=>{},120)"]);
+  }
+}
+function ensureServer() {
+  const st = readServerStatus();
+  if (st.running && st.port !== null) return st.port;
+  fs5.mkdirSync(DATA_ROOT, { recursive: true });
+  return spawnDetachedServer(portFrom(args.flag("--port")));
+}
+var pageUrl = (port) => `http://localhost:${port}/`;
 var need = (flag) => args.flag(flag) ?? fail(`${flag} is required
 ${USAGE}`);
 var runArg = () => {
@@ -773,7 +1231,7 @@ function parseFile(spec) {
 function readSlices(file) {
   let raw;
   try {
-    raw = JSON.parse(fs3.readFileSync(path4.resolve(file), "utf8"));
+    raw = JSON.parse(fs5.readFileSync(path6.resolve(file), "utf8"));
   } catch (e) {
     return fail(`cannot read slices from ${file}: ${e.message}`);
   }
@@ -789,7 +1247,11 @@ async function main(board) {
     case "open": {
       const plan = need("--plan");
       const run = board.openRun({ repo: repoOf(process.cwd()), plan, title: need("--title"), slices: readSlices(need("--slices")) });
-      emit({ run: run.id, repo: run.repo, plan: run.plan }, String(run.id));
+      const port = ensureServer();
+      const url = port === null ? null : pageUrl(port);
+      if (url === null) console.error(`swarm: the page did not start (port ${portFrom(args.flag("--port"))} may be in use; swarm serve --detach --port <n>). The run is open.`);
+      emit({ run: run.id, repo: run.repo, plan: run.plan, url }, url ? `${run.id}
+${url}` : String(run.id));
       break;
     }
     case "slice": {
@@ -859,7 +1321,7 @@ ${USAGE}`);
       break;
     }
     case "roster": {
-      const repo = repoOf(path4.resolve(args.flag("--repo") ?? process.cwd()));
+      const repo = repoOf(path6.resolve(args.flag("--repo") ?? process.cwd()));
       const roster = board.roster(repo);
       emit({ repo, roster }, () => {
         for (const r of roster) console.log(rosterLine(r));
@@ -869,7 +1331,7 @@ ${USAGE}`);
     case "release": {
       const p = caller(board);
       const file = args.positional[0] ?? fail("release: which path?");
-      board.release(p, path4.resolve(file));
+      board.release(p, path6.resolve(file));
       emit({ runner: p.name, released: file }, `${p.name} released ${file}`);
       break;
     }
@@ -886,7 +1348,7 @@ ${USAGE}`);
       const p = caller(board);
       const sha = args.positional[0] ?? fail("merged: which sha?");
       const files = args.list("--files");
-      board.merged(p, sha, files.map((f) => path4.resolve(f)));
+      board.merged(p, sha, files.map((f) => path6.resolve(f)));
       emit({ runner: p.name, sha, files }, `merged ${sha}: lock released`);
       break;
     }
@@ -898,9 +1360,13 @@ ${USAGE}`);
     }
     case "status": {
       const runs = board.runs();
-      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, runs }, () => {
+      const server = readServerStatus();
+      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, runs: runs.length }, () => {
         console.log(`home    ${DATA_ROOT}`);
         console.log(`sqlite  ${SQLITE_PATH}`);
+        console.log(
+          server.running ? `page    running  pid ${server.pid}  ${pageUrl(server.port)}` : `page    not running${server.stale ? " (stale pid file)" : ""}: swarm serve --detach`
+        );
         if (!runs.length) console.log("no open run");
         for (const r of runs) {
           console.log(`run ${r.id}  ${r.plan}  ${r.title}  ${r.repo}`);
@@ -919,6 +1385,19 @@ if (!args.verb) {
 }
 if (args.verb === "hook") {
   await runHook(args.positional[0]);
+} else if (args.verb === "serve" && args.has("--detach")) {
+  const st = readServerStatus();
+  const port = st.running && st.port !== null ? st.port : (fs5.mkdirSync(DATA_ROOT, { recursive: true }), spawnDetachedServer(portFrom(args.flag("--port"))));
+  if (port === null) {
+    console.error(`swarm: the server did not come up within 10 s (port ${portFrom(args.flag("--port"))} may be in use; retry with --port <n>)`);
+    process.exitCode = 1;
+  } else {
+    const server = readServerStatus();
+    emit({ server, url: pageUrl(port), already: st.running }, st.running ? `swarm's page already running on ${pageUrl(port)} (pid ${server.pid})` : `swarm's page up on ${pageUrl(port)}`);
+  }
+} else if (args.verb === "serve") {
+  const { startServer: startServer2 } = await Promise.resolve().then(() => (init_server(), server_exports));
+  startServer2(await openBoard(), { port: portFrom(args.flag("--port")), open: args.has("--open") });
 } else {
   const board = await openBoard();
   try {
