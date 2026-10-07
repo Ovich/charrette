@@ -1,0 +1,6 @@
+{
+  "hooks": {
+    "PreToolUse": [{ "matcher": "Edit|Write|NotebookEdit|Bash", "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/skills/swarm/swarm.mjs", "hook", "pre"] }] }],
+    "PostToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/skills/swarm/swarm.mjs", "hook", "post"] }] }]
+  }
+}
