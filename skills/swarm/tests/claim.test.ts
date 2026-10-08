@@ -26,6 +26,18 @@ const cli = (cwd: string, ...argv: string[]): string => {
   assert.equal(r.status, 0, `${argv.join(" ")}: ${r.stderr}`);
   return r.stdout;
 };
+/** The claim's own answer: the listener line a runner with no listener gets last (D61), checked
+ *  present and taken off; `answerJson` does the same with `next`, its --json form. */
+const LISTENER = /^start your listener now, in the background \(your harness's background task\): node \S+ wait --mentions --as \S+\n$/m;
+const answer = (stdout: string): string => {
+  assert.match(stdout, LISTENER);
+  return stdout.replace(LISTENER, "");
+};
+const answerJson = (stdout: string): Record<string, unknown> => {
+  const { next, ...rest } = JSON.parse(stdout);
+  assert.match(next, /wait --mentions --as /);
+  return rest;
+};
 const git = (cwd: string, ...argv: string[]): void => {
   const r = spawnSync("git", argv, { cwd, encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);
@@ -80,7 +92,7 @@ afterEach(() => {
 test("claim on a free path claims it, exit 0; another runner is then held on it", () => {
   running();
   const r = swarm(wtA, "claim", "src/new.ts");
-  assert.deepEqual([r.status, r.stdout, r.stderr], [0, "claimed src/new.ts\n", ""]);
+  assert.deepEqual([r.status, answer(r.stdout), r.stderr], [0, "claimed src/new.ts\n", ""]);
   const held = swarm(wtB, "claim", "src/new.ts");
   assert.equal(held.status, 3);
   assert.match(held.stdout, /src\/new\.ts is also held by review-tool\/S3/);
@@ -91,7 +103,7 @@ test("claim on a shared path before a post holds it: the holder, its note, the p
   const r = swarm(wtB, "claim", "src/a.ts");
   assert.equal(r.status, 3, r.stderr);
   assert.equal(
-    r.stdout,
+    answer(r.stdout),
     `src/a.ts is also held by review-tool/S3 (${nick}: the page). You may share it, but first tell its holder what you change in it: ` +
       '`swarm post "@review-tool/S3 …" --about src/a.ts`, then claim again.\n',
   );
@@ -99,7 +111,7 @@ test("claim on a shared path before a post holds it: the holder, its note, the p
   assert.equal(swarm(wtB, "claim", "src/a.ts").status, 3);
   const json = swarm(wtB, "claim", "src/a.ts", "--json");
   assert.equal(json.status, 3);
-  assert.deepEqual(Object.keys(JSON.parse(json.stdout)).sort(), ["allowed", "refusal"]);
+  assert.deepEqual(Object.keys(answerJson(json.stdout)).sort(), ["allowed", "refusal"]);
 });
 
 test("claim on a shared path after a post: claimed, the other holder named once, exit 0 (D40)", () => {
@@ -107,9 +119,9 @@ test("claim on a shared path after a post: claimed, the other holder named once,
   swarm(wtB, "claim", "src/a.ts");
   cli(wtB, "post", "@S3 I add isExpired() at the end", "--about", "src/a.ts");
   const first = swarm(wtB, "claim", "src/a.ts");
-  assert.deepEqual([first.status, first.stdout], [0, `claimed src/a.ts, also held by review-tool/S3 · ${nick}: the page\n`]);
-  assert.equal(cli(wtB, "claim", "src/a.ts"), "claimed src/a.ts\n", "the notice, once per runner and path");
-  assert.deepEqual(JSON.parse(cli(wtB, "claim", "src/a.ts", "--json")), {
+  assert.deepEqual([first.status, answer(first.stdout)], [0, `claimed src/a.ts, also held by review-tool/S3 · ${nick}: the page\n`]);
+  assert.equal(answer(cli(wtB, "claim", "src/a.ts")), "claimed src/a.ts\n", "the notice, once per runner and path");
+  assert.deepEqual(answerJson(cli(wtB, "claim", "src/a.ts", "--json")), {
     allowed: true,
     sharedWith: [{ runner: "review-tool/S3", doing: "the page" }],
     notice: null,
@@ -118,7 +130,7 @@ test("claim on a shared path after a post: claimed, the other holder named once,
 
 test("claim --interface claims the path as an interface", async () => {
   running();
-  assert.equal(cli(wtA, "claim", "src/api.ts", "--interface"), "claimed src/api.ts\n");
+  assert.equal(answer(cli(wtA, "claim", "src/api.ts", "--interface")), "claimed src/api.ts\n");
   const board = await openBoard(path.join(home, "swarm.sqlite"));
   try {
     const files = board.snapshot(board.repos()[0].repo).files;

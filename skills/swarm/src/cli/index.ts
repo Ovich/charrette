@@ -18,7 +18,7 @@ const USAGE = [
   '          # the slices file: [{"id", "title", "blockers": [...], "link"?: "<slice document URL>"}]',
   "  slice   <id> --run <id> --state ready|running|done|blocked      # (orchestrator)",
   "  close   --run <id>                                              # (orchestrator)",
-  '  join    --run <id> --slice <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # prints the roster',
+  '  join    --run <id> --slice <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # prints the roster, then the command that starts your listener',
   "  doing   [--as <runner>] <text>",
   "  post    [--as <runner>] <body> [--about <path>]                 # prints the seq",
   "  agree   [--as <runner>] <terms> [--about <path>]                # prints the seq",
@@ -169,6 +169,25 @@ const printDelivery = (d: Delivery): void => {
 /** A word of a POSIX command line, double-quoted when it holds anything else than plain characters. */
 const shellWord = (w: string): string => (/^[\w@%+=:,./-]+$/.test(w) ? w : `"${w.replace(/(["\\$`])/g, "\\$1")}"`);
 
+/** This CLI as a runner calls it: `node <skill-dir>/swarm.mjs`, as the skill writes it and the allow
+ *  rule matches it; forward slashes, which Node takes on Windows too and no shell eats (D49). */
+const self = (): string[] => ["node", shellWord(process.argv[1].replace(/\\/g, "/"))];
+
+/** The line that starts a runner's listener: the exact command, --as included (D61). */
+const listenNow = (runner: string): string =>
+  `start your listener now, in the background (your harness's background task): ${[...self(), "wait", "--mentions", "--as", shellWord(runner)].join(" ")}`;
+
+/** A verb's output, then the listener line when the caller has no `wait --mentions` pending and has
+ *  not ended (D61), once per call; --json carries it as `next`. */
+const emitHeard = (p: Participant, json: object, human: string | (() => void)): void => {
+  const next = !p.ended && !p.listening ? listenNow(p.name) : null;
+  emit(next ? { ...json, next } : json, () => {
+    if (typeof human === "string") console.log(human);
+    else human();
+    if (next) console.log(next);
+  });
+};
+
 /** `<path>`, `<path>:inside` or `<path>:interface`. */
 function parseFile(spec: string): Declared {
   const m = spec.match(/^(.*):(interface|inside)$/);
@@ -229,9 +248,12 @@ async function main(board: Board): Promise<void> {
         files: [...args.list("--files"), ...args.flags("--file")].map(parseFile),
         worktree: worktreeOf(process.cwd()) ?? undefined,
       });
-      emit({ runner: runner.name, nick: runner.nick, roster }, () => {
+      // the runner's next step, last: its listener, started at once (D61)
+      const next = listenNow(runner.name);
+      emit({ runner: runner.name, nick: runner.nick, roster, next }, () => {
         console.log(`you are ${runner.name}, ${runner.nick}: @${runner.slice} or @${runner.nick.replace(/\s+/g, "")} mentions you`);
         for (const r of roster) console.log(rosterLine(r));
+        console.log(next);
       });
       break;
     }
@@ -239,7 +261,7 @@ async function main(board: Board): Promise<void> {
       const p = caller(board);
       const text = args.positional.join(" ") || fail("doing: what?");
       board.setDoing(p, text);
-      emit({ runner: p.name, doing: text }, `${p.name} doing: ${text}`);
+      emitHeard(p, { runner: p.name, doing: text }, `${p.name} doing: ${text}`);
       break;
     }
     case "post":
@@ -247,7 +269,7 @@ async function main(board: Board): Promise<void> {
       const p = caller(board);
       const body = args.positional.join(" ") || fail(`${args.verb}: nothing to say`);
       const m = board.post(p, body, { about: args.flag("--about"), kind: args.verb === "agree" ? "agreement" : "msg" });
-      emit({ seq: m.seq, mentions: m.mentions }, `#${m.seq}`);
+      emitHeard(p, { seq: m.seq, mentions: m.mentions }, `#${m.seq}`);
       break;
     }
     case "read": {
@@ -275,9 +297,7 @@ async function main(board: Board): Promise<void> {
         break;
       }
       // the runner's next step, before the message: the exact command that re-arms this listener (D49)
-      // `node <skill-dir>/swarm.mjs`, as the skill writes it and the allow rule matches it; forward
-      // slashes, which Node takes on Windows too and no shell eats
-      const again = ["node", shellWord(process.argv[1].replace(/\\/g, "/")), "wait"];
+      const again = [...self(), "wait"];
       if (mentionsOnly) again.push("--mentions");
       if (args.flag("--as")) again.push("--as", shellWord(args.flag("--as")!));
       if (raw !== undefined) again.push("--timeout", raw);
@@ -303,7 +323,7 @@ async function main(board: Board): Promise<void> {
       const verdict = board.checkEdit(p, path.resolve(file), { interface: args.has("--interface") });
       // held (D41): exit 3, the runner posts about the path and claims again
       if (!verdict.allowed) process.exitCode = 3;
-      emit(verdict, () => {
+      emitHeard(p, verdict, () => {
         if (!verdict.allowed) return console.log(verdict.refusal);
         // the other holders are named once per runner and path, when the board says so (D40)
         const also = verdict.notice

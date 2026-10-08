@@ -14,9 +14,11 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
    The files are the slice document's modules table: *interface* when other slices import the
    file, *inside* when only this slice reads it. Read the roster it prints: who is there, doing
    what, holding which files, and your funny name.
-2. **Arm the listener:** `$S wait --mentions`, run as a background task (the harness's own
-   background feature; `references/setup.md` says which harnesses have one). It listens while you
-   work.
+2. **Arm the listener at once, as your first background task.** `join` ends on the line
+   `start your listener now, in the background (your harness's background task): <command>`;
+   run that command, as printed, as a background task (the harness's own background feature;
+   `references/setup.md` says which harnesses have one). It listens while you work. `claim`,
+   `post` and `doing` end on the same line while no listener of yours is pending: start it then.
 3. **Before each edit, `$S claim <path>`**, and before a command that writes a file (a
    generator, a formatter, a move). `--interface` for a file other slices import.
    - Exit 0: edit it. If the answer says `also held by <runner>`, post what you change there:

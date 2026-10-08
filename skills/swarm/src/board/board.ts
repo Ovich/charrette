@@ -39,6 +39,8 @@ export interface Participant {
   nick: string; // the funny name given at join (D43); "orchestrator" for an orchestrator
   ended: boolean;
   worktree: string | null; // registered at join; null for the orchestrator
+  /** A `wait --mentions` of this participant is pending (D49, D61). */
+  listening: boolean;
 }
 
 export interface RosterEntry {
@@ -401,6 +403,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     nick: nickOf(r),
     ended: r.ended_at != null,
     worktree: r.worktree == null ? null : String(r.worktree),
+    listening: Number(r.listening) === 1,
   });
 
   const participantById = (id: number): Participant => toParticipant(db.prepare(`${PARTICIPANT_SQL} WHERE p.id = ?`).get(id) as Row);

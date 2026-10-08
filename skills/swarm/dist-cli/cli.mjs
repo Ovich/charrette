@@ -555,7 +555,8 @@ async function openBoard(dbPath = SQLITE_PATH) {
     name: `${r.plan}/${r.slice}`,
     nick: nickOf(r),
     ended: r.ended_at != null,
-    worktree: r.worktree == null ? null : String(r.worktree)
+    worktree: r.worktree == null ? null : String(r.worktree),
+    listening: Number(r.listening) === 1
   });
   const participantById = (id) => toParticipant(db.prepare(`${PARTICIPANT_SQL} WHERE p.id = ?`).get(id));
   const toMessage = (r) => ({
@@ -1193,7 +1194,7 @@ var USAGE = [
   '          # the slices file: [{"id", "title", "blockers": [...], "link"?: "<slice document URL>"}]',
   "  slice   <id> --run <id> --state ready|running|done|blocked      # (orchestrator)",
   "  close   --run <id>                                              # (orchestrator)",
-  '  join    --run <id> --slice <id> --doing <t> [--files "<path>:interface,<path>:inside,\u2026"]   # prints the roster',
+  '  join    --run <id> --slice <id> --doing <t> [--files "<path>:interface,<path>:inside,\u2026"]   # prints the roster, then the command that starts your listener',
   "  doing   [--as <runner>] <text>",
   "  post    [--as <runner>] <body> [--about <path>]                 # prints the seq",
   "  agree   [--as <runner>] <terms> [--about <path>]                # prints the seq",
@@ -1315,6 +1316,16 @@ var printDelivery = (d) => {
   for (const l of d.lines) console.log(l);
 };
 var shellWord = (w) => /^[\w@%+=:,./-]+$/.test(w) ? w : `"${w.replace(/(["\\$`])/g, "\\$1")}"`;
+var self = () => ["node", shellWord(process.argv[1].replace(/\\/g, "/"))];
+var listenNow = (runner) => `start your listener now, in the background (your harness's background task): ${[...self(), "wait", "--mentions", "--as", shellWord(runner)].join(" ")}`;
+var emitHeard = (p, json, human) => {
+  const next = !p.ended && !p.listening ? listenNow(p.name) : null;
+  emit(next ? { ...json, next } : json, () => {
+    if (typeof human === "string") console.log(human);
+    else human();
+    if (next) console.log(next);
+  });
+};
 function parseFile(spec) {
   const m = spec.match(/^(.*):(interface|inside)$/);
   return m ? { path: m[1], interface: m[2] === "interface" } : { path: spec, interface: false };
@@ -1373,9 +1384,11 @@ ${USAGE}`);
         files: [...args.list("--files"), ...args.flags("--file")].map(parseFile),
         worktree: worktreeOf(process.cwd()) ?? void 0
       });
-      emit({ runner: runner.name, nick: runner.nick, roster }, () => {
+      const next = listenNow(runner.name);
+      emit({ runner: runner.name, nick: runner.nick, roster, next }, () => {
         console.log(`you are ${runner.name}, ${runner.nick}: @${runner.slice} or @${runner.nick.replace(/\s+/g, "")} mentions you`);
         for (const r of roster) console.log(rosterLine(r));
+        console.log(next);
       });
       break;
     }
@@ -1383,7 +1396,7 @@ ${USAGE}`);
       const p = caller(board);
       const text = args.positional.join(" ") || fail("doing: what?");
       board.setDoing(p, text);
-      emit({ runner: p.name, doing: text }, `${p.name} doing: ${text}`);
+      emitHeard(p, { runner: p.name, doing: text }, `${p.name} doing: ${text}`);
       break;
     }
     case "post":
@@ -1391,7 +1404,7 @@ ${USAGE}`);
       const p = caller(board);
       const body = args.positional.join(" ") || fail(`${args.verb}: nothing to say`);
       const m = board.post(p, body, { about: args.flag("--about"), kind: args.verb === "agree" ? "agreement" : "msg" });
-      emit({ seq: m.seq, mentions: m.mentions }, `#${m.seq}`);
+      emitHeard(p, { seq: m.seq, mentions: m.mentions }, `#${m.seq}`);
       break;
     }
     case "read": {
@@ -1418,7 +1431,7 @@ ${USAGE}`);
         emit(d, "");
         break;
       }
-      const again = ["node", shellWord(process.argv[1].replace(/\\/g, "/")), "wait"];
+      const again = [...self(), "wait"];
       if (mentionsOnly) again.push("--mentions");
       if (args.flag("--as")) again.push("--as", shellWord(args.flag("--as")));
       if (raw !== void 0) again.push("--timeout", raw);
@@ -1443,7 +1456,7 @@ ${USAGE}`);
       const file = args.positional[0] ?? fail("claim: which path?");
       const verdict = board.checkEdit(p, path5.resolve(file), { interface: args.has("--interface") });
       if (!verdict.allowed) process.exitCode = 3;
-      emit(verdict, () => {
+      emitHeard(p, verdict, () => {
         if (!verdict.allowed) return console.log(verdict.refusal);
         const also = verdict.notice ? verdict.sharedWith.map((o) => `${o.runner} \xB7 ${board.participant(o.runner)?.nick ?? "?"}: ${o.doing}`).join("; ") : "";
         console.log(also ? `claimed ${file}, also held by ${also}` : `claimed ${file}`);

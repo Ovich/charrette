@@ -183,6 +183,50 @@ test("wait prints, before the message, the line that re-arms it with the exact c
   assert.equal(again.stdout, "");
 });
 
+const LISTEN = (runner: string): string =>
+  `start your listener now, in the background (your harness's background task): node ${CLI.replace(/\\/g, "/")} wait --mentions --as ${runner}`;
+
+test("join ends on the line that starts the listener, the exact command with --as; --json carries it as next (D61)", () => {
+  const id = String(openRun());
+  const r = run("join", "--run", id, "--slice", "S5", "--doing", "y");
+  assert.equal(r.status, 0, r.stderr);
+  const lines = r.stdout.trimEnd().split("\n");
+  assert.equal(lines.at(-1), LISTEN("review-tool/S5"));
+  assert.equal(lines.filter((l) => l.startsWith("start your listener")).length, 1);
+  const json = JSON.parse(run("join", "--run", id, "--slice", "S3", "--doing", "x", "--json").stdout);
+  assert.equal(json.next, LISTEN("review-tool/S3"));
+});
+
+test("claim, post and doing end on the listener line while no listener is pending, and not while one is (D61)", async () => {
+  const id = String(openRun());
+  run("join", "--run", id, "--slice", "S5", "--doing", "y");
+  const as = ["--as", "review-tool/S5"];
+  const unheard = [run("claim", ...as, "src/a.ts"), run("post", ...as, "hello"), run("doing", ...as, "the page")];
+  for (const r of unheard) {
+    assert.equal(r.status, 0, r.stderr);
+    const lines = r.stdout.trimEnd().split("\n");
+    assert.equal(lines.at(-1), LISTEN("review-tool/S5"), r.stdout);
+    assert.equal(lines.length, 2, r.stdout); // the verb's own line, then the listener line, once
+  }
+  assert.equal(JSON.parse(run("post", ...as, "again", "--json").stdout).next, LISTEN("review-tool/S5"));
+
+  const child = spawn(process.execPath, [CLI, "wait", "--mentions", ...as, "--timeout", "15000"], { cwd: repo, env: env() });
+  const exited = new Promise<number | null>((resolve) => child.on("exit", resolve));
+  try {
+    await new Promise((r) => setTimeout(r, 1500)); // the child is up and listening
+    const claimed = run("claim", ...as, "src/b.ts");
+    assert.equal(claimed.stdout, "claimed src/b.ts\n");
+    const posted = run("post", ...as, "hello again");
+    assert.match(posted.stdout, /^#\d+\n$/);
+    assert.equal(JSON.parse(run("post", ...as, "once more", "--json").stdout).next, undefined);
+  } finally {
+    run("end", ...as); // releases the child's wait
+    await exited;
+  }
+  // ended: no line
+  assert.doesNotMatch(run("doing", ...as, "nothing").stdout, /start your listener/);
+});
+
 test("a mentions-only wait in a child process sleeps through a join and wakes on a mention", async () => {
   const id = String(openRun());
   run("join", "--run", id, "--slice", "S5", "--doing", "y");
