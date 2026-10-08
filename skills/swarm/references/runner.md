@@ -40,9 +40,11 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
    1. `$S merge-lock --onto <target>`. `held by …`: run `$S wait --timeout 540000` in the
       foreground for its merged event, then run `merge-lock` again.
    2. Commit, then `git rebase <target>`.
-   3. A conflict in a file another runner changed: resolve it, then before going on
-      `$S post "@<other> I resolved <file>: <how>" --about <file>`. You merge second; the
-      resolution is yours, but the other runner hears of it.
+   3. A conflict in a file another runner changed: resolve it. You merge second; the
+      resolution is yours, but the other runner hears of it: `merged` (step 5) ends, for each
+      such file, on `if you resolved a conflict in <file>, tell them: swarm post "@<them> I
+      resolved <file>: <how>" --about <file>`. For each file you resolved, run that post with
+      `<how>` filled in.
    4. Run the slice's check on the rebased branch, then merge into `<target>` as the brief says.
    5. `$S merged <sha> --files <every path the merge changed>`. After a change to an
       *interface* file, `$S post "@all <what changed in it>" --about <file>`.

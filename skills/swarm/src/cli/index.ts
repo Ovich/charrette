@@ -30,7 +30,7 @@ const USAGE = [
   "  claim   [--as <runner>] <path> [--interface]                    # before editing a file: exit 0 claimed, 3 held until you post about it",
   "  release [--as <runner>] <path>                                  # gives up a claim",
   "  merge-lock --onto <branch> [--as <runner>]                      # one merge at a time per repository; claims or flags what your branch wrote unclaimed",
-  "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase",
+  "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase, names whom to tell of a resolved conflict",
   "  end     [--as <runner>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
   "  serve   [--port <p>] [--open] [--detach]                        # the page, on :4322 (SWARM_PORT)",
   "  status                                                          # data home, the page's server, open runs",
@@ -358,8 +358,15 @@ async function main(board: Board): Promise<void> {
       const p = caller(board);
       const sha = args.positional[0] ?? fail("merged: which sha?");
       const files = args.list("--files");
-      board.merged(p, sha, files.map((f) => path.resolve(f)));
-      emit({ runner: p.name, sha, files }, `merged ${sha}: lock released`);
+      const sharers = board.merged(p, sha, files.map((f) => path.resolve(f)));
+      // the post after a resolved conflict, prompted by the command just run (D63)
+      const tell = sharers.map(
+        (o) => `if you resolved a conflict in ${o.path}, tell them: swarm post "@${o.runner} I resolved ${o.path}: <how>" --about ${o.path}`,
+      );
+      emit({ runner: p.name, sha, files, tell }, () => {
+        console.log(`merged ${sha}: lock released`);
+        for (const line of tell) console.log(line);
+      });
       break;
     }
     case "end": {

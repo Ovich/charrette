@@ -197,6 +197,29 @@ test("join ends on the line that starts the listener, the exact command with --a
   assert.equal(json.next, LISTEN("review-tool/S3"));
 });
 
+test("merged ends, for each merged path another runner holds or held, on the line that tells them; --json carries the lines as tell (D63)", () => {
+  const id = String(openRun());
+  run("join", "--run", id, "--slice", "S3", "--doing", "x");
+  run("join", "--run", id, "--slice", "S5", "--doing", "y");
+  const s3 = ["--as", "review-tool/S3"];
+  const s5 = ["--as", "review-tool/S5"];
+  for (const f of ["src/held.ts", "src/holds.ts"]) assert.equal(run("claim", ...s3, f).status, 0);
+  assert.equal(run("release", ...s3, "src/held.ts").status, 0);
+  assert.equal(run("claim", ...s5, "src/mine.ts").status, 0);
+
+  const TELL = (f: string): string =>
+    `if you resolved a conflict in ${f}, tell them: swarm post "@review-tool/S3 I resolved ${f}: <how>" --about ${f}`;
+  const r = run("merged", ...s5, "abc123", "--files", "src/held.ts", "src/holds.ts", "src/mine.ts", "src/nobody.ts");
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(r.stdout.trimEnd().split("\n"), ["merged abc123: lock released", TELL("src/held.ts"), TELL("src/holds.ts")]);
+
+  const j = JSON.parse(run("merged", ...s5, "def456", "--files", "src/held.ts", "--json").stdout);
+  assert.deepEqual(j.tell, [TELL("src/held.ts")]);
+
+  // a path nobody else held: the merge line alone
+  assert.equal(run("merged", ...s5, "fed789", "--files", "src/mine.ts", "src/nobody.ts").stdout, "merged fed789: lock released\n");
+});
+
 test("claim, post and doing end on the listener line while no listener is pending, and not while one is (D61)", async () => {
   const id = String(openRun());
   run("join", "--run", id, "--slice", "S5", "--doing", "y");

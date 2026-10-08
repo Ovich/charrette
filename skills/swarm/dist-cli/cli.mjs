@@ -426,6 +426,13 @@ async function openBoard(dbPath = SQLITE_PATH) {
       since_seq INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (repo, path, participant)
     );
+    -- every claim made, kept past its release: who held a path during a run (D63)
+    CREATE TABLE IF NOT EXISTS claim_log (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      PRIMARY KEY (repo, path, participant)
+    );
     -- a holder of a shared path already told of another holder (D41): once per runner and path
     CREATE TABLE IF NOT EXISTS notices (
       repo TEXT NOT NULL,
@@ -612,6 +619,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
       `INSERT INTO claims (repo, path, participant, kind, since_seq) VALUES (?, ?, ?, ?, ?)
            ON CONFLICT (repo, path, participant) DO UPDATE SET kind = excluded.kind WHERE claims.kind = 'inside' AND excluded.kind = 'interface'`
     ).run(p.repo, rel, p.id, kind, lastSeq());
+    db.prepare("INSERT OR IGNORE INTO claim_log (repo, path, participant) VALUES (?, ?, ?)").run(p.repo, rel, p.id);
     if (Number(r.changes) === 0) return false;
     bump(p.repo);
     return true;
@@ -984,6 +992,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
       const wanted = new Set(rels);
       const told = /* @__PURE__ */ new Set();
       const iface = /* @__PURE__ */ new Set();
+      const sharers = [];
       transaction(() => {
         transaction(() => {
           const lock = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo);
@@ -1013,7 +1022,17 @@ async function openBoard(dbPath = SQLITE_PATH) {
         if (iface.size) lines.push(`@all interface changed: ${[...iface].join(", ")}.`);
         lines.push(`files: ${rels.join(", ") || "-"}`);
         insertMessage(me, lines.join("\n"), null, "event", [.../* @__PURE__ */ new Set([...told, ...all])]);
+        for (const rel of rels) {
+          const ids = new Set(holdersOf(me.repo, rel).map((c) => c.participant));
+          const held = db.prepare("SELECT l.participant FROM claim_log l JOIN participants p ON p.id = l.participant WHERE l.repo = ? AND l.path = ? AND p.run = ? ORDER BY l.rowid").all(me.repo, rel, me.run);
+          for (const r of held) ids.add(Number(r.participant));
+          ids.delete(me.id);
+          for (const id of ids) {
+            sharers.push({ path: rel, runner: participantById(id).name });
+          }
+        }
       });
+      return sharers;
     },
     repos() {
       const byRepo = /* @__PURE__ */ new Map();
@@ -1219,7 +1238,7 @@ var USAGE = [
   "  claim   [--as <runner>] <path> [--interface]                    # before editing a file: exit 0 claimed, 3 held until you post about it",
   "  release [--as <runner>] <path>                                  # gives up a claim",
   "  merge-lock --onto <branch> [--as <runner>]                      # one merge at a time per repository; claims or flags what your branch wrote unclaimed",
-  "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase",
+  "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase, names whom to tell of a resolved conflict",
   "  end     [--as <runner>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
   "  serve   [--port <p>] [--open] [--detach]                        # the page, on :4322 (SWARM_PORT)",
   "  status                                                          # data home, the page's server, open runs",
@@ -1499,8 +1518,14 @@ ${USAGE}`);
       const p = caller(board);
       const sha = args.positional[0] ?? fail("merged: which sha?");
       const files = args.list("--files");
-      board.merged(p, sha, files.map((f) => path5.resolve(f)));
-      emit({ runner: p.name, sha, files }, `merged ${sha}: lock released`);
+      const sharers = board.merged(p, sha, files.map((f) => path5.resolve(f)));
+      const tell = sharers.map(
+        (o) => `if you resolved a conflict in ${o.path}, tell them: swarm post "@${o.runner} I resolved ${o.path}: <how>" --about ${o.path}`
+      );
+      emit({ runner: p.name, sha, files, tell }, () => {
+        console.log(`merged ${sha}: lock released`);
+        for (const line of tell) console.log(line);
+      });
       break;
     }
     case "end": {

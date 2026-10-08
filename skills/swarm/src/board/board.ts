@@ -43,6 +43,12 @@ export interface Participant {
   listening: boolean;
 }
 
+/** A merged path and another runner that holds it, or held it during the merger's run (D63). */
+export interface Sharer {
+  path: string;
+  runner: string; // "<plan>/<slice>"
+}
+
 export interface RosterEntry {
   name: string;
   nick: string;
@@ -147,8 +153,9 @@ export interface Board {
   release(p: Participant, path: string): void;
   lockMerge(p: Participant): { granted: true } | { granted: false; holder: string };
   /** Releases the lock; tells whoever holds or declared one of `files` to rebase onto `sha`,
-   *  every plan on the repository when one of them is an interface (D26). */
-  merged(p: Participant, sha: string, files: string[]): void;
+   *  every plan on the repository when one of them is an interface (D26). Returns, for each
+   *  merged path, every other runner that holds it, or held it during `p`'s run (D63). */
+  merged(p: Participant, sha: string, files: string[]): Sharer[];
 
   // the page (D39)
   /** Every repository with an open run or one of the machine's last ten closed runs (D34). */
@@ -255,6 +262,13 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       participant INTEGER NOT NULL,
       kind TEXT NOT NULL DEFAULT 'inside',
       since_seq INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (repo, path, participant)
+    );
+    -- every claim made, kept past its release: who held a path during a run (D63)
+    CREATE TABLE IF NOT EXISTS claim_log (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
       PRIMARY KEY (repo, path, participant)
     );
     -- a holder of a shared path already told of another holder (D41): once per runner and path
@@ -500,6 +514,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
            ON CONFLICT (repo, path, participant) DO UPDATE SET kind = excluded.kind WHERE claims.kind = 'inside' AND excluded.kind = 'interface'`,
         )
         .run(p.repo, rel, p.id, kind, lastSeq());
+      db.prepare("INSERT OR IGNORE INTO claim_log (repo, path, participant) VALUES (?, ?, ?)").run(p.repo, rel, p.id);
       if (Number(r.changes) === 0) return false;
       bump(p.repo);
       return true;
@@ -935,6 +950,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       const wanted = new Set(rels);
       const told = new Set<string>();
       const iface = new Set<string>();
+      const sharers: Sharer[] = [];
       // one transaction: the page sees the merge as one change
       transaction(() => {
       transaction(() => {
@@ -969,7 +985,20 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       if (iface.size) lines.push(`@all interface changed: ${[...iface].join(", ")}.`);
       lines.push(`files: ${rels.join(", ") || "-"}`);
       insertMessage(me, lines.join("\n"), null, "event", [...new Set([...told, ...all])]);
+      // whom to tell of a resolved conflict (D63): a holder from any run, or one of this run that held it
+      for (const rel of rels) {
+        const ids = new Set(holdersOf(me.repo, rel).map((c) => c.participant));
+        const held = db
+          .prepare("SELECT l.participant FROM claim_log l JOIN participants p ON p.id = l.participant WHERE l.repo = ? AND l.path = ? AND p.run = ? ORDER BY l.rowid")
+          .all(me.repo, rel, me.run) as Row[];
+        for (const r of held) ids.add(Number(r.participant));
+        ids.delete(me.id);
+        for (const id of ids) {
+          sharers.push({ path: rel, runner: participantById(id).name });
+        }
+      }
       });
+      return sharers;
     },
 
     repos() {
