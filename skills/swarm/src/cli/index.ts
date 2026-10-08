@@ -24,7 +24,7 @@ const USAGE = [
   "  agree   [--as <runner>] <terms> [--about <path>]                # prints the seq",
   "  read    <seq>",
   "  deliver [--as <runner>]                                         # what you have not had: mentions in full, the rest one line",
-  "  wait    [--as <runner>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end",
+  "  wait    [--as <runner>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end; a newer wait supersedes it",
   "          # --mentions: only a mention of you or an urgent post ends it; the rest stays for deliver",
   "  roster  [--repo <path>]",
   "  claim   [--as <runner>] <path> [--interface]                    # before editing a file: exit 0 claimed, 3 held until you post about it",
@@ -292,6 +292,10 @@ async function main(board: Board): Promise<void> {
       if (timeout !== undefined && !(timeout >= 0)) fail(`--timeout takes milliseconds, got ${raw}`);
       const mentionsOnly = args.has("--mentions");
       const d = await board.wait(p, { timeoutMs: timeout, mentionsOnly });
+      if (d.superseded) {
+        emit(d, "superseded by a newer wait"); // a newer wait of this runner gets what arrives (D64)
+        break;
+      }
       if (!d.full.length && !d.lines.length) {
         emit(d, ""); // a timeout, or the runner ended: nothing to answer, nothing to re-arm
         break;
@@ -350,7 +354,7 @@ async function main(board: Board): Promise<void> {
       const r = board.lockMerge(p);
       emit({ runner: p.name, ...r, reconciled, flags }, () => {
         printReconciled(reconciled, flags);
-        console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait for its merged event`);
+        console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait --mentions for its merged event`);
       });
       break;
     }

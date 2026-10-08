@@ -470,6 +470,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
   upkeep("participants", "waiting", "waiting INTEGER NOT NULL DEFAULT 0");
   upkeep("participants", "listening", "listening INTEGER NOT NULL DEFAULT 0");
   upkeep("participants", "nick", "nick TEXT");
+  upkeep("participants", "wait_gen", "wait_gen INTEGER NOT NULL DEFAULT 0");
   upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
   upkeep("runs", "link", "link TEXT");
   upkeep("slices", "link", "link TEXT");
@@ -658,10 +659,6 @@ async function openBoard(dbPath = SQLITE_PATH) {
     clearFlags();
     if (owner && claims + locks > 0) bump(String(owner.repo));
   };
-  const setWaiting = (p, on, column) => transaction(() => {
-    const r = db.prepare(`UPDATE participants SET ${column} = ? WHERE id = ? AND ${column} != ?`).run(on ? 1 : 0, p.id, on ? 1 : 0);
-    if (Number(r.changes) > 0) bump(participantById(p.id).repo);
-  });
   const askedAbout = (me, author, m) => {
     const about = fold(relPath(me.repo, m.about) ?? slashes(m.about));
     const mine = db.prepare("SELECT path FROM claims WHERE repo = ? AND participant = ? AND since_seq < ?").all(me.repo, me.id, m.seq);
@@ -866,9 +863,14 @@ async function openBoard(dbPath = SQLITE_PATH) {
     },
     wait(p, opts = {}) {
       const { timeoutMs, mentionsOnly = false } = opts;
-      participantById(p.id);
       const column = mentionsOnly ? "listening" : "waiting";
-      setWaiting(p, true, column);
+      const gen = transaction(() => {
+        const me = participantById(p.id);
+        db.prepare("UPDATE participants SET wait_gen = wait_gen + 1, waiting = ?, listening = ? WHERE id = ?").run(mentionsOnly ? 0 : 1, mentionsOnly ? 1 : 0, me.id);
+        bump(me.repo);
+        return Number(db.prepare("SELECT wait_gen FROM participants WHERE id = ?").get(me.id).wait_gen);
+      });
+      const current = () => Number(db.prepare("SELECT wait_gen FROM participants WHERE id = ?").get(p.id).wait_gen) === gen;
       return new Promise((resolve, reject) => {
         let settled = false;
         let watcher;
@@ -881,7 +883,10 @@ async function openBoard(dbPath = SQLITE_PATH) {
           clearInterval(poll);
           clearTimeout(timer);
           try {
-            setWaiting(p, false, column);
+            transaction(() => {
+              const r = db.prepare(`UPDATE participants SET ${column} = 0 WHERE id = ? AND wait_gen = ? AND ${column} = 1`).run(p.id, gen);
+              if (Number(r.changes) > 0) bump(participantById(p.id).repo);
+            });
           } catch {
           }
           if (d instanceof Error) reject(d);
@@ -891,7 +896,8 @@ async function openBoard(dbPath = SQLITE_PATH) {
           if (settled) return;
           try {
             if (participantById(p.id).ended) return finish({ full: [], lines: [] });
-            const d = deliverTo(p, true, mentionsOnly);
+            const d = transaction(() => current() ? deliverTo(p, true, mentionsOnly) : null);
+            if (!d) return finish({ full: [], lines: [], superseded: true });
             if (d.full.length || d.lines.length) finish(d);
           } catch (e) {
             finish(e);
@@ -1232,7 +1238,7 @@ var USAGE = [
   "  agree   [--as <runner>] <terms> [--about <path>]                # prints the seq",
   "  read    <seq>",
   "  deliver [--as <runner>]                                         # what you have not had: mentions in full, the rest one line",
-  "  wait    [--as <runner>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end",
+  "  wait    [--as <runner>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end; a newer wait supersedes it",
   "          # --mentions: only a mention of you or an urgent post ends it; the rest stays for deliver",
   "  roster  [--repo <path>]",
   "  claim   [--as <runner>] <path> [--interface]                    # before editing a file: exit 0 claimed, 3 held until you post about it",
@@ -1459,6 +1465,10 @@ ${USAGE}`);
       if (timeout !== void 0 && !(timeout >= 0)) fail(`--timeout takes milliseconds, got ${raw}`);
       const mentionsOnly = args.has("--mentions");
       const d = await board.wait(p, { timeoutMs: timeout, mentionsOnly });
+      if (d.superseded) {
+        emit(d, "superseded by a newer wait");
+        break;
+      }
       if (!d.full.length && !d.lines.length) {
         emit(d, "");
         break;
@@ -1510,7 +1520,7 @@ ${USAGE}`);
       const r = board.lockMerge(p);
       emit({ runner: p.name, ...r, reconciled, flags }, () => {
         printReconciled(reconciled, flags);
-        console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait for its merged event`);
+        console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait --mentions for its merged event`);
       });
       break;
     }

@@ -186,6 +186,42 @@ test("without mentionsOnly, a wait still ends on any delivery", async () => {
   assert.equal(d.lines.length, 1);
 });
 
+test("a newer wait of a runner, from another process, supersedes the older: it returns empty at once; the newer gets the message", async () => {
+  const { s3, s5 } = twoRunners();
+  const other = await another(); // the foreground wait, in a second process
+  const older = board.wait(s5, { timeoutMs: 10_000, mentionsOnly: true });
+  let olderAt = 0;
+  void older.then(() => (olderAt = Date.now()));
+  await new Promise((r) => setTimeout(r, 100));
+  const t0 = Date.now();
+  const newer = other.wait(other.participant(s5.name)!, { timeoutMs: 10_000, mentionsOnly: true });
+  assert.deepEqual(await older, { full: [], lines: [], superseded: true });
+  assert.ok(olderAt - t0 < 1000, `superseded after ${olderAt - t0} ms`);
+  board.post(s3, "@S5 rebase onto abc");
+  const d = await newer;
+  assert.equal(d.superseded, undefined);
+  assert.deepEqual(d.full.map((m) => m.body), ["@S5 rebase onto abc"]);
+  assert.deepEqual(board.deliver(s5), { full: [], lines: [] }, "the message was taken by the newer wait only");
+});
+
+test("a superseded wait leaves the newer one's state: listening while a mentions wait is pending, waiting for a plain one", async () => {
+  const { s5 } = twoRunners();
+  const watcher = await another();
+  const s5Of = () => watcher.snapshot(REPO).roster.find((r) => r.runner === s5.name)!;
+  const listener = board.wait(s5, { timeoutMs: 10_000, mentionsOnly: true });
+  const foreground = watcher.wait(watcher.participant(s5.name)!, { timeoutMs: 400 });
+  assert.equal((await listener).superseded, true);
+  assert.deepEqual([s5Of().state, s5Of().listening], ["waiting", false]);
+  await foreground;
+  assert.deepEqual([s5Of().state, s5Of().listening], ["working", false]);
+  const first = board.wait(s5, { timeoutMs: 10_000, mentionsOnly: true });
+  const second = watcher.wait(watcher.participant(s5.name)!, { timeoutMs: 400, mentionsOnly: true });
+  assert.equal((await first).superseded, true);
+  assert.deepEqual([s5Of().state, s5Of().listening], ["working", true]);
+  await second;
+  assert.equal(s5Of().listening, false);
+});
+
 test("end releases a pending wait of that runner, empty, at once", async () => {
   const { s5 } = twoRunners();
   const other = await another(); // end from a second connection, as the runner's next call would

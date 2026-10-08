@@ -74,7 +74,9 @@ export interface Message {
   answer?: string;
 }
 
-export type Delivery = { full: Message[]; lines: string[] }; // mentions in full; the rest one line each
+/** Mentions in full, the rest one line each. `superseded`: a newer `wait` of the same runner
+ *  started, so this one returned empty (D64). */
+export type Delivery = { full: Message[]; lines: string[]; superseded?: true };
 
 /** What the page draws (D39). */
 export type RunSummary = { run: number; plan: string; code: string; title: string; link: string | null; open: boolean; runners: number; done: number; of: number };
@@ -140,7 +142,8 @@ export interface Board {
   deliver(p: Participant): Delivery; // undelivered since last time; marks them delivered; stamps the last call
   /** The first delivery, or empty on timeout or once `p` has ended (D49). `mentionsOnly`: only a
    *  message that mentions `p` or is urgent ends it, and only those are marked delivered; the rest
-   *  stays for the next `deliver`. */
+   *  stays for the next `deliver`. A runner has one live wait (D64): a newer `wait` of `p`, from
+   *  any process, makes this one return at once, empty, with `superseded`. */
   wait(p: Participant, opts?: { timeoutMs?: number; mentionsOnly?: boolean }): Promise<Delivery>;
 
   /** A claim before an edit of `path` (absolute, or repository-relative), `swarm claim` (D58).
@@ -310,6 +313,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   // 1 while a `wait --mentions` is pending: a listener, not a wait (D49)
   upkeep("participants", "listening", "listening INTEGER NOT NULL DEFAULT 0");
   upkeep("participants", "nick", "nick TEXT");
+  // moved by every `wait` start: a pending wait whose number is no longer this one is superseded (D64)
+  upkeep("participants", "wait_gen", "wait_gen INTEGER NOT NULL DEFAULT 0");
   // 1: written by the board itself in a runner's name (a flag, a merge notice), never a runner's own word
   upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
   upkeep("runs", "link", "link TEXT");
@@ -558,14 +563,6 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     clearFlags();
     if (owner && claims + locks > 0) bump(String(owner.repo));
   };
-  /** A runner inside a `wait` shows `waiting` on the page; inside a `wait --mentions`, `listening`
-   *  beside its state: a background listener is pending almost all the time, the runner working. */
-  const setWaiting = (p: Participant, on: boolean, column: "waiting" | "listening"): void =>
-    transaction(() => {
-      const r = db.prepare(`UPDATE participants SET ${column} = ? WHERE id = ? AND ${column} != ?`).run(on ? 1 : 0, p.id, on ? 1 : 0);
-      if (Number(r.changes) > 0) bump(participantById(p.id).repo);
-    });
-
   /** The path `m` asks `me` about, when `me` held it before `m` and its author did not (D62). */
   const askedAbout = (me: Participant, author: number, m: Message): string | null => {
     const about = fold(relPath(me.repo, m.about!) ?? slashes(m.about!));
@@ -811,9 +808,17 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
 
     wait(p, opts = {}) {
       const { timeoutMs, mentionsOnly = false } = opts;
-      participantById(p.id);
       const column = mentionsOnly ? "listening" : "waiting";
-      setWaiting(p, true, column);
+      // a runner inside a `wait` shows `waiting` on the page; inside a `wait --mentions`, `listening`
+      // beside its state. One live wait per runner (D64): this one takes the next number and the page's state, and any
+      // older pending wait, here or in another process, sees the number move and returns superseded
+      const gen = transaction(() => {
+        const me = participantById(p.id);
+        db.prepare("UPDATE participants SET wait_gen = wait_gen + 1, waiting = ?, listening = ? WHERE id = ?").run(mentionsOnly ? 0 : 1, mentionsOnly ? 1 : 0, me.id);
+        bump(me.repo);
+        return Number((db.prepare("SELECT wait_gen FROM participants WHERE id = ?").get(me.id) as Row).wait_gen);
+      });
+      const current = (): boolean => Number((db.prepare("SELECT wait_gen FROM participants WHERE id = ?").get(p.id) as Row).wait_gen) === gen;
       return new Promise<Delivery>((resolve, reject) => {
         let settled = false;
         let watcher: fs.FSWatcher | undefined;
@@ -826,7 +831,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           clearInterval(poll);
           clearTimeout(timer);
           try {
-            setWaiting(p, false, column);
+            // the page's state is this wait's only while no newer one took it
+            transaction(() => {
+              const r = db.prepare(`UPDATE participants SET ${column} = 0 WHERE id = ? AND wait_gen = ? AND ${column} = 1`).run(p.id, gen);
+              if (Number(r.changes) > 0) bump(participantById(p.id).repo);
+            });
           } catch {}
           if (d instanceof Error) reject(d);
           else resolve(d);
@@ -836,7 +845,9 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           try {
             // `end`, from this process or another, releases a pending wait of that runner
             if (participantById(p.id).ended) return finish({ full: [], lines: [] });
-            const d = deliverTo(p, true, mentionsOnly);
+            // the look and the superseded test in one transaction: a superseded wait takes nothing
+            const d = transaction(() => (current() ? deliverTo(p, true, mentionsOnly) : null));
+            if (!d) return finish({ full: [], lines: [], superseded: true });
             if (d.full.length || d.lines.length) finish(d);
           } catch (e) {
             finish(e as Error);

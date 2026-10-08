@@ -275,6 +275,34 @@ test("a mentions-only wait in a child process sleeps through a join and wakes on
   assert.doesNotMatch(out, /joined/);
 });
 
+test("a foreground wait supersedes the background listener in another process; the listener prints so, the wait gets the mention", async () => {
+  const id = String(openRun());
+  run("join", "--run", id, "--slice", "S3", "--doing", "x");
+  run("join", "--run", id, "--slice", "S5", "--doing", "y");
+  run("deliver", "--as", "review-tool/S5");
+  const start = (...argv: string[]) => {
+    const child = spawn(process.execPath, [CLI, "wait", "--mentions", "--as", "review-tool/S5", "--timeout", "15000", ...argv], { cwd: repo, env: env() });
+    let out = "";
+    child.stdout.on("data", (b) => (out += b));
+    const exited = new Promise<number | null>((resolve) => child.on("exit", resolve));
+    return { exited, out: () => out };
+  };
+  const listener = start("--json");
+  await new Promise((r) => setTimeout(r, 1500)); // the listener is up and watching
+  const foreground = start();
+  assert.equal(await listener.exited, 0);
+  assert.deepEqual(JSON.parse(listener.out()), { full: [], lines: [], superseded: true });
+  run("post", "--as", "review-tool/S3", "@S5 rebase onto abc");
+  assert.equal(await foreground.exited, 0);
+  assert.match(foreground.out(), /^answer on the thread if needed[^\n]*\n[^\n]*review-tool\/S3[^\n]*\n@S5 rebase onto abc/);
+  // the human form, superseded by a short foreground wait
+  const third = start();
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.equal(run("wait", "--as", "review-tool/S5", "--timeout", "100").status, 0);
+  assert.equal(await third.exited, 0);
+  assert.equal(third.out(), "superseded by a newer wait\n");
+});
+
 test("end releases a runner's pending wait in another process", async () => {
   const id = String(openRun());
   run("join", "--run", id, "--slice", "S5", "--doing", "y");

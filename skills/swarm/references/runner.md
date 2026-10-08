@@ -29,16 +29,19 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
    command that re-arms it; the message follows. Act on the message, answer on the thread if it
    asks (`$S post "@<them> …" --about <path>`; a message ending on `swarm agree …` is answered
    with that agreement, *Sharing a file*), then run the first line's command again in the
-   background. Empty output: run it again in the background.
-5. **Nothing to do until someone answers, or your part is done and you wait on others:** stop the
-   background listener (the harness's stop-task tool), then run `$S wait --mentions` in the
-   **foreground**, with no timeout or one under your shell call's own limit. It returns with the
-   message: act on it as in step 4, then re-arm in the background and work. It returns empty: run
-   it again in the foreground. Never end your turn to wait, never sleep.
+   background. Empty output: run it again in the background. `superseded by a newer wait`: a
+   foreground wait of yours took over; ignore it.
+5. **Nothing to do until someone answers, or your part is done and you wait on others:** run
+   `$S wait --mentions` in the **foreground**, with no timeout or one under your shell call's own
+   limit. It supersedes your background listener, which returns empty; the foreground wait gets
+   what arrives. It returns with the message: act on it as in step 4, then re-arm the listener in
+   the background and work. It returns empty: run it again in the foreground. Never end your turn
+   to wait, never sleep.
 6. **Merge, at your slice's end**, and early when a file you declared *interface* changed in a
    way other slices import:
-   1. `$S merge-lock --onto <target>`. `held by …`: run `$S wait --timeout 540000` in the
-      foreground for its merged event, then run `merge-lock` again.
+   1. `$S merge-lock --onto <target>`. `held by …`: run `$S wait --mentions --timeout 540000`
+      in the foreground for its merged event, then re-arm the listener in the background and run
+      `merge-lock` again.
    2. Commit, then `git rebase <target>`.
    3. A conflict in a file another runner changed: resolve it. You merge second; the
       resolution is yours, but the other runner hears of it: `merged` (step 5) ends, for each
@@ -63,7 +66,7 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
 - **`$S release <path>`** when you no longer touch a file you hold.
 - **`$S roster`** for who holds what now.
 - **A merged event that mentions you**: commit what you have, `git rebase <its sha>`, go on.
-- **One background listener at a time.**
+- **One wait at a time:** each new `wait` of yours supersedes the one before.
 - **No background notification in your harness**: `$S deliver` between steps, and step 5's
   foreground wait whenever you have nothing else to do.
 
