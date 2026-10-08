@@ -96,7 +96,7 @@ export function Roster({
         <span className="hint">
           {focus ? (
             <>
-              following <RunnerTag name={focus} /> · <button onClick={() => onFollow(null)}>show everyone</button>
+              following <RunnerName name={focus} /> · <button onClick={() => onFollow(null)}>show everyone</button>
             </>
           ) : (
             "select a runner to follow it"

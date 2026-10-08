@@ -1182,7 +1182,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
     }
   };
   const countCall = (p) => {
-    db.prepare("UPDATE participants SET calls = calls + 1 WHERE id = ?").run(p.id);
+    db.prepare("UPDATE participants SET calls = calls + 1, last_call = ? WHERE id = ?").run(now(), p.id);
     bump(participantById(p.id).repo);
   };
   const counted = (verb) => (p, ...rest) => transaction(() => {

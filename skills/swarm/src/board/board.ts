@@ -1199,9 +1199,10 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     },
   };
   // Every verb a runner calls is one call to the board, counted here and nowhere else (D66):
-  // what the card's call count shows. `reconcileWrites` is part of `merge-lock` and `end`, not a call.
+  // what the card's call count shows, and the last sign of life "stale" is measured from.
+  // `reconcileWrites` is part of `merge-lock` and `end`, not a call.
   const countCall = (p: Participant): void => {
-    db.prepare("UPDATE participants SET calls = calls + 1 WHERE id = ?").run(p.id);
+    db.prepare("UPDATE participants SET calls = calls + 1, last_call = ? WHERE id = ?").run(now(), p.id);
     bump(participantById(p.id).repo);
   };
   // the verb and its count in one transaction: the page sees one change, and a refused call
