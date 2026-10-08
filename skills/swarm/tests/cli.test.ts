@@ -174,7 +174,7 @@ test("wait prints, before the message, the line that re-arms it with the exact c
   const script = CLI.replace(/\\/g, "/");
   assert.equal(
     hint,
-    `answer on the thread if needed, then start this listener again in the background: node ${script} wait --mentions --as review-tool/S5 --timeout 5000`,
+    `answer on the thread if needed, then start this listener again, in the background while you work, in the foreground when you are waiting: node ${script} wait --mentions --as review-tool/S5 --timeout 5000`,
   );
   assert.match(message.join("\n"), /review-tool\/S3[^\n]*\n@S5 your turn/);
   // the command it names runs as written: nothing more for S5, so it times out, silent

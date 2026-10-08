@@ -282,7 +282,7 @@ async function main(board: Board): Promise<void> {
       if (args.flag("--as")) again.push("--as", shellWord(args.flag("--as")!));
       if (raw !== undefined) again.push("--timeout", raw);
       if (asJson) again.push("--json");
-      const next = `answer on the thread if needed, then start this listener again in the background: ${again.join(" ")}`;
+      const next = `answer on the thread if needed, then start this listener again, in the background while you work, in the foreground when you are waiting: ${again.join(" ")}`;
       emit({ next, ...d }, () => {
         console.log(next);
         printDelivery(d);
