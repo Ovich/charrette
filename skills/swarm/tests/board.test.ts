@@ -439,6 +439,50 @@ test("grants the lock to one runner at a time", () => {
   assert.deepEqual(board.lockMerge(s5), { granted: true });
 });
 
+test("a runner refused the lock hears its release by merged in a mentions-only wait (D65)", async () => {
+  const { s3, s5 } = claimed();
+  assert.deepEqual(board.lockMerge(s3), { granted: true });
+  assert.deepEqual(board.lockMerge(s5), { granted: false, holder: "review-tool/S3" });
+  const merger = await another();
+  // S3 merged a file S5 neither holds nor declared: only the refusal makes S5 a reader
+  setTimeout(() => merger.merged(merger.participant(s3.name)!, "abc123", ["src/a.ts"]), 100);
+  const d = await board.wait(s5, { timeoutMs: 5000, mentionsOnly: true });
+  assert.equal(d.full.length, 1);
+  assert.match(d.full[0].body, /the merge lock is free: @review-tool\/S5/);
+  assert.ok(d.full[0].mentions.includes("review-tool/S5"));
+  // the record is cleared: the next merge does not mention S5 again
+  assert.deepEqual(board.lockMerge(s3), { granted: true });
+  board.merged(s3, "def456", ["src/a.ts"]);
+  assert.equal(board.deliver(s5).full.length, 0);
+});
+
+test("a runner refused the lock hears its release by the holder's end (D65)", async () => {
+  const { s3, s5 } = claimed();
+  assert.deepEqual(board.lockMerge(s3), { granted: true });
+  assert.deepEqual(board.lockMerge(s5), { granted: false, holder: "review-tool/S3" });
+  const ender = await another();
+  setTimeout(() => ender.end(ender.participant(s3.name)!), 100);
+  const d = await board.wait(s5, { timeoutMs: 5000, mentionsOnly: true });
+  assert.equal(d.full.length, 1);
+  assert.match(d.full[0].body, /the merge lock is free: @review-tool\/S5/);
+  assert.deepEqual(board.lockMerge(s5), { granted: true });
+});
+
+test("a refusal recorded under one holder is not carried to the next (D65)", () => {
+  const { run, s3, s5 } = claimed();
+  const s1 = board.join({ run: run.id, slice: "S1", doing: "board", files: [], worktree: wt("s1") }).runner;
+  board.deliver(s3);
+  board.deliver(s5);
+  board.deliver(s1);
+  board.lockMerge(s3);
+  board.lockMerge(s5); // refused under S3
+  board.end(s3); // tells S5, clears the record
+  assert.equal(board.deliver(s5).full.length, 1);
+  assert.deepEqual(board.lockMerge(s1), { granted: true });
+  board.merged(s1, "abc123", ["src/c.ts"]);
+  assert.equal(board.deliver(s5).full.length, 0, "S5 was not refused under S1");
+});
+
 test("merged releases the lock and mentions holders and declarers", () => {
   const { run, s3, s5 } = claimed();
   // S1 declares src/b.ts, which S5 holds: a declarer, not a holder

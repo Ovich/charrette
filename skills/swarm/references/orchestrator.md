@@ -17,6 +17,12 @@ except `open`, `slice`, `close` and `status`.
    `$S open --plan <plan slug> --title "<plan title>" --slices <file> --link <plan URL>`.
    It prints the run id, then the page's URL: give the URL to the person.
 
+## Dispatch
+
+**Send the `Agent` call of every slice whose blockers are done in one single message, each run
+in the background**, with nothing between them: no text, no other call, no wait for one to start
+before the next.
+
 ## Slice states
 
 - **`$S slice <id> --run <run> --state running`** at its dispatch; `done` once its tick stands;

@@ -287,6 +287,12 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       participant INTEGER NOT NULL,
       at TEXT NOT NULL
     );
+    -- a runner refused the merge lock since its holder took it: mentioned when it is released (D65)
+    CREATE TABLE IF NOT EXISTS lock_waiters (
+      repo TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      PRIMARY KEY (repo, participant)
+    );
     -- a path written outside its writer's claim, by reconcileWrites; lives while a claim on it does (D39)
     CREATE TABLE IF NOT EXISTS flags (
       repo TEXT NOT NULL,
@@ -563,6 +569,12 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     clearFlags();
     if (owner && claims + locks > 0) bump(String(owner.repo));
   };
+  /** The live runners refused the lock since its holder took it, as mentions name them; the record is cleared (D65). */
+  const takeLockWaiters = (repo: string): string[] => {
+    const rows = db.prepare("SELECT participant FROM lock_waiters WHERE repo = ? ORDER BY rowid").all(repo) as Row[];
+    db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(repo);
+    return rows.map((r) => Number(r.participant)).filter(isLive).map((id) => participantById(id).name);
+  };
   /** The path `m` asks `me` about, when `me` held it before `m` and its author did not (D62). */
   const askedAbout = (me: Participant, author: number, m: Message): string | null => {
     const about = fold(relPath(me.repo, m.about!) ?? slashes(m.about!));
@@ -768,7 +780,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     end(p) {
       const fresh = live(p);
       transaction(() => {
-        insertMessage(fresh, "ended", null, "event");
+        // a held lock released by the end frees whoever was refused it (D65)
+        const held = db.prepare("SELECT 1 FROM merge_locks WHERE repo = ? AND participant = ?").get(fresh.repo, fresh.id) !== undefined;
+        const waiters = held ? takeLockWaiters(fresh.repo).filter((n) => n !== fresh.name) : [];
+        if (waiters.length) insertMessage(fresh, `ended\nthe merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event", waiters);
+        else insertMessage(fresh, "ended", null, "event");
         db.prepare("UPDATE participants SET ended_at = ? WHERE id = ?").run(now(), fresh.id);
         releaseAll(fresh.id);
       });
@@ -946,9 +962,12 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       return transaction(() => {
         const r = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo) as Row | undefined;
         if (r && Number(r.participant) !== me.id && isLive(Number(r.participant))) {
+          db.prepare("INSERT OR IGNORE INTO lock_waiters (repo, participant) VALUES (?, ?)").run(me.repo, me.id);
           return { granted: false as const, holder: participantById(Number(r.participant)).name };
         }
         if (r && Number(r.participant) === me.id) return { granted: true as const };
+        // a new holder: the waiters on the one before are not this one's (D65)
+        db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(me.repo);
         db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at) VALUES (?, ?, ?)").run(me.repo, me.id, now());
         bump(me.repo);
         return { granted: true as const };
@@ -962,6 +981,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       const told = new Set<string>();
       const iface = new Set<string>();
       const sharers: Sharer[] = [];
+      let waiters: string[] = [];
       // one transaction: the page sees the merge as one change
       transaction(() => {
       transaction(() => {
@@ -970,6 +990,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           throw new Error(`the merge lock is held by ${participantById(Number(lock.participant)).name}, not ${me.name}`);
         }
         db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
+        waiters = takeLockWaiters(me.repo).filter((n) => n !== me.name);
       });
       // holders of the files
       // every holder of a merged path, a shared one included (D40)
@@ -994,8 +1015,9 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       const lines = [`merged ${sha}: rebase onto ${sha}.`];
       if (told.size) lines.push(`${[...told].map((n) => `@${n}`).join(" ")}: you hold or declared a file it changed.`);
       if (iface.size) lines.push(`@all interface changed: ${[...iface].join(", ")}.`);
+      if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);
       lines.push(`files: ${rels.join(", ") || "-"}`);
-      insertMessage(me, lines.join("\n"), null, "event", [...new Set([...told, ...all])]);
+      insertMessage(me, lines.join("\n"), null, "event", [...new Set([...told, ...waiters, ...all])]);
       // whom to tell of a resolved conflict (D63): a holder from any run, or one of this run that held it
       for (const rel of rels) {
         const ids = new Set(holdersOf(me.repo, rel).map((c) => c.participant));
