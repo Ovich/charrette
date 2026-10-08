@@ -105,7 +105,8 @@ test("claim on a shared path before a post holds it: the holder, its note, the p
   assert.equal(
     answer(r.stdout),
     `src/a.ts is also held by review-tool/S3 (${nick}: the page). You may share it, but first tell its holder what you change in it: ` +
-      '`swarm post "@review-tool/S3 …" --about src/a.ts`, then claim again.\n',
+      '`swarm post "@review-tool/S3 …" --about src/a.ts`; its holder answers with an agreement on who changes what ' +
+      "(`swarm agree … --about src/a.ts`), and that agreement goes. Then claim again.\n",
   );
   // held again until the post is made
   assert.equal(swarm(wtB, "claim", "src/a.ts").status, 3);
@@ -126,6 +127,21 @@ test("claim on a shared path after a post: claimed, the other holder named once,
     sharedWith: [{ runner: "review-tool/S3", doing: "the page" }],
     notice: null,
   });
+});
+
+test("the claimer's post reaches the holder ending on the agreement to answer with; nothing else does (D62)", () => {
+  running();
+  swarm(wtB, "claim", "src/a.ts");
+  cli(wtB, "post", "@S3 I add isExpired() at the end", "--about", "src/a.ts");
+  const AGREE = 'answer with an agreement on who changes what: swarm agree "<who changes what in src/a.ts>" --about src/a.ts';
+  const heard = cli(wtA, "deliver");
+  assert.ok(heard.includes(`I add isExpired() at the end\n${AGREE}\n`), heard);
+  // the holder's answer, and a post once the claimer holds the file, carry no such line
+  cli(wtB, "claim", "src/a.ts");
+  cli(wtA, "agree", "@S5 S5 adds isExpired() at the end, S3 the rest", "--about", "src/a.ts");
+  cli(wtB, "post", "@S3 done with my part", "--about", "src/a.ts");
+  assert.ok(!cli(wtB, "deliver").includes("answer with an agreement"));
+  assert.ok(!cli(wtA, "deliver").includes("answer with an agreement"));
 });
 
 test("claim --interface claims the path as an interface", async () => {

@@ -654,6 +654,14 @@ async function openBoard(dbPath = SQLITE_PATH) {
     const r = db.prepare(`UPDATE participants SET ${column} = ? WHERE id = ? AND ${column} != ?`).run(on ? 1 : 0, p.id, on ? 1 : 0);
     if (Number(r.changes) > 0) bump(participantById(p.id).repo);
   });
+  const askedAbout = (me, author, m) => {
+    const about = fold(relPath(me.repo, m.about) ?? slashes(m.about));
+    const mine = db.prepare("SELECT path FROM claims WHERE repo = ? AND participant = ? AND since_seq < ?").all(me.repo, me.id, m.seq);
+    const rel = mine.map((r) => String(r.path)).find((x) => fold(x) === about || fold(x).endsWith(`/${about}`));
+    if (!rel) return null;
+    const theirs = db.prepare("SELECT 1 FROM claims WHERE repo = ? AND path = ? AND participant = ? AND since_seq < ?").get(me.repo, rel, author, m.seq);
+    return theirs ? null : rel;
+  };
   const deliverTo = (p, fromWait, mentionsOnly = false) => {
     const me = participantById(p.id);
     const named = (m) => m.mentions.includes(me.name) || m.mentions.includes(`${me.plan}/*`);
@@ -673,7 +681,11 @@ async function openBoard(dbPath = SQLITE_PATH) {
         const r = db.prepare("UPDATE participants SET waiting = 0 WHERE id = ? AND waiting = 1").run(me.id);
         if (Number(r.changes) > 0) bump(me.repo);
       }
-      return rows.map(toMessage);
+      return rows.map((r) => {
+        const m = toMessage(r);
+        const rel = r.by_board || m.kind !== "msg" || !m.about || !named(m) ? null : askedAbout(me, Number(r.author), m);
+        return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}` } : m;
+      });
     });
     return {
       full: messages.filter(named),
@@ -902,7 +914,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
             const at = people.map((o) => `@${o.name}`).join(" ");
             return {
               allowed: false,
-              refusal: `${rel} is also held by ${who}. You may share it, but first tell ${people.length > 1 ? "them" : "its holder"} what you change in it: \`swarm post "${at} \u2026" --about ${rel}\`, then claim again.`
+              refusal: `${rel} is also held by ${who}. You may share it, but first tell ${people.length > 1 ? "them" : "its holder"} what you change in it: \`swarm post "${at} \u2026" --about ${rel}\`; ${people.length > 1 ? "they answer" : "its holder answers"} with an agreement on who changes what (\`swarm agree \u2026 --about ${rel}\`), and that agreement goes. Then claim again.`
             };
           }
         }
@@ -1182,7 +1194,8 @@ var fullText = (m) => {
   const kind = m.kind === "msg" ? "" : ` (${m.kind})`;
   const about = m.about ? ` about ${m.about}` : "";
   return `#${m.seq} ${m.from}${kind}${about}  ${m.at}
-${m.body}`;
+${m.body}${m.answer ? `
+${m.answer}` : ""}`;
 };
 
 // src/cli/index.ts

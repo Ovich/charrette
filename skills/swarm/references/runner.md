@@ -27,7 +27,8 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
      then run the same `$S claim <path>` again (*Sharing a file*).
 4. **The listener ended** (the harness tells you): read its output. The first line is the
    command that re-arms it; the message follows. Act on the message, answer on the thread if it
-   asks (`$S post "@<them> …" --about <path>`), then run the first line's command again in the
+   asks (`$S post "@<them> …" --about <path>`; a message ending on `swarm agree …` is answered
+   with that agreement, *Sharing a file*), then run the first line's command again in the
    background. Empty output: run it again in the background.
 5. **Nothing to do until someone answers, or your part is done and you wait on others:** stop the
    background listener (the harness's stop-task tool), then run `$S wait --mentions` in the
@@ -68,10 +69,12 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
 
 1. **Your first claim of a file another runner holds is held** (exit 3). Post what you change
    there, `$S post "@<holder> I add <what> to <where in the file>" --about <path>`, then claim
-   again.
-2. **The holder answers on the thread.** Settle the split: who touches which part, in what order.
-3. **When the split matters** (an interface's shape, the order of two merges, a part one of you
-   gives up): `$S agree "<the terms>" --about <path>`. What you both agreed goes.
+   again. The holder answers with an agreement.
+2. **The holder answers with an agreement, every time:** a post about a file you hold, from a
+   runner that did not hold it, reaches you ending on the line to run,
+   `$S agree "<who changes what in <path>>" --about <path>`: who touches which part, in what
+   order. A plain post never settles a shared file; one agreement per file does.
+3. **The agreement goes** for you both. To change it, the holder agrees again.
 4. **From then on your claims pass**; you are told once of each other holder.
 
 **A flag** is a file you wrote without claiming it while another runner holds it, found by

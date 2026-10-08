@@ -63,6 +63,9 @@ export interface Message {
   kind: MessageKind;
   mentions: string[]; // "<plan>/<slice>" or "<plan>/*"
   at: string;
+  /** On delivery only, to a holder of `about` when a runner that did not hold it posted about it:
+   *  the agreement that answers it (D62). */
+  answer?: string;
 }
 
 export type Delivery = { full: Message[]; lines: string[] }; // mentions in full; the rest one line each
@@ -548,6 +551,15 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       if (Number(r.changes) > 0) bump(participantById(p.id).repo);
     });
 
+  /** The path `m` asks `me` about, when `me` held it before `m` and its author did not (D62). */
+  const askedAbout = (me: Participant, author: number, m: Message): string | null => {
+    const about = fold(relPath(me.repo, m.about!) ?? slashes(m.about!));
+    const mine = db.prepare("SELECT path FROM claims WHERE repo = ? AND participant = ? AND since_seq < ?").all(me.repo, me.id, m.seq) as Row[];
+    const rel = mine.map((r) => String(r.path)).find((x) => fold(x) === about || fold(x).endsWith(`/${about}`));
+    if (!rel) return null;
+    const theirs = db.prepare("SELECT 1 FROM claims WHERE repo = ? AND path = ? AND participant = ? AND since_seq < ?").get(me.repo, rel, author, m.seq);
+    return theirs ? null : rel;
+  };
   /** `fromWait`: a wait's own look is not a tool call of its own, so it counts no call.
    *  `mentionsOnly`: only what mentions `p` or is urgent is taken and marked; the rest stays. */
   const deliverTo = (p: Participant, fromWait: boolean, mentionsOnly = false): Delivery => {
@@ -573,7 +585,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         const r = db.prepare("UPDATE participants SET waiting = 0 WHERE id = ? AND waiting = 1").run(me.id);
         if (Number(r.changes) > 0) bump(me.repo);
       }
-      return rows.map(toMessage);
+      return rows.map((r) => {
+        const m = toMessage(r);
+        const rel = r.by_board || m.kind !== "msg" || !m.about || !named(m) ? null : askedAbout(me, Number(r.author), m);
+        return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}` } : m;
+      });
     });
     return {
       full: messages.filter(named),
@@ -840,7 +856,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
               allowed: false,
               refusal:
                 `${rel} is also held by ${who}. You may share it, but first tell ${people.length > 1 ? "them" : "its holder"} what you change in it: ` +
-                `\`swarm post "${at} …" --about ${rel}\`, then claim again.`,
+                `\`swarm post "${at} …" --about ${rel}\`; ${people.length > 1 ? "they answer" : "its holder answers"} with an agreement on who changes what ` +
+                `(\`swarm agree … --about ${rel}\`), and that agreement goes. Then claim again.`,
             };
           }
         }

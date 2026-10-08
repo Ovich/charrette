@@ -239,7 +239,7 @@ test("the first edit of a held file is held, naming the holder and the post that
   assert.match(refusal, /review-tool\/S3/);
   assert.match(refusal, /the page/);
   assert.match(refusal, /`swarm post "@review-tool\/S3 …" --about src\/a\.ts`/);
-  assert.match(refusal, /then claim again\.$/);
+  assert.match(refusal, /its holder answers with an agreement on who changes what \(`swarm agree … --about src\/a\.ts`\), and that agreement goes\. Then claim again\.$/);
 });
 
 test("a post about the path mentioning the holder opens it; both then hold it", () => {
