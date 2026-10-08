@@ -1,6 +1,6 @@
 import type { SnapshotEvent } from "../../src/board/board.ts";
 import { eventLine, hhmm, type Filter } from "../lib/view.ts";
-import { RichText, RunnerName, RunnerTag } from "./chips.tsx";
+import { RichText, RunnerName } from "./chips.tsx";
 
 function FeedFilters({
   chips,
@@ -25,7 +25,7 @@ function FeedFilters({
       ))}
       {focus && (
         <button className="chip" aria-pressed="true" onClick={onUnfollow}>
-          <RunnerTag name={focus} /> involved
+          <RunnerName name={focus} /> involved
           <span className="x" aria-label="stop following">
             ×
           </span>

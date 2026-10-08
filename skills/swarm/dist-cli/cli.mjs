@@ -477,6 +477,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
   upkeep("participants", "listening", "listening INTEGER NOT NULL DEFAULT 0");
   upkeep("participants", "nick", "nick TEXT");
   upkeep("participants", "wait_gen", "wait_gen INTEGER NOT NULL DEFAULT 0");
+  upkeep("participants", "merged", "merged INTEGER NOT NULL DEFAULT 0");
   upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
   upkeep("runs", "link", "link TEXT");
   upkeep("slices", "link", "link TEXT");
@@ -693,7 +694,6 @@ async function openBoard(dbPath = SQLITE_PATH) {
       for (const r of rows) mark.run(me.id, Number(r.seq));
       db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(now(), me.id);
       if (!fromWait) {
-        db.prepare("UPDATE participants SET calls = calls + 1 WHERE id = ?").run(me.id);
         const r = db.prepare("UPDATE participants SET waiting = 0 WHERE id = ? AND waiting = 1").run(me.id);
         if (Number(r.changes) > 0) bump(me.repo);
       }
@@ -788,7 +788,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
             return funnyName(rows.map(nickOf));
           };
           if (existing) {
-            db.prepare("UPDATE participants SET doing = ?, files = ?, worktree = ?, ended_at = NULL, nick = COALESCE(nick, ?) WHERE id = ?").run(
+            db.prepare("UPDATE participants SET doing = ?, files = ?, worktree = ?, ended_at = NULL, merged = 0, nick = COALESCE(nick, ?) WHERE id = ?").run(
               doing,
               JSON.stringify(files),
               where,
@@ -846,7 +846,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
         if (waiters.length) insertMessage(fresh, `ended
 the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event", waiters);
         else insertMessage(fresh, "ended", null, "event");
-        db.prepare("UPDATE participants SET ended_at = ? WHERE id = ?").run(now(), fresh.id);
+        db.prepare("UPDATE participants SET ended_at = ?, doing = CASE merged WHEN 1 THEN 'merged and ended' ELSE 'ended' END WHERE id = ?").run(now(), fresh.id);
         releaseAll(fresh.id);
       });
     },
@@ -1024,6 +1024,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
             throw new Error(`the merge lock is held by ${participantById(Number(lock.participant)).name}, not ${me.name}`);
           }
           db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
+          db.prepare("UPDATE participants SET merged = 1 WHERE id = ?").run(me.id);
           waiters = takeLockWaiters(me.repo).filter((n) => n !== me.name);
         });
         for (const rel of rels) {
@@ -1110,6 +1111,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
           stale: !ended && !orchestrator && Date.parse(String(r.last_call ?? r.joined_at)) < cutoff,
           files: claimsOf.all(id).map((c) => ({ path: String(c.path), interface: c.kind === "interface", shared: sharedBy(String(c.path), id) })),
           joined: String(r.joined_at),
+          ended: r.ended_at == null ? null : String(r.ended_at),
           calls: Number(r.calls ?? 0),
           listening: !ended && Number(r.listening) === 1
         };
@@ -1178,6 +1180,30 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       listeners.clear();
       db.close();
     }
+  };
+  const countCall = (p) => {
+    db.prepare("UPDATE participants SET calls = calls + 1 WHERE id = ?").run(p.id);
+    bump(participantById(p.id).repo);
+  };
+  const counted = (verb) => (p, ...rest) => transaction(() => {
+    const out = verb(p, ...rest);
+    countCall(p);
+    return out;
+  });
+  board.setDoing = counted(board.setDoing);
+  board.end = counted(board.end);
+  board.post = counted(board.post);
+  board.deliver = counted(board.deliver);
+  board.wait = counted(board.wait);
+  board.checkEdit = counted(board.checkEdit);
+  board.release = counted(board.release);
+  board.lockMerge = counted(board.lockMerge);
+  board.merged = counted(board.merged);
+  const read = board.read;
+  board.read = (seq, by) => {
+    const m = read(seq);
+    if (by) transaction(() => countCall(by));
+    return m;
   };
   return board;
 }
@@ -1469,7 +1495,13 @@ ${USAGE}`);
       const raw = (args.positional[0] ?? fail("read: which seq?")).replace(/^#/, "");
       const seq = Number(raw);
       if (!Number.isInteger(seq)) fail(`read takes a seq, got ${raw}`);
-      const m = board.read(seq);
+      let by;
+      try {
+        by = caller(board);
+      } catch (e) {
+        if (!(e instanceof CliError)) throw e;
+      }
+      const m = board.read(seq, by);
       emit(m, fullText(m));
       break;
     }

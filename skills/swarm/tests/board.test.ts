@@ -663,13 +663,61 @@ test("each write fires onChange once with its repository", async () => {
   off();
 });
 
-test("calls counts deliveries", () => {
-  const { s3 } = claimed();
+test("calls counts every board call of a runner, one each, a wait's looks none (D66)", async () => {
+  const { s3, s5 } = claimed();
   const calls = () => board.snapshot(REPO).roster.find((r) => r.runner === s3.name)!.calls;
+  const step = (what: string, call: () => unknown): void => {
+    const before = calls();
+    call();
+    assert.equal(calls(), before + 1, what);
+  };
+  step("claim", () => board.checkEdit(s3, path.join(wt("s3"), "src/c.ts")));
+  step("post", () => board.post(s3, "@S5 a word"));
+  step("agree", () => board.post(s3, "S3 changes c.ts", { kind: "agreement" }));
+  step("doing", () => board.setDoing(s3, "the tests"));
+  step("deliver", () => board.deliver(s3));
+  const seq = board.post(s5, "@S3 hello").seq;
+  step("read", () => board.read(seq, s3));
+  step("release", () => board.release(s3, path.join(wt("s3"), "src/c.ts")));
+  step("merge-lock", () => board.lockMerge(s3));
+  step("merged", () => board.merged(s3, "abc123", []));
+  board.deliver(s3); // nothing left for s3: the wait below times out after several looks
   const before = calls();
-  board.deliver(s3);
-  board.deliver(s3);
-  assert.equal(calls(), before + 2);
+  await board.wait(s3, { timeoutMs: 1300 }); // more than one look: the poll runs every second
+  assert.equal(calls(), before + 1, "wait");
+  step("end", () => board.end(s3));
+  // a read with no runner, and a refused call, count none
+  const after = calls();
+  board.read(seq);
+  assert.throws(() => board.post(s3, "too late"));
+  assert.equal(calls(), after);
+});
+
+test("an ended runner's doing says how it ended, and its end time is kept (D66)", () => {
+  const { s3, s5 } = claimed();
+  board.setDoing(s3, "writing src/cli.js");
+  board.setDoing(s5, "writing src/b.ts");
+  assert.deepEqual(board.lockMerge(s3), { granted: true });
+  board.merged(s3, "abc123", []);
+  board.end(s3);
+  board.end(s5);
+  const by = Object.fromEntries(board.snapshot(REPO).roster.map((r) => [r.runner, r]));
+  assert.equal(by[s3.name].doing, "merged and ended");
+  assert.equal(by[s5.name].doing, "ended");
+  for (const r of [by[s3.name], by[s5.name]]) {
+    assert.ok(r.ended && Date.parse(r.ended) >= Date.parse(r.joined), `${r.runner} ended ${r.ended}`);
+  }
+});
+
+test("a runner joined again starts unmerged and live (D66)", () => {
+  const { run, s3 } = claimed();
+  board.lockMerge(s3);
+  board.merged(s3, "abc123", []);
+  board.end(s3);
+  const again = board.join({ run: run.id, slice: "S3", doing: "a second pass", files: [], worktree: wt("s3") }).runner;
+  assert.equal(board.snapshot(REPO).roster.find((r) => r.runner === again.name)!.ended, null);
+  board.end(again);
+  assert.equal(board.snapshot(REPO).roster.find((r) => r.runner === again.name)!.doing, "ended");
 });
 
 test("a flag appears and clears with its claim", () => {

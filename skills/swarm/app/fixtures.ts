@@ -31,6 +31,7 @@ const runner = (
   files: [string, boolean?][],
   joined: string,
   calls: number,
+  ended: string | null = null,
 ): SnapshotRunner => {
   const i = name.lastIndexOf("/");
   return {
@@ -44,6 +45,7 @@ const runner = (
     stale: false,
     files: files.map(([path, iface]) => ({ path, interface: !!iface, shared: false })),
     joined: at(joined),
+    ended: ended === null ? null : at(ended),
     calls,
     listening: false,
   };
@@ -107,7 +109,7 @@ export const LIVE: BoardSnapshot = {
     runner(`${RT}/S5`, "The client retries once on 401", "Running the client tests", "working", [["web/http/client.ts"], ["web/http/client.test.ts"]], "14:10", 12),
     runner(`${AL}/S1`, "The audit table and its writer", "Writing the migration for audit_entries", "working", [["src/audit/audit.ts", true], ["migrations/0042_audit.sql"]], "14:06", 15),
     runner(`${AL}/S2`, "Every auth route writes an audit entry", "Adding audit() to the login and logout handlers", "working", [["src/routes/login.ts"]], "14:06", 11),
-    runner(`${RT}/S2`, "The token store", "Merged a41c9e2 and ended", "ended", [], "14:01", 9),
+    runner(`${RT}/S2`, "The token store", "merged and ended", "ended", [], "14:01", 9, "14:09"),
   ],
   events: [
     ev("14:02", "event", `${RT}/S3`, "joined: the Session interface"),

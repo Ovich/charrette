@@ -276,7 +276,14 @@ async function main(board: Board): Promise<void> {
       const raw = (args.positional[0] ?? fail("read: which seq?")).replace(/^#/, "");
       const seq = Number(raw);
       if (!Number.isInteger(seq)) fail(`read takes a seq, got ${raw}`);
-      const m = board.read(seq);
+      // a runner's read is a call of its own (D66); a reader no runner answers to reads all the same
+      let by: Participant | undefined;
+      try {
+        by = caller(board);
+      } catch (e) {
+        if (!(e instanceof CliError)) throw e;
+      }
+      const m = board.read(seq, by);
       emit(m, fullText(m));
       break;
     }

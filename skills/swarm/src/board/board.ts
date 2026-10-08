@@ -93,6 +93,8 @@ export type SnapshotRunner = {
   stale: boolean;
   files: (Declared & { shared: boolean })[]; // shared: another live runner holds it too (D40)
   joined: string;
+  /** When the runner ended, stored at `end`; null while it has not (D66). */
+  ended: string | null;
   calls: number;
   /** A background `wait --mentions` is pending: the runner hears the board while it works (D49). */
   listening: boolean;
@@ -133,12 +135,14 @@ export interface Board {
   /** Who is calling (D28): the one live runner whose worktree holds `worktree`. */
   identify(who: { worktree?: string }): Participant | null;
   setDoing(p: Participant, doing: string): void;
-  /** Ends the runner and releases its claims and any merge lock it holds. */
+  /** Ends the runner and releases its claims and any merge lock it holds; its doing becomes
+   *  "merged and ended" when it merged since it joined, else "ended" (D66). */
   end(p: Participant): void;
   roster(repo: string): RosterEntry[];
 
   post(p: Participant, body: string, opts?: { about?: string; kind?: MessageKind }): Message;
-  read(seq: number): Message;
+  /** `by`: the runner reading, when known, counted as a call of its own (D66). */
+  read(seq: number, by?: Participant): Message;
   deliver(p: Participant): Delivery; // undelivered since last time; marks them delivered; stamps the last call
   /** The first delivery, or empty on timeout or once `p` has ended (D49). `mentionsOnly`: only a
    *  message that mentions `p` or is urgent ends it, and only those are marked delivered; the rest
@@ -321,6 +325,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   upkeep("participants", "nick", "nick TEXT");
   // moved by every `wait` start: a pending wait whose number is no longer this one is superseded (D64)
   upkeep("participants", "wait_gen", "wait_gen INTEGER NOT NULL DEFAULT 0");
+  // 1 once the runner has called `merged` since it joined: what `end` writes as its doing (D66)
+  upkeep("participants", "merged", "merged INTEGER NOT NULL DEFAULT 0");
   // 1: written by the board itself in a runner's name (a flag, a merge notice), never a runner's own word
   upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
   upkeep("runs", "link", "link TEXT");
@@ -584,7 +590,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     const theirs = db.prepare("SELECT 1 FROM claims WHERE repo = ? AND path = ? AND participant = ? AND since_seq < ?").get(me.repo, rel, author, m.seq);
     return theirs ? null : rel;
   };
-  /** `fromWait`: a wait's own look is not a tool call of its own, so it counts no call.
+  /** `fromWait`: a wait's own look, not a call of the runner's.
    *  `mentionsOnly`: only what mentions `p` or is urgent is taken and marked; the rest stays. */
   const deliverTo = (p: Participant, fromWait: boolean, mentionsOnly = false): Delivery => {
     const me = participantById(p.id);
@@ -604,7 +610,6 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       // a delivery is a call to the board: the runner's last call (D31)
       db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(now(), me.id);
       if (!fromWait) {
-        db.prepare("UPDATE participants SET calls = calls + 1 WHERE id = ?").run(me.id);
         // a call after a wait that never returned (killed): the runner is no longer waiting
         const r = db.prepare("UPDATE participants SET waiting = 0 WHERE id = ? AND waiting = 1").run(me.id);
         if (Number(r.changes) > 0) bump(me.repo);
@@ -717,7 +722,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           return funnyName(rows.map(nickOf));
         };
         if (existing) {
-          db.prepare("UPDATE participants SET doing = ?, files = ?, worktree = ?, ended_at = NULL, nick = COALESCE(nick, ?) WHERE id = ?").run(
+          db.prepare("UPDATE participants SET doing = ?, files = ?, worktree = ?, ended_at = NULL, merged = 0, nick = COALESCE(nick, ?) WHERE id = ?").run(
             doing,
             JSON.stringify(files),
             where,
@@ -785,7 +790,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         const waiters = held ? takeLockWaiters(fresh.repo).filter((n) => n !== fresh.name) : [];
         if (waiters.length) insertMessage(fresh, `ended\nthe merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event", waiters);
         else insertMessage(fresh, "ended", null, "event");
-        db.prepare("UPDATE participants SET ended_at = ? WHERE id = ?").run(now(), fresh.id);
+        // the card's last word: what the runner's run came to, not its last doing (D66)
+        db.prepare("UPDATE participants SET ended_at = ?, doing = CASE merged WHEN 1 THEN 'merged and ended' ELSE 'ended' END WHERE id = ?").run(now(), fresh.id);
         releaseAll(fresh.id);
       });
     },
@@ -990,6 +996,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           throw new Error(`the merge lock is held by ${participantById(Number(lock.participant)).name}, not ${me.name}`);
         }
         db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
+        db.prepare("UPDATE participants SET merged = 1 WHERE id = ?").run(me.id);
         waiters = takeLockWaiters(me.repo).filter((n) => n !== me.name);
       });
       // holders of the files
@@ -1106,6 +1113,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           stale: !ended && !orchestrator && Date.parse(String(r.last_call ?? r.joined_at)) < cutoff,
           files: (claimsOf.all(id) as Row[]).map((c) => ({ path: String(c.path), interface: c.kind === "interface", shared: sharedBy(String(c.path), id) })),
           joined: String(r.joined_at),
+          ended: r.ended_at == null ? null : String(r.ended_at),
           calls: Number(r.calls ?? 0),
           listening: !ended && Number(r.listening) === 1,
         };
@@ -1189,6 +1197,36 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       listeners.clear();
       db.close();
     },
+  };
+  // Every verb a runner calls is one call to the board, counted here and nowhere else (D66):
+  // what the card's call count shows. `reconcileWrites` is part of `merge-lock` and `end`, not a call.
+  const countCall = (p: Participant): void => {
+    db.prepare("UPDATE participants SET calls = calls + 1 WHERE id = ?").run(p.id);
+    bump(participantById(p.id).repo);
+  };
+  // the verb and its count in one transaction: the page sees one change, and a refused call
+  // (an ended runner, an unknown path) counts none
+  const counted = <A extends unknown[], R>(verb: (p: Participant, ...rest: A) => R) =>
+    (p: Participant, ...rest: A): R =>
+      transaction(() => {
+        const out = verb(p, ...rest);
+        countCall(p);
+        return out;
+      });
+  board.setDoing = counted(board.setDoing);
+  board.end = counted(board.end);
+  board.post = counted(board.post);
+  board.deliver = counted(board.deliver);
+  board.wait = counted(board.wait);
+  board.checkEdit = counted(board.checkEdit);
+  board.release = counted(board.release);
+  board.lockMerge = counted(board.lockMerge);
+  board.merged = counted(board.merged);
+  const read = board.read;
+  board.read = (seq, by) => {
+    const m = read(seq);
+    if (by) transaction(() => countCall(by));
+    return m;
   };
   return board;
 }

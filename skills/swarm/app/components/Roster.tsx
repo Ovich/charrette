@@ -19,7 +19,9 @@ function RunnerCard({
   const orch = p.slice === ORCHESTRATOR;
   const { h, s } = runnerColor(p.runner);
   const label = p.stale && !["ended", "done"].includes(p.state) ? "stale" : p.state;
-  const meta = orch ? [`opened ${hhmm(p.joined)}`] : [`joined ${hhmm(p.joined)}`, `${p.calls} ${p.calls === 1 ? "call" : "calls"}`];
+  // an ended runner's span, joined → ended, from the end time the Board stored (D66)
+  const joined = p.ended ? `joined ${hhmm(p.joined)} → ${hhmm(p.ended)}` : `joined ${hhmm(p.joined)}`;
+  const meta = orch ? [`opened ${hhmm(p.joined)}`] : [joined, `${p.calls} ${p.calls === 1 ? "call" : "calls"}`];
   return (
     <button
       className={["card", orch && "orch", p.state, fresh && "new"].filter(Boolean).join(" ")}

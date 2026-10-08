@@ -42,7 +42,9 @@ describe("the regions render their copy from the live snapshot", () => {
     expect(screen.getByText("select a runner to follow it")).toBeTruthy();
     expect(screen.getAllByText("Feeds the swarm")).toHaveLength(2);
     expect(card(/Adding refreshToken to Session/).textContent).toMatch(/RT·S3working.*joined 14:02.*31 calls/);
-    expect(card(/Merged a41c9e2 and ended/).textContent).toMatch(/ended/);
+    // an ended card: how it ended for its doing, joined → ended for its meta (D66)
+    expect(card(/merged and ended/).textContent).toMatch(/Lucky Moose·RT·S2ended.*merged and ended.*joined 14:01 → 14:09.*9 calls/);
+    expect(card(/Adding refreshToken to Session/).textContent).not.toMatch(/→/);
     // Thread with FeedFilters and ReaderNote
     expect(chip(/Everything/).textContent).toBe("Everything10");
     expect(chip(/Messages only/).textContent).toBe("Messages only8");
@@ -118,7 +120,8 @@ test("following a runner dims the others and narrows the feed; show everyone res
   expect(card(/Adding refreshToken to Session/).getAttribute("aria-pressed")).toBe("true");
   expect(card(/Writing POST \/auth\/refresh/).getAttribute("aria-pressed")).toBe("false");
   expect(screen.getByText(/following/)).toBeTruthy();
-  expect(chip(/involved/)).toBeTruthy();
+  // the chip names the runner as everywhere else: its funny name, then its tag (D66)
+  expect(chip(/involved/).textContent).toBe("Sleepy Otter·RT·S3 involved×");
   // from S3, or naming it: kept; the rest gone
   expect(within(feed()).getByText(/Is/)).toBeTruthy(); // "@S3 I read Session …"
   expect(within(feed()).getByText(/Only the new field/)).toBeTruthy();
