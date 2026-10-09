@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 import type { SnapshotEvent } from "../../src/board/board.ts";
 import { eventLine, hhmm, type Filter } from "../lib/view.ts";
 import { RichText, RunnerName } from "./chips.tsx";
@@ -137,10 +138,21 @@ export function Thread({
   onUnfollow: () => void;
   onShowAll: () => void;
 }) {
+  // A thread reads from the bottom: it opens there, and follows new rows while the reader is there.
+  const feedRef = useRef<HTMLOListElement>(null);
+  const atBottom = useRef(true);
+  const onScroll = () => {
+    const el = feedRef.current;
+    if (el) atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+  };
+  useLayoutEffect(() => {
+    const el = feedRef.current;
+    if (el && atBottom.current) el.scrollTop = el.scrollHeight;
+  }, [shown]);
   return (
     <section className="panel" data-component="Thread" aria-label="The thread">
       <FeedFilters chips={chips} filter={filter} focus={focus} onFilter={onFilter} onUnfollow={onUnfollow} />
-      <ol className="feed" aria-live="polite">
+      <ol className="feed" aria-live="polite" ref={feedRef} onScroll={onScroll}>
         {shown.length ? (
           shown.map((e) => {
             const isNew = fresh.has(e.seq);

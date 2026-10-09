@@ -194,7 +194,7 @@ p { margin: 0; }
 .chip .c { font-size: 10.5px; color: var(--faint-foreground); }
 .chip[aria-pressed="true"] .c { color: inherit; opacity: .75; }
 .chip .x { font-size: 13px; line-height: 1; margin-left: -2px; }
-.feed { list-style: none; margin: 0; padding: 6px 0 4px; }
+.feed { list-style: none; margin: 0; padding: 6px 0 4px; max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; }
 .row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; padding: 6px 14px; }
 .row .when { font-size: 10.5px; line-height: 1.9; color: var(--faint-foreground); }
 .row .head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; color: var(--faint-foreground); }
