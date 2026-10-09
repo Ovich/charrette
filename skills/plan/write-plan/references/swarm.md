@@ -5,6 +5,9 @@ tracker and the order the documents are written in.
 
 ## The cut
 
+- **The plan stays high level.** Cut slices as independent as the work allows; an overlap is
+  settled by the runners on the board, not designed away. The plan fixes the goals, the decisions
+  and the cut; the detail of each slice is its runners' and the board's.
 - **No fork proof.** Slices may share a file: their runners settle it on the board (the `swarm`
   skill). Cut thin and vertical as the `write-slice` skill's `references/cutting.md` says; its
   fork rule and the disjoint arms of `references/tracker.md` do not apply.
