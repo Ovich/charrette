@@ -8,8 +8,11 @@ tracker and the order the documents are written in.
 - **No fork proof.** Slices may share a file: their runners settle it on the board (the `swarm`
   skill). Cut thin and vertical as the `write-slice` skill's `references/cutting.md` says; its
   fork rule and the disjoint arms of `references/tracker.md` do not apply.
-- **A blocker only where a slice needs another's merged result.** Every other slice starts at
-  the open.
+- **Three phases, no chains.** An optional ground slice first, only when the others need its
+  merged result (a shared contract, a move, a rename); then every other slice at once, settling
+  what they share on the board; then the test slice. No slice waits on another between the ground
+  slice and the tests: a dependency short of the ground is settled on the board, never drawn as a
+  blocker.
 - **The riskiest unknown is still Slice 1**, so its runner meets it first and the others hear of
   it on the thread.
 - **Every slice document is written before the run**, with the `write-slice` skill, the test
