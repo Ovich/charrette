@@ -70,6 +70,7 @@ Each answer is written into the bench skill's head as it lands.
   `select`. Basecoat carries no Tailwind utilities, so layout is the page's own CSS. The
   product the bench shows (a document, a screen, a card) is drawn in the project's design
   language, from the `design-prototype` skill's reference when there is one.
+- **JSON the project produced** (a request, a reply, a stored document) is shown as a tree that folds node by node: when the bench shows any, read `references/json-data.md`.
 - **The data is the project's, as it is.** Copied byte for byte, never renamed, reshaped
   or summarised: the page adapts to the shape, so the bench stays as close to the real
   run as it can. A rendering that interprets the data is what the app already shows.
