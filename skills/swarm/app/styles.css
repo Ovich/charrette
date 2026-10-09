@@ -143,7 +143,7 @@ p { margin: 0; }
 .lock.held { color: var(--foreground); border-color: color-mix(in srgb, var(--accent) 35%, transparent); background: var(--accent-soft); }
 @media (max-width: 720px) { .lock span.t { display: none; } }
 
-.content { padding: 22px 28px 56px; max-width: 1380px; }
+.content { padding: 22px 28px 20px; }
 @media (max-width: 720px) { .content { padding: 16px; } }
 .label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--faint-foreground); margin: 0 0 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .label .n { background: var(--surface-2); color: var(--muted-foreground); border-radius: 999px; padding: 0 7px; letter-spacing: 0; font-weight: 500; }
@@ -187,6 +187,12 @@ p { margin: 0; }
 
 /* Thread */
 .panel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); overflow: hidden; min-width: 0; }
+/* The run page fills the view: the roster at its height, the thread taking the rest and scrolling inside */
+.run-page { height: 100vh; display: flex; flex-direction: column; }
+.run-page > .content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.run-page .roster { flex: none; max-height: 45vh; overflow-y: auto; }
+.run-page .panel { flex: 1; min-height: 240px; display: flex; flex-direction: column; }
+.run-page .filters, .run-page .reader { flex: none; }
 .filters { display: flex; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; background: var(--surface); }
 .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--background); border-radius: 999px; padding: 1px 10px; font-size: 11.5px; color: var(--muted-foreground); white-space: nowrap; }
 .chip:hover { background: var(--surface-2); }
@@ -194,7 +200,7 @@ p { margin: 0; }
 .chip .c { font-size: 10.5px; color: var(--faint-foreground); }
 .chip[aria-pressed="true"] .c { color: inherit; opacity: .75; }
 .chip .x { font-size: 13px; line-height: 1; margin-left: -2px; }
-.feed { list-style: none; margin: 0; padding: 6px 0 4px; max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; }
+.feed { list-style: none; margin: 0; padding: 6px 0 4px; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; padding: 6px 14px; }
 .row .when { font-size: 10.5px; line-height: 1.9; color: var(--faint-foreground); }
 .row .head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; color: var(--faint-foreground); }
