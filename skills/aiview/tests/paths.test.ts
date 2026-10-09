@@ -19,6 +19,9 @@ test("formatOf dispatches on extension", () => {
   assert.equal(formatOf("a.htm"), "html");
   assert.equal(formatOf("a.pdf"), "pdf");
   assert.equal(formatOf("a"), "markdown");
+  assert.equal(formatOf("2026-10-09-p-run-1.swarm.json"), "swarm");
+  assert.equal(kindFromName("2026-10-09-p-run-1.swarm.json"), "swarm");
+  assert.equal(formatOf("other.json"), "markdown");
 });
 
 test("titleOf: md h1, html title, h1 fallback, filename fallback", () => {

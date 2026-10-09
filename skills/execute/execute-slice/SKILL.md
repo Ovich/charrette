@@ -7,6 +7,8 @@ description: Use when handed one slice document to carry out, as the agent doing
 
 **The slice document is the design; the brief is the mandate.** Where the brief asks for something, it wins over any habit, this skill's included.
 
+**When the brief names a run on the board, load the `swarm` skill, runner side, before the work.** It changes nothing else here.
+
 ## When to stop
 
 Each is a report, never an improvisation.

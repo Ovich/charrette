@@ -14,9 +14,10 @@ Every skill is one folder under `skills/`, opening on a `SKILL.md`; supporting f
 sit beside it, situational ones under `references/`. `project/` holds what a project
 has once and keeps, `verify/` its verification skill and the validation with the person, `workbench/` the pages worked on
 with the person during development and the project skills that feed them; the loop's phases group the rest,
-`architecture/`, `ui/`, `plan/`, `execute/`, `review/`; `interview/` and `whiteboard-defense/` sit at the root, as does
-aiview, `skills/aiview/`, the one tool: a CLI, a server and a UI, shipped as versioned
-bundles so an install never builds. The plugin sees a group only through the `skills`
+`architecture/`, `ui/`, `plan/`, `execute/`, `review/`; `interview/` and `whiteboard-defense/` sit at the root, as do
+the two tools, aiview (`skills/aiview/`, the documents) and swarm (`skills/swarm/`, the board a
+swarm-mode plan runs on): each a CLI, a server and a UI, shipped as versioned bundles so an
+install never builds. The plugin sees a group only through the `skills`
 list in `.claude-plugin/plugin.json`: the default scan reads one level under `skills/`,
 so a group left off the list ships none of its skills, and `claude plugin validate`
 passes all the same. What runs for a user is the plugin cache, not this checkout; a
@@ -39,7 +40,7 @@ file the person was looking for. Refresh the cache with
 
 3. **MUST write a description as the trigger and nothing else: what activates the skill, what it produces, what it excludes.** Method, mechanics and instructions to a loaded agent belong in the body, and the body carries no "when to use" section of its own. The router reads only the description; the agent reads the body only after.
 
-4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute/execute-plan/references/tracker.md`; diagram discipline is `skills/architecture/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/aiview/`.
+4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute/execute-plan/references/tracker.md`; diagram discipline is `skills/architecture/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/aiview/`; the board protocol is `skills/swarm/`.
 
 8. **MUST write a skill, its examples included, only in terms every project has, never a file, module or name from the project the change came from.** A skill loads in every project; a foreign name reads as a fact about the current codebase, and the agent looks for it. Abstract the case to the rule it taught, and the counterweight it needed.
 

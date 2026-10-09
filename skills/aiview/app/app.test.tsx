@@ -421,6 +421,41 @@ describe("MockupFrame modes", () => {
   });
 });
 
+describe("swarm document", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  test("the viewer frames the URL a swarm document names, full height, theme only", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(""))));
+    const { SwarmDocumentView } = await import("./App.tsx");
+    render(<SwarmDocumentView content={JSON.stringify({ run: "7", url: "http://127.0.0.1:4777/run/7" })} />);
+    const frame = await screen.findByTitle("swarm run");
+    expect(frame.getAttribute("src")).toMatch(/^http:\/\/127\.0\.0\.1:4777\/run\/7/);
+    expect(frame.className).toContain("h-[calc(100vh-10rem)]");
+    expect(document.querySelector('[data-component="SwarmThemeToggle"]')).toBeTruthy();
+    expect(document.querySelector('[data-component="MockupViewportToggle"]')).toBeNull();
+    expect(document.querySelector('[data-component="MockupModeToggle"]')).toBeNull();
+  });
+
+  test("an unreachable URL shows the line with the command", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("refused"))));
+    const { SwarmFrame } = await import("./components/viewers/SwarmFrame.tsx");
+    render(<SwarmFrame url="http://127.0.0.1:1/run/7" />);
+    expect(await screen.findByText("swarm serve --detach")).toBeTruthy();
+    expect(document.querySelector("iframe")).toBeNull();
+  });
+
+  test("the theme is asked of the page by query, system leaves the URL as written", async () => {
+    const { themedSwarmUrl, swarmUrlOf } = await import("./components/viewers/SwarmFrame.tsx");
+    expect(themedSwarmUrl("http://h/run/7", "dark")).toBe("http://h/run/7?theme=dark");
+    expect(themedSwarmUrl("http://h/run/7", "system")).toBe("http://h/run/7");
+    expect(swarmUrlOf("not json")).toBeNull();
+  });
+
+  test("the swarm chip has its own placed colour", () => {
+    expect(kindHue("swarm")).toBe(110);
+  });
+});
+
 describe("mockup full screen", () => {
   afterEach(() => {
     delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen;

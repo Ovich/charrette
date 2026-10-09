@@ -37,6 +37,8 @@ const KIND_COLORS: Record<string, { h: number; s: number; tone: KindTone }> = {
   report: { h: 30, s: 70, tone: "light" },
   verification: { h: 50, s: 80, tone: "strong" },
   mockup: { h: 85, s: 65, tone: "light" },
+  // A swarm run sits beside its plan and slices: off both in hue, more saturated than the slice.
+  swarm: { h: 110, s: 80, tone: "strong" },
   slice: { h: 130, s: 55, tone: "strong" },
   spec: { h: 170, s: 60, tone: "light" },
   plan: { h: 205, s: 70, tone: "strong" },

@@ -15,6 +15,8 @@ Carry out one slice document with the `execute-slice` skill.
 
 **Pull request**: <the line below that applies>.
 
+**Board**: run `<run id>` on `<repository>`; load the `swarm` skill, runner side.   ← `mode: swarm` only
+
 <the testing prompt of the mandate's `tests` answer, from `references/tests.md`>
 
 <the one thing this slice must not do, when there is one>
@@ -25,6 +27,9 @@ Carry out one slice document with the `execute-slice` skill.
 | `one per slice` | open a draft `<title>` (`gh pr create --draft`) on your first commit, push as you go. |
 | `one for the plan`, open | none. Commit to your branch; the orchestrator joins it into `<branch>`. |
 | `one for the plan`, not yet open | open a draft `<title>` (`gh pr create --draft`) on your first commit; every later slice pushes to it. |
+| `mode: swarm` | none. Merge your branch into `<branch>` in `<checkout>` yourself, under the board's lock, as the `swarm` skill's runner side says. |
+
+**The board line** only in swarm mode, without its marker; a classic brief has none.
 
 **The last line** only when the slice has a boundary the mandate does not draw: a directory it
 must not touch, a command it must not run, an environment it must not reach. The watch's

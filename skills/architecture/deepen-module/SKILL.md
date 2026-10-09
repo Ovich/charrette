@@ -27,6 +27,7 @@ description: Use when a person asks to design a new module's interface or to rew
    - the module imports nothing from the application, and receives any collaborator it drives
    - it reads no environment and no global state
    - every project-specific name, path or setting is an option with a working default
+   - its tuning numbers (a limit, a retry count, a default, a threshold) are named once in one constants file beside its entry, never written as a literal in a branch or a schema bound
    - its tests go through the entry only, and a boundary test enforces these conditions
 5. **The gap**: what changes from *Today* to reach the design: exports, imports, and every caller. Changing the callers is part of the work. A large gap is drawn, who depends on whom before and after, through the `write-diagrams` skill.
 6. **The open decisions**, numbered, each with its options and a recommendation.
@@ -50,3 +51,4 @@ description: Use when a person asks to design a new module's interface or to rew
 | "I'll add an option for that" | An option nobody passes is surface. |
 | "One entry, an option picks the mode" | Neither the import nor the call says which rules apply. One entry per case. |
 | "Callers may need this helper" | Name the caller. One that exists only in the tests is served by the entry. |
+| "It's only a 3, it reads fine inline" | The same 3 in a second file drifts from the first. Name it in the constants file. |

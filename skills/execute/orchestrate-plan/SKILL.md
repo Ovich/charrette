@@ -13,6 +13,8 @@ Read the plan's *Mandate* section. Ask what it leaves open before the first slic
 
 ## Dispatch
 
+**The mandate says `mode: swarm`**: the `swarm` skill's orchestrator side replaces *Forks* below and *Checking the run*, and `references/swarm.md` says what else changes here; read both before the first dispatch. Classic mode reads neither.
+
 - **One subagent per slice**, on a subagent definition carrying the mandate's model and effort; the dispatch passes its model.
 - **The brief is the only thing sent**: where the work is, the mandate in force, and the testing prompt the `tests` answer gives. Never the plan, never a restatement of the slice document. Template: `references/brief.md`, read before the first dispatch.
 - **Check blockers before every dispatch.**

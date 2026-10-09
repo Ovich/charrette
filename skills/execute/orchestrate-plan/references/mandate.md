@@ -2,9 +2,17 @@
 
 Ask what is open in one message, the recommended answer first. Write the answers into the
 plan's *Mandate* section as `field: value` lines, and into the one line under the tracker:
-`mandate: run through · one for the plan · delegated · opus · medium · tests at the plan end · verify off`.
+`mandate: mode classic · run through · one for the plan · delegated · opus · medium · tests at the plan end · verify off`.
 An amendment mid-run overwrites its field in both places, the decision's id beside it
 (`pace: run through, the person merges (D41)`), and reaches the next brief only.
+
+**`mode:`** first. Asked by the `write-plan` skill before the cut, since the plan differs by
+mode; asked here only for a plan that predates the field, where a plan cut for classic stays
+classic.
+
+1. **classic** (recommended): slices one after another, forks proved apart and joined at the end.
+2. **swarm**: every slice dispatched at once, the runners coordinating on the board of the
+   `swarm` skill. The plan must have been cut for it (the `write-plan` skill's `references/swarm.md`).
 
 **`pace:`**
 
