@@ -12,6 +12,7 @@ import { DocItem } from "./components/docs/DocItem.tsx";
 import { ProjectSelector } from "./components/shell/ProjectSelector.tsx";
 import { Sidebar } from "./components/shell/Sidebar.tsx";
 import type { DocumentWithState } from "./lib/api.ts";
+import { readFileSync } from "node:fs";
 
 const doc = (over: Partial<DocumentWithState>): DocumentWithState => ({
   id: 1,
@@ -678,5 +679,16 @@ describe("pointing at a mockup's components", () => {
 
     rerender(<MockupFrame html="<html><body></body></html>" />);
     expect(container.querySelector('[data-component="PointerChip"]')).toBeNull();
+  });
+});
+
+// jsdom resolves neither `color-scheme` nor `light-dark()`, so the seam is the stylesheet's
+// source: the root declares both schemes, or every light-dark() (the kind chips) reads light
+// on a dark OS theme. Read from disk: vitest serves a stylesheet import, `?raw` included, empty.
+describe("color scheme", () => {
+  test("the root declares both schemes, so light-dark() follows the OS theme", () => {
+    const stylesheet = readFileSync(`${import.meta.dirname}/styles.css`, "utf8");
+    const root = stylesheet.match(/(?:^|\n):root\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(root).toMatch(/(?:^|[;\s])color-scheme\s*:\s*light\s+dark\s*;/);
   });
 });

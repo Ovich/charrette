@@ -1,7 +1,11 @@
 @import "tailwindcss";
 
 /* Tokens from the approved mockup (docs/design/mockups/2026-08-23-aiview-app.mockup.html) */
+/* The OS decides the theme (aiview has no toggle). Declaring both schemes lets the
+   browser resolve light-dark() (the kind chips) and draw native controls and scrollbars
+   in the dark one; without it every light-dark() resolves to its light side. */
 :root {
+  color-scheme: light dark;
   --background: #ffffff;
   --surface: #fafafa;
   --surface-2: #f4f4f5;
