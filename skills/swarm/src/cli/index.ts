@@ -8,13 +8,14 @@ import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
 import { portFrom, PORT_FILE, readServerStatus } from "../server/state.ts";
 import { parseArgs } from "./args.ts";
 import { fullText } from "./format.ts";
+import { registerRunDocument } from "./aiview-document.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
 
 const USAGE = [
   "usage: swarm <verb> [--json]",
-  "  open    --plan <slug> --title <t> --slices <file.json> [--link <url>]   # opens a run, prints its id then the page's URL (orchestrator)",
+  "  open    --plan <slug> --title <t> --slices <file.json> [--link <url>]   # opens a run, registers it in aiview in the plan's group, prints its id then the aiview URL (orchestrator)",
   '          # the slices file: [{"id", "title", "blockers": [...], "link"?: "<slice document URL>"}]',
   "  slice   <id> --run <id> --state ready|running|done|blocked      # (orchestrator)",
   "  close   --run <id>                                              # (orchestrator)",
@@ -135,6 +136,10 @@ function ensureServer(): number | null {
 }
 
 const pageUrl = (port: number): string => `http://localhost:${port}/`;
+/** One run's page, the one aiview frames. */
+const runPageUrl = (port: number, run: number): string => `${pageUrl(port)}?run=${run}`;
+/** The tool's folder (swarm.mjs's), the aiview skill beside it. */
+const toolRoot = (): string => process.env.SWARM_ROOT ?? path.dirname(path.resolve(process.argv[1]));
 
 const need = (flag: string): string => args.flag(flag) ?? fail(`${flag} is required\n${USAGE}`);
 
@@ -221,9 +226,17 @@ async function main(board: Board): Promise<void> {
       const run = board.openRun({ repo: repoOf(process.cwd()), plan, title: need("--title"), link: args.flag("--link") ?? null, slices: readSlices(need("--slices")) });
       // the person watches the run on the page: start it when none runs (US1, US6)
       const port = ensureServer();
-      const url = port === null ? null : pageUrl(port);
-      if (url === null) console.error(`swarm: the page did not start (port ${portFrom(args.flag("--port"))} may be in use; swarm serve --detach --port <n>). The run is open.`);
-      emit({ run: run.id, repo: run.repo, plan: run.plan, url }, url ? `${run.id}\n${url}` : String(run.id));
+      const page = port === null ? null : runPageUrl(port, run.id);
+      if (page === null) {
+        console.error(`swarm: the page did not start (port ${portFrom(args.flag("--port"))} may be in use; swarm serve --detach --port <n>). The run is open.`);
+        emit({ run: run.id, repo: run.repo, plan: run.plan, url: null }, String(run.id));
+        break;
+      }
+      // the person watches the run in aiview, in the plan's group (plan D2, D3)
+      const doc = registerRunDocument({ toolRoot: toolRoot(), plan, run: run.id, pageUrl: page, date: new Date().toISOString().slice(0, 10) });
+      if (!doc.registered) console.error(`swarm: ${doc.reason}: open the URL`);
+      const url = doc.registered ? doc.url : page;
+      emit({ run: run.id, repo: run.repo, plan: run.plan, url }, `${run.id}\n${url}`);
       break;
     }
     case "slice": {

@@ -71,6 +71,13 @@ export function startServer(board: Board, options: ServeOptions): http.Server {
     try {
       if (p === "/events") return sse.add(res);
       if (p === "/api/repos") return json(res, board.repos());
+      if (p === "/api/run") {
+        // one run's repository snapshot, the page scopes it (plan D2): the view aiview frames
+        const id = Number(url.searchParams.get("id"));
+        const repo = board.repos().find((r) => r.runs.some((x) => x.run === id));
+        if (!repo) return json(res, { error: `no run ${url.searchParams.get("id")}` }, 404);
+        return json(res, { run: id, snapshot: board.snapshot(repo.repo) });
+      }
       if (p === "/api/board") {
         const repo = url.searchParams.get("repo") ?? "";
         if (!board.repos().some((r) => r.repo === repo)) return json(res, { error: `no repository ${repo}` }, 404);

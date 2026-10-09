@@ -91,6 +91,19 @@ test("GET /api/board returns the snapshot; an unknown repository is a 404 naming
   assert.deepEqual(await missing.json(), { error: "no repository /repos/none/.git" });
 });
 
+test("GET /api/run returns the run's repository snapshot; an unknown run is a 404", async () => {
+  const run = writer.runs()[0];
+  const r = await fetch(`${base}/api/run?id=${run.id}`);
+  assert.equal(r.status, 200);
+  const body = (await r.json()) as { run: number; snapshot: BoardSnapshot };
+  assert.equal(body.run, run.id);
+  assert.equal(body.snapshot.repo, REPO);
+  assert.ok(body.snapshot.runs.some((x) => x.run === run.id));
+  const missing = await fetch(`${base}/api/run?id=999`);
+  assert.equal(missing.status, 404);
+  assert.deepEqual(await missing.json(), { error: "no run 999" });
+});
+
 test("/events sends hello, pings, and changed with the repository within a second of a post", async () => {
   const run = writer.runs()[0];
   const s3 = writer.join({ run: run.id, slice: "S3", doing: "page", files: [] }).runner;

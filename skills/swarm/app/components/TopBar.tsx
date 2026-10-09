@@ -1,7 +1,7 @@
 import type { BoardSnapshot } from "../../src/board/board.ts";
 import { RunnerTag } from "./chips.tsx";
 
-function MergeLock({ lock }: { lock: BoardSnapshot["lock"] }) {
+export function MergeLock({ lock }: { lock: BoardSnapshot["lock"] }) {
   return (
     <span className={lock ? "lock held" : "lock"} data-component="MergeLock" title={lock ? `held since ${lock.since}` : "no merge under way"}>
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
