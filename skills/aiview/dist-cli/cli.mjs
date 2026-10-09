@@ -97,6 +97,7 @@ function kindFromName(file) {
   return parts.length >= 3 ? parts[parts.length - 2].toLowerCase() : "";
 }
 function titleOf(text, file) {
+  if (isSwarm(file)) return path3.basename(file);
   const m = isHtml(file) ? text.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? text.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1] : text.match(/^#\s+(.+)$/m)?.[1];
   return (m ?? path3.basename(file)).trim();
 }
@@ -104,13 +105,14 @@ function toStored(abs, root) {
   const rel = path3.relative(root, abs);
   return rel && !rel.startsWith("..") && !path3.isAbsolute(rel) ? rel.split(path3.sep).join("/") : abs;
 }
-var isHtml, isPdf, formatOf, projectRoot, readDoc, toAbs;
+var isHtml, isPdf, isSwarm, formatOf, projectRoot, readDoc, toAbs;
 var init_paths = __esm({
   "src/core/paths.ts"() {
     "use strict";
     isHtml = (file) => /\.html?$/i.test(file);
     isPdf = (file) => /\.pdf$/i.test(file);
-    formatOf = (file) => isHtml(file) ? "html" : isPdf(file) ? "pdf" : "markdown";
+    isSwarm = (file) => /\.swarm\.json$/i.test(file);
+    formatOf = (file) => isHtml(file) ? "html" : isPdf(file) ? "pdf" : isSwarm(file) ? "swarm" : "markdown";
     projectRoot = (file) => path3.basename(repoRootOf(path3.dirname(file)));
     readDoc = (p) => fs2.readFileSync(p, "utf8").replace(/\r\n/g, "\n");
     toAbs = (stored, root) => path3.isAbsolute(stored) ? stored : path3.resolve(root, ...stored.split("/"));
