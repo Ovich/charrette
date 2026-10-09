@@ -35,6 +35,39 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 }
+/* aiview's frame passes ?theme=light|dark (main.tsx sets data-theme): it wins over the system */
+:root[data-theme="light"] {
+  --background: #ffffff;
+  --surface: #fafafa;
+  --surface-2: #f4f4f5;
+  --foreground: #18181b;
+  --muted-foreground: #71717a;
+  --faint-foreground: #a1a1aa;
+  --border: #e4e4e7;
+  --accent: #4f46e5;
+  --accent-soft: #eef2ff;
+  --ok: #16a34a;
+  --star: #eab308;
+  --star-glow: #facc1599;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --background: #09090b;
+  --surface: #101013;
+  --surface-2: #1b1b1f;
+  --foreground: #f4f4f5;
+  --muted-foreground: #a1a1aa;
+  --faint-foreground: #63636b;
+  --border: #232327;
+  --accent: #818cf8;
+  --accent-soft: #1e1b3a;
+  --ok: #4ade80;
+  --star: #facc15;
+  --star-glow: #facc15b3;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -290,3 +323,6 @@ a.doc:hover { text-decoration-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before { animation: none !important; transition: none !important; }
 }
+
+/* RunPage: one run framed by aiview; the merge lock up top, no rails, no top bar */
+.run-lock { display: flex; justify-content: flex-end; padding: 10px 28px 0; }

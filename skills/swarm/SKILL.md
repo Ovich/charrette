@@ -71,9 +71,11 @@ first. A long call holds the listener's news until it ends; only the orchestrato
 
 ## The page
 
-The person watches the run on the page: one feed per repository, the roster, the plan's
-slices and the files held. `open` starts it and prints its URL; `serve --detach` starts it
-alone; `status` says where it runs.
+The person watches the run in aiview, not on a tab of its own: `open` registers the run as a
+`swarm` document in the plan's group and prints its aiview URL, which aiview frames as the
+run's roster and thread, the merge lock up top. Without aiview, `open` prints the run's page
+URL and says to open it. `serve --detach` starts the page's server alone; `status` says where
+it runs.
 
 ## Your side
 

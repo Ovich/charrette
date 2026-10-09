@@ -83,6 +83,55 @@ test("open then join prints the roster", () => {
   assert.match(r.stdout, /review-tool\/orchestrator/);
 });
 
+/** A stand-in for aiview's CLI: `path` answers a file in `<toolRoot>/docs`, `open` logs its argv. */
+const fakeAiview = (): { launcher: string; log: string } => {
+  const launcher = path.join(toolRoot, "fake-aiview.mjs");
+  const log = path.join(toolRoot, "aiview.log");
+  fs.writeFileSync(
+    launcher,
+    `import fs from "node:fs"; import path from "node:path";
+const [verb, arg] = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)) + "\\n");
+if (verb === "path") { const dir = path.join(${JSON.stringify(toolRoot)}, "docs"); fs.mkdirSync(dir, { recursive: true }); console.log(JSON.stringify({ path: path.join(dir, arg), dir, project: "p" })); }
+else if (verb === "open") console.log(JSON.stringify({ id: 7, url: "http://localhost:4321/#doc=7" }));
+else process.exit(1);
+`,
+  );
+  return { launcher, log };
+};
+
+const openWith = (aiview: string) => {
+  const slices = path.join(toolRoot, "s.json");
+  fs.writeFileSync(slices, SLICES);
+  return spawnSync(process.execPath, [CLI, "open", "--plan", "review-tool", "--title", "A plan", "--slices", slices], {
+    cwd: repo,
+    encoding: "utf8",
+    env: { ...env(), SWARM_AIVIEW: aiview },
+  });
+};
+
+test("open writes the run's swarm document and registers it in the plan's group in aiview", () => {
+  const { launcher, log } = fakeAiview();
+  const r = openWith(launcher);
+  assert.equal(r.status, 0, r.stderr);
+  const [id, url] = r.stdout.trim().split("\n");
+  assert.equal(url, "http://localhost:4321/#doc=7");
+  const calls = fs.readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
+  const name = calls[0][1];
+  assert.match(name, new RegExp(`^\\d{4}-\\d{2}-\\d{2}-review-tool-run-${id}\\.swarm\\.json$`));
+  const file = path.join(toolRoot, "docs", name);
+  assert.deepEqual(calls[1], ["open", file, "--group", "review-tool-plan", "--json"]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), { run: Number(id), url: `http://localhost:${port}/?run=${id}` });
+});
+
+test("open without aiview prints the run's page and says to open it", () => {
+  const r = openWith(path.join(toolRoot, "none.mjs"));
+  assert.equal(r.status, 0, r.stderr);
+  const [id, url] = r.stdout.trim().split("\n");
+  assert.equal(url, `http://localhost:${port}/?run=${id}`);
+  assert.match(r.stderr, /aiview not found: open the URL/);
+});
+
 test("the roster shows a runner's funny name beside it; open keeps the links (D43, D44)", async () => {
   const slices = path.join(toolRoot, "linked.json");
   fs.writeFileSync(slices, JSON.stringify([{ id: "S3", title: "the page", blockers: [], link: "http://localhost:4321/d/7" }]));
@@ -424,11 +473,12 @@ test("open starts the server when none runs and prints the page's URL", async ()
   assert.equal(r.status, 0, r.stderr);
   const [id, url] = r.stdout.trim().split("\n");
   assert.ok(Number(id) > 0);
-  assert.equal(url, `http://localhost:${port}/`);
+  assert.equal(url, `http://localhost:${port}/?run=${id}`);
   assert.equal(status().server.running, true);
   const repos = (await (await fetch(`http://127.0.0.1:${port}/api/repos`)).json()) as { runs: { run: number }[] }[];
   assert.equal(repos[0].runs[0].run, Number(id));
   // a second run reuses the server
   const again = run("open", "--plan", "swarm", "--title", "T", "--slices", slices, "--json");
-  assert.equal(JSON.parse(again.stdout).url, url);
+  const second = JSON.parse(again.stdout);
+  assert.equal(second.url, `http://localhost:${port}/?run=${second.run}`);
 });
