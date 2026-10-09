@@ -7,7 +7,7 @@ description: Use when handed one slice document to carry out, as the agent doing
 
 **The slice document is the design; the brief is the mandate.** Where the brief asks for something, it wins over any habit, this skill's included.
 
-**When the brief names a run on the board, load the `swarm` skill, runner side, before the work.** It changes nothing else here.
+**Before the first edit, look for a run on the board**: the `swarm` skill's `status` lists the open runs. One open on this repository, or a run the brief names, means you load the `swarm` skill, runner side, and join it before the work, even when the brief forgot to say so; ask the orchestrator on the board which slice id is yours if the brief names none. It changes nothing else here.
 
 ## When to stop
 
