@@ -18,23 +18,3 @@ export function MergeLock({ lock }: { lock: BoardSnapshot["lock"] }) {
     </span>
   );
 }
-
-/** The repository and what is shown of it; the lock when there is a board to show. */
-export function TopBar({ name, title, lock }: { name: string | null; title: string | null; lock: BoardSnapshot["lock"] | undefined }) {
-  return (
-    <header className="topbar" data-component="TopBar">
-      <span className="crumb">
-        {name === null ? (
-          <b>swarm</b>
-        ) : (
-          <>
-            <span>{name}</span>
-            <span className="sep">/</span>
-            <b>{title ?? "The thread"}</b>
-          </>
-        )}
-      </span>
-      <div className="tb-r">{lock !== undefined && <MergeLock lock={lock} />}</div>
-    </header>
-  );
-}

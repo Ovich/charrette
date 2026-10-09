@@ -1,7 +1,6 @@
 // The page's server: two read routes, the SSE stream and the built page, on 127.0.0.1 only.
 // It reads the Board and never writes to it; the CLI writes, in its own
 // processes, and the Board's onChange tells this one.
-import { spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -11,7 +10,6 @@ import { clearServerFiles, writeServerFiles } from "./state.ts";
 
 export interface ServeOptions {
   port: number; // 4322 default; --port, SWARM_PORT
-  open: boolean; // open the browser
   toolRoot?: string; // where dist/ lives; injectable for tests
   writeState?: boolean; // claim swarm.pid / swarm.port; tests pass false
   heartbeatMs?: number; // SSE ping interval; injectable for tests
@@ -33,15 +31,8 @@ const MIME: Record<string, string> = {
 /** The tool's folder, dist/ beside it: the launcher sets SWARM_ROOT, else the launcher's own folder. */
 const defaultToolRoot = (): string => process.env.SWARM_ROOT ?? path.dirname(path.resolve(process.argv[1] ?? "."));
 
-function openBrowser(url: string): void {
-  const [c, a] = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
-  try {
-    spawn(c, a as string[], { detached: true, stdio: "ignore" }).unref();
-  } catch {}
-}
-
 export function startServer(board: Board, options: ServeOptions): http.Server {
-  const { port, open, toolRoot = defaultToolRoot(), writeState = true, heartbeatMs } = options;
+  const { port, toolRoot = defaultToolRoot(), writeState = true, heartbeatMs } = options;
   const sse = createSseHub(heartbeatMs);
   const off = board.onChange((repo) => sse.broadcast({ type: "changed", repo }));
 
@@ -70,18 +61,12 @@ export function startServer(board: Board, options: ServeOptions): http.Server {
     const p = url.pathname;
     try {
       if (p === "/events") return sse.add(res);
-      if (p === "/api/repos") return json(res, board.repos());
       if (p === "/api/run") {
         // one run's repository snapshot, the page scopes it (plan D2): the view aiview frames
         const id = Number(url.searchParams.get("id"));
         const repo = board.repos().find((r) => r.runs.some((x) => x.run === id));
         if (!repo) return json(res, { error: `no run ${url.searchParams.get("id")}` }, 404);
         return json(res, { run: id, snapshot: board.snapshot(repo.repo) });
-      }
-      if (p === "/api/board") {
-        const repo = url.searchParams.get("repo") ?? "";
-        if (!board.repos().some((r) => r.repo === repo)) return json(res, { error: `no repository ${repo}` }, 404);
-        return json(res, board.snapshot(repo));
       }
       if (p.startsWith("/api/")) return json(res, { error: `no route ${p}` }, 404);
       return serveStatic(res, p);
@@ -108,7 +93,6 @@ export function startServer(board: Board, options: ServeOptions): http.Server {
     }
     const url = `http://localhost:${actual}/`;
     console.log(`swarm  the page\n  url   ${url}`);
-    if (open) openBrowser(url);
   });
   return server;
 }

@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useRun } from "./hooks/useRun.ts";
 import { feed, filters, lit, mentionCtx, nicksOf, scope } from "./lib/view.ts";
 import { NicksContext } from "./components/chips.tsx";
-import { MergeLock } from "./components/TopBar.tsx";
+import { MergeLock } from "./components/MergeLock.tsx";
 import { Roster } from "./components/Roster.tsx";
 import { Thread } from "./components/Thread.tsx";
 

@@ -59,10 +59,6 @@ export const nicksOf = (snap: BoardSnapshot): Map<string, string> =>
 /** Whom a message names, resolved as the Board resolves it. */
 export const targets = (e: SnapshotEvent, ctx: MentionCtx): string[] => parseMentions(e.body, splitRunner(e.from).plan, ctx.plans, ctx.names);
 
-/** The blockers of a slice still to merge: a slice not done with any reads "after <ids>", whatever its state. */
-export const waitingOn = (s: QueueSlice, queue: QueueSlice[]): string[] =>
-  s.state === "done" ? [] : s.blockers.filter((b) => queue.find((x) => x.slice === b)?.state !== "done");
-
 /** Orchestrators first, then working, waiting, merging, then ended and done. */
 const ORDER: Record<string, number> = { working: 1, waiting: 2, merging: 3, ended: 4, done: 4 };
 export function orderRoster(roster: SnapshotRunner[]): SnapshotRunner[] {

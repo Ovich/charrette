@@ -130,19 +130,11 @@ var server_exports = {};
 __export(server_exports, {
   startServer: () => startServer
 });
-import { spawn } from "node:child_process";
 import fs4 from "node:fs";
 import http from "node:http";
 import path5 from "node:path";
-function openBrowser(url) {
-  const [c, a] = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
-  try {
-    spawn(c, a, { detached: true, stdio: "ignore" }).unref();
-  } catch {
-  }
-}
 function startServer(board, options) {
-  const { port, open, toolRoot: toolRoot2 = defaultToolRoot(), writeState = true, heartbeatMs } = options;
+  const { port, toolRoot: toolRoot2 = defaultToolRoot(), writeState = true, heartbeatMs } = options;
   const sse = createSseHub(heartbeatMs);
   const off = board.onChange((repo) => sse.broadcast({ type: "changed", repo }));
   const send = (res, status, body, type) => {
@@ -167,17 +159,11 @@ function startServer(board, options) {
     const p = url.pathname;
     try {
       if (p === "/events") return sse.add(res);
-      if (p === "/api/repos") return json(res, board.repos());
       if (p === "/api/run") {
         const id = Number(url.searchParams.get("id"));
         const repo = board.repos().find((r) => r.runs.some((x) => x.run === id));
         if (!repo) return json(res, { error: `no run ${url.searchParams.get("id")}` }, 404);
         return json(res, { run: id, snapshot: board.snapshot(repo.repo) });
-      }
-      if (p === "/api/board") {
-        const repo = url.searchParams.get("repo") ?? "";
-        if (!board.repos().some((r) => r.repo === repo)) return json(res, { error: `no repository ${repo}` }, 404);
-        return json(res, board.snapshot(repo));
       }
       if (p.startsWith("/api/")) return json(res, { error: `no route ${p}` }, 404);
       return serveStatic(res, p);
@@ -203,7 +189,6 @@ function startServer(board, options) {
     const url = `http://localhost:${actual}/`;
     console.log(`swarm  the page
   url   ${url}`);
-    if (open) openBrowser(url);
   });
   return server;
 }
@@ -230,7 +215,7 @@ var init_server = __esm({
 });
 
 // src/cli/index.ts
-import { spawn as spawn2, spawnSync as spawnSync2 } from "node:child_process";
+import { spawn, spawnSync as spawnSync2 } from "node:child_process";
 import fs5 from "node:fs";
 import path6 from "node:path";
 
@@ -1327,7 +1312,7 @@ var USAGE = [
   "  merge-lock --onto <branch> [--as <runner>]                      # one merge at a time per repository; claims or flags what your branch wrote unclaimed",
   "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase and who was refused the lock, names whom to tell of a resolved conflict",
   "  end     [--as <runner>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
-  "  serve   [--port <p>] [--open] [--detach]                        # the page, on :4322 (SWARM_PORT)",
+  "  serve   [--port <p>] [--detach]                 # the run pages aiview frames, on :4322 (SWARM_PORT)",
   "  status                                                          # data home, the page's server, open runs",
   "a runner is <plan>/<slice>, the orchestrator <plan>/orchestrator; without --as, the runner joined from this worktree"
 ].join("\n");
@@ -1389,7 +1374,7 @@ function spawnDetachedServer(port) {
     fs5.rmSync(PORT_FILE, { force: true });
   } catch {
   }
-  const child = spawn2(process.execPath, [process.argv[1], "serve", "--port", String(port)], {
+  const child = spawn(process.execPath, [process.argv[1], "serve", "--port", String(port)], {
     detached: true,
     stdio: "ignore",
     cwd: DATA_ROOT
@@ -1682,7 +1667,7 @@ if (args.verb === "serve" && args.has("--detach")) {
   }
 } else if (args.verb === "serve") {
   const { startServer: startServer2 } = await Promise.resolve().then(() => (init_server(), server_exports));
-  startServer2(await openBoard(), { port: portFrom(args.flag("--port")), open: args.has("--open") });
+  startServer2(await openBoard(), { port: portFrom(args.flag("--port")) });
 } else {
   const board = await openBoard();
   try {

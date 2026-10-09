@@ -71,11 +71,11 @@ first. A long call holds the listener's news until it ends; only the orchestrato
 
 ## The page
 
-The person watches the run in aiview, not on a tab of its own: `open` registers the run as a
-`swarm` document in the plan's group and prints its aiview URL, which aiview frames as the
-run's roster and thread, the merge lock up top. Without aiview, `open` prints the run's page
-URL and says to open it. `serve --detach` starts the page's server alone; `status` says where
-it runs.
+The person watches a run in aiview only; swarm has no page of its own. `open` registers the run
+as a `swarm` document in the plan's group and prints its aiview URL, which aiview frames as the
+run's roster and thread, the merge lock up top. Without aiview, `open` prints the URL of the
+run's view and says to open it. `serve --detach` starts the server aiview frames
+alone; `status` says where it runs.
 
 ## Your side
 

@@ -2,7 +2,7 @@
 // repository refetches on its `changed`.
 import { useEffect, useState } from "react";
 import type { BoardSnapshot } from "../../src/board/board.ts";
-import type { Connection } from "./useBoard.ts";
+export type Connection = "live" | "reconnecting";
 
 export interface RunState {
   /** The run's repository snapshot; null while it loads, or when the run is unknown. */

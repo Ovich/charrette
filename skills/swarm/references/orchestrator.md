@@ -15,7 +15,8 @@ except `open`, `slice`, `close` and `status`.
 
 2. **From the repository's checkout:**
    `$S open --plan <plan slug> --title "<plan title>" --slices <file> --link <plan URL>`.
-   It prints the run id, then the page's URL: give the URL to the person.
+   It prints the run id, then the run's aiview URL: give the URL to the person, who watches the
+   run there.
 
 ## Dispatch
 
@@ -26,8 +27,7 @@ before the next.
 ## Slice states
 
 - **`$S slice <id> --run <run> --state running`** at its dispatch; `done` once its tick stands;
-  `blocked` when it waits on a person. The page shows a slice whose blockers are not done as
-  waiting on them.
+  `blocked` when it waits on a person.
 - **A runner ends with its slice.** The next slice gets a fresh runner.
 
 ## Watching the thread
@@ -59,5 +59,4 @@ runner, which joins the same slice.
 
 ## Close
 
-**`$S close --run <run>`** once every slice is done. The page keeps the run among the last
-ones closed.
+**`$S close --run <run>`** once every slice is done.

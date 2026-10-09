@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { openBoard, type Board, type BoardSnapshot, type RepoSummary } from "../src/board/board.ts";
+import { openBoard, type Board, type BoardSnapshot } from "../src/board/board.ts";
 import { startServer } from "../src/server/index.ts";
 
 const REPO = "/repos/one/.git";
@@ -25,7 +25,7 @@ before(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-server-"));
   board = await openBoard(path.join(dir, "swarm.sqlite"));
   writer = await openBoard(path.join(dir, "swarm.sqlite"));
-  server = startServer(board, { port: 0, open: false, toolRoot: dir, writeState: false, heartbeatMs: 200 });
+  server = startServer(board, { port: 0, toolRoot: dir, writeState: false, heartbeatMs: 200 });
   await new Promise<void>((r) => server.on("listening", () => r()));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -68,27 +68,9 @@ function listen(until: (events: { type: string; repo?: string }[]) => boolean, m
   });
 }
 
-test("GET /api/repos is empty, then lists a repository once a run opens", async () => {
-  assert.deepEqual(await (await fetch(`${base}/api/repos`)).json(), []);
+test("the old page's routes are gone: /api/repos and /api/board answer 404 (plan D6)", async () => {
   writer.openRun({ repo: REPO, plan: "review-tool", title: "Review tool", slices: SLICES });
-  const repos = (await (await fetch(`${base}/api/repos`)).json()) as RepoSummary[];
-  assert.equal(repos.length, 1);
-  assert.equal(repos[0].repo, REPO);
-  assert.equal(repos[0].name, "one");
-  assert.deepEqual(repos[0].runs.map((r) => [r.plan, r.code, r.open]), [["review-tool", "RT", true]]);
-});
-
-test("GET /api/board returns the snapshot; an unknown repository is a 404 naming it", async () => {
-  const r = await fetch(`${base}/api/board?repo=${encodeURIComponent(REPO)}`);
-  assert.equal(r.status, 200);
-  const snap = (await r.json()) as BoardSnapshot;
-  assert.equal(snap.repo, REPO);
-  assert.deepEqual(Object.keys(snap.queues), ["review-tool"]);
-  assert.ok(snap.roster.some((p) => p.runner === "review-tool/orchestrator"));
-
-  const missing = await fetch(`${base}/api/board?repo=${encodeURIComponent("/repos/none/.git")}`);
-  assert.equal(missing.status, 404);
-  assert.deepEqual(await missing.json(), { error: "no repository /repos/none/.git" });
+  for (const route of ["/api/repos", `/api/board?repo=${encodeURIComponent(REPO)}`]) assert.equal((await fetch(`${base}${route}`)).status, 404, route);
 });
 
 test("GET /api/run returns the run's repository snapshot; an unknown run is a 404", async () => {
@@ -124,7 +106,7 @@ test("/events sends hello, pings, and changed with the repository within a secon
 
 test("no route accepts a write method", async () => {
   for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
-    for (const route of ["/api/repos", `/api/board?repo=${encodeURIComponent(REPO)}`, "/events", "/"]) {
+    for (const route of [`/api/run?id=1`, "/events", "/"]) {
       const r = await fetch(`${base}${route}`, { method, body: method === "DELETE" ? undefined : "{}" });
       assert.equal(r.status, 405, `${method} ${route}`);
     }

@@ -475,8 +475,8 @@ test("open starts the server when none runs and prints the page's URL", async ()
   assert.ok(Number(id) > 0);
   assert.equal(url, `http://localhost:${port}/?run=${id}`);
   assert.equal(status().server.running, true);
-  const repos = (await (await fetch(`http://127.0.0.1:${port}/api/repos`)).json()) as { runs: { run: number }[] }[];
-  assert.equal(repos[0].runs[0].run, Number(id));
+  const body = (await (await fetch(`http://127.0.0.1:${port}/api/run?id=${id}`)).json()) as { run: number };
+  assert.equal(body.run, Number(id));
   // a second run reuses the server
   const again = run("open", "--plan", "swarm", "--title", "T", "--slices", slices, "--json");
   const second = JSON.parse(again.stdout);

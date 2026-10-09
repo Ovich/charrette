@@ -1,7 +1,6 @@
 // The mockup's "live" variant (2026-10-07-swarm-board.mockup.html) as the Board would return
 // it: two plans on one repository, a second repository running, a third with a closed run.
-import type { BoardSnapshot, RepoSummary, SnapshotEvent, SnapshotRunner } from "../src/board/board.ts";
-import type { BoardState, RepoView } from "./hooks/useBoard.ts";
+import type { BoardSnapshot, SnapshotEvent, SnapshotRunner } from "../src/board/board.ts";
 
 const at = (hm: string): string => {
   const [h, m] = hm.split(":").map(Number);
@@ -131,23 +130,5 @@ export const LIVE: BoardSnapshot = {
 LIVE.files = LIVE.roster.flatMap((r) => r.files.map((f) => ({ path: f.path, holders: [r.runner], interface: f.interface })));
 
 
-const REPOS: RepoSummary[] = [
-  { repo: APP, name: "charrette-app", runs: LIVE.runs },
-  { repo: "/repos/billing-service/.git", name: "billing-service", runs: [{ run: 3, plan: "invoice-pdfs", code: "IP", title: "Invoice PDFs", link: null, open: true, runners: 3, done: 4, of: 6 }] },
-  { repo: "/repos/docs-site/.git", name: "docs-site", runs: [{ run: 4, plan: "search-rewrite", code: "SR", title: "Search rewrite", link: null, open: false, runners: 0, done: 5, of: 5 }] },
-];
-
-export const liveState = (over: Partial<BoardSnapshot> = {}): BoardState => ({
-  repos: REPOS.map((r): RepoView => ({ ...r, unread: 0 })),
-  snapshot: { ...LIVE, ...over },
-  connection: "live",
-});
-
-/** No run open anywhere: only the closed run of docs-site is listed. */
-export const emptyState = (): BoardState => ({
-  repos: [{ ...REPOS[2], unread: 0 }],
-  snapshot: null,
-  connection: "live",
-});
 
 export const at1414 = at("14:14");
