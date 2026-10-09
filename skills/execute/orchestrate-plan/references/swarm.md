@@ -13,6 +13,9 @@ everything said on the board. This file says what changes in this skill's own du
 - **The brief carries the board line and the swarm pull request line** (`references/brief.md`).
   The subagent definition is the same as in classic mode: the board line tells it to load the
   `swarm` skill.
+- **Every subagent a swarm run sends joins its board**: a slice, a fix drawn from a verification, a
+  slice added mid-run. Its brief carries the board line and a slice id on the run (`slice <id> --run
+  <run> --state running` first); a brief without one is a classic dispatch and is not sent.
 
 ## Checking the run
 
