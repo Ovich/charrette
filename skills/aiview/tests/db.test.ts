@@ -69,6 +69,16 @@ test("register: pdf titles by filename, explicit kind", () => {
   assert.equal(d.title, "cv-live.pdf");
 });
 
+test("a swarm document lists with its kind and the swarm format, titled by its file", () => {
+  const abs = write("docs/2026-10-09-plan-run-7.swarm.json", JSON.stringify({ run: "7", url: "http://127.0.0.1:4777/run/7" }));
+  const d = index.register(abs);
+  assert.equal(d.kind, "swarm");
+  assert.equal(d.title, "2026-10-09-plan-run-7.swarm.json");
+  const listed = index.all().find((x) => x.id === d.id)!;
+  assert.equal(listed.kind, "swarm");
+  assert.equal(listed.format, "swarm");
+});
+
 test("all: newest created_at first, exists + format computed", () => {
   const a = write("a.spec.md", "# A\n");
   const b = write("b.mockup.html", "<title>B</title>");

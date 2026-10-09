@@ -48,6 +48,7 @@ $A open "$F" --tag <topic>
 - **Fix metadata with `update`.** `aiview.sqlite` is the tool's to write, and scratch files stay unregistered.
 - **Mockups are self-contained HTML**, per the `design-prototype` skill.
 - **Workbenches are self-contained HTML too**, per the `create-workbench` skill; a trace is a workbench.
+- **A `swarm` document is one run's live page**, `<date>-<plan>-run-<id>.swarm.json` holding `{ run, url }`, written by `swarm open` and framed from swarm's server.
 
 ## Publishing before the work is done
 

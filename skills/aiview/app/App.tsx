@@ -9,6 +9,14 @@ import { MarkdownView } from "./components/viewers/MarkdownView.tsx";
 import { PendingCards } from "./components/docs/PendingCards.tsx";
 import { MockupFrame } from "./components/viewers/MockupFrame.tsx";
 import { PdfFrame } from "./components/viewers/PdfFrame.tsx";
+import { SwarmFrame, swarmUrlOf } from "./components/viewers/SwarmFrame.tsx";
+
+/** A swarm document framed from the URL its file names, or why it cannot be. */
+export function SwarmDocumentView({ content }: { content: string }) {
+  const url = swarmUrlOf(content);
+  if (url === null) return <p className="text-muted-foreground">This swarm document names no page URL.</p>;
+  return <SwarmFrame url={url} />;
+}
 
 /** The hash is the pointer: the document, and what the agent is pointing at in it. */
 const hashPointer = (): Pointer | null => readPointer(location.hash);
@@ -220,6 +228,9 @@ export function App() {
                   onClearPointer={stopPointing}
                   workbench={doc.kind === "workbench"}
                 />
+              )}
+              {format === "swarm" && response!.content !== null && (
+                <SwarmDocumentView content={response!.content} />
               )}
               {format === "markdown" && response!.content !== null && (
                 <MarkdownView content={response!.content} docId={doc.id} />
