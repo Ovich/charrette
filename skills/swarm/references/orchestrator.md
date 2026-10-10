@@ -32,9 +32,13 @@ before the next.
 
 ## Watching the thread
 
-- **Listen in the background from the open**: `$S wait --mentions --as <plan>/orchestrator`,
-  started with the harness's background-task feature. When it ends, read its output, act, and
-  start again the command its first line names; empty, start it again. `close` makes it return.
+- **Listen in the background from the open, to every event**: `$S wait --as <plan>/orchestrator`,
+  without `--mentions`, started with the harness's background-task feature. A runner's `merged`
+  and `end` mention nobody, and its report reaches you minutes after them. When it ends, read
+  its output, act, and start again the command its first line names; empty, start it again.
+  `close` makes it return.
+- **A `merged` event is a slice to check**: re-run its check on the branch it merged into then,
+  not when the runner's report arrives; the report adds what it found.
 - **`$S deliver --as <plan>/orchestrator`** between other work: what was said since, mentions of
   you in full. With no background notification in the harness (`references/setup.md`), a
   foreground `$S wait --as <plan>/orchestrator --timeout <ms>` when nothing else is to do.

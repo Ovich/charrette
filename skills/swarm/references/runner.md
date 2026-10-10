@@ -9,7 +9,8 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
 
 ## The checklist
 
-1. **Join, from your worktree, before the first edit:**
+1. **Join, from your worktree, before anything else**, the install and a rebase included, so the
+   roster shows you from the start:
    `$S join --run <run> --slice <slice> --doing "<what you start on>" --files "<path>:interface,<path>:inside,…"`.
    The files are the slice document's modules table: *interface* when other slices import the
    file, *inside* when only this slice reads it. Read the roster it prints: who is there, doing
@@ -49,8 +50,10 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
       resolved <file>: <how>" --about <file>`. For each file you resolved, run that post with
       `<how>` filled in.
    4. Run the slice's check on the rebased branch, then merge into `<target>` as the brief says.
-   5. `$S merged <sha> --files <every path the merge changed>`. After a change to an
-      *interface* file, `$S post "@all <what changed in it>" --about <file>`.
+   5. `$S merged <sha> --files <every path the merge changed>`, then at once
+      `$S post "@orchestrator merged <sha>"`, before your report: the orchestrator checks your
+      slice from that post. After a change to an *interface* file, `$S post "@all <what changed
+      in it>" --about <file>`.
 7. **`$S end`** after your last merge. It claims or flags what you wrote without a claim,
    releases your claims and the lock, and makes your listener return empty: do not re-arm it.
    A slice that stops on a finding posts it first: `$S post "@orchestrator <the finding>"`, then
