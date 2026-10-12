@@ -1,4 +1,4 @@
-// Writes a new workbench page: Basecoat inlined, the bench bar opening on the label, an
+// Writes a new workbench page: Basecoat and the JSON reader (`jsonTree`) inlined, the bench bar opening on the label, an
 // empty data block for the feed, and the bridge from aiview's theme switch to Basecoat's
 // `.dark`. The bench's own code goes in the last script, under its marker.
 //   node page.mjs <YYYY-MM-DD-<bench>.workbench.html> --label "<label>"
@@ -27,6 +27,9 @@ const assets = join(dirname(fileURLToPath(import.meta.url)), "../assets/basecoat
 // `<` escaped wherever text lands inside an element that a stray `</style>` or `</script>` would close.
 const css = readFileSync(join(assets, "basecoat.min.css"), "utf8").replace(/<\/style/gi, "<\\/style");
 const js = readFileSync(join(assets, "basecoat.min.js"), "utf8").replace(/<\/script/gi, "<\\/script");
+const jsonTreeDir = join(assets, "../json-tree");
+const treeCss = readFileSync(join(jsonTreeDir, "json-tree.css"), "utf8");
+const treeJs = readFileSync(join(jsonTreeDir, "json-tree.js"), "utf8").replace(/<\/script/gi, "<\\/script");
 const text = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const page = `<!doctype html>
@@ -36,6 +39,7 @@ const page = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${text(label)}</title>
 <style data-basecoat>${css}</style>
+<style data-json-tree>${treeCss}</style>
 <style>
   body { margin: 0; background: var(--background); color: var(--foreground); }
   .bench-bar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px;
@@ -53,6 +57,7 @@ const page = `<!doctype html>
 <main class="bench" id="bench"></main>
 <script id="data" type="application/json">null</script>
 <script data-basecoat>${js}</script>
+<script data-json-tree>${treeJs}</script>
 <script>
   // aiview forces its theme by rewriting the media query text, this one included, so the
   // page follows the viewer's switch as well as the machine's.

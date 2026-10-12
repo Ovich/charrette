@@ -19,51 +19,17 @@ a model is often mostly one key).
 
 ## The reader
 
-Placed in the bench's code once, used wherever JSON is shown: `jsonTree(value, { open: 1 })`.
+**Every page carries it**: `page.mjs` inlines `assets/json-tree/` (the `jsonTree` function and
+its CSS), so a bench never writes or pastes its own. Every JSON shown on the page goes through it:
 
 ```js
-/** A JSON value as a tree: objects and arrays fold, `open` levels start unfolded. */
-const jsonTree = (value, { open = 1, label = null } = {}) => {
-  const node = (tag, className, children) => {
-    const made = document.createElement(tag);
-    if (className) made.className = className;
-    for (const child of children) if (child !== null) made.append(child);
-    return made;
-  };
-  const text = (className, words) => node("span", className, [String(words)]);
-  const tree = (value, key, depth) => {
-    const name = key === null ? null : text("jt-key", `${key}: `);
-    if (value === null || typeof value !== "object") {
-      return node("div", "jt-leaf", [name, text(`jt-${value === null ? "null" : typeof value}`, JSON.stringify(value))]);
-    }
-    const entries = Array.isArray(value) ? value.map((each, at) => [at, each]) : Object.entries(value);
-    const fold = node("details", "jt-node", [
-      node("summary", null, [
-        name,
-        text("jt-count", Array.isArray(value) ? `[${entries.length}]` : `{${entries.length}}`),
-        text("jt-size", `${JSON.stringify(value).length.toLocaleString()} chars`),
-      ]),
-      node("div", "jt-kids", entries.map(([k, v]) => tree(v, k, depth + 1))),
-    ]);
-    if (depth < open) fold.open = true;
-    return fold;
-  };
-  return node("div", "json-tree", [tree(value, label, 0)]);
-};
+container.append(jsonTree(value, { open: 1, label: "request" }));
 ```
 
-```css
-.json-tree { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; line-height: 1.5; }
-.json-tree .jt-node > summary { display: flex; gap: 6px; cursor: pointer; padding: 1px 0; }
-.json-tree .jt-size { margin-left: auto; color: var(--muted-foreground); }
-.json-tree .jt-kids { padding-left: 14px; margin-left: 3px; border-left: 1px solid var(--border); }
-.json-tree .jt-leaf { padding: 1px 0; white-space: pre-wrap; word-break: break-word; }
-.json-tree .jt-key, .json-tree .jt-count, .json-tree .jt-null { color: var(--muted-foreground); }
-.json-tree .jt-string { color: #15803d; }
-.json-tree .jt-number, .json-tree .jt-boolean { color: #b45309; }
-.dark .json-tree .jt-string { color: #86efac; }
-.dark .json-tree .jt-number, .dark .json-tree .jt-boolean { color: #fbbf24; }
-```
+**The toolbar comes with every tree, never without it**: Fold all, Unfold all, Unfold 2 levels,
+Copy (the value as indented JSON). It sticks at the top of the tree while the tree scrolls.
+A bench that needs another action on a tree adds it to `assets/json-tree/json-tree.js` here,
+so every bench gets it.
 
 ## Where it goes
 

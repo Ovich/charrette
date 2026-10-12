@@ -5,6 +5,10 @@ description: "Use when a page is wanted to work on something with the person dur
 
 # Create a workbench
 
+**A workbench is a dev tool for iterating on an idea, and it has two users**: the person, who
+needs a clear UI that opens on what is being tried now, and the agent, who needs the bench
+cheap to read, change and check. It is judged by the time from "what if…" to the result seen.
+
 **Two things are produced, and a later agent works the bench from them alone**: the page,
 in the data home like every document, and the project's `workbench-<bench>` skill, which
 holds the feed that fills the page and the steps to operate it.
@@ -70,12 +74,29 @@ Each answer is written into the bench skill's head as it lands.
   `select`. Basecoat carries no Tailwind utilities, so layout is the page's own CSS. The
   product the bench shows (a document, a screen, a card) is drawn in the project's design
   language, from the `design-prototype` skill's reference when there is one.
-- **JSON the project produced** (a request, a reply, a stored document) is shown as a tree that folds node by node: when the bench shows any, read `references/json-data.md`.
+- **JSON is always shown through `jsonTree`**, the reader `page.mjs` inlines, with its toolbar
+  (Fold all, Unfold all, Unfold 2 levels, Copy): never a `<pre>` dump or a reader of the
+  bench's own. When the bench shows any JSON, read `references/json-data.md`.
+- **The page opens on the current question**, and each thing is shown once: a view that repeats
+  another, or that nobody looks at any more, is removed with its code and its feed fields.
 - **The data is the project's, as it is.** Copied byte for byte, never renamed, reshaped
   or summarised: the page adapts to the shape, so the bench stays as close to the real
   run as it can. A rendering that interprets the data is what the app already shows.
 - **Only the feed writes the data block.** The agent edits the page's code, never its data.
 - **Self-contained**: no CDN, no fetch, the page opens offline.
+
+## Ergonomic for the agent
+
+- **The scripts that drive the bench are built with it**, each with the view or control
+  that needs it: open a view, set its controls, screenshot it, read back what it shows as
+  text. An agent drives the bench through them, never with hand-written browser calls.
+- **The loop is one command**, named in the bench skill's Iterating section: feed, reload,
+  screenshot. An agent never rebuilds it.
+- **Scripts print a short summary** (counts, what changed, what failed), so a result is
+  checked without reading the page or the raw data.
+- **The bench's code is read by its marker**, never the whole page: Basecoat and the
+  JSON reader are inlined above it and cost tokens for nothing.
+- **The feed writes only what a view shows.**
 
 ## The bench's skill
 
@@ -100,4 +121,6 @@ The page's URL, the skill's path, the sources and the feed's kind, what was walk
 |---|---|
 | "I'll map the data to a cleaner shape for the page" | The page adapts to the project's shape. A translation hides what the app really produced, and drifts from it unseen. |
 | "Quicker to paste the data into the page" | Only the feed writes the block. A pasted copy is stale on the next run and nothing says so. |
+| "I'll keep the old view in case" | A dropped idea leaves with its view, its code and its feed fields, in the same change. A bench that only grows is slow for both users. |
+| "This JSON is small, a `<pre>` will do" | Every JSON goes through `jsonTree`, with its toolbar. One reader, read the same way everywhere. |
 | "The feed can sit next to the page in the data home" | It reads the project, so it lives in the project's skill. In the data home it breaks without anyone seeing. |

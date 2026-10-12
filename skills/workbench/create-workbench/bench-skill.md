@@ -15,7 +15,7 @@ description: "Use when [the bench's scope, a kind of work on a part of the produ
 
 [The bench's scope, one sentence.] [Its views, one line each: the question each answers.] [What the person does on it.]
 
-A new question in this scope is a new view or mode here, never a second bench.
+This bench is a dev tool for iterating on ideas with the person: a clear UI for them, cheap to read, change and check for you. A new question in this scope is a new view or mode here, never a second bench; an idea dropped takes its view, its code and its feed fields with it, in the same change. Every JSON on the page is shown through `jsonTree`, with its toolbar.
 
 **The page** is `[YYYY-MM-DD-bench.workbench.html]` in aiview, kind `workbench`
 ([the aiview link]). It is a working document of the data home and never enters this
@@ -36,6 +36,10 @@ The page works on these as the project produces them, never on a translation.
 rebuilds the data block from the sources. | Log: `node .claude/skills/workbench-[bench]/scripts/feed.mjs <verb>`
 appends one entry and never rewrites one; the page is the only record of the walk.]
 Only the feed writes the data block, through `scripts/data-block.mjs`.
+
+## Iterating
+
+[The one command that runs the loop: feed, reload, screenshot.] [The scripts that drive the page, one line each: open a view, set its controls, screenshot, read back what it shows.] Drive the bench through them; a view or control added gets its driving script in the same change. [The view the page opens on: the current question.] Read the page's code from its marker `// ---- the bench`, never the whole file.
 
 ## Operating
 
