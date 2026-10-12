@@ -39,7 +39,11 @@ Only the feed writes the data block, through `scripts/data-block.mjs`.
 
 ## Iterating
 
-[The one command that runs the loop: feed, reload, screenshot.] [The scripts that drive the page, one line each: open a view, set its controls, screenshot, read back what it shows.] Drive the bench through them; a view or control added gets its driving script in the same change. [The view the page opens on: the current question.] Read the page's code from its marker `// ---- the bench`, never the whole file.
+[The one command that runs the loop: feed, reload, screenshot.] [The scripts that drive the page, one line each: open a view, set its controls, screenshot, read back what it shows.] Drive the bench through them; a view or control added gets its driving script in the same change.
+
+**Keep your context clean.** Every verb prints a short summary; ask for `--full` or `--json` only when the summary cannot answer. Read summaries and diffs, never the raw files the bench shows.
+
+**The person asks from a phone.** "Send me X" is `shot <view> --mobile` for a picture or `--md` on a reading verb for data, then the file sent as it is, unread. [The CLI's verbs, one line each, with what they print.] [The view the page opens on: the current question.] Read the page's code from its marker `// ---- the bench`, never the whole file.
 
 ## Operating
 

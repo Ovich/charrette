@@ -92,8 +92,15 @@ Each answer is written into the bench skill's head as it lands.
   text. An agent drives the bench through them, never with hand-written browser calls.
 - **The loop is one command**, named in the bench skill's Iterating section: feed, reload,
   screenshot. An agent never rebuilds it.
-- **Scripts print a short summary** (counts, what changed, what failed), so a result is
-  checked without reading the page or the raw data.
+- **The scripts are one CLI with verbs, terse by default.** Each verb prints a short plain
+  summary (counts, what changed, what failed); the full output only with `--full`, machine
+  output with `--json`. The agent reads summaries and diffs, never the raw files the bench
+  shows (a prompt, a reply, a recording): a result is checked without filling the context.
+- **Anything can go to the person's phone in one command, without passing through the
+  agent's context.** A `shot` verb with `--mobile` takes a phone-width PNG of any view, with one item
+  opened if asked, and prints only its path. `--md` on the reading verbs also writes the
+  output as a short markdown file laid out for a phone: lists, not wide tables. The agent
+  sends the file it names (the harness's send-file tool) and reads neither.
 - **The bench's code is read by its marker**, never the whole page: Basecoat and the
   JSON reader are inlined above it and cost tokens for nothing.
 - **The feed writes only what a view shows.**
