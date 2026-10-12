@@ -26,7 +26,7 @@ its CSS), so a bench never writes or pastes its own. Every JSON shown on the pag
 container.append(jsonTree(value, { open: 1, label: "request" }));
 ```
 
-**The toolbar comes with every tree, never without it**: Fold all, Unfold all, Unfold 2 levels,
+**The toolbar comes with every tree, never without it**: Fold all, Unfold all, Unfold n levels with 2 by default,
 Copy (the value as indented JSON). It sticks at the top of the tree while the tree scrolls.
 A bench that needs another action on a tree adds it to `assets/json-tree/json-tree.js` here,
 so every bench gets it.

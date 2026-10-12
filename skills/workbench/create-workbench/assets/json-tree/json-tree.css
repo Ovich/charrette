@@ -1,5 +1,6 @@
 .json-tree { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; line-height: 1.5; }
 .json-tree .jt-bar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0 6px; background: var(--background); font-family: var(--font-sans, inherit); }
+.json-tree .jt-levels { width: 4em; height: auto; padding: 2px 6px; }
 .json-tree .jt-node > summary { display: flex; gap: 6px; cursor: pointer; padding: 1px 0; }
 .json-tree .jt-size { margin-left: auto; color: var(--muted-foreground); }
 .json-tree .jt-kids { padding-left: 14px; margin-left: 3px; border-left: 1px solid var(--border); }

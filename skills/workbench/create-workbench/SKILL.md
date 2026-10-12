@@ -75,7 +75,7 @@ Each answer is written into the bench skill's head as it lands.
   product the bench shows (a document, a screen, a card) is drawn in the project's design
   language, from the `design-prototype` skill's reference when there is one.
 - **JSON is always shown through `jsonTree`**, the reader `page.mjs` inlines, with its toolbar
-  (Fold all, Unfold all, Unfold 2 levels, Copy): never a `<pre>` dump or a reader of the
+  (Fold all, Unfold all, Unfold n levels with 2 by default, Copy): never a `<pre>` dump or a reader of the
   bench's own. When the bench shows any JSON, read `references/json-data.md`.
 - **The page opens on the current question**, and each thing is shown once: a view that repeats
   another, or that nobody looks at any more, is removed with its code and its feed fields.

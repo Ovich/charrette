@@ -1,6 +1,6 @@
 // The JSON reader every bench page carries, inlined by page.mjs: `jsonTree(value, { open, label })`
 // returns the value as a tree whose objects and arrays fold, with its toolbar on top of it:
-// Fold all, Unfold all, Unfold 2 levels, Copy. The toolbar sticks while the tree scrolls.
+// Fold all, Unfold all, Unfold n levels (2 by default), Copy. The toolbar sticks while the tree scrolls.
 const jsonTree = (value, { open = 1, label = null } = {}) => {
   const node = (tag, className, children = []) => {
     const made = document.createElement(tag);
@@ -53,10 +53,18 @@ const jsonTree = (value, { open = 1, label = null } = {}) => {
     made.textContent = "Copied";
     setTimeout(() => (made.textContent = "Copy"), 1200);
   };
+  // Unfold n: the levels to open, 2 by default; Enter in the field unfolds too.
+  const levels = node("input", "input jt-levels");
+  levels.type = "number";
+  levels.min = "0";
+  levels.value = "2";
+  levels.title = "Levels to unfold";
+  levels.addEventListener("keydown", (e) => e.key === "Enter" && unfoldTo(Number(levels.value) || 0));
   const bar = node("div", "jt-bar", [
     button("Fold all", () => unfoldTo(0)),
     button("Unfold all", () => unfoldTo(Infinity)),
-    button("Unfold 2 levels", () => unfoldTo(2)),
+    button("Unfold", () => unfoldTo(Number(levels.value) || 0)),
+    levels,
     button("Copy", copy),
   ]);
   return node("div", "json-tree", [bar, body]);
