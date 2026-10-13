@@ -15,7 +15,7 @@ answer into the board as it lands.
 
 The board, in this order:
 
-- **Decisions table**: id `D3`, decision, depends on, status (agreed, open, deferred), log entry `Q7`. The interview's `experiments` option is its first row.
+- **Decisions table**: id `D3`, numbered from `D1` in this board and cited `<topic>.board#D3` from anywhere else, decision, depends on, status (agreed, open, deferred), log entry `Q7`. The interview's `experiments` option is its first row.
 - **Context being built on.**
 - **Diagrams**, through the `write-diagrams` skill, drawn during the questions.
 - **What ran**: the recipes the experiments hand back.

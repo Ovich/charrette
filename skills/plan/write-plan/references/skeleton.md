@@ -47,7 +47,11 @@ The recipes the experiments handed back.
 
 ## 8. Decisions
 | id | Kind | Decision | Status | Source | Slice |
-One series, `D1` onward, continuing the project's numbering. Kinds: purpose, module (with
+`D1` onward within this plan, never continuing another document's numbering: no counter is
+shared between plans written on two branches. Outside the plan, a decision is cited `<topic>#D<n>`,
+the topic being the plan file's slug, and a board's `<topic>.board#D<n>`. A project still on
+one global series keeps it in the documents that carry `> **Decision ids**: legacy series`
+under their title; a bare `D96` cited from code resolves against those. Kinds: purpose, module (with
 its state, as write-slice names them), architecture, contract, clarification. Open
 questions are rows with status open and an owner. A departure from a rule is a row naming
 what is owed for it.

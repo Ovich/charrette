@@ -91,6 +91,9 @@ test("a citation shown in a code span or a fence of a document is an example, no
     "2026-10-01-alerts.plan.md": "Cite it as `fork-demo#D4` from code.\n\n```\nalerts#D99\n```\n" + plan("D1"),
   });
   assert.deepEqual(findings(p), []);
+  // an escape sequence before a topic is not part of it: "\nalerts#D99" in a string cites alerts
+  const q = project({ "2026-10-01-alerts.plan.md": plan("D1") }, { "a.js": 'const s = "\\nalerts#D99";\n' });
+  assert.match(findings(q)[0].text, /^alerts#D99: /);
 });
 
 test("slice documents are read but neither collide by topic nor dangle on their short ids", () => {
