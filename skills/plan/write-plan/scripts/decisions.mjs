@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 const DOCUMENT = /^\d{4}-\d{2}-\d{2}-(.+)\.(plan|brainstorm|slice)\.md$/;
 const ROW = /^\|\s*(D\d+)\s*\|/;
 const LEGACY = /^>\s*\*\*Decision ids\*\*:\s*legacy series\b/m;
-const QUALIFIED = /(?<![\w.-])([a-z0-9]+(?:-[a-z0-9]+)*)(\.board)?#(D\d+)\b/g;
+const QUALIFIED = /(?:(?<=\\[a-z])|(?<![\w.\\-]))([a-z0-9]+(?:-[a-z0-9]+)*)(\.board)?#(D\d+)\b/g; // after `\n` too
 const BARE = /(?<![\w#.-])(D\d+)\b/g;
 const SKIPPED = new Set([".git", "node_modules", "dist", "dist-cli"]);
 

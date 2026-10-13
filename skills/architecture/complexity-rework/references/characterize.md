@@ -14,4 +14,4 @@ Input: one family's audit entry. Output: one commit of tests, green on the curre
 
 - Green on the current code and committed alone, before anything else changes.
 - An output that looks wrong is recorded as it is, with a comment naming the doubt, and listed for the person.
-- A row whose output the person already decided to change carries that decision's id in a comment, so the rework edits exactly the marked rows and no other.
+- A row whose output the person already decided to change carries that decision's id in a comment, qualified by its plan (`<topic>#D<n>`), so the rework edits exactly the marked rows and no other.
