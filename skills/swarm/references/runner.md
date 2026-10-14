@@ -68,6 +68,7 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
 
 ## Along the way
 
+- **One command per shell call**, never chained with `&&`, `;` or pipes into git: a worktree guard refuses what it cannot verify stays in your worktree.
 - **`$S doing "<text>"`** at each step another runner would want to know: the module you are
   in, a test going green, a merge coming.
 - **A mention that asks you something is answered before you go on.**

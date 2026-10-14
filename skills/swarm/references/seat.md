@@ -62,6 +62,7 @@ A seat that ends its turn is not woken by its listener: it is gone.
 
 ## Along the way
 
+- **One command per shell call**, never chained with `&&`, `;` or pipes into git: a worktree guard refuses what it cannot verify stays in your worktree.
 - **`$S doing "<text>" --as <group>/<seat>`** when you turn to another question.
 - **`$S deliver --as <group>/<seat>`** gives what you have not had; `$S read <n> --as
   <group>/<seat>` a message in full.
