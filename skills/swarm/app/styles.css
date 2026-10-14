@@ -328,3 +328,37 @@ p { margin: 0; }
 .archive .arow .am { grid-column: 2; font-size: 11.5px; color: var(--muted-foreground); }
 .archive .arow .ad { grid-row: 1; grid-column: 3; font: 11px var(--mono, ui-monospace, monospace); color: var(--faint-foreground); white-space: nowrap; }
 .archive .aempty { padding: 8px; font-size: 12px; color: var(--faint-foreground); }
+/* SL6: the one conversation (D8, D9), as mockup #643 draws it. Red only means act now. */
+:root { --amber: #b45309; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --amber: #fbbf24; } }
+:root[data-theme="dark"] { --amber: #fbbf24; }
+.convo { flex: 1; display: flex; flex-direction: column; min-height: 240px; min-width: 0; }
+.stream { list-style: none; margin: 0; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 24px 24px; }
+.archived-line { font-size: 12px; color: var(--muted-foreground); padding: 0 0 10px 12px; }
+.item { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 12px; padding: 6px 0 6px 10px; border-left: 2px solid transparent; }
+.item + .item.cont { padding-top: 0; }
+.item .time, .event .time { font: 11px ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace; color: var(--faint-foreground); padding-top: 2px; }
+.item .head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 12.5px; }
+.item .what { font-size: 12px; }
+.item .text { grid-column: 2; max-width: 72ch; font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.item .text code { font-size: 12px; background: var(--surface-2); border-radius: 4px; padding: 1px 4px; }
+.item .text .post-md pre code { background: none; padding: 0; }
+.item .text .seq-ref { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.item.cont .head, .item.cont .time { display: none; }
+.item.act { border-left: 2px solid var(--danger); }
+.item.act .what { color: var(--danger); font-weight: 600; }
+.item.flag.open { background: color-mix(in srgb, var(--danger) 5%, transparent); }
+.item.wait { border-left: 2px dashed var(--amber); }
+.item.wait .what { color: var(--amber); }
+.item.decided .what { color: var(--ok); }
+.item.new, .event.new { animation: rise .35s ease-out; }
+.event { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 12px; padding: 2px 0 2px 12px; font-size: 12px; color: var(--faint-foreground); }
+.tip { cursor: help; text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; }
+#tipbox { position: fixed; z-index: 50; max-width: 300px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--foreground); color: var(--background); font-size: 12px; line-height: 1.45; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); pointer-events: none; }
+#tipbox[hidden] { display: none; }
+@media (max-width: 860px) {
+  .stream { padding: 10px 14px; }
+  .item, .event { grid-template-columns: 1fr; }
+  .item .time, .event .time { display: none; }
+  .item .text { grid-column: 1; }
+}
