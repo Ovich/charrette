@@ -66,7 +66,11 @@ Each answer is written into the bench skill's head as it lands.
    skill: kind `workbench`, tags the bench and `trace` for a walk, group the
    piece of work it serves. Open it in the watched browser. The page carries Basecoat,
    `jsonTree` and the loader, `bench`; the bench's code goes between its
-   `<!-- bench-code -->` markers, put on by the bench's `code.mjs`.
+   `<!-- bench-code -->` markers, put on by the bench's `code.mjs`. A bench that makes one
+   page per run (a walk, a session) keeps the page's code in its skill instead, and each
+   run's page has its own sidecar: its feed's `init` makes each run's page, and its `refresh`
+   puts changed code onto every page as `page.mjs --replace` does, the code block replaced,
+   the sidecar untouched.
 2. **The feed**: copy `scripts/data-folder.mjs` into the bench skill's `scripts/` and write
    `feed.mjs` over it. It writes the sidecar, the folder `YYYY-MM-DD-<bench>.workbench/`
    beside the page. A derived feed calls `writeDerived` and takes `--watch`. A log feed, new

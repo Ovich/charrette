@@ -20,7 +20,10 @@ This bench is a dev tool for iterating on ideas with the person: a clear UI for 
 
 **The page** is `[YYYY-MM-DD-bench.workbench.html]` in aiview, kind `workbench`
 ([the aiview link]). It is a working document of the data home and never enters this
-repository. Its data is in the sidecar beside it, `[YYYY-MM-DD-bench.workbench/]`.
+repository. Its data is in the sidecar beside it, `[YYYY-MM-DD-bench.workbench/]`.[ One page
+per run: the page code kept in this skill is every page's code; the feed's `init` makes a run's
+page with a sidecar of its own, and its `refresh` puts changed code onto each page as
+`page.mjs --replace` does, the code block replaced, the sidecar untouched.]
 
 ## Sources
 
