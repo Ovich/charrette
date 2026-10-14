@@ -212,8 +212,8 @@ export type Pick = { run: RunId | null; follow: string | null };
 export type ItemKind = "message" | "flag" | "urgent" | "held" | "question" | "quiet" | "agreement" | "settled";
 export type Tier = "act" | "wait" | "decided" | "talk";
 export type Item =
-  | { kind: ItemKind; tier: Tier; seq: number; at: string; run: RunId; from: string; word: string | null; tip: string | null; text: string; joined: boolean; state: string | null }
-  | { kind: "event"; seq: number; at: string; run: RunId; from: string; text: string; tip: string | null };
+  | { kind: ItemKind; tier: Tier; seq: number; at: string; run: RunId; from: string; word: string | null; tip: string | null; text: string; joined: boolean; state: string | null; about: string | null }
+  | { kind: "event"; seq: number; at: string; run: RunId; from: string; text: string; tip: string | null; about: string | null };
 
 /** Every tip, verbatim from the mockup (D9). */
 export const TIPS = {
@@ -317,7 +317,7 @@ const QUESTION = /^@orchestrator new question:/;
 
 /** One event as an item: its tier, word, tip and state, read from the thread (D8, D9, D16). */
 function itemOf(snap: BoardSnapshot, e: SnapshotEvent, run: RunSummary, ctx: MentionCtx): Item {
-  const base = { seq: e.seq, at: e.at, run: run.run, from: e.from };
+  const base = { seq: e.seq, at: e.at, run: run.run, from: e.from, about: e.about ?? null };
   const said = (kind: ItemKind, tier: Tier, word: string | null, tip: string | null, state: string | null = null): Item => ({
     ...base,
     kind,
@@ -385,6 +385,49 @@ export function conversation(snap: BoardSnapshot, pick: Pick): Item[] {
     items.push(joins ? { ...item, joined: true } : item);
   }
   return items;
+}
+
+// ── the conversation's filters (SL11) ───────────────────────────────────────────────
+
+/** One kind at a time; `all` narrows nothing. */
+export type KindFilter = "all" | "messages" | "agreements" | "flags";
+/** The conversation's narrowing after the pick: a kind, and a file its items are about. */
+export type Narrow = { kind: KindFilter; file: string | null };
+
+const MESSAGE_KINDS = new Set<Item["kind"]>(["message", "urgent", "held", "question"]);
+const isFlagItem = (i: Item): boolean => i.kind === "flag" || i.kind === "settled";
+
+/** The items a kind keeps; Flags keeps each flag and the posts after it about its file. */
+function kindTest(items: Item[], kind: KindFilter): (i: Item) => boolean {
+  if (kind === "messages") return (i) => MESSAGE_KINDS.has(i.kind);
+  if (kind === "agreements") return (i) => i.kind === "agreement";
+  if (kind === "flags") {
+    const flags = items.filter(isFlagItem);
+    return (i) => isFlagItem(i) || (i.kind !== "event" && i.about != null && flags.some((f) => f.about === i.about && f.seq < i.seq));
+  }
+  return () => true;
+}
+
+/** The items through the kind, then the file. */
+export function narrow(items: Item[], n: Narrow): Item[] {
+  const byKind = kindTest(items, n.kind);
+  return items.filter((i) => byKind(i) && (n.file == null || i.about === n.file));
+}
+
+/** What each kind chip counts: Flags its flags alone, not their answers. */
+export function filterCounts(items: Item[]): Record<Exclude<KindFilter, "all">, number> {
+  return {
+    messages: items.filter((i) => MESSAGE_KINDS.has(i.kind)).length,
+    agreements: items.filter((i) => i.kind === "agreement").length,
+    flags: items.filter(isFlagItem).length,
+  };
+}
+
+/** Every file the items are about, with how many, sorted by path. */
+export function conversationFiles(items: Item[]): { path: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const i of items) if (i.about) counts.set(i.about, (counts.get(i.about) ?? 0) + 1);
+  return [...counts.entries()].map(([path, count]) => ({ path, count })).sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 }
 
 /** A run's members, orchestrator first; none for a closed run. */

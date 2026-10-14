@@ -4,7 +4,8 @@
 import { useCallback, useMemo, useState } from "react";
 import type { RunId } from "../src/board/board.ts";
 import { useBoard } from "./hooks/useBoard.ts";
-import { agents, archive, claimRows, conversation, nicksOf, runHue, runTabs, type Pick } from "./lib/view.ts";
+import { agents, archive, claimRows, conversation, narrow, nicksOf, runHue, runTabs, type Narrow, type Pick } from "./lib/view.ts";
+import { ConversationFilters } from "./components/ConversationFilters.tsx";
 import { NicksContext } from "./components/chips.tsx";
 import { AgentStrip } from "./components/AgentStrip.tsx";
 import { ArchivePanel } from "./components/ArchivePanel.tsx";
@@ -16,12 +17,15 @@ import { TipLayer } from "./components/Tip.tsx";
 
 const NONE = new Set<never>();
 const ALL: Pick = { run: null, follow: null };
+const UNNARROWED: Narrow = { kind: "all", file: null };
 
 export function BoardPage({ repos, run }: { repos: string[]; run: number | null }) {
   const [query, setQuery] = useState<{ repo: string | null; run: number | null }>({ repo: run === null ? (repos[0] ?? null) : null, run });
   // a run in the URL opens its tab, a closed one as an archived tab (gap 3)
   const [pick, setPick] = useState<Pick>({ run, follow: null });
   const [menuOpen, setMenuOpen] = useState(false);
+  // kept beside the pick, never in the URL: a reload starts unnarrowed
+  const [narrowing, setNarrowing] = useState<Narrow>(UNNARROWED);
   const board = useBoard(query);
   const snapshot = board.snapshot;
   const focus = pick.follow;
@@ -42,16 +46,20 @@ export function BoardPage({ repos, run }: { repos: string[]; run: number | null 
   const nicks = useMemo(() => (snapshot ? nicksOf(snapshot) : new Map<string, string>()), [snapshot]);
   const items = useMemo(() => (snapshot ? conversation(snapshot, { run: picked, follow: focus }) : []), [snapshot, picked, focus]);
   // a closed run picked reads "Archived <when> · read only · <done> of <of> slices" first
+  const shown = useMemo(() => narrow(items, narrowing), [items, narrowing]);
   const archivedLine = useMemo(() => (archived ? { closed: archived.closed, summary: `${archived.done} of ${archived.of} slices` } : null), [archived]);
 
   const pickRun = (r: RunId | null): void => {
     setPick({ run: r, follow: null });
+    // the kind stays; the file goes when the new run has no item about it
+    if (snapshot && narrowing.file && !conversation(snapshot, { run: r, follow: null }).some((i) => i.about === narrowing.file)) setNarrowing((n) => ({ ...n, file: null }));
     setMenuOpen(false);
   };
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const pickRepo = (repo: string): void => {
     setQuery({ repo, run: null });
     setPick(ALL);
+    setNarrowing((n) => ({ ...n, file: null }));
     setMenuOpen(false);
   };
 
@@ -78,7 +86,8 @@ export function BoardPage({ repos, run }: { repos: string[]; run: number | null 
           ) : (
             <>
               <AgentStrip agents={members} hue={selectedRun ? runHue(selectedRun.code) : 0} follow={focus} onFollow={setFocus} />
-              <Conversation items={items} archived={archivedLine} fresh={NONE} />
+              <ConversationFilters items={items} narrow={narrowing} onNarrow={setNarrowing} />
+              <Conversation items={shown} archived={archivedLine} fresh={NONE} />
               {claims && <ClaimsRow rows={claims} />}
             </>
           )}
