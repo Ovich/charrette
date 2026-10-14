@@ -4,6 +4,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Declared, EditAllowed, EditHeld, Flag, Message, MessageKind, Participant, Sharer } from "./board.ts";
 import { type EventName, EVENTS } from "./events.ts";
+import { profileOf } from "./kinds.ts";
 
 export interface ClaimsDeps {
   db: DatabaseSync;
@@ -300,8 +301,10 @@ export function claimsOf(deps: ClaimsDeps): Claims {
             if (Number(o.id) !== me.id) told.add(`${o.plan}/${o.slice}`);
           }
         }
-        // an interface change is announced to every runner on the repository (D26)
-        const openPlans = (db.prepare("SELECT DISTINCT plan FROM runs WHERE repo = ? AND state = 'open'").all(me.repo) as Row[]).map((r) => String(r.plan));
+        // an interface change is announced to every runner on the repository (D26), never to a kind without claims (D70)
+        const openPlans = (db.prepare("SELECT DISTINCT plan, kind FROM runs WHERE repo = ? AND state = 'open'").all(me.repo) as Row[])
+          .filter((r) => profileOf(String(r.kind)).claims)
+          .map((r) => String(r.plan));
         const all = iface.size ? openPlans.map((plan) => `${plan}/*`) : [];
         const lines = [`merged ${sha}: rebase onto ${sha}.`];
         if (told.size) lines.push(`${[...told].map((n) => `@${n}`).join(" ")}: you hold or declared a file it changed.`);

@@ -531,6 +531,22 @@ test("an interface file in a merge is announced to @all", () => {
   }
 });
 
+test("a plan merge of an interface file never mentions a brainstorm seat subscribed to nothing, and stays in its run (D70)", async () => {
+  const run = board.openRun({ repo: REPO, group: "review-tool", title: "A", seats: SLICES });
+  const s3 = board.join({ run: run.id, slice: "S3", doing: "api", files: [{ path: "src/api.ts", interface: true }], worktree: wt("s3") }).runner;
+  const debate = board.openRun({ repo: REPO, kind: "brainstorm", group: "topic", title: "T", seats: SLICES });
+  const seat = board.join({ run: debate.id, slice: "S1", doing: "arguing", files: [], on: [] }).runner;
+  board.deliver(seat);
+  board.lockMerge(s3);
+  board.merged(s3, "def456", [path.join(wt("s3"), "src", "api.ts")]);
+  const event = board.snapshot(REPO).events.find((e) => /rebase onto def456/.test(e.body))!;
+  assert.ok(!board.read(event.seq).mentions.includes("topic/*"), "the seat's run is not @all-ed");
+  assert.notEqual(event.channel, "main");
+  const { wakes } = await import("../src/board/events.ts");
+  assert.equal(wakes(board.read(event.seq), seat, []), false);
+  assert.equal(board.deliver(seat).full.length, 0);
+});
+
 test("identify resolves the live runner from its worktree, a subdirectory included (D28)", () => {
   const { s3, s5 } = claimed();
   assert.equal(board.identify({ worktree: path.join(wt("s3"), "src") })?.name, s3.name);
