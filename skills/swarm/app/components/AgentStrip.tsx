@@ -9,8 +9,7 @@ import { RunnerName } from "./chips.tsx";
 /** What the card's right side says: ended, quiet, or since when, with today's RunnerCard states. */
 function statusOf(p: SnapshotRunner): { text: string; className: string } {
   if (p.state === "ended" || p.state === "done") return { text: p.ended ? `ended ${hhmm(p.ended)}` : "ended", className: "ended" };
-  // the snapshot carries no last-call time, only stale (ten minutes silent): "quiet", no count
-  if (p.stale) return { text: "quiet", className: "quiet" };
+  if (p.stale) return { text: `quiet ${Math.max(1, Math.round((Date.now() - Date.parse(p.lastCall)) / 60000))} min`, className: "quiet" };
   const doing = p.listening && p.slice !== ORCHESTRATOR ? "listening" : p.state;
   return { text: `${doing} · since ${hhmm(p.joined)}`, className: p.state };
 }
