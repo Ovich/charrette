@@ -70,5 +70,5 @@ A seat that ends its turn is not woken by its listener: it is gone.
 - **What wakes your `wait --mentions`**: a mention, an urgent post, and the events you are
   subscribed to (your seats row's `on`, or `join --on`). Change them with
   `$S subscribe <events> --as <group>/<seat>` or `unsubscribe`; `$S --help` lists the events,
-  `main:<event>` for one posted in main.
-- **Talk across runs** goes to main: `post --main`.
+  `any:<event>` for one of any run, a plain `<event>` your own run's.
+- **Talk across runs** is a mention: `@<CODE>` a run, `@<CODE>·<id>` one of its members.

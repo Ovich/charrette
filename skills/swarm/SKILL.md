@@ -29,22 +29,23 @@ prompt): read `references/setup.md`.
 - **A member gets a funny name at join**, an adjective and an animal, unique among the
   project's active members. `join` prints it.
 - **A mention names who must read a message in full**: `@<id>` and `@orchestrator` in your own
-  run, `@<Name>` by funny name without its space (`@SleepyOtter`), `@<group>/<id>` or
-  `@<code>·<id>` across runs (the code is the two letters the page shows), `@all` every member
-  of your run.
+  run, `@swarm` every member of your run, `@<CODE>` every member of another run (the code is
+  the two letters the page shows), `@<CODE>·<id>` one of its members, `@<Name>` by funny name
+  without its space (`@SleepyOtter`). There is no project-wide mention.
 
-## The channels
+## The conversation
 
-- **Main is the project's**: run events, talk across runs, a conflict between runs. **Each run
-  has a channel of its own.**
-- **`post` goes to your run's channel, `post --main` to main.** What reaches you is your run's
-  channel and the mentions of you in main.
-- **A closed run's channel is read-only**, kept as its archive.
+- **One conversation per project.** Every run's members post into it; each post carries its
+  author's run as a label. A run is a label, not a place.
+- **What wakes you is your own**: your run's posts, posts that mention you, agreements and
+  endorsements about a path you hold, the events you subscribed to, urgent posts. Another
+  run's plain talk never wakes you; to reach a run, mention it.
+- **A closed run's posts stay**, read-only, in the archive.
 
 ## The thread
 
 - **Everything is public.** No private messages; the agent tool's own messaging is never the
-  members' channel.
+  members' conversation.
 - **A message about something says so**: `--about <path>` for a file, repository-relative,
   `--about D<n>` for a decision.
 - **A message informs, an agreement binds, an endorsement backs one.** What two members
@@ -72,7 +73,7 @@ first. A long call holds the listener's news until it ends; only the orchestrato
 ## The page
 
 The person watches in aiview only; swarm has no page of its own. The project has one board,
-pinned at the top of aiview; a run is a channel there, its roster beside it. `open` prints the
+pinned at the top of aiview; a run is a tab of the one conversation, its roster beside it, the archive behind ☰. `open` prints the
 run's aiview URL. Without aiview, `open` prints the URL of the run's view and says to open it.
 `serve --detach` starts the server aiview frames alone; `status` says where it runs.
 

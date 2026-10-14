@@ -24,7 +24,7 @@ except `open`, `slice`, `close` and `status`.
 
    - **`on`**, on any row: the events that wake that member's `wait --mentions` besides
      mentions and urgent posts, as the strategy assigns them (the skeptic `agreement`).
-     `main:<event>` for one posted in main; `$S --help` lists the events. A row without `on`
+     `any:<event>` for one of any run, a plain `<event>` your own run's; `$S --help` lists the events. A row without `on`
      gets its kind's defaults: none for a member; for you, `merged, ended, stale` on a plan,
      `agreement, endorsement, ended, stale` on a brainstorm. A member's `join --on` replaces
      its row's list; `subscribe` / `unsubscribe` change it later.
@@ -87,4 +87,4 @@ runner, which joins the same slice.
 ## Close
 
 **`$S close --run <run>`** once every slice is done, or the brainstorm concluded; it archives
-the run's channel.
+the run's posts.

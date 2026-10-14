@@ -57,7 +57,7 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
       rebase again.
    5. `$S merged <sha> --files <every path the merge changed>`, then at once
       `$S post "@orchestrator merged <sha>"`, before your report: the orchestrator checks your
-      slice from that post. After a change to an *interface* file, `$S post "@all <what changed
+      slice from that post. After a change to an *interface* file, `$S post "@swarm <what changed
       in it>" --about <file>`.
 7. **`$S end`** after your last merge. It claims or flags what you wrote without a claim,
    releases your claims and the lock, and makes your listener return empty: do not re-arm it.
@@ -90,8 +90,8 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
 | `claimed <path>, also held by …` | 0 | edit it; its holder works in it too: say what you change |
 
 Nothing stops an edit made without a claim; `end` claims or flags it on the thread, late.
-Claims are the project's, across every run on it: a holder in another run is told on main,
-and the post the answer gives then carries `--main`.
+Claims are the project's, across every run on it: a holder in another run is told by
+mention, and the post the answer gives then names it `@<CODE>·<id>`.
 
 ## Sharing a file
 
