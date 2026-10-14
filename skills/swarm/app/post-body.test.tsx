@@ -96,6 +96,84 @@ describe("PostBody", () => {
   });
 });
 
+// SL1 (posts): a body is GitHub-flavoured markdown.
+describe("PostBody markdown", () => {
+  // The trial's pasted 4-column table: its first two rows as the slice gives them, eleven more alike.
+  const TRIAL_TABLE = [
+    "| input | today | R (regex) | S (strip) |",
+    "|---|---|---|---|",
+    "| word, word. word | word, / word. / word | word:3 | word:3 |",
+    "| don't / don’t | 2 keys | don't:2 (’ folded) | 2 keys unless folded too |",
+    ...Array.from({ length: 11 }, (_, i) => `| case ${i + 3} | t${i} | r${i} | s${i} |`),
+  ].join("\n");
+
+  test("the trial's pasted table renders as a table with 13 body rows", () => {
+    const { container } = render(<PostBody body={`results:\n\n${TRIAL_TABLE}`} shown={new Set()} />);
+    const table = container.querySelector("table")!;
+    expect(table.querySelectorAll("thead th")).toHaveLength(4);
+    expect(table.querySelectorAll("tbody tr")).toHaveLength(13);
+    expect(table.querySelector("tbody tr td")!.textContent).toBe("word, word. word");
+  });
+
+  test("a list, inline code, a js fence, bold and a link each render as their element", () => {
+    const body = ["- one", "- two", "", "run `npm ci` **now**, see [docs](https://example.com)", "", `${FENCE}js`, "const a = 1;", FENCE].join("\n");
+    const { container } = render(<PostBody body={body} shown={new Set()} />);
+    expect(container.querySelectorAll("ul > li")).toHaveLength(2);
+    expect(container.querySelector("p code")!.textContent).toBe("npm ci");
+    expect(container.querySelector("strong")!.textContent).toBe("now");
+    expect(screen.getByRole("link", { name: "docs" }).getAttribute("href")).toBe("https://example.com");
+    const fence = container.querySelector("pre > code")!;
+    expect(fence.className).toContain("language-js");
+    expect(fence.textContent).toBe("const a = 1;\n");
+  });
+
+  test("a mermaid fence inside markdown is drawn by PostDiagram, the text around as markdown", async () => {
+    mermaidMock.render = async () => ({ svg: '<svg data-testid="drawn-md"></svg>' });
+    const body = ["**before**", "", `${FENCE}mermaid`, "flowchart LR", " A-->B", FENCE, "", "- after"].join("\n");
+    const { container } = render(<PostBody body={body} shown={new Set()} />);
+    await screen.findByTestId("drawn-md");
+    expect(container.querySelector('[data-component="PostDiagram"]')!.getAttribute("data-state")).toBe("drawn");
+    expect(container.querySelector("strong")!.textContent).toBe("before");
+    expect(container.querySelector("li")!.textContent).toBe("after");
+    expect(container.querySelector("pre code.language-mermaid")).toBeNull();
+  });
+
+  test("mentions and #seq highlight in a table cell and a list item, stay literal in code", () => {
+    const body = [
+      "| who | ref |",
+      "|---|---|",
+      "| @swarm-kinds/SL2 @HumblePanda | #43 |",
+      "",
+      "- ask @HumblePanda about #43",
+      "",
+      "`@HumblePanda #43`",
+      "",
+      `${FENCE}`,
+      "@swarm-kinds/SL2 #43",
+      FENCE,
+    ].join("\n");
+    const { container } = render(<PostBody body={body} shown={new Set([43])} />);
+    const cellMentions = [...container.querySelectorAll("td .mention")].map((m) => m.textContent);
+    expect(cellMentions).toEqual(["@swarm-kinds/SL2", "@HumblePanda"]);
+    expect(container.querySelector("td a")!.getAttribute("href")).toBe("#seq-43");
+    expect(container.querySelector("li .mention")!.textContent).toBe("@HumblePanda");
+    expect(container.querySelector("li a")!.getAttribute("href")).toBe("#seq-43");
+    expect(container.querySelector("p code")!.textContent).toBe("@HumblePanda #43");
+    expect(container.querySelector("p code .mention, p code a")).toBeNull();
+    expect(container.querySelector("pre .mention, pre a")).toBeNull();
+    expect(container.querySelector("pre")!.textContent).toBe("@swarm-kinds/SL2 #43\n");
+  });
+
+  test("raw HTML is shown as text, never rendered", () => {
+    const body = 'look <img src=x onerror="alert(1)"> here\n\n<script>alert(2)</script>';
+    const { container } = render(<PostBody body={body} shown={new Set()} />);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("script")).toBeNull();
+    expect(container.textContent).toContain('<img src=x onerror="alert(1)">');
+    expect(container.textContent).toContain("<script>alert(2)</script>");
+  });
+});
+
 // Kept last in the file and isolated by module: mermaid is imported only once a block needs it.
 test("a body without a block never imports mermaid", async () => {
   vi.resetModules();
