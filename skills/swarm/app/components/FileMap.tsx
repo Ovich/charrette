@@ -31,7 +31,7 @@ export function FileMap({ files }: { files: FileRow[] }) {
     setExpanded(!expanded);
   };
   return (
-    <section className="panel filemap" data-component="FileMap" aria-label="Files held">
+    <section className="panel filemap" data-component="FileMap" data-expanded={expanded} aria-label="Files held">
       <button className="label rail-toggle" aria-expanded={expanded} onClick={toggle}>
         Files held · <span className="n">{files.length}</span>
         {shared > 0 && <> · {shared} shared</>}

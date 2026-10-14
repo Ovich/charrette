@@ -2,6 +2,8 @@
 // selection is recorded, and the snapshot answered is the repository it asks for.
 import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { BoardSnapshot } from "../src/board/board.ts";
 import type { BoardState } from "./hooks/useBoard.ts";
 import { ALL_CLOSED, APP, BRAINSTORM_ONLY, CLOSED, LIVE, OTHER, REPOS, SITE } from "./fixtures.ts";
@@ -84,6 +86,18 @@ test("Files held is collapsed by default, its header counting files and shared f
   expect(within(screen.getByRole("region", { name: "Files held" })).queryByText("src/shared.ts")).toBeNull();
   expandFiles();
   expect(within(screen.getByRole("region", { name: "Files held" })).getByText("src/shared.ts")).toBeTruthy();
+});
+
+test("collapsed, Files held gives the thread its room: the panel says so and the stylesheet grows the thread (D5)", () => {
+  show([APP], 1);
+  const region = screen.getByRole("region", { name: "Files held" });
+  expect(region.getAttribute("data-expanded")).toBe("false");
+  expandFiles();
+  expect(region.getAttribute("data-expanded")).toBe("true");
+  // jsdom lays nothing out: the rules that size the two panels are held as written
+  const css = readFileSync(join(__dirname, "styles.css"), "utf8");
+  expect(css).toContain('.board-page .panel[data-component="Thread"] { flex: 1 1 auto; }');
+  expect(css).toContain('.board-page .panel.filemap[data-expanded="true"] { max-height: 40vh; overflow-y: auto; }');
 });
 
 test("expanding Files held is remembered across renders", () => {
