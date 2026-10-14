@@ -1,12 +1,10 @@
-// The board page (plan §3, "The page"): useBoard is stood in for with the fixtures; each call's
-// selection is recorded, and the snapshot answered is the repository it asks for.
+// The board page (plan D7, D9, D14, D20, D22; mockup #643): useBoard is stood in for with the
+// fixtures; each call's selection is recorded, and the snapshot answered is the repository it asks for.
 import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { BoardSnapshot } from "../src/board/board.ts";
 import type { BoardState } from "./hooks/useBoard.ts";
-import { ALL_CLOSED, APP, BRAINSTORM_ONLY, CLOSED, LIVE, OTHER, REPOS, SITE } from "./fixtures.ts";
+import { APP, CLOSED, LIVE, NICKS, OTHER, REPOS, SITE } from "./fixtures.ts";
 
 const source = vi.hoisted(() => ({
   calls: [] as { repo: string | null; run: number | null }[],
@@ -23,7 +21,7 @@ vi.mock("./hooks/useBoard.ts", () => ({
 }));
 
 import { BoardPage } from "./BoardPage.tsx";
-import { FILEMAP_EXPANDED_KEY } from "./components/FileMap.tsx";
+import { CLAIMS_EXPANDED_KEY } from "./components/ClaimsRow.tsx";
 
 afterEach(() => {
   cleanup();
@@ -40,135 +38,206 @@ const show = (repos: string[], run: number | null, boards: BoardSnapshot[] = [LI
   source.boards = Object.fromEntries(boards.map((b) => [b.repo, b]));
   return render(<BoardPage repos={repos} run={run} />);
 };
-const rail = () => within(screen.getByRole("navigation", { name: "Channels" }));
-const current = () => rail().getAllByRole("button").find((b) => b.getAttribute("aria-current") === "true");
-const expandFiles = () => fireEvent.click(screen.getByRole("button", { name: /Files held/ }));
-const thread = () => within(screen.getByRole("region", { name: "The thread" }));
+const tabs = () => within(screen.getByRole("navigation", { name: "Runs" }));
+const pressed = () => tabs().getAllByRole("button").find((b) => b.getAttribute("aria-pressed") === "true");
+const convo = () => within(screen.getByRole("region", { name: "The conversation" }));
+const strip = () => screen.queryByRole("region", { name: "Agents" });
+const tabOf = (title: string) => tabs().getByText(title).closest("button")!;
 
-test("run selects its channel", () => {
-  show([APP], 1);
-  expect(current()?.textContent).toContain("Sessions with refresh tokens");
-  expect(thread().getByText(/staying a number/)).toBeTruthy();
-  expect(thread().queryByText(/yes, I add it./)).toBeNull();
-});
+// ── RunTabs ────────────────────────────────────────────────────────────────────────
 
-test("no run selects Main", () => {
+test("the tab row: All, then each open run with its code, title and slices done/total; no closed run", () => {
   show([APP], null);
-  expect(current()?.textContent).toContain("Main");
+  const names = tabs().getAllByRole("button").map((b) => b.textContent);
+  expect(names[1]).toBe("All");
+  expect(names.slice(2)).toEqual(["RTSessions with refresh tokens2/7", "ALAudit log0/3", "NMNaming the kinds0/1"]);
+  for (const r of CLOSED) expect(tabs().queryByText(r.title)).toBeNull();
+  expect(pressed()?.textContent).toBe("All");
 });
 
-test("no run and no open run selects the newest closed run, Closed expanded", () => {
-  show([APP], null, [ALL_CLOSED]);
-  expect(current()?.textContent).toContain("Theme tokens");
-  expect(rail().getByRole("button", { name: /Closed/ }).getAttribute("aria-expanded")).toBe("true");
-  expect(thread().getByText(/Two names per token/)).toBeTruthy();
-});
-
-test("a run in the URL wins over the newest closed run", () => {
-  show([APP], 4, [ALL_CLOSED]);
-  expect(current()?.textContent).toContain("The login page");
-});
-
-test("Main's count in the rail is the entries Main's thread shows, events included", () => {
+test("All shows every open run's items, none of a closed run", () => {
   show([APP], null);
-  const main = rail().getAllByRole("button").find((b) => b.textContent?.startsWith("Main"))!;
-  const onMain = LIVE.events.filter((e) => e.channel === "main").length;
-  expect(onMain).toBeGreaterThan(0);
-  expect(main.querySelector(".n")?.textContent).toBe(String(onMain));
+  for (const said of [/staying a number/, /yes, I add it\./, /reads better than/]) expect(convo().getByText(said)).toBeTruthy();
+  expect(convo().queryByText(/Two names per token/)).toBeNull();
 });
 
-test("Files held is collapsed by default, its header counting files and shared files (D5)", () => {
-  const shared = { ...LIVE, files: [...LIVE.files, { path: "src/shared.ts", holders: [LIVE.roster[1].runner, LIVE.roster[2].runner], interface: true }] };
-  show([APP], 1, [shared]);
-  const header = screen.getByRole("button", { name: /Files held/ });
-  expect(header.getAttribute("aria-expanded")).toBe("false");
-  expect(header.textContent).toBe(`Files held · ${shared.files.length} · 1 shared`);
-  expect(within(screen.getByRole("region", { name: "Files held" })).queryByText("src/shared.ts")).toBeNull();
-  expandFiles();
-  expect(within(screen.getByRole("region", { name: "Files held" })).getByText("src/shared.ts")).toBeTruthy();
-});
-
-test("collapsed, Files held gives the thread its room: the panel says so and the stylesheet grows the thread (D5)", () => {
+test("a run in the URL picks its tab; the tab keeps its items and those naming its members (D14)", () => {
   show([APP], 1);
-  const region = screen.getByRole("region", { name: "Files held" });
-  expect(region.getAttribute("data-expanded")).toBe("false");
-  expandFiles();
-  expect(region.getAttribute("data-expanded")).toBe("true");
-  // jsdom lays nothing out: the rules that size the two panels are held as written
-  const css = readFileSync(join(__dirname, "styles.css"), "utf8");
-  expect(css).toContain('.board-page .panel[data-component="Thread"] { flex: 1 1 auto; }');
-  expect(css).toContain('.board-page .panel.filemap[data-expanded="true"] { max-height: 40vh; overflow-y: auto; }');
+  expect(pressed()).toBe(tabOf("Sessions with refresh tokens"));
+  expect(convo().getByText(/staying a number/)).toBeTruthy();
+  // audit-log's post naming RT·S4 shows under RT
+  expect(convo().getByText(/I need one call at the top/)).toBeTruthy();
+  expect(convo().queryByText(/reads better than/)).toBeNull();
 });
 
-test("expanding Files held is remembered across renders", () => {
-  show([APP], 1);
-  expandFiles();
-  expect(localStorage.getItem(FILEMAP_EXPANDED_KEY)).toBe("1");
+test("picking a tab narrows the conversation; All widens it again", () => {
+  show([APP], null);
+  fireEvent.click(tabOf("Naming the kinds"));
+  expect(pressed()).toBe(tabOf("Naming the kinds"));
+  expect(convo().getByText(/reads better than/)).toBeTruthy();
+  expect(convo().queryByText(/staying a number/)).toBeNull();
+  fireEvent.click(tabs().getByText("All"));
+  expect(convo().getByText(/staying a number/)).toBeTruthy();
+});
+
+test("a run's code in its tab carries no tip (D9)", () => {
+  show([APP], null);
+  const code = tabOf("Audit log").querySelector(".code") as HTMLElement;
+  expect(code.textContent).toBe("AL");
+  expect(code.closest("[data-tip]")).toBeNull();
+});
+
+test("a closed run in the URL opens as an archived tab, read only, × back to All", () => {
+  show([APP], 4);
+  const archived = screen.getByText("The login page").closest('[data-component="ArchivedTab"]') as HTMLElement;
+  expect(archived.getAttribute("aria-pressed")).toBe("true");
+  expect(within(archived).getByText("archived")).toBeTruthy();
+  expect(convo().getByText(/read only · 4 of 4 slices/)).toBeTruthy();
+  expect(convo().getByText(/merged 9f0c1d2/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Close the archived run" }));
+  expect(pressed()?.textContent).toBe("All");
+});
+
+test("an unknown run picks All and says so", () => {
+  show([APP], 99);
+  expect(pressed()?.textContent).toBe("All");
+  expect(screen.getByText("run 99 is not on this board")).toBeTruthy();
+});
+
+// ── ArchivePanel ─────────────────────────────────────────────────────────────────
+
+test("☰ opens the archive: every closed run, newest first; a row picks it as an archived tab", () => {
+  show([APP], null);
+  fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+  const panel = within(screen.getByRole("dialog", { name: "Archive" }));
+  expect(panel.getByText(/· 2 closed runs/)).toBeTruthy();
+  const rows = panel.getAllByRole("button").filter((b) => b.classList.contains("arow"));
+  expect(rows.map((r) => r.querySelector(".code")?.textContent)).toEqual(["TT", "LP"]);
+  fireEvent.click(rows[1]);
+  expect(screen.queryByRole("dialog", { name: "Archive" })).toBeNull();
+  expect(screen.getByText("The login page").closest('[data-component="ArchivedTab"]')).toBeTruthy();
+});
+
+test("the archive's search matches title, code and orchestrator", () => {
+  show([APP], null);
+  fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+  const panel = within(screen.getByRole("dialog", { name: "Archive" }));
+  const search = panel.getByRole("searchbox");
+  const codes = () => panel.queryAllByRole("button").filter((b) => b.classList.contains("arow")).map((r) => r.querySelector(".code")?.textContent);
+  fireEvent.change(search, { target: { value: "login" } });
+  expect(codes()).toEqual(["LP"]);
+  fireEvent.change(search, { target: { value: "tt" } });
+  expect(codes()).toEqual(["TT"]);
+  fireEvent.change(search, { target: { value: "nothing like it" } });
+  expect(panel.getByText("No archived run matches.")).toBeTruthy();
+});
+
+test("Escape closes the archive", () => {
+  show([APP], null);
+  fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.queryByRole("dialog", { name: "Archive" })).toBeNull();
+});
+
+test("a click outside closes the archive; one inside does not", () => {
+  show([APP], null);
+  fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+  fireEvent.mouseDown(screen.getByRole("searchbox"));
+  expect(screen.getByRole("dialog", { name: "Archive" })).toBeTruthy();
+  fireEvent.mouseDown(screen.getByRole("region", { name: "The conversation" }));
+  expect(screen.queryByRole("dialog", { name: "Archive" })).toBeNull();
+});
+
+// ── AgentStrip ───────────────────────────────────────────────────────────────────
+
+test("the agent strip is hidden on All and on a closed run", () => {
+  show([APP], null);
+  expect(strip()).toBeNull();
   cleanup();
-  show([APP], 1);
-  expect(screen.getByRole("button", { name: /Files held/ }).getAttribute("aria-expanded")).toBe("true");
+  show([APP], 4);
+  expect(strip()).toBeNull();
 });
 
-test("Files held falls back to collapsed when storage throws, and still expands", () => {
+test("under a picked run, its members, orchestrator first, each read code then nick", () => {
+  show([APP], 1);
+  const cards = within(strip()!).getAllByRole("button");
+  expect(cards[0].textContent).toContain("RT·orchestrator");
+  expect(cards[0].textContent).toContain(NICKS["refresh-tokens/orchestrator"]);
+  expect(cards[0].classList.contains("orch")).toBe(true);
+  expect(cards.map((c) => c.querySelector(".pc")?.textContent)).toEqual(cards.map(() => "RT·"));
+  expect(cards.some((c) => c.textContent?.includes("Sleepy Otter"))).toBe(true);
+});
+
+test("a card followed narrows the conversation to its member; clicked again, released", () => {
+  show([APP], 1);
+  const s5 = within(strip()!).getAllByRole("button").find((c) => c.textContent?.includes("Dizzy Puffin"))!;
+  fireEvent.click(s5);
+  expect(s5.getAttribute("aria-pressed")).toBe("true");
+  expect(convo().getByText(/staying a number/)).toBeTruthy();
+  expect(convo().queryByText(/return the new token/)).toBeNull();
+  fireEvent.click(s5);
+  expect(convo().getByText(/return the new token/)).toBeTruthy();
+});
+
+// ── ClaimsRow ────────────────────────────────────────────────────────────────────
+
+const SHARED: BoardSnapshot = { ...LIVE, files: [...LIVE.files, { path: "src/shared.ts", holders: ["refresh-tokens/S3", "audit-log/S1"], interface: true }] };
+
+test("the claims row is collapsed, counting files and those shared", () => {
+  show([APP], null, [SHARED]);
+  const toggle = screen.getByRole("button", { name: /Claims/ });
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  expect(toggle.textContent).toContain(`${SHARED.files.length} files · 1 shared by two runs`);
+  expect(screen.queryByText("src/shared.ts")).toBeNull();
+});
+
+test("opened, a plain list: one file per line with its holders, a shared one marked shared and uncoloured", () => {
+  show([APP], null, [SHARED]);
+  fireEvent.click(screen.getByRole("button", { name: /Claims/ }));
+  const row = screen.getByText("src/shared.ts").closest("li")!;
+  expect(row.querySelectorAll('[data-component="RunnerTag"]').length).toBe(2);
+  const mark = within(row).getByText("shared");
+  expect(mark.getAttribute("style")).toBeNull();
+  expect(row.getAttribute("style")).toBeNull();
+  expect(row.querySelector("[style*='danger'], [style*='amber']")).toBeNull();
+  expect(localStorage.getItem(CLAIMS_EXPANDED_KEY)).toBe("1");
+});
+
+test("the claims row falls back to collapsed when storage throws, and still opens", () => {
   vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
     throw new Error("blocked");
   });
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
     throw new Error("blocked");
   });
-  show([APP], 1);
-  expect(screen.getByRole("button", { name: /Files held/ }).getAttribute("aria-expanded")).toBe("false");
-  expandFiles();
-  expect(screen.getByRole("button", { name: /Files held/ }).getAttribute("aria-expanded")).toBe("true");
-});
-
-test("an unknown run selects Main and says so", () => {
-  show([APP], 99);
-  expect(current()?.textContent).toContain("Main");
-  expect(screen.getByText("run 99 is not on this board")).toBeTruthy();
-});
-
-test("a brainstorm-only board shows neither FileMap nor MergeLock", () => {
-  const { container } = show([APP], 3, [BRAINSTORM_ONLY]);
-  expect(current()?.textContent).toContain("Naming the kinds");
-  expect(container.querySelector('[data-component="FileMap"]')).toBeNull();
-  expect(container.querySelector('[data-component="MergeLock"]')).toBeNull();
-});
-
-test("a board with a plan open shows FileMap and MergeLock, even on a brainstorm's channel", () => {
-  const { container } = show([APP], 3);
-  expect(container.querySelector('[data-component="FileMap"]')).toBeTruthy();
-  expect(screen.getByText("merge lock free")).toBeTruthy();
-  expandFiles();
-  expect(within(screen.getByRole("region", { name: "Files held" })).getByText("src/routes/auth.ts")).toBeTruthy();
-});
-
-test("FileMap lists every holder of a shared file (D62)", () => {
-  const shared = { ...LIVE, files: [...LIVE.files, { path: "src/shared.ts", holders: [LIVE.roster[1].runner, LIVE.roster[2].runner], interface: true }] };
-  show([APP], 1, [shared]);
-  expandFiles();
-  const row = within(screen.getByRole("region", { name: "Files held" })).getByText("src/shared.ts").closest("li")!;
-  expect(row.querySelectorAll('[data-component="RunnerTag"]').length).toBe(2);
-});
-
-test("ClosedChannels is collapsed, lists every closed run, and a closed thread reads only", () => {
   show([APP], null);
-  const toggle = rail().getByRole("button", { name: /Closed/ });
+  const toggle = screen.getByRole("button", { name: /Claims/ });
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
-  expect(toggle.textContent).toContain(String(CLOSED.length));
-  for (const r of CLOSED) expect(rail().queryByText(r.title)).toBeNull();
   fireEvent.click(toggle);
-  for (const r of CLOSED) expect(rail().getByText(r.title)).toBeTruthy();
-  fireEvent.click(rail().getByText("The login page"));
-  expect(thread().getByText(/merged 9f0c1d2/)).toBeTruthy();
-  expect(screen.getByText("closed: read-only")).toBeTruthy();
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
 });
 
-test("a closed run asked by the URL opens its section", () => {
-  show([APP], 5);
-  expect(rail().getByRole("button", { name: /Closed/ }).getAttribute("aria-expanded")).toBe("true");
-  expect(current()?.textContent).toContain("Theme tokens");
+test("under a closed run, no claims row", () => {
+  show([APP], 4);
+  expect(screen.queryByRole("region", { name: "Claims" })).toBeNull();
 });
+
+// ── MergeLock ────────────────────────────────────────────────────────────────────
+
+test("the merge lock sits at the tab row's end, free or held, with its tip on hover and focus (D22)", () => {
+  show([APP], null, [{ ...LIVE, lock: { holder: "refresh-tokens/S4", since: LIVE.events[0].at } }]);
+  const lock = tabs().getByText("merge lock").closest('[data-component="MergeLock"]') as HTMLElement;
+  expect(lock.getAttribute("tabindex")).toBe("0");
+  expect(lock.dataset.tip).toMatch(/^Merge lock: one member merges at a time, across every run\./);
+  expect(within(lock).getByText("S4")).toBeTruthy();
+  fireEvent.focusIn(lock);
+  expect(screen.getByRole("tooltip", { hidden: true }).textContent).toBe(lock.dataset.tip);
+  cleanup();
+  show([APP], null);
+  expect(screen.getByText("merge lock free")).toBeTruthy();
+});
+
+// ── RepoList ─────────────────────────────────────────────────────────────────────
 
 test("RepoList shows with two repositories, not with one; picking the second asks useBoard for it", () => {
   const one = show([APP], null, [LIVE, SITE]);
@@ -178,14 +247,6 @@ test("RepoList shows with two repositories, not with one; picking the second ask
   const repos = within(screen.getByRole("navigation", { name: "Repositories" }));
   fireEvent.click(repos.getByText("charrette-site"));
   expect(source.calls.at(-1)).toEqual({ repo: OTHER, run: null });
-  expect(current()?.textContent).toContain("Main");
-  expect(rail().getByText("The landing page")).toBeTruthy();
-});
-
-test("the Main thread holds run events and cross-run posts, never a run's own talk", () => {
-  show([APP], null);
-  expect(thread().getByText(/yes, I add it\./)).toBeTruthy();
-  for (const own of [/return the new token/, /staying a number/, /reads better than/, /Two names per token/]) {
-    expect(thread().queryByText(own)).toBeNull();
-  }
+  expect(pressed()?.textContent).toBe("All");
+  expect(tabs().getByText("The landing page")).toBeTruthy();
 });

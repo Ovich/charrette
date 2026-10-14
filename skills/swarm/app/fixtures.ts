@@ -13,12 +13,18 @@ const AL = "audit-log";
 const NM = "naming";
 const LP = "login-page";
 const TT = "theme-tokens";
-/** Each plan's run id: a post lands in its runner's run channel unless it is on Main (D18). */
-const RUN_OF: Record<string, number> = { [RT]: 1, [AL]: 2, [NM]: 3, [LP]: 4, [TT]: 5 };
+/** Each run's id: every item is stored with its author's run (plan D1, D13). */
+const RUN_OF: Record<string, number> = { [RT]: 1, [AL]: 2, [NM]: 3, [LP]: 4, [TT]: 5, landing: 7 };
 const runOf = (name: string): number => RUN_OF[name.slice(0, name.lastIndexOf("/"))] ?? 0;
 
-/** The runners' funny names (D43), fixed here; the Board picks them at random. */
+/** The members' funny names (D43), the orchestrators' included (plan D17), fixed here; the
+ *  Board picks them at random. */
 export const NICKS: Record<string, string> = {
+  [`${RT}/orchestrator`]: "Calm Owl",
+  [`${AL}/orchestrator`]: "Proud Lynx",
+  [`${NM}/orchestrator`]: "Wise Crow",
+  [`${LP}/orchestrator`]: "Gentle Bison",
+  [`${TT}/orchestrator`]: "Swift Hare",
   [`${RT}/S2`]: "Lucky Moose",
   [`${RT}/S3`]: "Sleepy Otter",
   [`${RT}/S4`]: "Brave Badger",
@@ -26,8 +32,13 @@ export const NICKS: Record<string, string> = {
   [`${AL}/S1`]: "Jolly Walrus",
   [`${AL}/S2`]: "Quiet Llama",
   [`${NM}/critic`]: "Witty Heron",
+  ["landing/S1"]: "Merry Finch",
 };
-const nickOf = (name: string): string => NICKS[name] ?? "orchestrator";
+const nickOf = (name: string): string => {
+  const nick = NICKS[name];
+  if (!nick) throw new Error(`fixtures: no funny name for ${name}`);
+  return nick;
+};
 
 const runner = (
   name: string,
@@ -39,6 +50,7 @@ const runner = (
   calls: number,
   ended: string | null = null,
   on: string[] = [],
+  lastCall: string = ended ?? joined,
 ): SnapshotRunner => {
   const i = name.lastIndexOf("/");
   return {
@@ -56,11 +68,12 @@ const runner = (
     calls,
     listening: false,
     on,
+    lastCall: at(lastCall),
   };
 };
 
 let seq = 0;
-/** A post in its author's run channel. */
+/** An item, stored with its author's run (plan D13); `channel` mirrors it, as the snapshot keeps it. */
 const ev = (hm: string, kind: SnapshotEvent["kind"], from: string, body: string, about: string | null = null): SnapshotEvent => ({
   seq: ++seq,
   at: at(hm),
@@ -68,12 +81,14 @@ const ev = (hm: string, kind: SnapshotEvent["kind"], from: string, body: string,
   from,
   body,
   about,
+  run: runOf(from),
   channel: runOf(from),
 });
-/** A post on Main: a run event, or a claim post across runs (D18). */
-const onMain = (hm: string, kind: SnapshotEvent["kind"], from: string, body: string, about: string | null = null): SnapshotEvent => ({
-  ...ev(hm, kind, from, body, about),
-  channel: "main",
+/** A board event, its name stored (D11). */
+const named = (hm: string, from: string, event: NonNullable<SnapshotEvent["event"]>, body: string): SnapshotEvent => ({
+  ...ev(hm, "event", from, body),
+  event,
+  mentions: [],
 });
 
 const RT_SLICES: [string, string, string, string[]][] = [
@@ -134,19 +149,20 @@ export const LIVE: BoardSnapshot = {
     runner(`${NM}/critic`, "The critic", "Reading the names proposed", "working", [], "14:04", 3, null, ["agreement"]),
   ],
   events: [
-    onMain("13:20", "event", `${LP}/orchestrator`, "closed: The login page"),
     ev("13:18", "msg", `${LP}/S4`, "@orchestrator merged 9f0c1d2"),
+    named("13:20", `${LP}/orchestrator`, "closed", "run 4 closed"),
     ev("13:40", "msg", `${TT}/critic`, "Two names per token, not three."),
-    onMain("14:00", "event", `${RT}/orchestrator`, "opened: Sessions with refresh tokens"),
-    ev("14:02", "event", `${RT}/S3`, "joined: the Session interface"),
-    ev("14:03", "msg", `${RT}/S3`, "@all I'm adding `refreshToken: string | null` to `Session`. Readers I know of: `web/http/client.ts`.", "src/auth/session.ts"),
+    named("13:50", `${TT}/orchestrator`, "closed", "run 5 closed"),
+    named("14:00", `${RT}/orchestrator`, "opened", "run 1 opened: plan refresh-tokens, Sessions with refresh tokens"),
+    named("14:02", `${RT}/S3`, "joined", "joined: the Session interface"),
+    ev("14:03", "msg", `${RT}/S3`, "@swarm I'm adding `refreshToken: string | null` to `Session`. Readers I know of: `web/http/client.ts`.", "src/auth/session.ts"),
     ev("14:04", "msg", `${NM}/critic`, "`kind` reads better than `type` on a run."),
     ev("14:05", "msg", `${RT}/S4`, "@S2 does `store.rotate()` return the new token or only write it?", "src/tokens/store.ts"),
     ev("14:06", "msg", `${RT}/S2`, "@S4 it returns it. Signature at `src/tokens/store.ts:12`.", "src/tokens/store.ts"),
-    onMain("14:09", "event", `${RT}/S2`, "merged a41c9e2: rebase onto a41c9e2.\nfiles: src/tokens/store.ts"),
-    onMain("14:12", "msg", `${AL}/S2`, "@RT·S4 I need one call at the top of every handler in `src/routes/auth.ts`. You hold it.", "src/routes/auth.ts"),
-    onMain("14:12", "msg", `${RT}/S4`, "@AL·S2 yes, I add it.", "src/routes/auth.ts"),
-    onMain("14:12", "agreement", `${RT}/S4`, "RT·S4 adds `audit(req, 'refresh')` in `src/routes/auth.ts`; AL·S2 does not touch the file.", "src/routes/auth.ts"),
+    named("14:09", `${RT}/S2`, "merged", "merged a41c9e2: rebase onto a41c9e2.\nfiles: src/tokens/store.ts"),
+    ev("14:12", "msg", `${AL}/S2`, "@RT·S4 I need one call at the top of every handler in `src/routes/auth.ts`. You hold it.", "src/routes/auth.ts"),
+    ev("14:12", "msg", `${RT}/S4`, "@AL·S2 yes, I add it.", "src/routes/auth.ts"),
+    ev("14:12", "agreement", `${RT}/S4`, "RT·S4 adds `audit(req, 'refresh')` in `src/routes/auth.ts`; AL·S2 does not touch the file.", "src/routes/auth.ts"),
     ev("14:13", "msg", `${RT}/S5`, "@S3 I read `Session` in the client. Is `expiresAt` staying a number?", "src/auth/session.ts"),
     ev("14:13", "msg", `${RT}/S3`, "@S5 yes, unchanged. Only the new field.", "src/auth/session.ts"),
   ],
@@ -154,7 +170,7 @@ export const LIVE: BoardSnapshot = {
   files: [],
   flags: [],
 };
-// the FileMap's rows, as the Board derives them from the claims: one holder each here
+// the claims, as the Board derives them: one holder each here
 LIVE.files = LIVE.roster.flatMap((r) => r.files.map((f) => ({ path: f.path, holders: [r.runner], interface: f.interface })));
 
 /** The same repository with only the brainstorm and the closed runs: no claims, no merge lock (D3). */
@@ -162,7 +178,7 @@ export const BRAINSTORM_ONLY: BoardSnapshot = {
   ...LIVE,
   runs: [...CLOSED, BRAINSTORM],
   roster: LIVE.roster.filter((r) => r.plan === NM),
-  events: LIVE.events.filter((e) => e.channel === "main" ? e.from.startsWith(`${LP}/`) : [3, 4, 5].includes(e.channel)),
+  events: LIVE.events.filter((e) => [3, 4, 5].includes(e.run)),
   queues: {},
   files: [],
 };
@@ -178,7 +194,7 @@ export const SITE: BoardSnapshot = {
   runs: [{ run: 7, kind: "plan", plan: "landing", group: "landing", code: "LA", title: "The landing page", link: null, open: true, runners: 1, done: 0, of: 2 }],
   lock: null,
   roster: [runner("landing/S1", "The hero", "Writing the hero", "working", [["site/hero.tsx"]], "14:03", 4)],
-  events: [onMain("14:03", "event", "landing/orchestrator", "opened: The landing page")],
+  events: [named("14:03", "landing/orchestrator", "opened", "run 7 opened: plan landing, The landing page")],
   queues: {},
   files: [{ path: "site/hero.tsx", holders: ["landing/S1"], interface: false }],
   flags: [],
