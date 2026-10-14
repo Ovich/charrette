@@ -107,7 +107,8 @@ else if (verb === "open") {
   if (!d) { d = { id: docs.reduce((m, x) => Math.max(m, x.id), 6) + 1, file_path: arg, kind: kindOf(arg), project: "p" }; docs.push(d); fs.writeFileSync(indexFile, JSON.stringify(docs)); }
   console.log(JSON.stringify({ id: d.id, url: "http://localhost:4321/#doc=" + d.id }));
 }
-else if (verb === "list") console.log(JSON.stringify(docs.filter((d) => d.kind === argv[argv.indexOf("--kind") + 1])));
+// as the real aiview: file_path relative to its data home, abs_path absolute
+else if (verb === "list") console.log(JSON.stringify(docs.filter((d) => d.kind === argv[argv.indexOf("--kind") + 1]).map((d) => ({ ...d, file_path: path.relative(${JSON.stringify(toolRoot)}, d.file_path), abs_path: d.file_path }))));
 else if (verb === "remove") {
   const ids = argv.slice(1).map((r) => Number(r.replace("#", "")));
   fs.writeFileSync(indexFile, JSON.stringify(docs.filter((d) => !ids.includes(d.id))));
@@ -738,4 +739,11 @@ test("--help prints the core verbs, --help code the claim and merge verbs; no ve
   assert.equal(none.status, 1);
   assert.match(none.stderr, /^  endorse /m);
   assert.doesNotMatch(none.stderr, /^  claim /m);
+});
+
+test("open keeps the project's board in aiview's index, aiview listing paths relative to its data home (SL10 trial)", () => {
+  const { launcher, index } = fakeAiview();
+  const r = openWith(launcher);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(indexed(index).map((d) => d.file_path), [boardFile()]);
 });

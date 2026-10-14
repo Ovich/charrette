@@ -91,7 +91,8 @@ function retireOtherSwarmDocuments(
 ): { ok: true; files: string[] } | { ok: false; error: string } {
   const listed = aiview(["list", "--kind", "swarm", "--project", project]);
   if (!listed.ok) return listed;
-  const others = (listed.out as { id: number; file_path: string }[]).filter((d) => path.resolve(d.file_path) !== path.resolve(board));
+  // abs_path: aiview lists file_path relative to its data home, never to this cwd
+  const others = (listed.out as { id: number; file_path: string; abs_path?: string }[]).filter((d) => path.resolve(d.abs_path ?? d.file_path) !== path.resolve(board));
   if (!others.length) return { ok: true, files: [] };
   const removed = aiview(["remove", ...others.map((d) => `#${d.id}`)]);
   if (!removed.ok) return removed;
