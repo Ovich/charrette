@@ -321,7 +321,18 @@ var EVENTS = {
   // in main when a run opens: its kind, group and title (D69)
   opened: { name: "opened" },
   closed: { name: "closed" },
-  urgent: { name: "urgent", always: true }
+  urgent: { name: "urgent", always: true },
+  // a write outside the writer's claim on a path another holds (D10); mentions: the holder, then the writer
+  flag: {
+    name: "flag",
+    next: (m, me, cli) => {
+      const [holder, writer] = m.mentions;
+      if (!m.about || !holder || !writer) return null;
+      if (me.name === holder) return `settle it: ${cli} agree ${word(`@${writer} <who changes what>`)} --about ${word(m.about)}`;
+      if (me.name === writer) return `settle it: ${cli} post ${word(`@${holder} <what you change>`)} --about ${word(m.about)}`;
+      return null;
+    }
+  }
 };
 var NAMES = Object.keys(EVENTS);
 var isEvent = (s) => Object.hasOwn(EVENTS, s);
@@ -403,10 +414,16 @@ function claimsOf(deps) {
       });
     });
   };
+  const noticeOf = (me, rel, people) => {
+    const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
+    const fresh = people.filter((o) => Number(told.run(me.repo, rel, me.id, o.id).changes) > 0);
+    return fresh.length ? fresh.map((o) => `${rel} is also held by ${o.name}: ${doingOf(o.id)}`).join("; ") : null;
+  };
   const releaseAll = (id) => {
     const owner = db.prepare("SELECT r.repo FROM participants p JOIN runs r ON r.id = p.run WHERE p.id = ?").get(id);
     const claims = Number(db.prepare("DELETE FROM claims WHERE participant = ?").run(id).changes);
     const locks = Number(db.prepare("DELETE FROM merge_locks WHERE participant = ?").run(id).changes);
+    db.prepare("DELETE FROM claim_requests WHERE participant = ?").run(id);
     clearFlags();
     if (owner && claims + locks > 0) bump(String(owner.repo));
   };
@@ -422,6 +439,24 @@ function claimsOf(deps) {
     lockWaitersFreedBy(p) {
       const held = db.prepare("SELECT 1 FROM merge_locks WHERE repo = ? AND participant = ?").get(p.repo, p.id) !== void 0;
       return held ? takeLockWaiters(p.repo).filter((n) => n !== p.name) : [];
+    },
+    claimByPost(me, m) {
+      if (m.kind !== "msg" && m.kind !== "agreement" || !m.about) return null;
+      const about = fold(relPath(me.repo, m.about) ?? slashes(m.about));
+      return transaction(() => {
+        const asked = db.prepare("SELECT path, kind FROM claim_requests WHERE repo = ? AND participant = ?").all(me.repo, me.id).find((r) => {
+          const x = fold(String(r.path));
+          return x === about || x.endsWith(`/${about}`);
+        });
+        if (!asked) return null;
+        const rel = String(asked.path);
+        const others = holdersOf(me.repo, rel).filter((c) => c.participant !== me.id);
+        if (!others.length || !hasPostedAbout(me, rel, others)) return null;
+        hold(me, rel, String(asked.kind) === "interface" ? "interface" : "inside");
+        db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
+        const people = others.map((c) => participantById(c.participant));
+        return { path: rel, sharedWith: people.map((o) => o.name) };
+      });
     },
     claimDeclared(p, files) {
       transaction(() => {
@@ -470,6 +505,10 @@ function claimsOf(deps) {
         const people = others.map((c) => participantById(c.participant));
         if (!all.some((c) => c.participant === me.id)) {
           if (!hasPostedAbout(me, rel, others)) {
+            db.prepare(
+              `INSERT INTO claim_requests (repo, path, participant, kind) VALUES (?, ?, ?, ?)
+               ON CONFLICT (repo, path, participant) DO UPDATE SET kind = CASE WHEN claim_requests.kind = 'interface' THEN 'interface' ELSE excluded.kind END`
+            ).run(me.repo, rel, me.id, kind);
             const who = people.map((o) => `${o.name} (${o.nick}: ${doingOf(o.id)})`).join(", ");
             const at = people.map((o) => `@${o.name}`).join(" ");
             return {
@@ -479,17 +518,16 @@ function claimsOf(deps) {
           }
         }
         hold(me, rel, kind);
+        db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
         const sharedWith = people.map((o) => ({ runner: o.name, doing: doingOf(o.id) }));
-        const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
-        const fresh = people.filter((o) => Number(told.run(me.repo, rel, me.id, o.id).changes) > 0);
-        const notice = fresh.length ? fresh.map((o) => `${rel} is also held by ${o.name}: ${doingOf(o.id)}`).join("; ") : null;
-        return { allowed: true, sharedWith, notice };
+        return { allowed: true, sharedWith, notice: noticeOf(me, rel, people) };
       });
     },
     reconcileWrites(me, changed) {
       const flags = [];
       return transaction(() => {
         const flag = db.prepare("INSERT OR IGNORE INTO flags (repo, path, participant) VALUES (?, ?, ?)");
+        const posted = db.prepare("INSERT OR IGNORE INTO flag_posts (repo, path, participant, holder) VALUES (?, ?, ?, ?)");
         for (const file of changed) {
           const rel = relPath(me.repo, file);
           if (!rel) continue;
@@ -501,12 +539,14 @@ function claimsOf(deps) {
           if (taken || others.length) flag.run(me.repo, rel, me.id);
           if (!others.length) continue;
           const holder = participantById(others[0].participant);
+          if (Number(posted.run(me.repo, rel, me.id, holder.id).changes) === 0) continue;
           const m = insertMessage(
             me,
             `@${holder.name} @${me.name} flag: ${me.name} wrote ${rel} outside its claim; ${holder.name} holds it. Settle it here.`,
             rel,
-            "msg",
-            [holder.name, me.name]
+            "event",
+            [holder.name, me.name],
+            { event: EVENTS.flag.name }
           );
           flags.push({ path: rel, holder: holder.name, seq: m.seq });
         }
@@ -523,16 +563,19 @@ function claimsOf(deps) {
         bump(me.repo);
       });
     },
-    lockMerge(me) {
+    lockMerge(me, onto) {
       return transaction(() => {
         const r = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo);
         if (r && Number(r.participant) !== me.id && isLive(Number(r.participant))) {
           db.prepare("INSERT OR IGNORE INTO lock_waiters (repo, participant) VALUES (?, ?)").run(me.repo, me.id);
           return { granted: false, holder: participantById(Number(r.participant)).name };
         }
-        if (r && Number(r.participant) === me.id) return { granted: true };
+        if (r && Number(r.participant) === me.id) {
+          if (onto) db.prepare("UPDATE merge_locks SET onto = ? WHERE repo = ?").run(onto, me.repo);
+          return { granted: true };
+        }
         db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(me.repo);
-        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at) VALUES (?, ?, ?)").run(me.repo, me.id, now());
+        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at, onto) VALUES (?, ?, ?, ?)").run(me.repo, me.id, now(), onto ?? null);
         bump(me.repo);
         return { granted: true };
       });
@@ -544,12 +587,14 @@ function claimsOf(deps) {
       const iface = /* @__PURE__ */ new Set();
       const sharers = [];
       let waiters = [];
+      let onto = null;
       transaction(() => {
         transaction(() => {
-          const lock = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo);
+          const lock = db.prepare("SELECT participant, onto FROM merge_locks WHERE repo = ?").get(me.repo);
           if (lock && Number(lock.participant) !== me.id && isLive(Number(lock.participant))) {
             throw new Error(`the merge lock is held by ${participantById(Number(lock.participant)).name}, not ${me.name}`);
           }
+          if (lock && Number(lock.participant) === me.id && lock.onto != null) onto = String(lock.onto);
           db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
           db.prepare("UPDATE participants SET merged = 1 WHERE id = ?").run(me.id);
           waiters = takeLockWaiters(me.repo).filter((n) => n !== me.name);
@@ -571,12 +616,11 @@ function claimsOf(deps) {
         }
         const openPlans = db.prepare("SELECT DISTINCT plan, kind FROM runs WHERE repo = ? AND state = 'open'").all(me.repo).filter((r) => profileOf(String(r.kind)).claims).map((r) => String(r.plan));
         const all = iface.size ? openPlans.map((plan) => `${plan}/*`) : [];
-        const lines = [`merged ${sha}: rebase onto ${sha}.`];
+        const lines = [`merged ${sha}${onto ? ` into ${onto}` : ""}: rebase your branch onto it.`];
         if (told.size) lines.push(`${[...told].map((n) => `@${n}`).join(" ")}: you hold or declared a file it changed.`);
         if (iface.size) lines.push(`@all interface changed: ${[...iface].join(", ")}.`);
         if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);
         lines.push(`files: ${rels.join(", ") || "-"}`);
-        insertMessage(me, lines.join("\n"), null, "event", [.../* @__PURE__ */ new Set([...told, ...waiters, ...all])], { event: EVENTS.merged.name });
         for (const rel of rels) {
           const ids = new Set(holdersOf(me.repo, rel).map((c) => c.participant));
           const held = db.prepare("SELECT l.participant FROM claim_log l JOIN participants p ON p.id = l.participant WHERE l.repo = ? AND l.path = ? AND p.run = ? ORDER BY l.rowid").all(me.repo, rel, me.run);
@@ -584,6 +628,8 @@ function claimsOf(deps) {
           ids.delete(me.id);
           for (const id of ids) sharers.push({ path: rel, runner: participantById(id).name });
         }
+        const meta = { rebase: [...told], tell: [...new Set(sharers.map((o) => o.runner))] };
+        insertMessage(me, lines.join("\n"), null, "event", [.../* @__PURE__ */ new Set([...told, ...waiters, ...all])], { event: EVENTS.merged.name, meta });
       });
       return sharers;
     }
@@ -786,6 +832,22 @@ async function openBoard(dbPath = SQLITE_PATH) {
       participant INTEGER NOT NULL,
       PRIMARY KEY (repo, path, participant)
     );
+    -- a claim refused as held: the post that settles it claims it (D7)
+    CREATE TABLE IF NOT EXISTS claim_requests (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      PRIMARY KEY (repo, path, participant)
+    );
+    -- a flag posted, once per writer, path and holder (D8)
+    CREATE TABLE IF NOT EXISTS flag_posts (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      holder INTEGER NOT NULL,
+      PRIMARY KEY (repo, path, participant, holder)
+    );
     -- a version per repository, moved by every write: what onChange compares (D39)
     CREATE TABLE IF NOT EXISTS changes (
       repo TEXT PRIMARY KEY,
@@ -809,6 +871,8 @@ async function openBoard(dbPath = SQLITE_PATH) {
   upkeep("participants", "merged", "merged INTEGER NOT NULL DEFAULT 0");
   upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
   upkeep("runs", "link", "link TEXT");
+  upkeep("messages", "meta", "meta TEXT");
+  upkeep("merge_locks", "onto", "onto TEXT");
   upkeep("slices", "link", "link TEXT");
   upkeep("runs", "kind", "kind TEXT NOT NULL DEFAULT 'plan'");
   upkeep("messages", "run", "run INTEGER");
@@ -921,7 +985,8 @@ async function openBoard(dbPath = SQLITE_PATH) {
     at: String(r.at),
     channel: r.run == null ? "main" : { run: Number(r.run) },
     endorses: r.endorses == null ? null : Number(r.endorses),
-    event: r.event == null || !Object.hasOwn(EVENTS, String(r.event)) ? null : String(r.event)
+    event: r.event == null || !Object.hasOwn(EVENTS, String(r.event)) ? null : String(r.event),
+    meta: r.meta == null ? null : JSON.parse(String(r.meta))
   });
   const lastSeq = () => Number(db.prepare("SELECT COALESCE(MAX(seq), 0) AS s FROM messages").get().s);
   const openPlans = (repo) => db.prepare("SELECT DISTINCT plan FROM runs WHERE repo = ? AND state = 'open'").all(repo).map((r) => String(r.plan));
@@ -942,7 +1007,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
     const mentions2 = named ?? (kind === "event" ? [] : parseMentions(body, p.plan, openPlans(p.repo), activeNames(p.repo)));
     const run2 = channelOf(p, kind, about, mentions2, extra.channel ?? "run");
     if (run2 != null && runRow(run2).state === "closed") throw new Error(`run ${run2} is closed`);
-    const r = db.prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at, by_board, run, endorses, event) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(p.repo, p.id, body, about, kind, JSON.stringify(mentions2), now(), named ? 1 : 0, run2, extra.endorses ?? null, extra.event ?? null);
+    const r = db.prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at, by_board, run, endorses, event, meta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(p.repo, p.id, body, about, kind, JSON.stringify(mentions2), now(), named ? 1 : 0, run2, extra.endorses ?? null, extra.event ?? null, extra.meta ? JSON.stringify(extra.meta) : null);
     const seq = Number(r.lastInsertRowid);
     bump(p.repo);
     return board.read(seq);
@@ -1143,7 +1208,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
         for (const run2 of runIds) {
           for (const r of db.prepare("SELECT id FROM participants WHERE run = ?").all(run2)) {
             const id = Number(r.id);
-            for (const table of ["claim_log", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries"]) {
+            for (const table of ["claim_log", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries", "claim_requests", "flag_posts"]) {
               db.prepare(`DELETE FROM ${table} WHERE participant = ?`).run(id);
             }
             db.prepare("DELETE FROM notices WHERE other = ?").run(id);
@@ -1289,7 +1354,9 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
     },
     post(p, body, opts = {}) {
       const fresh = live(p);
-      return insertMessage(fresh, body, opts.about ?? null, opts.kind ?? "msg", void 0, { channel: opts.channel });
+      const m = insertMessage(fresh, body, opts.about ?? null, opts.kind ?? "msg", void 0, { channel: opts.channel });
+      const claimed = profileOf(fresh.kind).claims ? claims.claimByPost(fresh, m) : null;
+      return claimed ? { ...m, claimed } : m;
     },
     endorse(p, seq) {
       const fresh = live(p);
@@ -1366,8 +1433,8 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
     release(p, file) {
       claims.release(gated(live(p), "release"), file);
     },
-    lockMerge(p) {
-      return claims.lockMerge(gated(live(p), "merge-lock"));
+    lockMerge(p, onto) {
+      return claims.lockMerge(gated(live(p), "merge-lock"), onto);
     },
     merged(p, sha, files) {
       return claims.merged(gated(live(p), "merged"), sha, files);
@@ -1439,7 +1506,18 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       });
       const events = db.prepare("SELECT * FROM (SELECT * FROM messages WHERE repo = ? ORDER BY seq DESC LIMIT ?) ORDER BY seq").all(repo, EVENTS_SHOWN).map((r) => {
         const m = toMessage(r);
-        return { seq: m.seq, at: m.at, kind: m.kind, from: m.from, body: m.body, about: m.about, channel: m.channel === "main" ? "main" : m.channel.run };
+        return {
+          seq: m.seq,
+          at: m.at,
+          kind: m.kind,
+          from: m.from,
+          body: m.body,
+          about: m.about,
+          channel: m.channel === "main" ? "main" : m.channel.run,
+          event: m.event,
+          mentions: m.mentions,
+          meta: m.meta ?? null
+        };
       });
       const nameOf = new Map(people.map((r) => [`${r.run}/${r.slice}`, `${r.plan}/${r.slice}`]));
       const queues = {};
@@ -1728,7 +1806,7 @@ var USAGE = [
 ].join("\n");
 var CODE_USAGE = [
   "usage: swarm <verb> [--json]        the code verbs; refused on a run whose kind has no claims",
-  "  claim   [--as <runner>] <path> [--interface]                    # before editing a file: exit 0 claimed, 3 held until you post about it",
+  "  claim   [--as <runner>] <path> [--interface] [--new]            # before editing a file: exit 0 claimed, 3 held until you post about it (the post claims it); --new: a file you create",
   "  release [--as <runner>] <path>                                  # gives up a claim",
   "  merge-lock --onto <branch> [--as <runner>]                      # one merge at a time per repository; claims or flags what your branch wrote unclaimed",
   "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase and who was refused the lock, names whom to tell of a resolved conflict"
@@ -1871,9 +1949,30 @@ var emitHeard = (p, json, human) => {
     if (next) console.log(next);
   });
 };
+function resolveClaimPath(file) {
+  if (path6.isAbsolute(file)) return file;
+  const here = path6.resolve(file);
+  if (fs5.existsSync(here)) return here;
+  const root = worktreeOf(process.cwd());
+  const fromRoot = root ? path6.resolve(root, file) : null;
+  if (fromRoot && fs5.existsSync(fromRoot)) return fromRoot;
+  if (args.has("--new")) return here;
+  return fail(`no such file: ${here}${fromRoot && fromRoot !== here ? ` nor ${fromRoot}` : ""}; pass --new if you are creating it`);
+}
+function repoRelative(abs) {
+  const root = worktreeOf(process.cwd());
+  const rel = root ? path6.relative(root, abs) : abs;
+  return rel.split(path6.sep).join("/");
+}
+function aboutArg() {
+  const about = args.flag("--about");
+  if (about === void 0 || !/[\\/]/.test(about)) return about;
+  return repoRelative(resolveClaimPath(about));
+}
 function parseFile(spec) {
   const m = spec.match(/^(.*):(interface|inside)$/);
-  return m ? { path: m[1], interface: m[2] === "interface" } : { path: spec, interface: false };
+  const d = m ? { path: m[1], interface: m[2] === "interface" } : { path: spec, interface: false };
+  return { ...d, path: repoRelative(resolveClaimPath(d.path)) };
 }
 function readSlices(file) {
   let raw;
@@ -1926,6 +2025,7 @@ function joinedSeat() {
   return seat ?? slice ?? fail(`--seat (or --slice) is required
 ${USAGE}`);
 }
+var SEAT_POSTS_DRAW = "posts render markdown and mermaid: compare in a table, draw a flow as a mermaid block";
 var seatCommands = (as) => {
   const cli = self().join(" ");
   const who = `--as ${shellWord(as)}`;
@@ -2022,11 +2122,13 @@ ${USAGE}`);
       const shared = !profileOf(runner.kind).worktree;
       const as = shared ? `pass --as ${runner.name} on every call: this checkout is shared, the board cannot tell you apart` : null;
       const commands = shared ? seatCommands(runner.name) : null;
-      emit({ runner: runner.name, nick: runner.nick, roster, ...shared ? { as: runner.name, commands } : {}, next }, () => {
+      const drawing = profileOf(runner.kind).member === "seat" ? SEAT_POSTS_DRAW : null;
+      emit({ runner: runner.name, nick: runner.nick, roster, ...shared ? { as: runner.name, commands } : {}, ...drawing ? { drawing } : {}, next }, () => {
         console.log(`you are ${runner.name}, ${runner.nick}: @${runner.slice} or @${runner.nick.replace(/\s+/g, "")} mentions you`);
         for (const r of roster) console.log(rosterLine(r));
         if (as) console.log(as);
         for (const c of commands ?? []) console.log(c);
+        if (drawing) console.log(drawing);
         console.log(next);
       });
       break;
@@ -2051,13 +2153,14 @@ ${USAGE}`);
       const p = caller(board);
       const body = args.positional.join(" ") || fail(`${args.verb}: nothing to say`);
       const m = board.post(p, body, {
-        about: args.flag("--about"),
+        about: aboutArg(),
         kind: args.verb === "agree" ? "agreement" : "msg",
         channel: args.has("--main") ? "main" : "run"
       });
       const unmatched = unmatchedLines(board, p, body);
-      emitHeard(p, { seq: m.seq, mentions: m.mentions, channel: m.channel, ...unmatched.length ? { unmatched } : {} }, () => {
+      emitHeard(p, { seq: m.seq, mentions: m.mentions, channel: m.channel, ...unmatched.length ? { unmatched } : {}, ...m.claimed ? { claimed: m.claimed } : {} }, () => {
         console.log(seqLine(m));
+        if (m.claimed) console.log(`claimed ${m.claimed.path}, shared with ${m.claimed.sharedWith.join(", ")}`);
         for (const line of unmatched) console.log(line);
       });
       break;
@@ -2129,20 +2232,23 @@ ${USAGE}`);
     case "claim": {
       const p = caller(board);
       const file = args.positional[0] ?? fail("claim: which path?");
-      const verdict = board.checkEdit(p, path6.resolve(file), { interface: args.has("--interface") });
+      const abs = resolveClaimPath(file);
+      const rel = repoRelative(abs);
+      const verdict = board.checkEdit(p, abs, { interface: args.has("--interface") });
       if (!verdict.allowed) process.exitCode = 3;
       emitHeard(p, verdict, () => {
         if (!verdict.allowed) return console.log(verdict.refusal);
         const also = verdict.notice ? verdict.sharedWith.map((o) => `${o.runner} \xB7 ${board.participant(o.runner)?.nick ?? "?"}: ${o.doing}`).join("; ") : "";
-        console.log(also ? `claimed ${file}, also held by ${also}` : `claimed ${file}`);
+        console.log(also ? `claimed ${rel}, also held by ${also}` : `claimed ${rel}`);
       });
       break;
     }
     case "release": {
       const p = caller(board);
       const file = args.positional[0] ?? fail("release: which path?");
-      board.release(p, path6.resolve(file));
-      emit({ runner: p.name, released: file }, `${p.name} released ${file}`);
+      const abs = resolveClaimPath(file);
+      board.release(p, abs);
+      emit({ runner: p.name, released: repoRelative(abs) }, `${p.name} released ${repoRelative(abs)}`);
       break;
     }
     case "merge-lock": {
@@ -2150,7 +2256,7 @@ ${USAGE}`);
       const onto = need("--onto");
       const reconciled = p.worktree ? branchChangedIn(p.worktree, onto) : [];
       const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
-      const r = board.lockMerge(p);
+      const r = board.lockMerge(p, onto);
       emit({ runner: p.name, ...r, reconciled, flags }, () => {
         printReconciled(reconciled, flags);
         console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait --mentions for its merged event`);
