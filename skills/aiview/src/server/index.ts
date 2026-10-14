@@ -11,6 +11,7 @@ import type {
   DocumentResponse,
   PendingEventPayload,
   IndexEventPayload,
+  DataChangedEventPayload,
   ProjectEventPayload,
   ShowDoneEventPayload,
   ShowEventPayload,
@@ -20,7 +21,7 @@ import { resolveBindings } from "../core/bind.ts";
 import { formatOf, isHtml, isPdf, readDoc } from "../core/paths.ts";
 import { isName } from "../core/pointer.ts";
 import { clearServerFiles, writeServerFiles } from "../core/serverstate.ts";
-import { DocWatcher } from "../core/watcher.ts";
+import { DocWatcher, type DataChangedEvent } from "../core/watcher.ts";
 import { createSseHub } from "./sse.ts";
 
 export interface ServeOptions {
@@ -93,6 +94,9 @@ export function startServer(
   watcher.on("changed", ({ id }: { id: number }) => {
     index.touch(id);
     sse.broadcast({ type: "changed", id });
+  });
+  watcher.on("data-changed", ({ id }: DataChangedEvent) => {
+    sse.broadcast({ type: "data-changed", id } satisfies DataChangedEventPayload);
   });
   for (const d of index.all()) if (d.exists) watcher.ensureWatch(d);
 
@@ -232,10 +236,17 @@ export function startServer(
     if (a) {
       const doc = index.get(Number(a[1]));
       if (!doc) return send(res, 404, "not found", "text/plain");
-      const base = path.dirname(doc.abs_path);
-      const f = path.resolve(base, decodeURIComponent(a[2]));
+      // Real paths on both sides, so a link or junction inside the folder cannot lead out.
+      let base: string;
+      let f: string;
+      try {
+        base = fs.realpathSync(path.dirname(doc.abs_path));
+        f = fs.realpathSync(path.resolve(path.dirname(doc.abs_path), decodeURIComponent(a[2])));
+      } catch {
+        return send(res, 404, "not found", "text/plain");
+      }
       if (f !== base && !f.startsWith(base + path.sep)) return send(res, 403, "forbidden", "text/plain");
-      if (!fs.existsSync(f) || !fs.statSync(f).isFile()) return send(res, 404, "not found", "text/plain");
+      if (!fs.statSync(f).isFile()) return send(res, 404, "not found", "text/plain");
       return send(res, 200, fs.readFileSync(f), MIME[path.extname(f).toLowerCase()] ?? "application/octet-stream");
     }
     // Raw bytes (PDF viewing) — read per request, never held open, so writers are not blocked.

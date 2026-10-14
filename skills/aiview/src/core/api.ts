@@ -46,6 +46,12 @@ export interface ChangedEventPayload {
   id: number;
 }
 
+/** A workbench's sidecar data was committed; the page itself did not change. */
+export interface DataChangedEventPayload {
+  type: "data-changed";
+  id: number;
+}
+
 /** Broadcast when the active project changes, from either the UI or the CLI. */
 export interface ProjectEventPayload {
   type: "project";

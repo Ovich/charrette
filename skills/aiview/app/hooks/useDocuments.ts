@@ -28,6 +28,9 @@ export interface DocumentsState {
   /** Bumped whenever the given doc id changed on disk — viewers key refetches off it. */
   changedTick: number;
   changedId: number | null;
+  /** Bumped when a workbench's sidecar data was committed; never refetches the document. */
+  dataTick: number;
+  dataId: number | null;
   /** Bumped whenever the agent points at a mockup's components (`aiview show`). */
   shownTick: number;
   shown: Pointer | null;
@@ -45,6 +48,7 @@ export function useDocuments(): DocumentsState {
   const [version, setVersion] = useState<string | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [changed, setChanged] = useState<{ tick: number; id: number | null }>({ tick: 0, id: null });
+  const [dataChanged, setDataChanged] = useState<{ tick: number; id: number | null }>({ tick: 0, id: null });
   const [shown, setShown] = useState<{ tick: number; pointer: Pointer | null }>({ tick: 0, pointer: null });
   const [showDoneTick, setShowDoneTick] = useState(0);
   const loadedOnce = useRef(false);
@@ -88,6 +92,8 @@ export function useDocuments(): DocumentsState {
         // itself moved, so refetch it. This is what makes a new document appear without
         // a manual refresh — `changed` only fires for files already being watched.
         if (ev.type === "index") reload();
+        // A workbench's data moved, not its page: the bench refreshes itself, no reload.
+        if (ev.type === "data-changed") setDataChanged((d) => ({ tick: d.tick + 1, id: ev.id ?? null }));
         // The agent is pointing at a mockup's components: this tab goes there.
         if (ev.type === "show" && typeof ev.id === "number") {
           const pointer: Pointer = { id: ev.id, components: ev.components ?? [], ...(ev.variant ? { variant: ev.variant } : {}) };
@@ -129,6 +135,8 @@ export function useDocuments(): DocumentsState {
     connection,
     changedTick: changed.tick,
     changedId: changed.id,
+    dataTick: dataChanged.tick,
+    dataId: dataChanged.id,
     shownTick: shown.tick,
     shown: shown.pointer,
     showDoneTick,
