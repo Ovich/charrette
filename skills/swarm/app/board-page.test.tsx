@@ -150,12 +150,20 @@ test("a click outside closes the archive; one inside does not", () => {
 
 // ── AgentStrip ───────────────────────────────────────────────────────────────────
 
-test("the agent strip is hidden on All and on a closed run", () => {
+test("the agent strip is hidden on All", () => {
   show([APP], null);
   expect(strip()).toBeNull();
-  cleanup();
-  show([APP], 4);
-  expect(strip()).toBeNull();
+});
+
+test("under a closed run, its members as they ended, a card still followed", () => {
+  const was = LIVE.roster.find((r) => r.state === "ended")!;
+  const member = (slice: string, state: "done" | "ended") => ({ ...was, runner: `login-page/${slice}`, nick: `LP ${slice}`, plan: "login-page", slice, state });
+  show([APP], 4, [{ ...LIVE, roster: [...LIVE.roster, member("S1", "ended"), member("orchestrator", "done")] }]);
+  const cards = within(strip()!).getAllByRole("button");
+  expect(cards.map((c) => c.querySelector(".slice")?.textContent)).toEqual(["orchestrator", `S1 · ${was.title}`]);
+  expect(cards.every((c) => c.textContent?.includes("ended"))).toBe(true);
+  fireEvent.click(cards[1]);
+  expect(cards[1].getAttribute("aria-pressed")).toBe("true");
 });
 
 test("under a picked run, its members, orchestrator first, each read code then nick", () => {

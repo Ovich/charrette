@@ -273,9 +273,11 @@ p { margin: 0; }
 .item { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 12px; padding: 6px 0 6px 10px; border-left: 2px solid transparent; }
 .item + .item.cont { padding-top: 0; }
 .item .time, .event .time { font: 11px ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace; color: var(--faint-foreground); padding-top: 2px; }
+/* the time centred on the head's line, the 18px of a member's chip, not 2px above it */
+.item .time { padding-top: 0; line-height: 18px; }
 .item .head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 12.5px; }
 .item .what { font-size: 12px; }
-.item .text { grid-column: 2; max-width: 72ch; font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.item .text { grid-column: 2; font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; }
 .item .text code { font-size: 12px; background: var(--surface-2); border-radius: 4px; padding: 1px 4px; }
 .item .text .post-md pre code { background: none; padding: 0; }
 .item .text .seq-ref { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
@@ -288,6 +290,9 @@ p { margin: 0; }
 .item.decided .what { color: var(--ok); }
 .item.new, .event.new { animation: rise .35s ease-out; }
 .event { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 12px; padding: 2px 0 2px 12px; font-size: 12px; color: var(--faint-foreground); }
+.event .head { display: flex; align-items: center; min-height: 18px; }
+.event .time { padding-top: 0; line-height: 18px; }
+.event .text { grid-column: 2; line-height: 1.5; overflow-wrap: anywhere; }
 .tip { cursor: help; text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; }
 #tipbox { position: fixed; z-index: 50; max-width: 300px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--foreground); color: var(--background); font-size: 12px; line-height: 1.45; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); pointer-events: none; }
 #tipbox[hidden] { display: none; }
@@ -295,7 +300,7 @@ p { margin: 0; }
   .stream { padding: 10px 14px; }
   .item, .event { grid-template-columns: 1fr; }
   .item .time, .event .time { display: none; }
-  .item .text { grid-column: 1; }
+  .item .text, .event .text { grid-column: 1; }
 }
 
 

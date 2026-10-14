@@ -67,7 +67,7 @@ export function BoardPage({ repos, run }: { repos: string[]; run: number | null 
   if (!snapshot) return <div className="content">Loading the board…</div>;
   const listed = board.repos.filter((r) => repos.includes(r.repo));
   const selectedRun = snapshot.runs.find((r) => r.run === picked) ?? null;
-  // the agent strip only under a picked open run; the claims row hidden under a closed one (D7)
+  // the agent strip under a picked run, open or closed; the claims row hidden under a closed one (D7)
   const members = picked === null ? [] : agents(snapshot, picked);
   const claims = selectedRun && !selectedRun.open ? null : claimRows(snapshot, picked);
   return (

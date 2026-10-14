@@ -170,9 +170,10 @@ describe("archive (D18)", () => {
 });
 
 describe("agents (D7, D20)", () => {
-  test("a run's members, orchestrator first; none for a closed run", () => {
+  test("a run's members, orchestrator first; a closed run's too", () => {
     expect(agents(board(RUNS, ROSTER), 1).map((m) => m.runner)).toEqual(["alpha/orchestrator", "alpha/S1"]);
-    expect(agents(board(RUNS, ROSTER), 3)).toEqual([]);
+    expect(agents(board(RUNS, ROSTER), 3).map((m) => m.runner)).toEqual(["gamma/orchestrator"]);
+    expect(agents(board(RUNS, ROSTER), 9)).toEqual([]);
   });
 });
 

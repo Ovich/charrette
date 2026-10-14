@@ -50,8 +50,11 @@ function BoardEventLine({ item, fresh }: { item: BoardEventItem; fresh: boolean 
       <span className="time" title={item.at}>
         {hhmm(item.at)}
       </span>
-      <span>
-        <RunnerName name={item.from} />{" "}
+      <div className="head">
+        <RunnerName name={item.from} />
+      </div>
+      {/* the text below its author, as a message's (D8) */}
+      <div className="text">
         {item.tip ? (
           <span className="tip" tabIndex={0} data-tip={item.tip}>
             <RichText text={item.text} mentions={false} />
@@ -59,7 +62,7 @@ function BoardEventLine({ item, fresh }: { item: BoardEventItem; fresh: boolean 
         ) : (
           <RichText text={item.text} mentions={false} />
         )}
-      </span>
+      </div>
     </li>
   );
 }

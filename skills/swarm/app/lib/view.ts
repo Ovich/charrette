@@ -430,10 +430,10 @@ export function conversationFiles(items: Item[]): { path: string; count: number 
   return [...counts.entries()].map(([path, count]) => ({ path, count })).sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 }
 
-/** A run's members, orchestrator first; none for a closed run. */
+/** A run's members, orchestrator first; a closed run's too, as they ended. */
 export function agents(snap: BoardSnapshot, run: RunId): SnapshotRunner[] {
   const r = snap.runs.find((x) => x.run === run);
-  return r?.open ? orderRoster(membersOf(snap, r)) : [];
+  return r ? orderRoster(membersOf(snap, r)) : [];
 }
 
 /** The held files with their holders: those held by one run's members, or every one (null). */

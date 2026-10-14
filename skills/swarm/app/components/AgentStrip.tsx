@@ -1,4 +1,4 @@
-// A picked open run's members, one row of cards under the tabs, orchestrator first (D7, D20):
+// A picked run's members, a closed run's as they ended, one row of cards under the tabs, orchestrator first (D7, D20):
 // each card its member (code, then nick), its status, the slice, what it does. A card clicked
 // follows the member and narrows the conversation; clicked again, released.
 import type { CSSProperties } from "react";
