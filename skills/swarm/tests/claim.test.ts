@@ -272,6 +272,19 @@ test("across runs: the post that opens a held file lands in main and opens it; t
   }
 });
 
+test("across runs: the answer line the holder gets carries --main, so an agreement before the claimer's reclaim lands in main (D57)", async () => {
+  const { board, mine, theirs } = await crossRuns();
+  try {
+    board.post(mine, "@swarm/S3 I add a helper to src/x.ts", { about: "src/x.ts" });
+    const heard = board.deliver(theirs).full[0] as { answer?: string };
+    assert.equal(heard.answer, 'answer with an agreement on who changes what: swarm agree "<who changes what in src/x.ts>" --about src/x.ts --main');
+    const agreed = board.post(theirs, "review-tool/S3 adds the helper at the end", { about: "src/x.ts", kind: "agreement", channel: "main" });
+    assert.equal(agreed.channel, "main");
+  } finally {
+    board.close();
+  }
+});
+
 test("across runs: merge notices to another run's holders land in main", async () => {
   const { board, mine, theirs } = await crossRuns();
   try {

@@ -618,7 +618,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       return rows.map((r) => {
         const m = toMessage(r);
         const rel = r.by_board || m.kind !== "msg" || !m.about || !named(m) ? null : claims.askedAbout(me, Number(r.author), m);
-        return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}` } : m;
+        return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}${m.channel === "main" ? " --main" : ""}` } : m;
       });
     });
     return {
