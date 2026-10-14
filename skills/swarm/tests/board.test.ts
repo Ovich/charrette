@@ -97,7 +97,7 @@ test("deliver marks delivered, a second deliver is empty", () => {
   assert.deepEqual(board.deliver(s5), { full: [], lines: [] });
 });
 
-test("@all reaches its plan only, @plan/S3 crosses", () => {
+test("@swarm reaches its run only, @<plan>/S1 and @<CODE>·S3 cross; @all names nobody (D3)", () => {
   const { s3, s5 } = twoRunners();
   const b = board.openRun({ repo: REPO, group: "swarm", title: "B", seats: SLICES });
   const far = board.join({ run: b.id, slice: "S1", doing: "board", files: [] }).runner;
@@ -105,11 +105,13 @@ test("@all reaches its plan only, @plan/S3 crosses", () => {
   board.deliver(s3);
   board.deliver(s5);
 
-  board.post(s3, "@all rebase on main");
+  board.post(s3, "@swarm rebase on the target");
   assert.equal(board.deliver(s5).full.length, 1);
-  const farGot = board.deliver(far);
-  assert.equal(farGot.full.length, 0);
-  assert.equal(farGot.lines.length, 0); // another run's talk is its own channel (D18)
+  assert.deepEqual(board.deliver(far), { full: [], lines: [] }); // another run's plain talk never reaches it (D2)
+
+  assert.deepEqual(board.post(s3, "@all anyone?").mentions, []);
+  assert.equal(board.deliver(s5).full.length, 0);
+  assert.deepEqual(board.deliver(far), { full: [], lines: [] });
 
   board.post(s3, "@swarm/S1 your schema touches mine");
   assert.equal(board.deliver(far).full.length, 1);
@@ -361,7 +363,10 @@ test("a runner is given a funny name at join, unique on the repository; @Name me
   const nicks = [...many, far].map((p) => p.nick);
   assert.ok(nicks.every((n) => /^[A-Z][a-z]+ [A-Z][a-z]+$/.test(n)), nicks.join(", "));
   assert.equal(new Set(nicks).size, nicks.length, "unique among the repository's active runners");
-  assert.equal(board.participant("review-tool/orchestrator")!.nick, "orchestrator");
+  // the orchestrator is given one at open too (D17), unique with the runners'
+  const orch = board.participant("review-tool/orchestrator")!.nick;
+  assert.match(orch, /^[A-Z][a-z]+ [A-Z][a-z]+$/);
+  assert.ok(!nicks.includes(orch));
   // kept for the run: a second join of the slice keeps it
   assert.equal(board.join({ run: run.id, slice: "T0", doing: "again", files: [] }).runner.nick, many[0].nick);
   assert.equal(board.roster(REPO).find((r) => r.name === far.name)!.nick, far.nick);
@@ -514,7 +519,7 @@ test("merged releases the lock and mentions holders and declarers", () => {
   assert.equal(forS3.lines.length, 1);
 });
 
-test("an interface file in a merge is announced to @all", () => {
+test("an interface file in a merge is announced to @swarm, and reaches the other run's members", () => {
   const run = board.openRun({ repo: REPO, group: "review-tool", title: "A", seats: SLICES });
   const s3 = board.join({ run: run.id, slice: "S3", doing: "api", files: [{ path: "src/api.ts", interface: true }], worktree: wt("s3") }).runner;
   const s5 = board.join({ run: run.id, slice: "S5", doing: "x", files: [], worktree: wt("s5") }).runner;
@@ -526,7 +531,7 @@ test("an interface file in a merge is announced to @all", () => {
   for (const p of [s5, far]) {
     const d = board.deliver(p);
     assert.equal(d.full.length, 1, `${p.name} got the announcement in full`);
-    assert.match(d.full[0].body, /@all interface changed: src\/api\.ts/);
+    assert.match(d.full[0].body, /@swarm interface changed: src\/api\.ts/);
     assert.match(d.full[0].body, /^merged def456: rebase your branch onto it./);
   }
 });
@@ -790,7 +795,8 @@ test("a store from before shared claims is rebuilt keyed by holder, its claims k
   assert.deepEqual(old.snapshot(REPO).files[0].holders, ["review-tool/S3", "review-tool/S5"]);
 });
 
-// Channels (D18, D26): each run talks in its own channel; what reaches another run lands in main.
+// One conversation (plan D1, D2): every item carries its author's run; another run's member is
+// reached only by what is its own.
 const twoRuns = () => {
   const { run, s3, s5 } = twoRunners();
   const other = board.openRun({ repo: REPO, group: "swarm", title: "B", seats: SLICES });
@@ -800,49 +806,74 @@ const twoRuns = () => {
   return { run, other, s3, s5, far, near };
 };
 
-test("a post inside run A is not delivered to run B, neither in full nor as a line", () => {
+test("the hard rule: run A's plain post reaches run B neither in full nor as a line; a mention, an agreement about a held path, a subscribed any: event and an urgent post do (D2)", () => {
   const { run, s3, s5, far } = twoRuns();
   const m = board.post(s3, "@S5 I take the header");
-  assert.deepEqual(m.channel, { run: run.id });
+  assert.equal(m.run, run.id);
   assert.equal(board.deliver(s5).full.length, 1);
   assert.deepEqual(board.deliver(far), { full: [], lines: [] });
   board.post(s3, "nothing for anyone");
-  assert.equal(board.deliver(s5).lines.length, 1);
+  board.setDoing(s3, "the header"); // an event far did not subscribe to
+  assert.equal(board.deliver(s5).lines.length, 2);
   assert.deepEqual(board.deliver(far), { full: [], lines: [] });
+
+  const mention = board.post(s3, "@SW·S1 your schema touches mine");
+  assert.deepEqual(board.deliver(far).full.map((x) => x.seq), [mention.seq]);
+
+  assert.equal(board.checkEdit(far, "src/x.ts").allowed, true);
+  const agreement = board.post(s3, "S1 first, then S3", { about: "src/x.ts", kind: "agreement" });
+  assert.deepEqual(board.deliver(far).full.map((x) => x.seq), [agreement.seq]);
+
+  board.subscribe(far, [{ event: "ended", scope: "any" }]);
+  board.end(s5);
+  const ended = board.deliver(far);
+  assert.deepEqual(ended.full, []);
+  assert.equal(ended.lines.length, 1);
+  assert.match(ended.lines[0], /ended/);
+
+  board.post(s3, "fire", { kind: "urgent" });
+  const urgent = board.deliver(far);
+  assert.equal(urgent.lines.length, 1);
+  assert.match(urgent.lines[0], /fire/);
 });
 
-test("a mention across runs lands in main and ends the other member's wait --mentions", async () => {
-  const { s3, far } = twoRuns();
+test("a mention across runs keeps its author's run and ends the other member's wait --mentions", async () => {
+  const { run, s3, far } = twoRuns();
   const waiting = board.wait(far, { mentionsOnly: true, timeoutMs: 5000 });
   const m = board.post(s3, "@swarm/S1 your schema touches mine");
-  assert.equal(m.channel, "main");
+  assert.equal(m.run, run.id);
   const got = await waiting;
   assert.deepEqual(got.full.map((x) => x.seq), [m.seq]);
 });
 
-test("@<group>/all across runs lands in main and reaches every member of that group", () => {
+test("@<CODE> across runs reaches every member of that run, and no one of the sender's (D3)", () => {
   const { s3, s5, far, near } = twoRuns();
-  const m = board.post(s3, "@swarm/all the schema moved");
-  assert.equal(m.channel, "main");
+  const m = board.post(s3, "@SW the schema moved");
+  assert.deepEqual(m.mentions, ["swarm/*"]);
   assert.equal(board.deliver(far).full.length, 1);
   assert.equal(board.deliver(near).full.length, 1);
-  assert.deepEqual(board.deliver(s5), { full: [], lines: [] }); // main, not mentioning s5
+  assert.deepEqual(board.deliver(s5).full, []); // its own run's talk, a line
 });
 
-test("events stay in the run; deliver takes no unmentioning main message", () => {
+test("an event keeps its author's run; the snapshot's events carry run, its runners lastCall (D13, D21)", () => {
   const { run, s3, s5, far } = twoRuns();
   board.setDoing(s3, "the header");
-  const m = board.post(s3, "for the record", { channel: "main" });
-  assert.equal(m.channel, "main");
   const got = board.deliver(s5);
-  assert.equal(got.lines.length, 1); // the doing event, not the main post
+  assert.equal(got.lines.length, 1);
   assert.match(got.lines[0], /doing: the header/);
   assert.deepEqual(board.deliver(far), { full: [], lines: [] });
   const snap = board.snapshot(REPO);
   const doing = snap.events.find((e) => e.body === "doing: the header")!;
-  assert.equal(doing.channel, run.id);
-  assert.equal(snap.events.find((e) => e.seq === m.seq)!.channel, "main");
+  assert.equal(doing.run, run.id);
+  assert.ok(snap.events.every((e) => typeof e.run === "number"));
+  for (const r of snap.roster) assert.ok(!Number.isNaN(Date.parse(r.lastCall)), r.runner);
   assert.deepEqual(snap.runs.map((r) => [r.kind, r.group]), [["plan", "review-tool"], ["plan", "swarm"]]);
+});
+
+test("a closed run refuses a post", () => {
+  const { run, s3 } = twoRuns();
+  board.closeRun(run.id);
+  assert.throws(() => board.post(s3, "late"), new RegExp(`run ${run.id} is closed|has ended`));
 });
 
 test("endorse backs an agreement: a mention of its author, its about copied", () => {
@@ -861,14 +892,17 @@ test("endorse backs an agreement: a mention of its author, its about copied", ()
   assert.throws(() => board.endorse(s3, a.seq), /your own agreement/);
 });
 
-test("an agreement about a path held by members of two runs lands in main", () => {
-  const { s3, far } = twoRuns();
+test("an agreement about a path held by members of two runs keeps its author's run and reaches the other holder", () => {
+  const { run, other, s3, far } = twoRuns();
   assert.equal(board.checkEdit(far, "src/x.ts").allowed, true);
   board.post(s3, "@swarm/S1 I add a helper to src/x.ts", { about: "src/x.ts" });
   assert.equal(board.checkEdit(s3, "src/x.ts").allowed, true);
   const a = board.post(far, "S1 first, then S3", { about: "src/x.ts", kind: "agreement" });
-  assert.equal(a.channel, "main");
-  assert.equal(board.endorse(s3, a.seq).channel, "main");
+  assert.equal(a.run, other.id);
+  assert.ok(board.deliver(s3).full.some((x) => x.seq === a.seq));
+  const e = board.endorse(s3, a.seq);
+  assert.equal(e.run, run.id);
+  assert.ok(board.deliver(far).full.some((x) => x.seq === e.seq));
 });
 
 // A brainstorm run (D3, D21, D22): seats with no worktree and no claims.
@@ -895,7 +929,7 @@ test("a brainstorm run refuses files, worktrees and every code verb, writing not
   }
 });
 
-test("a store from before channels opens: its messages read as main, its runs as plan, and an open run keeps going", async () => {
+test("a store from before channels opens: a row with run null reads as its author's run, its runs as plan, and an open run keeps going (D13)", async () => {
   const { DatabaseSync } = await import("node:sqlite");
   const file = path.join(dir, "before-channels.sqlite");
   const db = new DatabaseSync(file);
@@ -913,14 +947,14 @@ test("a store from before channels opens: its messages read as main, its runs as
   const old = await openBoard(file);
   opened.push(old);
   opened.push(await openBoard(file)); // the upkeep is idempotent
-  assert.equal(old.read(1).channel, "main");
+  assert.equal(old.read(1).run, 1);
   assert.equal(old.runs()[0].kind, "plan");
   const s3 = old.participant("old/S3")!;
   const s5 = old.participant("old/S5")!;
   assert.equal(s3.kind, "plan");
-  assert.deepEqual(old.deliver(s5).full.map((m) => m.seq), [1]); // a main message mentioning it
+  assert.deepEqual(old.deliver(s5).full.map((m) => m.seq), [1]); // an old message mentioning it
   const m = old.post(s3, "@S5 after");
-  assert.deepEqual(m.channel, { run: 1 });
+  assert.equal(m.run, 1);
   assert.deepEqual(old.deliver(s5).full.map((x) => x.seq), [m.seq]);
   assert.equal(old.checkEdit(s3, "src/a.ts").allowed, true);
   assert.deepEqual(old.snapshot(REPO).files, [{ path: "src/a.ts", holders: ["old/S3"], interface: false }]);
@@ -940,10 +974,10 @@ test("join: --on over the seat row's on over the kind's defaults, per role", () 
   assert.deepEqual(board.participant("idea/orchestrator")!.subscriptions.map((s) => s.event), ["agreement", "endorsement", "ended", "stale"]);
   assert.deepEqual(board.join({ run: idea.id, slice: "architect", doing: "x", files: [] }).runner.subscriptions, []);
   assert.deepEqual(board.join({ run: idea.id, slice: "skeptic", doing: "x", files: [] }).runner.subscriptions, [{ event: "agreement", scope: "run" }]);
-  const on = [{ event: "merged" as const, scope: "main" as const }];
+  const on = [{ event: "merged" as const, scope: "any" as const }];
   assert.deepEqual(board.join({ run: idea.id, slice: "skeptic", doing: "x", files: [], on }).runner.subscriptions, on);
   assert.deepEqual(board.roster(REPO).find((r) => r.slice === "skeptic")!.subscriptions, on);
-  assert.deepEqual(board.snapshot(REPO).roster.find((r) => r.slice === "skeptic")!.on, ["main:merged"]);
+  assert.deepEqual(board.snapshot(REPO).roster.find((r) => r.slice === "skeptic")!.on, ["any:merged"]);
 });
 
 test("a seats row naming an unknown event is refused at open", () => {
@@ -956,9 +990,9 @@ test("a seats row naming an unknown event is refused at open", () => {
 test("subscribe and unsubscribe return the member's set", () => {
   const idea = board.openRun({ repo: REPO, kind: "brainstorm", group: "idea", title: "I", seats: SEATS });
   const a = board.join({ run: idea.id, slice: "architect", doing: "x", files: [] }).runner;
-  assert.equal(board.subscribe(a, [{ event: "agreement", scope: "run" }, { event: "merged", scope: "main" }]).length, 2);
+  assert.equal(board.subscribe(a, [{ event: "agreement", scope: "run" }, { event: "merged", scope: "any" }]).length, 2);
   assert.equal(board.subscribe(a, [{ event: "agreement", scope: "run" }]).length, 2);
-  assert.deepEqual(board.unsubscribe(a, [{ event: "agreement", scope: "run" }]), [{ event: "merged", scope: "main" }]);
+  assert.deepEqual(board.unsubscribe(a, [{ event: "agreement", scope: "run" }]), [{ event: "merged", scope: "any" }]);
 });
 
 test("the board's events store their name; an agreement maps by kind, with no name stored", () => {
@@ -992,22 +1026,21 @@ test("an unsubscribed seat's wait --mentions stays waiting on another seat's agr
   assert.deepEqual(await idle, { full: [], lines: [] });
 });
 
-test("an agreement in another run does not wake a run-scoped seat; main:agreement wakes on one in main; urgent and mentions always", async () => {
+test("an agreement in another run does not wake a run-scoped seat; any:agreement wakes on one; urgent and mentions always", async () => {
   const idea = board.openRun({ repo: REPO, kind: "brainstorm", group: "idea", title: "I", seats: SEATS });
   const skeptic = board.join({ run: idea.id, slice: "skeptic", doing: "x", files: [] }).runner;
   const architect = board.join({ run: idea.id, slice: "architect", doing: "x", files: [] }).runner;
   const idea2 = board.openRun({ repo: REPO, kind: "brainstorm", group: "idea2", title: "J", seats: SEATS });
   const elsewhere = board.join({ run: idea2.id, slice: "architect", doing: "x", files: [] }).runner;
   board.post(elsewhere, "D9 in the other run", { kind: "agreement", about: "D9" });
-  board.post(elsewhere, "D9 in main", { kind: "agreement", about: "D9", channel: "main" });
   assert.deepEqual(await board.wait(skeptic, { mentionsOnly: true, timeoutMs: 1200 }), { full: [], lines: [] });
-  board.subscribe(skeptic, [{ event: "agreement", scope: "main" }]);
-  const m = board.post(elsewhere, "D10 in main", { kind: "agreement", about: "D10", channel: "main" });
+  board.subscribe(skeptic, [{ event: "agreement", scope: "any" }]);
+  const m = board.post(elsewhere, "D10 in the other run", { kind: "agreement", about: "D10" });
   const d = await board.wait(skeptic, { mentionsOnly: true, timeoutMs: 3000 });
   assert.ok(d.full.some((x) => x.seq === m.seq));
   board.unsubscribe(skeptic, [
     { event: "agreement", scope: "run" },
-    { event: "agreement", scope: "main" },
+    { event: "agreement", scope: "any" },
   ]);
   const u = board.post(architect, "fire", { kind: "urgent" });
   assert.deepEqual((await board.wait(skeptic, { mentionsOnly: true, timeoutMs: 3000 })).full.map((x) => x.seq), [u.seq]);

@@ -229,7 +229,9 @@ test("status --json lists each open run with its kind; the text names the kind (
   const id = openRun();
   const s = JSON.parse(run("status", "--json").stdout);
   assert.equal(s.runs, 1);
-  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", members: [{ name: "review-tool/orchestrator", nick: "orchestrator", worktree: null }] }]);
+  const nick = s.open[0]?.members[0]?.nick as string;
+  assert.match(nick, /^[A-Z][a-z]+ [A-Z][a-z]+$/, "the orchestrator's funny name, given at open (D17)");
+  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", members: [{ name: "review-tool/orchestrator", nick, worktree: null }] }]);
   assert.match(run("status").stdout, new RegExp(`run ${id}  plan  review-tool  A plan`));
 });
 
@@ -684,19 +686,30 @@ test("a seat's --files is refused by the board", () => {
   assert.match(r.stderr, /join: a brainstorm run has no claims/);
 });
 
-test("post --main lands in main; a cross-run mention without --main lands there too", () => {
+test("post, agree and endorse --main exit 2 naming the mention to use, writing nothing; a cross-run mention posts as any other (D12)", () => {
   const id = openBrainstorm();
   joinSeat(id, "architect");
-  const main = run("post", "hello all", "--main", "--as", "idea/architect");
-  assert.equal(main.status, 0, main.stderr);
-  assert.match(main.stdout, /^#\d+ \(main\)$/m);
+  joinSeat(id, "skeptic");
+  const agreed = run("agree", "we keep D3", "--about", "D3", "--as", "idea/architect");
+  const before = run("read", seqOf(agreed.stdout));
+  for (const argv of [
+    ["post", "hello all", "--main"],
+    ["agree", "we keep D4", "--about", "D4", "--main"],
+    ["endorse", seqOf(agreed.stdout), "--main"],
+  ]) {
+    const r = run(...argv, "--as", "idea/skeptic");
+    assert.equal(r.status, 2, argv[0]);
+    assert.match(r.stderr, /there is no Main any more: the conversation is one; mention who you mean \(@IW, @IW·SL3, @swarm\)/);
+  }
+  assert.equal(before.status, 0);
+  assert.equal(run("read", String(Number(seqOf(agreed.stdout)) + 1)).status, 1, "nothing was written");
   const inRun = run("post", "in the run", "--about", "D3", "--as", "idea/architect");
   assert.match(inRun.stdout, /^#\d+$/m);
   const other = openRun();
   run("join", "--run", String(other), "--slice", "S3", "--doing", "x");
   const cross = run("post", "@review-tool/S3 a question", "--as", "idea/architect");
   assert.equal(cross.status, 0, cross.stderr);
-  assert.match(cross.stdout, /^#\d+ \(main\)$/m);
+  assert.match(cross.stdout, /^#\d+$/m);
 });
 
 test("endorse backs an agreement and prints its seq; a plain post exits 1", () => {
@@ -768,21 +781,21 @@ test("join --on with an unknown event exits 1 listing the known ones; --on store
   const id = openBrainstorm();
   const bad = joinSeat(id, "architect", "--on", "agreed");
   assert.equal(bad.status, 1);
-  assert.match(bad.stderr, /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, opened, closed, urgent/);
-  const ok = joinSeat(id, "architect", "--on", "agreement,main:merged");
+  assert.match(bad.stderr, /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, quiet, back, opened, closed, urgent, flag/);
+  const ok = joinSeat(id, "architect", "--on", "agreement,any:merged");
   assert.equal(ok.status, 0, ok.stderr);
   const roster = run("roster");
-  assert.match(roster.stdout, /idea\/architect .*on: agreement, main:merged/);
+  assert.match(roster.stdout, /idea\/architect .*on: agreement, any:merged/);
 });
 
 test("subscribe and unsubscribe print the member's subscriptions after", () => {
   const id = openBrainstorm();
   joinSeat(id, "architect");
-  const s = run("subscribe", "agreement,main:merged", "--as", "idea/architect");
+  const s = run("subscribe", "agreement,any:merged", "--as", "idea/architect");
   assert.equal(s.status, 0, s.stderr);
-  assert.match(s.stdout, /idea\/architect wakes on: agreement, main:merged/);
+  assert.match(s.stdout, /idea\/architect wakes on: agreement, any:merged/);
   const u = run("unsubscribe", "agreement", "--as", "idea/architect");
-  assert.match(u.stdout, /wakes on: main:merged$/m);
+  assert.match(u.stdout, /wakes on: any:merged$/m);
   const bad = run("subscribe", "nope", "--as", "idea/architect");
   assert.equal(bad.status, 1);
 });
@@ -829,12 +842,17 @@ test("a mention naming nobody is told to its author, closest names offered; the 
   const id = String(openRun());
   const s3 = JSON.parse(run("join", "--run", id, "--slice", "S3", "--doing", "the page", "--json").stdout);
   const nick = s3.nick.replace(/\s+/g, "");
-  const r = run("post", "@S4 and @S3 and @orchestrator and @all: the header", "--as", "review-tool/S3");
+  const r = run("post", "@S4 and @S3 and @orchestrator and @swarm and @RT and @all: the header", "--as", "review-tool/S3");
   assert.equal(r.status, 0, r.stderr);
   const lines = r.stdout.split("\n");
   assert.match(lines[0], /^#\d+/);
   assert.equal(lines[1], `@S4 matched nobody on the board: did you mean @review-tool/S3 or @${nick}, @review-tool/orchestrator?`);
-  assert.ok(!r.stdout.includes("@S3 matched") && !r.stdout.includes("@orchestrator matched") && !r.stdout.includes("@all matched"), r.stdout);
+  // @all names nobody now (D3): told so, @swarm offered
+  assert.equal(lines[2], "@all matched nobody on the board: did you mean @swarm?");
+  for (const fine of ["@S3", "@orchestrator", "@swarm", "@RT"]) assert.ok(!r.stdout.includes(`${fine} matched`), r.stdout);
+  // a two-letter token naming no open run's code: the open codes offered
+  const code = run("post", "@ZZ the header", "--as", "review-tool/S3");
+  assert.match(code.stdout, /^@ZZ matched nobody on the board: did you mean @RT\?$/m);
   assert.equal(run("read", seqOf(r.stdout)).stdout.includes("@S4 and @S3"), true);
   const agreed = run("agree", "@Nobody owns it", "--as", "review-tool/S3", "--json");
   assert.equal(agreed.status, 0, agreed.stderr);

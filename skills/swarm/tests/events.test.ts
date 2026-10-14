@@ -9,18 +9,19 @@ const me: Participant = {
   ended: false, worktree: null, listening: true, subscriptions: [],
 };
 const msg = (over: Partial<Message> = {}): Message => ({
-  seq: 5, repo: "/r/.git", from: "idea/architect", body: "x", about: null, kind: "msg", mentions: [], at: "", channel: { run: 7 },
+  seq: 5, repo: "/r/.git", from: "idea/architect", body: "x", about: null, kind: "msg", mentions: [], at: "", run: 7,
   endorses: null, event: null, ...over,
 });
 
 test("parseSubscriptions reads scopes and refuses an unknown name, listing the known ones", () => {
-  assert.deepEqual(parseSubscriptions("agreement,main:merged"), [
+  assert.deepEqual(parseSubscriptions("agreement,any:merged"), [
     { event: "agreement", scope: "run" },
-    { event: "merged", scope: "main" },
+    { event: "merged", scope: "any" },
   ]);
+  assert.deepEqual(parseSubscriptions("main:merged"), [{ event: "merged", scope: "any" }]); // the old spelling reads as any:
   assert.deepEqual(parseSubscriptions(["agreement", "agreement"]), [{ event: "agreement", scope: "run" }]);
-  assert.throws(() => parseSubscriptions("agreed"), /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, opened, closed, urgent/);
-  assert.equal(formatSubscriptions(parseSubscriptions("agreement,main:merged")), "agreement, main:merged");
+  assert.throws(() => parseSubscriptions("agreed"), /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, quiet, back, opened, closed, urgent, flag$/);
+  assert.equal(formatSubscriptions(parseSubscriptions("agreement,any:merged")), "agreement, any:merged");
 });
 
 test("eventOf: the stored name, else derived from kind; an old row and a plain post have none", () => {
@@ -40,9 +41,9 @@ test("wakes: a mention, urgent, a subscribed event in its scope; not another run
   assert.ok(EVENTS.urgent.always);
   assert.ok(wakes(msg({ kind: "agreement" }), me, run));
   assert.ok(!wakes(msg({ kind: "agreement" }), me, []));
-  assert.ok(!wakes(msg({ kind: "agreement", channel: { run: 8 } }), me, run));
-  assert.ok(!wakes(msg({ kind: "agreement", channel: "main" }), me, run));
-  assert.ok(wakes(msg({ kind: "agreement", channel: "main" }), me, parseSubscriptions("main:agreement")));
+  assert.ok(!wakes(msg({ kind: "agreement", run: 8 }), me, run));
+  assert.ok(wakes(msg({ kind: "agreement", run: 8 }), me, parseSubscriptions("any:agreement")));
+  assert.ok(!wakes(msg({ mentions: ["other/*"], run: 8 }), me, [])); // another run's @swarm
   assert.ok(!wakes(msg({ kind: "agreement", from: "idea/skeptic" }), me, run)); // one's own
 });
 

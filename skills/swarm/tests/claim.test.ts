@@ -256,36 +256,37 @@ const crossRuns = async () => {
   return { board, mine, theirs };
 };
 
-test("across runs: the post that opens a held file lands in main and opens it; the agreement reaches the claimer", async () => {
+test("across runs: the post that opens a held file keeps its author's run and opens it; the agreement reaches the claimer", async () => {
   const { board, mine, theirs } = await crossRuns();
   try {
     assert.equal(board.checkEdit(mine, "src/x.ts").allowed, false);
     const ask = board.post(mine, "@swarm/S3 I add a helper to src/x.ts", { about: "src/x.ts" });
-    assert.equal(ask.channel, "main");
+    assert.equal(ask.run, mine.run);
     assert.deepEqual(board.deliver(theirs).full.map((m) => m.seq), [ask.seq]);
     assert.equal(board.checkEdit(mine, "src/x.ts").allowed, true);
     const agreed = board.post(theirs, "review-tool/S3 adds the helper at the end", { about: "src/x.ts", kind: "agreement" });
-    assert.equal(agreed.channel, "main");
+    assert.equal(agreed.run, theirs.run);
     assert.deepEqual(board.deliver(mine).full.map((m) => m.seq), [agreed.seq]);
   } finally {
     board.close();
   }
 });
 
-test("across runs: the answer line the holder gets carries --main, so an agreement before the claimer's reclaim lands in main (D57)", async () => {
+test("across runs: the answer line the holder gets carries no --main, and its agreement reaches the claimer before its reclaim (D12)", async () => {
   const { board, mine, theirs } = await crossRuns();
   try {
-    board.post(mine, "@swarm/S3 I add a helper to src/x.ts", { about: "src/x.ts" });
+    assert.equal(board.checkEdit(mine, "src/x.ts").allowed, false);
+    board.post(mine, "@swarm/S3 I add a helper to src/x.ts", { about: "src/x.ts" }); // settles the claim (D7)
     const heard = board.deliver(theirs).full[0] as { answer?: string };
-    assert.equal(heard.answer, 'answer with an agreement on who changes what: swarm agree "<who changes what in src/x.ts>" --about src/x.ts --main');
-    const agreed = board.post(theirs, "review-tool/S3 adds the helper at the end", { about: "src/x.ts", kind: "agreement", channel: "main" });
-    assert.equal(agreed.channel, "main");
+    assert.equal(heard.answer, 'answer with an agreement on who changes what: swarm agree "<who changes what in src/x.ts>" --about src/x.ts');
+    const agreed = board.post(theirs, "review-tool/S3 adds the helper at the end", { about: "src/x.ts", kind: "agreement" });
+    assert.deepEqual(board.deliver(mine).full.map((m) => m.seq), [agreed.seq]);
   } finally {
     board.close();
   }
 });
 
-test("across runs: merge notices to another run's holders land in main", async () => {
+test("across runs: a merge notice keeps the merger's run and reaches another run's holder in full", async () => {
   const { board, mine, theirs } = await crossRuns();
   try {
     board.post(mine, "@swarm/S3 I add a helper", { about: "src/x.ts" });
@@ -295,7 +296,7 @@ test("across runs: merge notices to another run's holders land in main", async (
     board.merged(mine, "abc123", ["src/x.ts"]);
     const got = board.deliver(theirs).full;
     assert.equal(got.length, 1);
-    assert.equal(got[0].channel, "main");
+    assert.equal(got[0].run, mine.run);
     assert.match(got[0].body, /merged abc123/);
   } finally {
     board.close();
