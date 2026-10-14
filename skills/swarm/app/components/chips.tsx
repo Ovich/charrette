@@ -1,12 +1,13 @@
 import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
 import { planCode } from "../../src/board/mentions.ts";
 import { SEQ_REF } from "../lib/post.ts";
-import { runnerColor, runnerLabel } from "../lib/view.ts";
+import { runHue, runnerLabel } from "../lib/view.ts";
 
-/** A runner's chip, "RT·S3": the KindChip recipe at its light tone, a hue per runner. */
+/** A member's chip, "RT·S3": the KindChip recipe at its light tone, in its run's hue (D19). */
 export function RunnerTag({ name, plan = true }: { name: string; plan?: boolean }) {
   const { code, slice } = runnerLabel(name);
-  const { h, s } = runnerColor(name);
+  const h = runHue(code);
+  const s = 60;
   return (
     <span className="who" style={{ "--h": h, "--s": s } as CSSProperties} data-component="RunnerTag">
       {plan && <span className="pc">{code}·</span>}
