@@ -1,7 +1,7 @@
 // What the page shows, as pure functions of the snapshot and the three selections App owns:
 // the run it is scoped to, the runner it follows, the filter. No child computes any of it.
-import type { BoardSnapshot, SnapshotEvent, SnapshotRunner, QueueSlice, RunId, RunSummary } from "../../src/board/board.ts";
-import { profileOf, type Kind, type KindProfile } from "../../src/board/kinds.ts";
+import type { BoardSnapshot, SnapshotEvent, SnapshotRunner, RunId, RunSummary } from "../../src/board/board.ts";
+import type { Kind } from "../../src/board/kinds.ts";
 import { nameHandle, parseMentions, planCode } from "../../src/board/mentions.ts";
 
 export const ORCHESTRATOR = "orchestrator";
@@ -40,7 +40,7 @@ export function hhmm(iso: string): string {
 
 export const basename = (p: string): string => p.split(/[\\/]/).pop() ?? p;
 
-// ── channels, and scoping to one ────────────────────────────────────────────────────
+// ── mentions and members ────────────────────────────────────────────────────────────
 
 /** What resolving a mention needs: every run's group on the repository, and the active runners'
  *  funny names as a mention writes them (D43). */
@@ -70,78 +70,8 @@ export function orderRoster(roster: SnapshotRunner[]): SnapshotRunner[] {
     .map((x) => x.r);
 }
 
-export interface Scoped {
-  roster: SnapshotRunner[];
-  events: SnapshotEvent[];
-  queues: [string, QueueSlice[]][];
-  files: FileRow[];
-}
-
-/** A held file and its holders, in claim order (D40); `flag`: written outside a claim. */
-export type FileRow = { path: string; holders: string[]; iface: boolean; flag: boolean };
-
-/** A channel: Main, or a run by its id (D18). */
-export type ChannelId = "main" | number;
-export type ChannelEntry = { id: ChannelId; title: string; code: string | null; kind: Kind | null; open: boolean; entries: number };
-export type ChannelGroups = { main: ChannelEntry; plans: ChannelEntry[]; brainstorms: ChannelEntry[]; closed: ChannelEntry[] };
-
-const isActive = (r: SnapshotRunner): boolean => r.state !== "ended" && r.state !== "done";
-
-/** The profile of a run's kind, or null for a kind this page's build does not know. */
-function knownProfile(kind: string): KindProfile | null {
-  try {
-    return profileOf(kind);
-  } catch {
-    return null;
-  }
-}
-
 /** A run's members: the roster entries of its group. */
 const membersOf = (snap: BoardSnapshot, run: RunSummary): SnapshotRunner[] => snap.roster.filter((r) => r.plan === run.group);
-
-/** A channel's count: the entries its thread shows under Everything, events included. */
-const entriesIn = (snap: BoardSnapshot, channel: ChannelId): number => snap.events.filter((e) => e.channel === channel).length;
-
-/** The rail: Main, the open runs by kind, oldest first, and every closed run the snapshot holds,
- *  newest first (D19, D46). A kind is a plan when its profile has claims, else a brainstorm. */
-export function channels(snap: BoardSnapshot): ChannelGroups {
-  const entry = (r: RunSummary): ChannelEntry => ({ id: r.run, title: r.title, code: r.code, kind: knownProfile(r.kind) ? r.kind : null, open: r.open, entries: entriesIn(snap, r.run) });
-  const hasClaims = (r: RunSummary): boolean => knownProfile(r.kind)?.claims ?? false;
-  const open = snap.runs.filter((r) => r.open).sort((a, b) => a.run - b.run);
-  return {
-    main: { id: "main", title: "Main", code: null, kind: null, open: true, entries: entriesIn(snap, "main") },
-    plans: open.filter(hasClaims).map(entry),
-    brainstorms: open.filter((r) => !hasClaims(r)).map(entry),
-    closed: snap.runs.filter((r) => !r.open).sort((a, b) => b.run - a.run).map(entry),
-  };
-}
-
-/** The channel a page opens on with no run asked for: Main while a run is open, else the most
- *  recently closed run, so a board whose runs all closed opens on what happened. */
-export function defaultChannel(snap: BoardSnapshot): ChannelId {
-  if (snap.runs.some((r) => r.open) || snap.runs.length === 0) return "main";
-  return Math.max(...snap.runs.map((r) => r.run));
-}
-
-const openProfiles = (snap: BoardSnapshot): KindProfile[] => snap.runs.filter((r) => r.open).flatMap((r) => knownProfile(r.kind) ?? []);
-/** The claims panel shows while some open run's kind has claims (D3). */
-export const showsClaims = (snap: BoardSnapshot): boolean => openProfiles(snap).some((p) => p.claims);
-/** The merge lock shows while some open run's kind has one (D3). */
-export const showsMergeLock = (snap: BoardSnapshot): boolean => openProfiles(snap).some((p) => p.mergeLock);
-
-/** One channel: its own events; the roster and queue of that run, or every active member and
- *  every queue on Main. Files are the repository's whole FileMap, claims being global (D26). */
-export function scope(snap: BoardSnapshot, channel: ChannelId): Scoped {
-  const run = channel === "main" ? null : (snap.runs.find((r) => r.run === channel) ?? null);
-  const roster = orderRoster(channel === "main" ? snap.roster.filter(isActive) : run ? membersOf(snap, run) : []);
-  const events = snap.events.filter((e) => e.channel === channel);
-  const queues = Object.entries(snap.queues).filter(([group]) => channel === "main" || group === run?.group);
-  const held: FileRow[] = snap.files.map((f) => ({ path: f.path, holders: f.holders, iface: f.interface, flag: snap.flags.some((x) => x.path === f.path) }));
-  const unheld = [...new Set(snap.flags.map((f) => f.path))]
-    .filter((p) => !held.some((h) => h.path === p))
-    .map((p) => ({ path: p, holders: snap.flags.filter((f) => f.path === p).map((f) => f.runner), iface: false, flag: true }));
-  return { roster, events, queues, files: [...held, ...unheld] };
-}
 
 // ── following a runner ──────────────────────────────────────────────────────────────
 
