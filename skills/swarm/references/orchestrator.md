@@ -1,28 +1,38 @@
 # The orchestrator's side
 
-You told the board the plan, you watch the run, and you are the only one who interrupts.
-`$S` is the tool, as `SKILL.md` names it; every verb here takes `--as <plan>/orchestrator`
+You told the board the work, you watch the run, and you are the only one who interrupts.
+`$S` is the tool, as `SKILL.md` names it; every verb here takes `--as <group>/orchestrator`
 except `open`, `slice`, `close` and `status`.
 
 ## Open the run
 
-1. **The slices file**, every slice of the plan, with the aiview URL of its slice document:
+1. **The seats file**, one entry per member the run will have.
+   - **A plan**: every slice, with the aiview URL of its slice document as `link`:
 
-   ```json
-   [{ "id": "S1", "title": "<the slice's title>", "blockers": [], "link": "<slice document URL>" },
-    { "id": "S2", "title": "<…>", "blockers": ["S1"], "link": "<…>" }]
-   ```
+     ```json
+     [{ "id": "S1", "title": "<the slice's title>", "blockers": [], "link": "<slice document URL>" },
+      { "id": "S2", "title": "<…>", "blockers": ["S1"], "link": "<…>" }]
+     ```
+
+   - **A brainstorm**: every seat, with its `role` and the brainstorm board's URL as `link`;
+     the seat's row on that board is named in its brief:
+
+     ```json
+     [{ "id": "skeptic", "title": "<the seat's title>", "role": "<the role>", "link": "<brainstorm board URL>" },
+      { "id": "builder", "title": "<…>", "role": "<…>", "link": "<…>" }]
+     ```
 
 2. **From the repository's checkout:**
-   `$S open --plan <plan slug> --title "<plan title>" --slices <file> --link <plan URL>`.
-   It prints the run id, then the run's aiview URL: give the URL to the person, who watches the
+   `$S open --kind <plan|brainstorm> --group <slug> --title "<title>" --seats <file> --link <plan or board URL>`.
+   `--plan <slug>` stays an alias of `--kind plan --group <slug>`, `--slices` of `--seats`. It
+   prints the run id, then the run's aiview URL: give the URL to the person, who watches the
    run there.
 
 ## Dispatch
 
-**Send the `Agent` call of every slice whose blockers are done in one single message, each run
-in the background**, with nothing between them: no text, no other call, no wait for one to start
-before the next.
+**The `orchestrate` skill dispatches.** For a kind without worktree, no `isolation`, and each
+brief carries `--as <group>/<seat>` and the join line; a seat runs on the plugin's
+`seat-runner` agent, as the `brainstorm` skill's `references/auto.md` says.
 
 ## Slice states
 
@@ -44,6 +54,8 @@ before the next.
   foreground `$S wait --as <plan>/orchestrator --timeout <ms>` when nothing else is to do.
 - **Answer what is asked of you**, on the thread. Two runners' agreement is theirs to make; an
   agreement that changes a decision the plan took is recorded in the plan.
+- **A brainstorm's events**: an agreement and its endorsement, an escalation, a new question,
+  handled as the `brainstorm` skill's `references/auto.md` says.
 - **`$S roster`** shows each runner, its doing and its files; `(stale)` after ten minutes
   without a call to the board.
 
@@ -55,7 +67,7 @@ before the next.
 2. **Stop the runner** (`TaskStop`), **then resume it with the same message** (`SendMessage`).
    It resumes with its context within seconds.
 
-## A stale runner
+## A stale member
 
 Read its subagent's digest first. Gone: **`$S slice <id> --run <run> --state done`** frees its
 claims and the merge lock if it held it; set the slice back to `running` and dispatch a fresh
@@ -63,4 +75,5 @@ runner, which joins the same slice.
 
 ## Close
 
-**`$S close --run <run>`** once every slice is done.
+**`$S close --run <run>`** once every slice is done, or the brainstorm concluded; it archives
+the run's channel.

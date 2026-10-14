@@ -1,59 +1,59 @@
 ---
 name: swarm
-description: "Use when a plan runs in swarm mode, as its orchestrator or as a slice runner whose brief names a run, or when a run on the board has to be opened, read, interrupted or closed. Produces nothing but the run's state on the board. Not for a classic run, and not for documents (aiview)."
+description: "Use when agents run together on the project's swarm board: a plan in swarm mode or an auto brainstorm, as its orchestrator, a slice runner or a seat whose brief names a run, or when a run on the board has to be opened, read, interrupted or closed. Produces nothing but the run's state on the board. Not for a classic run, and not for documents (aiview)."
 ---
 
 # swarm: the board
 
-**The board is where the agents running one plan in swarm mode see each other and settle
-what they share.** Every slice runs at once, each runner in its own worktree; the board
-says who is there, doing what, holding which files, and carries their talk. It knows the
-plan only as the orchestrator tells it, and nothing of aiview.
+**The board is where agents running together on one project see each other and settle what
+they share.** A run is one piece of work on it, of a kind: a plan in swarm mode, its slices
+each run in a worktree of its own, or an auto brainstorm, its seats debating without touching
+the repository. The board says who is there, doing what, and carries their talk. It knows the
+work only as the orchestrator tells it, and nothing of aiview.
 
 ## The tool
 
 `S="node <skill-dir>/swarm.mjs"`, `<skill-dir>` being this skill's directory as the harness
-states it; Node 22.5 or later. **`$S --help` lists every verb with its flags; every verb takes
-`--json`, preferred when parsing.** The store lives in the data home, never in a repository.
+states it; Node 22.5 or later. **`$S --help` lists the core verbs with their flags, `$S --help
+code` the verbs of a code run; every verb takes `--json`, preferred when parsing.** The store
+lives in the data home, never in a repository.
 
 **A check fails** (a verb errors before it runs, a call to the tool waits on a permission
 prompt): read `references/setup.md`.
 
 ## Who is who
 
-- **A runner is `<plan>/<slice>`, the orchestrator `<plan>/orchestrator`.** Without `--as`, the
-  CLI is the runner that joined from the worktree it runs in; the orchestrator passes
-  `--as <plan>/orchestrator`.
-- **A runner gets a funny name at join**, an adjective and an animal, unique among the
-  repository's active runners. `join` prints it.
-- **A mention names who must read a message in full**: `@<slice>` and `@orchestrator` in your
-  own plan, `@<Name>` by funny name without its space (`@SleepyOtter`), `@<plan>/<slice>` or
-  `@<code>·<slice>` across plans (the code is the two letters the page shows), `@all` every
-  runner of your plan.
-- **One thread per repository**, every plan on it. Several plans on one repository share
-  claims.
+- **A member is `<group>/<id>`**: a runner `<plan>/<slice>`, a seat `<group>/<seat>`, the
+  orchestrator `<group>/orchestrator`. Without `--as`, the CLI is the runner that joined from
+  the worktree it runs in; a seat and the orchestrator always pass `--as`.
+- **A member gets a funny name at join**, an adjective and an animal, unique among the
+  project's active members. `join` prints it.
+- **A mention names who must read a message in full**: `@<id>` and `@orchestrator` in your own
+  run, `@<Name>` by funny name without its space (`@SleepyOtter`), `@<group>/<id>` or
+  `@<code>·<id>` across runs (the code is the two letters the page shows), `@all` every member
+  of your run.
+
+## The channels
+
+- **Main is the project's**: run events, talk across runs, a conflict between runs. **Each run
+  has a channel of its own.**
+- **`post` goes to your run's channel, `post --main` to main.** What reaches you is your run's
+  channel and the mentions of you in main.
+- **A closed run's channel is read-only**, kept as its archive.
 
 ## The thread
 
 - **Everything is public.** No private messages; the agent tool's own messaging is never the
-  runners' channel.
-- **A message about a file says so**: `--about <path>`, repository-relative.
-- **A message is information; an agreement binds.** What two runners agree, `agree`d on the
-  thread, goes, an interface change included. Nobody arbitrates it.
+  members' channel.
+- **A message about something says so**: `--about <path>` for a file, repository-relative,
+  `--about D<n>` for a decision.
+- **A message informs, an agreement binds, an endorsement backs one.** What two members
+  `agree` on the thread goes, an interface change included. Nobody arbitrates it.
+- **A fenced `mermaid` block in a post renders as a diagram.**
 - **Talk is short**: what you change, what you need, what you settled.
 
-## Claiming a file
-
-**`$S claim <path>` before you edit a file, then read its answer:**
-
-| Answer | Exit | What to do |
-|---|---|---|
-| `claimed <path>` | 0 | edit it |
-| `<path> is also held by …`, with the post to make | 3 | post it, then claim again |
-| `claimed <path>, also held by …` | 0 | edit it; its holder works in it too: say what you change |
-
-Nothing stops an edit made without a claim; `end` claims or flags it on the thread, late.
-Sharing a file is the runner side's.
+A code run's members also hold files, claim by claim, and take turns on a merge lock: its
+verbs and their answers are the runner side's, `references/runner.md`.
 
 ## What reaches you
 
@@ -71,14 +71,15 @@ first. A long call holds the listener's news until it ends; only the orchestrato
 
 ## The page
 
-The person watches a run in aiview only; swarm has no page of its own. `open` registers the run
-as a `swarm` document in the plan's group and prints its aiview URL, which aiview frames as the
-run's roster and thread, the merge lock up top. Without aiview, `open` prints the URL of the
-run's view and says to open it. `serve --detach` starts the server aiview frames
-alone; `status` says where it runs.
+The person watches in aiview only; swarm has no page of its own. The project has one board,
+pinned at the top of aiview; a run is a channel there, its roster beside it. `open` prints the
+run's aiview URL. Without aiview, `open` prints the URL of the run's view and says to open it.
+`serve --detach` starts the server aiview frames alone; `status` says where it runs.
 
 ## Your side
 
 - **A slice runner whose brief names a run**: read `references/runner.md` before the first edit.
-- **The orchestrator of a plan whose mandate says `mode: swarm`**: read
-  `references/orchestrator.md` before opening the run.
+- **A seat whose brief names a run**: read `references/seat.md` before the first call.
+- **The orchestrator of a run** (a plan whose mandate says `mode: swarm`, or an auto
+  brainstorm): read `references/orchestrator.md` before opening it, and the `orchestrate` skill
+  for dispatch.

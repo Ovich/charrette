@@ -1,0 +1,48 @@
+# The seat's side
+
+You hold one seat in a debate: a role, arguing the open questions of a brainstorm with the
+other seats. `$S` is the tool, as `SKILL.md` names it. **You do no real work**: no edit to the
+repository, no claim, no merge. An experiment, when the strategy allows one, runs in a sandbox
+of your own outside the repository, and only its recipe comes back to the thread.
+
+**Every call passes `--as <group>/<seat>`**, as your brief gives it; you have no worktree to be
+found by. **Run the line the previous command printed**; never compose a command the CLI could
+have printed you.
+
+**You never end your turn while the run is open**, and you never write the brainstorm board.
+A seat that ends its turn is not woken by its listener: it is gone.
+
+## The checklist
+
+1. **Run the join line your brief gives, before anything else.** Read the roster it prints and
+   your funny name.
+2. **Start the listener line `join` printed, in the background** (your harness's background
+   task).
+3. **Read your role and the open questions**: your row in the strategy section of the
+   brainstorm board, and its decisions rows, through the `aiview` skill.
+4. **Post per question**: `$S post "<your position>" --about D<n> --as <group>/<seat>`. A
+   diagram, when it says it faster, goes in the post as a fenced `mermaid` block, with the
+   `write-diagrams` skill's discipline.
+5. **A position holds for you and the seats you argue with**:
+   `$S agree "<terms> because <reason>" --about D<n> --as <group>/<seat>`, naming the post
+   `#<seq>` of the diagram when one carries it.
+6. **As the skeptic**, an agreement reaching you ends on its line `back it: … endorse <seq>
+   --as …`: run that line only when its reason holds; otherwise post the objection,
+   `--about D<n>`.
+7. **A new question**: `$S post "@orchestrator new question: …" --as <group>/<seat>`.
+8. **A mention from the orchestrator** (a relay from the person, a ruling, an interrupt) is
+   acted on first.
+9. **The listener ended**: read its output; its first line is the command that re-arms it. Act,
+   then run that line again in the background.
+10. **Nothing to do**: `$S wait --mentions --as <group>/<seat>` in the **foreground**. It returns
+    with the message: act as in step 9. Empty: run it again. Never end your turn to wait.
+11. **The orchestrator closes the run, or mentions you to stop**: `$S end --as <group>/<seat>`,
+    then return your positions, the agreements you made or endorsed, and what you left open.
+
+## Along the way
+
+- **`$S doing "<text>" --as <group>/<seat>`** when you turn to another question.
+- **`$S deliver --as <group>/<seat>`** gives what you have not had; `$S read <n> --as
+  <group>/<seat>` a message in full.
+- **`$S roster --as <group>/<seat>`** for who sits where.
+- **Talk across runs** goes to main: `post --main`.

@@ -73,6 +73,20 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
 - **No background notification in your harness**: `$S deliver` between steps, and step 5's
   foreground wait whenever you have nothing else to do.
 
+## Claiming a file
+
+**`$S claim <path>` before you edit a file, then read its answer:**
+
+| Answer | Exit | What to do |
+|---|---|---|
+| `claimed <path>` | 0 | edit it |
+| `<path> is also held by …`, with the post to make | 3 | post it, then claim again |
+| `claimed <path>, also held by …` | 0 | edit it; its holder works in it too: say what you change |
+
+Nothing stops an edit made without a claim; `end` claims or flags it on the thread, late.
+Claims are the project's, across every run on it: a holder in another run is told on main,
+and the post the answer gives then carries `--main`.
+
 ## Sharing a file
 
 1. **Your first claim of a file another runner holds is held** (exit 3). Post what you change
