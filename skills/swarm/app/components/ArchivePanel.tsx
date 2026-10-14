@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { RunId } from "../../src/board/board.ts";
 import type { ArchivedRun } from "../lib/view.ts";
-import { RunnerTag } from "./chips.tsx";
 
 /** "Oct 14, 22:28", local time. */
 function closedAt(iso: string): string {
@@ -68,7 +67,7 @@ export function ArchivePanel({
               </span>
               <span className="ad">{closedAt(r.closed)}</span>
               <span className="am">
-                {r.of > 0 ? `${r.done}/${r.of} slices` : r.kind} · <RunnerTag name={r.orchestrator} />
+                {r.of > 0 ? `${r.done}/${r.of} slices` : r.kind} · {r.orchestrator}
               </span>
             </button>
           ))
