@@ -230,3 +230,14 @@ p { margin: 0; }
 
 /* RunPage: one run framed by aiview; the merge lock up top, no rails, no top bar */
 .run-lock { display: flex; justify-content: flex-end; padding: 10px 28px 0; }
+
+/* SL5: diagrams in posts, `#<seq>` links */
+.row .body .pb-text { white-space: pre-line; }
+.row .body .seq-ref { color: var(--accent, inherit); text-decoration: underline; text-underline-offset: 2px; }
+.post-diagram { margin: 6px 0; border: 1px solid var(--border); border-radius: 6px; padding: 8px; background: var(--surface-2); white-space: normal; }
+.post-diagram .pd-svg { overflow-x: auto; }
+.post-diagram .pd-svg svg { max-width: 100%; height: auto; }
+.post-diagram .pd-source { margin: 6px 0 0; font-size: 12px; white-space: pre; overflow-x: auto; }
+.post-diagram[data-state="loading"] .pd-source { opacity: 0.55; }
+.post-diagram .pd-error { margin: 0; font-size: 12px; color: var(--destructive, #c0392b); }
+.post-diagram .pd-toggle { font-size: 11px; color: var(--muted-foreground); text-decoration: underline; margin-top: 4px; }

@@ -1,7 +1,8 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import type { SnapshotEvent } from "../../src/board/board.ts";
 import { eventLine, hhmm, type Filter } from "../lib/view.ts";
 import { RichText, RunnerName } from "./chips.tsx";
+import { PostBody } from "./PostBody.tsx";
 
 function FeedFilters({
   chips,
@@ -55,7 +56,7 @@ function Head({ e, urgent = false }: { e: SnapshotEvent; urgent?: boolean }) {
 function BoardEvent({ e, fresh }: { e: SnapshotEvent; fresh: boolean }) {
   const { word, strong, rest } = eventLine(e.body);
   return (
-    <li className={fresh ? "row event new" : "row event"} data-component="BoardEvent">
+    <li id={`seq-${e.seq}`} className={fresh ? "row event new" : "row event"} data-component="BoardEvent">
       <When at={e.at} />
       <p className="body">
         <RunnerName name={e.from} />
@@ -70,9 +71,9 @@ function BoardEvent({ e, fresh }: { e: SnapshotEvent; fresh: boolean }) {
   );
 }
 
-function AgreementRow({ e, fresh }: { e: SnapshotEvent; fresh: boolean }) {
+function AgreementRow({ e, fresh, seqs }: { e: SnapshotEvent; fresh: boolean; seqs: ReadonlySet<number> }) {
   return (
-    <li className={fresh ? "row agreement new" : "row agreement"} data-component="AgreementRow">
+    <li id={`seq-${e.seq}`} className={fresh ? "row agreement new" : "row agreement"} data-component="AgreementRow">
       <When at={e.at} />
       <div>
         <Head e={e} />
@@ -81,7 +82,7 @@ function AgreementRow({ e, fresh }: { e: SnapshotEvent; fresh: boolean }) {
             <path d="M3 8.5l3 3 7-7" />
           </svg>
           <span>
-            <b>Agreed.</b> <RichText text={e.body} />
+            <b>Agreed.</b> <PostBody body={e.body} shown={seqs} />
           </span>
         </div>
       </div>
@@ -89,29 +90,29 @@ function AgreementRow({ e, fresh }: { e: SnapshotEvent; fresh: boolean }) {
   );
 }
 
-function UrgentRow({ e, fresh }: { e: SnapshotEvent; fresh: boolean }) {
+function UrgentRow({ e, fresh, seqs }: { e: SnapshotEvent; fresh: boolean; seqs: ReadonlySet<number> }) {
   return (
-    <li className={fresh ? "row urgent new" : "row urgent"} data-component="UrgentRow">
+    <li id={`seq-${e.seq}`} className={fresh ? "row urgent new" : "row urgent"} data-component="UrgentRow">
       <When at={e.at} />
       <div>
         <Head e={e} urgent />
-        <p className="body">
-          <RichText text={e.body} />
-        </p>
+        <div className="body">
+          <PostBody body={e.body} shown={seqs} />
+        </div>
       </div>
     </li>
   );
 }
 
-function BoardMessage({ e, lit, fresh }: { e: SnapshotEvent; lit: boolean; fresh: boolean }) {
+function BoardMessage({ e, lit, fresh, seqs }: { e: SnapshotEvent; lit: boolean; fresh: boolean; seqs: ReadonlySet<number> }) {
   return (
-    <li className={["row", "msg", lit && "lit", fresh && "new"].filter(Boolean).join(" ")} data-component="BoardMessage">
+    <li id={`seq-${e.seq}`} className={["row", "msg", lit && "lit", fresh && "new"].filter(Boolean).join(" ")} data-component="BoardMessage">
       <When at={e.at} />
       <div>
         <Head e={e} />
-        <p className="body">
-          <RichText text={e.body} />
-        </p>
+        <div className="body">
+          <PostBody body={e.body} shown={seqs} />
+        </div>
       </div>
     </li>
   );
@@ -138,6 +139,8 @@ export function Thread({
   onUnfollow: () => void;
   onShowAll: () => void;
 }) {
+  // the rows a `#<n>` in a post can link to
+  const seqs = useMemo(() => new Set(shown.map((e) => e.seq)), [shown]);
   // A thread reads from the bottom: it opens there, and follows new rows while the reader is there.
   const feedRef = useRef<HTMLOListElement>(null);
   const atBottom = useRef(true);
@@ -157,9 +160,9 @@ export function Thread({
           shown.map((e) => {
             const isNew = fresh.has(e.seq);
             if (e.kind === "event") return <BoardEvent key={e.seq} e={e} fresh={isNew} />;
-            if (e.kind === "agreement") return <AgreementRow key={e.seq} e={e} fresh={isNew} />;
-            if (e.kind === "urgent") return <UrgentRow key={e.seq} e={e} fresh={isNew} />;
-            return <BoardMessage key={e.seq} e={e} lit={isLit(e)} fresh={isNew} />;
+            if (e.kind === "agreement") return <AgreementRow key={e.seq} e={e} fresh={isNew} seqs={seqs} />;
+            if (e.kind === "urgent") return <UrgentRow key={e.seq} e={e} fresh={isNew} seqs={seqs} />;
+            return <BoardMessage key={e.seq} e={e} lit={isLit(e)} fresh={isNew} seqs={seqs} />;
           })
         ) : (
           <li className="none">

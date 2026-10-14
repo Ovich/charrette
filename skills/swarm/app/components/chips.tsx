@@ -1,5 +1,6 @@
 import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
 import { planCode } from "../../src/board/mentions.ts";
+import { SEQ_REF } from "../lib/post.ts";
 import { runnerColor, runnerLabel } from "../lib/view.ts";
 
 /** A runner's chip, "RT·S3": the KindChip recipe at its light tone, a hue per runner. */
@@ -44,8 +45,40 @@ export function PlanCode({ plan }: { plan: string }) {
 
 const MENTION = /(?<![\w@])@[A-Za-z0-9][\w.\-]*(?:[\/·][A-Za-z0-9][\w.\-]*)?/g;
 
-/** A body as written: `code` spans, @mentions in the accent; nothing else is interpreted. */
-export function RichText({ text, mentions = true }: { text: string; mentions?: boolean }) {
+/** `#<n>` as a link to row n when that row is shown, else the text as written. */
+function withSeqLinks(text: string, shown: ReadonlySet<number> | undefined, key: string): ReactNode[] {
+  if (!shown?.size) return [text];
+  const out: ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(SEQ_REF)) {
+    const seq = Number(m[1]);
+    if (!shown.has(seq)) continue;
+    const at = m.index ?? 0;
+    if (at > last) out.push(text.slice(last, at));
+    out.push(
+      <a
+        key={`${key}-#${at}`}
+        className="seq-ref"
+        href={`#seq-${seq}`}
+        onClick={(ev) => {
+          const row = document.getElementById(`seq-${seq}`);
+          if (!row) return;
+          ev.preventDefault();
+          row.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        }}
+      >
+        {m[0]}
+      </a>,
+    );
+    last = at + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+/** A body as written: `code` spans, @mentions in the accent, `#<n>` linking to a shown row;
+ *  nothing else is interpreted. */
+export function RichText({ text, mentions = true, shown }: { text: string; mentions?: boolean; shown?: ReadonlySet<number> }) {
   const out: ReactNode[] = [];
   text.split(/(`[^`\n]+`)/).forEach((part, i) => {
     if (part.startsWith("`") && part.endsWith("`") && part.length > 1) {
@@ -53,13 +86,13 @@ export function RichText({ text, mentions = true }: { text: string; mentions?: b
       return;
     }
     if (!mentions) {
-      out.push(part);
+      out.push(...withSeqLinks(part, shown, `${i}`));
       return;
     }
     let last = 0;
     for (const m of part.matchAll(MENTION)) {
       const at = m.index ?? 0;
-      if (at > last) out.push(part.slice(last, at));
+      if (at > last) out.push(...withSeqLinks(part.slice(last, at), shown, `${i}-${last}`));
       out.push(
         <span key={`${i}-${at}`} className="mention">
           {m[0].replace(/[.\-]+$/, "")}
@@ -69,7 +102,7 @@ export function RichText({ text, mentions = true }: { text: string; mentions?: b
       if (trail) out.push(trail);
       last = at + m[0].length;
     }
-    if (last < part.length) out.push(part.slice(last));
+    if (last < part.length) out.push(...withSeqLinks(part.slice(last), shown, `${i}-${last}`));
   });
   return <>{out}</>;
 }

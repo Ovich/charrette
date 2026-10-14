@@ -255,6 +255,250 @@ function parseMentions(body, senderPlan, plans, names) {
   return [...out];
 }
 
+// src/board/claims.ts
+function claimsOf(deps) {
+  const { db, transaction, bump, now, lastSeq, participantById, isLive, insertMessage, relPath, fold, slashes, doingOf } = deps;
+  const clearFlags = () => {
+    db.prepare("DELETE FROM flags WHERE NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = flags.repo AND c.path = flags.path)").run();
+    db.prepare(
+      `DELETE FROM notices WHERE NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = notices.repo AND c.path = notices.path AND c.participant = notices.participant)
+         OR NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = notices.repo AND c.path = notices.path AND c.participant = notices.other)`
+    ).run();
+  };
+  const holdersOf = (repo, rel) => db.prepare("SELECT participant, kind, since_seq FROM claims WHERE repo = ? AND path = ? ORDER BY rowid").all(repo, rel).map((r) => ({ participant: Number(r.participant), kind: String(r.kind), since: Number(r.since_seq) })).filter((c) => isLive(c.participant));
+  const hold = (p, rel, kind) => transaction(() => {
+    const r = db.prepare(
+      `INSERT INTO claims (repo, path, participant, kind, since_seq) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT (repo, path, participant) DO UPDATE SET kind = excluded.kind WHERE claims.kind = 'inside' AND excluded.kind = 'interface'`
+    ).run(p.repo, rel, p.id, kind, lastSeq());
+    db.prepare("INSERT OR IGNORE INTO claim_log (repo, path, participant) VALUES (?, ?, ?)").run(p.repo, rel, p.id);
+    if (Number(r.changes) === 0) return false;
+    bump(p.repo);
+    return true;
+  });
+  const take = (p, rel, kind) => transaction(() => {
+    const held = holdersOf(p.repo, rel).filter((c) => c.participant !== p.id);
+    if (held.length) return { held, taken: false };
+    return { held, taken: hold(p, rel, kind) };
+  });
+  const hasPostedAbout = (p, rel, holders) => {
+    const since = Math.min(...holders.map((h) => h.since));
+    const rows = db.prepare("SELECT seq, body, about, mentions FROM messages WHERE repo = ? AND author = ? AND seq > ? AND kind != 'event' AND by_board = 0").all(p.repo, p.id, since);
+    const base = rel.split("/").pop();
+    const names = (r) => {
+      const about = r.about == null ? "" : fold(slashes(String(r.about)));
+      const f = fold(rel);
+      if (about && (about === f || f.endsWith(`/${about}`))) return true;
+      const body = fold(String(r.body));
+      return body.includes(f) || body.includes(fold(base));
+    };
+    return rows.some((r) => {
+      if (!names(r)) return false;
+      const mentions = JSON.parse(String(r.mentions));
+      return holders.some((h) => {
+        const o = participantById(h.participant);
+        return Number(r.seq) > h.since && (mentions.includes(o.name) || mentions.includes(`${o.plan}/*`));
+      });
+    });
+  };
+  const releaseAll = (id) => {
+    const owner = db.prepare("SELECT r.repo FROM participants p JOIN runs r ON r.id = p.run WHERE p.id = ?").get(id);
+    const claims = Number(db.prepare("DELETE FROM claims WHERE participant = ?").run(id).changes);
+    const locks = Number(db.prepare("DELETE FROM merge_locks WHERE participant = ?").run(id).changes);
+    clearFlags();
+    if (owner && claims + locks > 0) bump(String(owner.repo));
+  };
+  const takeLockWaiters = (repo) => {
+    const rows = db.prepare("SELECT participant FROM lock_waiters WHERE repo = ? ORDER BY rowid").all(repo);
+    db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(repo);
+    return rows.map((r) => Number(r.participant)).filter(isLive).map((id) => participantById(id).name);
+  };
+  const declared = (id) => JSON.parse(String(db.prepare("SELECT files FROM participants WHERE id = ?").get(id).files));
+  return {
+    clearFlags,
+    releaseAll,
+    lockWaitersFreedBy(p) {
+      const held = db.prepare("SELECT 1 FROM merge_locks WHERE repo = ? AND participant = ?").get(p.repo, p.id) !== void 0;
+      return held ? takeLockWaiters(p.repo).filter((n) => n !== p.name) : [];
+    },
+    claimDeclared(p, files) {
+      transaction(() => {
+        for (const f of files) {
+          const rel = relPath(p.repo, f.path);
+          if (rel) take(p, rel, f.interface ? "interface" : "inside");
+        }
+      });
+    },
+    askedAbout(me, author, m) {
+      const about = fold(relPath(me.repo, m.about) ?? slashes(m.about));
+      const mine = db.prepare("SELECT path FROM claims WHERE repo = ? AND participant = ? AND since_seq < ?").all(me.repo, me.id, m.seq);
+      const rel = mine.map((r) => String(r.path)).find((x) => fold(x) === about || fold(x).endsWith(`/${about}`));
+      if (!rel) return null;
+      const theirs = db.prepare("SELECT 1 FROM claims WHERE repo = ? AND path = ? AND participant = ? AND since_seq < ?").get(me.repo, rel, author, m.seq);
+      return theirs ? null : rel;
+    },
+    heldInOtherRun(p, rel) {
+      const f = fold(rel);
+      const rows = db.prepare("SELECT l.path FROM claim_log l JOIN participants q ON q.id = l.participant WHERE l.repo = ? AND q.run != ?").all(p.repo, p.run);
+      return rows.some((r) => {
+        const x = fold(String(r.path));
+        return x === f || x.endsWith(`/${f}`);
+      });
+    },
+    holds(p, about) {
+      const f = fold(relPath(p.repo, about) ?? slashes(about));
+      if (!f) return false;
+      const rows = db.prepare("SELECT path FROM claims WHERE repo = ? AND participant = ?").all(p.repo, p.id);
+      return rows.some((r) => {
+        const x = fold(String(r.path));
+        return x === f || x.endsWith(`/${f}`);
+      });
+    },
+    checkEdit(me, file, opts = {}) {
+      const kind = opts.interface ? "interface" : "inside";
+      const rel = relPath(me.repo, file);
+      if (!rel) return { allowed: true, sharedWith: [], notice: null };
+      return transaction(() => {
+        const all = holdersOf(me.repo, rel);
+        const others = all.filter((c) => c.participant !== me.id);
+        if (!others.length) {
+          hold(me, rel, kind);
+          return { allowed: true, sharedWith: [], notice: null };
+        }
+        const people = others.map((c) => participantById(c.participant));
+        if (!all.some((c) => c.participant === me.id)) {
+          if (!hasPostedAbout(me, rel, others)) {
+            const who = people.map((o) => `${o.name} (${o.nick}: ${doingOf(o.id)})`).join(", ");
+            const at = people.map((o) => `@${o.name}`).join(" ");
+            return {
+              allowed: false,
+              refusal: `${rel} is also held by ${who}. You may share it, but first tell ${people.length > 1 ? "them" : "its holder"} what you change in it: \`swarm post "${at} \u2026" --about ${rel}\`; ${people.length > 1 ? "they answer" : "its holder answers"} with an agreement on who changes what (\`swarm agree \u2026 --about ${rel}\`), and that agreement goes. Then claim again.`
+            };
+          }
+        }
+        hold(me, rel, kind);
+        const sharedWith = people.map((o) => ({ runner: o.name, doing: doingOf(o.id) }));
+        const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
+        const fresh = people.filter((o) => Number(told.run(me.repo, rel, me.id, o.id).changes) > 0);
+        const notice = fresh.length ? fresh.map((o) => `${rel} is also held by ${o.name}: ${doingOf(o.id)}`).join("; ") : null;
+        return { allowed: true, sharedWith, notice };
+      });
+    },
+    reconcileWrites(me, changed) {
+      const flags = [];
+      return transaction(() => {
+        const flag = db.prepare("INSERT OR IGNORE INTO flags (repo, path, participant) VALUES (?, ?, ?)");
+        for (const file of changed) {
+          const rel = relPath(me.repo, file);
+          if (!rel) continue;
+          if (holdersOf(me.repo, rel).some((c) => c.participant === me.id)) {
+            take(me, rel, "inside");
+            continue;
+          }
+          const { held: others, taken } = take(me, rel, "inside");
+          if (taken || others.length) flag.run(me.repo, rel, me.id);
+          if (!others.length) continue;
+          const holder = participantById(others[0].participant);
+          const m = insertMessage(
+            me,
+            `@${holder.name} @${me.name} flag: ${me.name} wrote ${rel} outside its claim; ${holder.name} holds it. Settle it here.`,
+            rel,
+            "msg",
+            [holder.name, me.name]
+          );
+          flags.push({ path: rel, holder: holder.name, seq: m.seq });
+        }
+        return flags;
+      });
+    },
+    release(me, file) {
+      const rel = relPath(me.repo, file);
+      if (!rel) return;
+      transaction(() => {
+        const r = db.prepare("DELETE FROM claims WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
+        if (Number(r.changes) === 0) return;
+        clearFlags();
+        bump(me.repo);
+      });
+    },
+    lockMerge(me) {
+      return transaction(() => {
+        const r = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo);
+        if (r && Number(r.participant) !== me.id && isLive(Number(r.participant))) {
+          db.prepare("INSERT OR IGNORE INTO lock_waiters (repo, participant) VALUES (?, ?)").run(me.repo, me.id);
+          return { granted: false, holder: participantById(Number(r.participant)).name };
+        }
+        if (r && Number(r.participant) === me.id) return { granted: true };
+        db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(me.repo);
+        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at) VALUES (?, ?, ?)").run(me.repo, me.id, now());
+        bump(me.repo);
+        return { granted: true };
+      });
+    },
+    merged(me, sha, files) {
+      const rels = [...new Set(files.map((f) => relPath(me.repo, f)).filter((x) => x !== null))];
+      const wanted = new Set(rels);
+      const told = /* @__PURE__ */ new Set();
+      const iface = /* @__PURE__ */ new Set();
+      const sharers = [];
+      let waiters = [];
+      transaction(() => {
+        transaction(() => {
+          const lock = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo);
+          if (lock && Number(lock.participant) !== me.id && isLive(Number(lock.participant))) {
+            throw new Error(`the merge lock is held by ${participantById(Number(lock.participant)).name}, not ${me.name}`);
+          }
+          db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
+          db.prepare("UPDATE participants SET merged = 1 WHERE id = ?").run(me.id);
+          waiters = takeLockWaiters(me.repo).filter((n) => n !== me.name);
+        });
+        for (const rel of rels) {
+          for (const c of holdersOf(me.repo, rel)) {
+            if (c.kind === "interface") iface.add(rel);
+            if (c.participant !== me.id) told.add(participantById(c.participant).name);
+          }
+        }
+        const everyone = db.prepare("SELECT p.id, p.slice, r.plan FROM participants p JOIN runs r ON r.id = p.run WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL").all(me.repo);
+        for (const o of everyone) {
+          for (const f of declared(Number(o.id))) {
+            const rel = relPath(me.repo, f.path);
+            if (!rel || !wanted.has(rel)) continue;
+            if (f.interface) iface.add(rel);
+            if (Number(o.id) !== me.id) told.add(`${o.plan}/${o.slice}`);
+          }
+        }
+        const openPlans = db.prepare("SELECT DISTINCT plan FROM runs WHERE repo = ? AND state = 'open'").all(me.repo).map((r) => String(r.plan));
+        const all = iface.size ? openPlans.map((plan) => `${plan}/*`) : [];
+        const lines = [`merged ${sha}: rebase onto ${sha}.`];
+        if (told.size) lines.push(`${[...told].map((n) => `@${n}`).join(" ")}: you hold or declared a file it changed.`);
+        if (iface.size) lines.push(`@all interface changed: ${[...iface].join(", ")}.`);
+        if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);
+        lines.push(`files: ${rels.join(", ") || "-"}`);
+        insertMessage(me, lines.join("\n"), null, "event", [.../* @__PURE__ */ new Set([...told, ...waiters, ...all])]);
+        for (const rel of rels) {
+          const ids = new Set(holdersOf(me.repo, rel).map((c) => c.participant));
+          const held = db.prepare("SELECT l.participant FROM claim_log l JOIN participants p ON p.id = l.participant WHERE l.repo = ? AND l.path = ? AND p.run = ? ORDER BY l.rowid").all(me.repo, rel, me.run);
+          for (const r of held) ids.add(Number(r.participant));
+          ids.delete(me.id);
+          for (const id of ids) sharers.push({ path: rel, runner: participantById(id).name });
+        }
+      });
+      return sharers;
+    }
+  };
+}
+
+// src/board/kinds.ts
+var PROFILES = {
+  plan: { kind: "plan", claims: true, mergeLock: true, worktree: true, member: "runner" },
+  brainstorm: { kind: "brainstorm", claims: false, mergeLock: false, worktree: false, member: "seat" }
+};
+function profileOf(kind) {
+  const profile = PROFILES[kind];
+  if (!profile || !Object.hasOwn(PROFILES, kind)) throw new Error(`unknown kind ${kind}: the kinds are ${Object.keys(PROFILES).join(", ")}`);
+  return profile;
+}
+
 // src/board/names.ts
 var ADJECTIVES = [
   "Sleepy",
@@ -472,6 +716,10 @@ async function openBoard(dbPath = SQLITE_PATH) {
   upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
   upkeep("runs", "link", "link TEXT");
   upkeep("slices", "link", "link TEXT");
+  upkeep("runs", "kind", "kind TEXT NOT NULL DEFAULT 'plan'");
+  upkeep("messages", "run", "run INTEGER");
+  upkeep("messages", "endorses", "endorses INTEGER");
+  db.exec("CREATE INDEX IF NOT EXISTS messages_channel ON messages (repo, run, seq)");
   const claimKey = db.prepare("PRAGMA table_info(claims)").all().find((c) => c.name === "participant");
   if (claimKey && claimKey.pk === 0) {
     db.exec(`
@@ -523,13 +771,6 @@ async function openBoard(dbPath = SQLITE_PATH) {
     if (depth > 0) dirty = true;
     else touch();
   };
-  const clearFlags = () => {
-    db.prepare("DELETE FROM flags WHERE NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = flags.repo AND c.path = flags.path)").run();
-    db.prepare(
-      `DELETE FROM notices WHERE NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = notices.repo AND c.path = notices.path AND c.participant = notices.participant)
-         OR NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = notices.repo AND c.path = notices.path AND c.participant = notices.other)`
-    ).run();
-  };
   const runRow = (id) => {
     const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(id);
     if (!r) throw new Error(`unknown run ${id}`);
@@ -538,7 +779,9 @@ async function openBoard(dbPath = SQLITE_PATH) {
   const toRun = (r) => ({
     id: Number(r.id),
     repo: String(r.repo),
+    kind: profileOf(String(r.kind ?? "plan")).kind,
     plan: String(r.plan),
+    group: String(r.plan),
     title: String(r.title),
     link: r.link == null ? null : String(r.link),
     state: r.state === "closed" ? "closed" : "open",
@@ -551,11 +794,12 @@ async function openBoard(dbPath = SQLITE_PATH) {
     }))
   });
   const nickOf = (r) => String(r.slice) === ORCHESTRATOR ? ORCHESTRATOR : r.nick == null ? String(r.slice) : String(r.nick);
-  const PARTICIPANT_SQL = `SELECT p.*, r.repo, r.plan FROM participants p JOIN runs r ON r.id = p.run`;
+  const PARTICIPANT_SQL = `SELECT p.*, r.repo, r.plan, r.kind FROM participants p JOIN runs r ON r.id = p.run`;
   const toParticipant = (r) => ({
     id: Number(r.id),
     run: Number(r.run),
     repo: String(r.repo),
+    kind: profileOf(String(r.kind ?? "plan")).kind,
     plan: String(r.plan),
     slice: String(r.slice),
     name: `${r.plan}/${r.slice}`,
@@ -573,7 +817,9 @@ async function openBoard(dbPath = SQLITE_PATH) {
     about: r.about == null ? null : String(r.about),
     kind: String(r.kind),
     mentions: JSON.parse(String(r.mentions)),
-    at: String(r.at)
+    at: String(r.at),
+    channel: r.run == null ? "main" : { run: Number(r.run) },
+    endorses: r.endorses == null ? null : Number(r.endorses)
   });
   const lastSeq = () => Number(db.prepare("SELECT COALESCE(MAX(seq), 0) AS s FROM messages").get().s);
   const openPlans = (repo) => db.prepare("SELECT DISTINCT plan FROM runs WHERE repo = ? AND state = 'open'").all(repo).map((r) => String(r.plan));
@@ -581,12 +827,26 @@ async function openBoard(dbPath = SQLITE_PATH) {
     const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL AND p.slice != '${ORCHESTRATOR}'`).all(repo);
     return new Map(rows.map((r) => [nameHandle(nickOf(r)), `${r.plan}/${r.slice}`]));
   };
-  const insertMessage = (p, body, about, kind, named) => {
+  const channelOf = (p, kind, about, mentions, asked) => {
+    if (asked === "main") return null;
+    if (mentions.some((m) => m.slice(0, m.lastIndexOf("/")) !== p.plan)) return null;
+    if ((kind === "agreement" || kind === "endorsement") && about) {
+      const rel = relPath(p.repo, about) ?? slashes(about);
+      if (rel && claims.heldInOtherRun(p, rel)) return null;
+    }
+    return p.run;
+  };
+  const insertMessage = (p, body, about, kind, named, extra = {}) => {
     const mentions = named ?? (kind === "event" ? [] : parseMentions(body, p.plan, openPlans(p.repo), activeNames(p.repo)));
-    const r = db.prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at, by_board) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(p.repo, p.id, body, about, kind, JSON.stringify(mentions), now(), named ? 1 : 0);
+    const run = channelOf(p, kind, about, mentions, extra.channel ?? "run");
+    const r = db.prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at, by_board, run, endorses) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(p.repo, p.id, body, about, kind, JSON.stringify(mentions), now(), named ? 1 : 0, run, extra.endorses ?? null);
     const seq = Number(r.lastInsertRowid);
     bump(p.repo);
     return board.read(seq);
+  };
+  const gated = (p, verb) => {
+    if (!profileOf(p.kind).claims) throw new Error(`${verb}: a ${p.kind} run has no claims`);
+    return p;
   };
   const live = (p) => {
     const fresh = participantById(p.id);
@@ -612,75 +872,20 @@ async function openBoard(dbPath = SQLITE_PATH) {
     }
     return null;
   };
-  const holdersOf = (repo, rel) => db.prepare("SELECT participant, kind, since_seq FROM claims WHERE repo = ? AND path = ? ORDER BY rowid").all(repo, rel).map((r) => ({ participant: Number(r.participant), kind: String(r.kind), since: Number(r.since_seq) })).filter((c) => isLive(c.participant));
-  const hold = (p, rel, kind) => transaction(() => {
-    const r = db.prepare(
-      `INSERT INTO claims (repo, path, participant, kind, since_seq) VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT (repo, path, participant) DO UPDATE SET kind = excluded.kind WHERE claims.kind = 'inside' AND excluded.kind = 'interface'`
-    ).run(p.repo, rel, p.id, kind, lastSeq());
-    db.prepare("INSERT OR IGNORE INTO claim_log (repo, path, participant) VALUES (?, ?, ?)").run(p.repo, rel, p.id);
-    if (Number(r.changes) === 0) return false;
-    bump(p.repo);
-    return true;
-  });
-  const take = (p, rel, kind) => transaction(() => {
-    const held = holdersOf(p.repo, rel).filter((c) => c.participant !== p.id);
-    if (held.length) return { held, taken: false };
-    return { held, taken: hold(p, rel, kind) };
-  });
-  const takeUnlessHeld = (p, rel, kind) => void take(p, rel, kind);
   const doingOf = (id) => String(db.prepare("SELECT doing FROM participants WHERE id = ?").get(id).doing) || "no note";
-  const hasPostedAbout = (p, rel, holders) => {
-    const since = Math.min(...holders.map((h) => h.since));
-    const rows = db.prepare("SELECT seq, body, about, mentions FROM messages WHERE repo = ? AND author = ? AND seq > ? AND kind != 'event' AND by_board = 0").all(p.repo, p.id, since);
-    const base = rel.split("/").pop();
-    const names = (r) => {
-      const about = r.about == null ? "" : fold(slashes(String(r.about)));
-      const f = fold(rel);
-      if (about && (about === f || f.endsWith(`/${about}`))) return true;
-      const body = fold(String(r.body));
-      return body.includes(f) || body.includes(fold(base));
-    };
-    return rows.some((r) => {
-      if (!names(r)) return false;
-      const mentions = JSON.parse(String(r.mentions));
-      return holders.some((h) => {
-        const o = participantById(h.participant);
-        return Number(r.seq) > h.since && (mentions.includes(o.name) || mentions.includes(`${o.plan}/*`));
-      });
-    });
-  };
-  const releaseAll = (id) => {
-    const owner = db.prepare("SELECT r.repo FROM participants p JOIN runs r ON r.id = p.run WHERE p.id = ?").get(id);
-    const claims = Number(db.prepare("DELETE FROM claims WHERE participant = ?").run(id).changes);
-    const locks = Number(db.prepare("DELETE FROM merge_locks WHERE participant = ?").run(id).changes);
-    clearFlags();
-    if (owner && claims + locks > 0) bump(String(owner.repo));
-  };
-  const takeLockWaiters = (repo) => {
-    const rows = db.prepare("SELECT participant FROM lock_waiters WHERE repo = ? ORDER BY rowid").all(repo);
-    db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(repo);
-    return rows.map((r) => Number(r.participant)).filter(isLive).map((id) => participantById(id).name);
-  };
-  const askedAbout = (me, author, m) => {
-    const about = fold(relPath(me.repo, m.about) ?? slashes(m.about));
-    const mine = db.prepare("SELECT path FROM claims WHERE repo = ? AND participant = ? AND since_seq < ?").all(me.repo, me.id, m.seq);
-    const rel = mine.map((r) => String(r.path)).find((x) => fold(x) === about || fold(x).endsWith(`/${about}`));
-    if (!rel) return null;
-    const theirs = db.prepare("SELECT 1 FROM claims WHERE repo = ? AND path = ? AND participant = ? AND since_seq < ?").get(me.repo, rel, author, m.seq);
-    return theirs ? null : rel;
-  };
+  const claims = claimsOf({ db, transaction, bump, now, lastSeq, participantById, isLive, insertMessage, relPath, fold, slashes, doingOf });
   const deliverTo = (p, fromWait, mentionsOnly = false) => {
     const me = participantById(p.id);
-    const named = (m) => m.mentions.includes(me.name) || m.mentions.includes(`${me.plan}/*`);
+    const named = (m) => m.mentions.includes(me.name) || m.mentions.includes(`${me.plan}/*`) || m.channel === "main" && (m.kind === "agreement" || m.kind === "endorsement") && m.about != null && claims.holds(me, m.about);
     const messages = transaction(() => {
       const unseen = db.prepare(
         `SELECT m.* FROM messages m
-           WHERE m.repo = ? AND m.seq > ? AND m.author != ?
+           WHERE m.repo = ? AND m.seq > ? AND m.author != ? AND (m.run = ? OR m.run IS NULL)
              AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.participant = ? AND d.seq = m.seq)
            ORDER BY m.seq`
-      ).all(me.repo, Number(db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id).since_seq), me.id, me.id);
-      const rows = mentionsOnly ? unseen.filter((r) => r.kind === "urgent" || named(toMessage(r))) : unseen;
+      ).all(me.repo, Number(db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id).since_seq), me.id, me.run, me.id);
+      const heard = unseen.filter((r) => r.run != null || r.kind === "urgent" || named(toMessage(r)));
+      const rows = mentionsOnly ? heard.filter((r) => r.kind === "urgent" || named(toMessage(r))) : heard;
       const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
       for (const r of rows) mark.run(me.id, Number(r.seq));
       db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(now(), me.id);
@@ -690,7 +895,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
       }
       return rows.map((r) => {
         const m = toMessage(r);
-        const rel = r.by_board || m.kind !== "msg" || !m.about || !named(m) ? null : askedAbout(me, Number(r.author), m);
+        const rel = r.by_board || m.kind !== "msg" || !m.about || !named(m) ? null : claims.askedAbout(me, Number(r.author), m);
         return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}` } : m;
       });
     });
@@ -710,7 +915,9 @@ async function openBoard(dbPath = SQLITE_PATH) {
     const open = r.state === "open";
     return {
       run: id,
+      kind: profileOf(String(r.kind ?? "plan")).kind,
       plan: String(r.plan),
+      group: String(r.plan),
       code: planCode(String(r.plan)),
       title: String(r.title),
       link: r.link == null ? null : String(r.link),
@@ -728,14 +935,14 @@ async function openBoard(dbPath = SQLITE_PATH) {
   let watching = null;
   let versions = /* @__PURE__ */ new Map();
   const readVersions = () => new Map(db.prepare("SELECT repo, version FROM changes").all().map((r) => [String(r.repo), Number(r.version)]));
-  const declared = (id) => JSON.parse(String(db.prepare("SELECT files FROM participants WHERE id = ?").get(id).files));
   const board = {
-    openRun({ repo, plan, title, link, slices }) {
+    openRun({ repo, kind = "plan", group, title, link, seats }) {
+      const profile = profileOf(kind);
       const id = transaction(() => {
-        const r = db.prepare("INSERT INTO runs (repo, plan, title, link, opened_at) VALUES (?, ?, ?, ?, ?)").run(repo, plan, title, link ?? null, now());
+        const r = db.prepare("INSERT INTO runs (repo, kind, plan, title, link, opened_at) VALUES (?, ?, ?, ?, ?, ?)").run(repo, profile.kind, group, title, link ?? null, now());
         const run = Number(r.lastInsertRowid);
         const ins = db.prepare("INSERT INTO slices (run, id, title, blockers, link, ord) VALUES (?, ?, ?, ?, ?, ?)");
-        slices.forEach((s, i) => ins.run(run, s.id, s.title, JSON.stringify(s.blockers ?? []), s.link ?? null, i));
+        seats.forEach((s, i) => ins.run(run, s.id, s.title, JSON.stringify(s.blockers ?? []), s.link ?? null, i));
         db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at) VALUES (?, ?, ?, ?)").run(run, ORCHESTRATOR, lastSeq(), now());
         bump(repo);
         return run;
@@ -751,7 +958,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
         bump(String(runRow(run).repo));
         if (state !== "done") return;
         const p = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run, slice);
-        if (p) releaseAll(Number(p.id));
+        if (p) claims.releaseAll(Number(p.id));
       });
     },
     closeRun(run) {
@@ -760,7 +967,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
         db.prepare("UPDATE runs SET state = 'closed', closed_at = ? WHERE id = ?").run(now(), run);
         bump(String(runRow(run).repo));
         db.prepare("UPDATE participants SET ended_at = COALESCE(ended_at, ?) WHERE run = ?").run(now(), run);
-        for (const p of db.prepare("SELECT id FROM participants WHERE run = ?").all(run)) releaseAll(Number(p.id));
+        for (const p of db.prepare("SELECT id FROM participants WHERE run = ?").all(run)) claims.releaseAll(Number(p.id));
       });
     },
     runs() {
@@ -770,7 +977,9 @@ async function openBoard(dbPath = SQLITE_PATH) {
       const r = runRow(run);
       if (r.state !== "open") throw new Error(`run ${run} is closed`);
       if (slice === ORCHESTRATOR) throw new Error(`"${ORCHESTRATOR}" is not a slice`);
-      const where = worktree ? path2.resolve(worktree) : null;
+      const profile = profileOf(String(r.kind ?? "plan"));
+      if (files.length && !profile.claims) throw new Error(`join: a ${profile.kind} run has no claims`);
+      const where = worktree && profile.worktree ? path2.resolve(worktree) : null;
       return transaction(() => {
         const id = transaction(() => {
           const existing = db.prepare("SELECT id, nick FROM participants WHERE run = ? AND slice = ?").get(run, slice);
@@ -792,12 +1001,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
           return Number(ins.lastInsertRowid);
         });
         const runner = participantById(id);
-        transaction(() => {
-          for (const f of files) {
-            const rel = relPath(runner.repo, f.path);
-            if (rel) takeUnlessHeld(runner, rel, f.interface ? "interface" : "inside");
-          }
-        });
+        claims.claimDeclared(runner, files);
         insertMessage(runner, `joined: ${doing}`, null, "event");
         return { runner, roster: board.roster(runner.repo) };
       });
@@ -832,13 +1036,12 @@ async function openBoard(dbPath = SQLITE_PATH) {
     end(p) {
       const fresh = live(p);
       transaction(() => {
-        const held = db.prepare("SELECT 1 FROM merge_locks WHERE repo = ? AND participant = ?").get(fresh.repo, fresh.id) !== void 0;
-        const waiters = held ? takeLockWaiters(fresh.repo).filter((n) => n !== fresh.name) : [];
+        const waiters = claims.lockWaitersFreedBy(fresh);
         if (waiters.length) insertMessage(fresh, `ended
 the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event", waiters);
         else insertMessage(fresh, "ended", null, "event");
         db.prepare("UPDATE participants SET ended_at = ?, doing = CASE merged WHEN 1 THEN 'merged and ended' ELSE 'ended' END WHERE id = ?").run(now(), fresh.id);
-        releaseAll(fresh.id);
+        claims.releaseAll(fresh.id);
       });
     },
     roster(repo) {
@@ -857,7 +1060,17 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
     },
     post(p, body, opts = {}) {
       const fresh = live(p);
-      return insertMessage(fresh, body, opts.about ?? null, opts.kind ?? "msg");
+      return insertMessage(fresh, body, opts.about ?? null, opts.kind ?? "msg", void 0, { channel: opts.channel });
+    },
+    endorse(p, seq) {
+      const fresh = live(p);
+      const r = db.prepare("SELECT * FROM messages WHERE seq = ?").get(seq);
+      if (!r) throw new Error(`unknown message #${seq}`);
+      if (r.kind !== "agreement") throw new Error(`#${seq} is not an agreement`);
+      if (Number(r.author) === fresh.id) throw new Error(`#${seq} is your own agreement`);
+      const author = participantById(Number(r.author));
+      const about = r.about == null ? null : String(r.about);
+      return insertMessage(fresh, `endorses #${seq}`, about, "endorsement", [author.name], { endorses: seq });
     },
     read(seq) {
       const r = db.prepare("SELECT * FROM messages WHERE seq = ?").get(seq);
@@ -916,141 +1129,19 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       });
     },
     checkEdit(p, file, opts = {}) {
-      const kind = opts.interface ? "interface" : "inside";
-      const me = live(p);
-      const rel = relPath(me.repo, file);
-      if (!rel) return { allowed: true, sharedWith: [], notice: null };
-      return transaction(() => {
-        const all = holdersOf(me.repo, rel);
-        const others = all.filter((c) => c.participant !== me.id);
-        if (!others.length) {
-          hold(me, rel, kind);
-          return { allowed: true, sharedWith: [], notice: null };
-        }
-        const people = others.map((c) => participantById(c.participant));
-        if (!all.some((c) => c.participant === me.id)) {
-          if (!hasPostedAbout(me, rel, others)) {
-            const who = people.map((o) => `${o.name} (${o.nick}: ${doingOf(o.id)})`).join(", ");
-            const at = people.map((o) => `@${o.name}`).join(" ");
-            return {
-              allowed: false,
-              refusal: `${rel} is also held by ${who}. You may share it, but first tell ${people.length > 1 ? "them" : "its holder"} what you change in it: \`swarm post "${at} \u2026" --about ${rel}\`; ${people.length > 1 ? "they answer" : "its holder answers"} with an agreement on who changes what (\`swarm agree \u2026 --about ${rel}\`), and that agreement goes. Then claim again.`
-            };
-          }
-        }
-        hold(me, rel, kind);
-        const sharedWith = people.map((o) => ({ runner: o.name, doing: doingOf(o.id) }));
-        const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
-        const fresh = people.filter((o) => Number(told.run(me.repo, rel, me.id, o.id).changes) > 0);
-        const notice = fresh.length ? fresh.map((o) => `${rel} is also held by ${o.name}: ${doingOf(o.id)}`).join("; ") : null;
-        return { allowed: true, sharedWith, notice };
-      });
+      return claims.checkEdit(gated(live(p), "claim"), file, opts);
     },
     reconcileWrites(p, changed) {
-      const me = live(p);
-      const flags = [];
-      return transaction(() => {
-        const flag = db.prepare("INSERT OR IGNORE INTO flags (repo, path, participant) VALUES (?, ?, ?)");
-        for (const file of changed) {
-          const rel = relPath(me.repo, file);
-          if (!rel) continue;
-          if (holdersOf(me.repo, rel).some((c) => c.participant === me.id)) {
-            take(me, rel, "inside");
-            continue;
-          }
-          const { held: others, taken } = take(me, rel, "inside");
-          if (taken || others.length) flag.run(me.repo, rel, me.id);
-          if (!others.length) continue;
-          const holder = participantById(others[0].participant);
-          const m = insertMessage(
-            me,
-            `@${holder.name} @${me.name} flag: ${me.name} wrote ${rel} outside its claim; ${holder.name} holds it. Settle it here.`,
-            rel,
-            "msg",
-            [holder.name, me.name]
-          );
-          flags.push({ path: rel, holder: holder.name, seq: m.seq });
-        }
-        return flags;
-      });
+      return claims.reconcileWrites(gated(live(p), "reconcile"), changed);
     },
     release(p, file) {
-      const me = live(p);
-      const rel = relPath(me.repo, file);
-      if (!rel) return;
-      transaction(() => {
-        const r = db.prepare("DELETE FROM claims WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
-        if (Number(r.changes) === 0) return;
-        clearFlags();
-        bump(me.repo);
-      });
+      claims.release(gated(live(p), "release"), file);
     },
     lockMerge(p) {
-      const me = live(p);
-      return transaction(() => {
-        const r = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo);
-        if (r && Number(r.participant) !== me.id && isLive(Number(r.participant))) {
-          db.prepare("INSERT OR IGNORE INTO lock_waiters (repo, participant) VALUES (?, ?)").run(me.repo, me.id);
-          return { granted: false, holder: participantById(Number(r.participant)).name };
-        }
-        if (r && Number(r.participant) === me.id) return { granted: true };
-        db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(me.repo);
-        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at) VALUES (?, ?, ?)").run(me.repo, me.id, now());
-        bump(me.repo);
-        return { granted: true };
-      });
+      return claims.lockMerge(gated(live(p), "merge-lock"));
     },
     merged(p, sha, files) {
-      const me = live(p);
-      const rels = [...new Set(files.map((f) => relPath(me.repo, f)).filter((x) => x !== null))];
-      const wanted = new Set(rels);
-      const told = /* @__PURE__ */ new Set();
-      const iface = /* @__PURE__ */ new Set();
-      const sharers = [];
-      let waiters = [];
-      transaction(() => {
-        transaction(() => {
-          const lock = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo);
-          if (lock && Number(lock.participant) !== me.id && isLive(Number(lock.participant))) {
-            throw new Error(`the merge lock is held by ${participantById(Number(lock.participant)).name}, not ${me.name}`);
-          }
-          db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
-          db.prepare("UPDATE participants SET merged = 1 WHERE id = ?").run(me.id);
-          waiters = takeLockWaiters(me.repo).filter((n) => n !== me.name);
-        });
-        for (const rel of rels) {
-          for (const c of holdersOf(me.repo, rel)) {
-            if (c.kind === "interface") iface.add(rel);
-            if (c.participant !== me.id) told.add(participantById(c.participant).name);
-          }
-        }
-        const everyone = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL`).all(me.repo);
-        for (const o of everyone) {
-          for (const f of declared(Number(o.id))) {
-            const rel = relPath(me.repo, f.path);
-            if (!rel || !wanted.has(rel)) continue;
-            if (f.interface) iface.add(rel);
-            if (Number(o.id) !== me.id) told.add(`${o.plan}/${o.slice}`);
-          }
-        }
-        const all = iface.size ? openPlans(me.repo).map((plan) => `${plan}/*`) : [];
-        const lines = [`merged ${sha}: rebase onto ${sha}.`];
-        if (told.size) lines.push(`${[...told].map((n) => `@${n}`).join(" ")}: you hold or declared a file it changed.`);
-        if (iface.size) lines.push(`@all interface changed: ${[...iface].join(", ")}.`);
-        if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);
-        lines.push(`files: ${rels.join(", ") || "-"}`);
-        insertMessage(me, lines.join("\n"), null, "event", [.../* @__PURE__ */ new Set([...told, ...waiters, ...all])]);
-        for (const rel of rels) {
-          const ids = new Set(holdersOf(me.repo, rel).map((c) => c.participant));
-          const held = db.prepare("SELECT l.participant FROM claim_log l JOIN participants p ON p.id = l.participant WHERE l.repo = ? AND l.path = ? AND p.run = ? ORDER BY l.rowid").all(me.repo, rel, me.run);
-          for (const r of held) ids.add(Number(r.participant));
-          ids.delete(me.id);
-          for (const id of ids) {
-            sharers.push({ path: rel, runner: participantById(id).name });
-          }
-        }
-      });
-      return sharers;
+      return claims.merged(gated(live(p), "merged"), sha, files);
     },
     repos() {
       const byRepo = /* @__PURE__ */ new Map();
@@ -1074,7 +1165,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       const people = db.prepare(`${PARTICIPANT_SQL} WHERE p.run IN (${marks}) ORDER BY p.run, p.id`).all(...runIds);
       const runOpen = new Map(runRows.map((r) => [Number(r.id), r.state === "open"]));
       const cutoff = Date.now() - STALE_MS;
-      const claimsOf = db.prepare("SELECT path, kind FROM claims WHERE participant = ? ORDER BY rowid");
+      const claimsOf2 = db.prepare("SELECT path, kind FROM claims WHERE participant = ? ORDER BY rowid");
       const live2 = db.prepare("SELECT c.path, c.kind, c.participant, p.slice, r.plan FROM claims c JOIN participants p ON p.id = c.participant JOIN runs r ON r.id = p.run WHERE c.repo = ? ORDER BY c.rowid").all(repo).filter((c) => isLive(Number(c.participant)));
       const files = /* @__PURE__ */ new Map();
       for (const c of live2) {
@@ -1100,7 +1191,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
           doing: String(r.doing),
           state,
           stale: !ended && !orchestrator && Date.parse(String(r.last_call ?? r.joined_at)) < cutoff,
-          files: claimsOf.all(id).map((c) => ({ path: String(c.path), interface: c.kind === "interface", shared: sharedBy(String(c.path), id) })),
+          files: claimsOf2.all(id).map((c) => ({ path: String(c.path), interface: c.kind === "interface", shared: sharedBy(String(c.path), id) })),
           joined: String(r.joined_at),
           ended: r.ended_at == null ? null : String(r.ended_at),
           calls: Number(r.calls ?? 0),
@@ -1109,7 +1200,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       });
       const events = db.prepare("SELECT * FROM (SELECT * FROM messages WHERE repo = ? ORDER BY seq DESC LIMIT ?) ORDER BY seq").all(repo, EVENTS_SHOWN).map((r) => {
         const m = toMessage(r);
-        return { seq: m.seq, at: m.at, kind: m.kind, from: m.from, body: m.body, about: m.about };
+        return { seq: m.seq, at: m.at, kind: m.kind, from: m.from, body: m.body, about: m.about, channel: m.channel === "main" ? "main" : m.channel.run };
       });
       const nameOf = new Map(people.map((r) => [`${r.run}/${r.slice}`, `${r.plan}/${r.slice}`]));
       const queues = {};
@@ -1184,6 +1275,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
   board.setDoing = counted(board.setDoing);
   board.end = counted(board.end);
   board.post = counted(board.post);
+  board.endorse = counted(board.endorse);
   board.deliver = counted(board.deliver);
   board.wait = counted(board.wait);
   board.checkEdit = counted(board.checkEdit);
@@ -1459,7 +1551,7 @@ async function main(board) {
   switch (args.verb) {
     case "open": {
       const plan = need("--plan");
-      const run = board.openRun({ repo: repoOf(process.cwd()), plan, title: need("--title"), link: args.flag("--link") ?? null, slices: readSlices(need("--slices")) });
+      const run = board.openRun({ repo: repoOf(process.cwd()), group: plan, title: need("--title"), link: args.flag("--link") ?? null, seats: readSlices(need("--slices")) });
       const port = ensureServer();
       const page = port === null ? null : runPageUrl(port, run.id);
       if (page === null) {

@@ -27,6 +27,7 @@
     "vitest": "4.1.11"
   },
   "dependencies": {
+    "mermaid": "11.17.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   }
