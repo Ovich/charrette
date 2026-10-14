@@ -1,6 +1,6 @@
 // The mockup's "live" variant (2026-10-07-swarm-board.mockup.html) as the Board would return
-// it: two plans on one repository, a second repository running, a third with a closed run.
-import type { BoardSnapshot, SnapshotEvent, SnapshotRunner } from "../src/board/board.ts";
+// it: two plans and a brainstorm open on one repository, two closed runs, a second repository.
+import type { BoardSnapshot, RepoSummary, RunSummary, SnapshotEvent, SnapshotRunner } from "../src/board/board.ts";
 
 const at = (hm: string): string => {
   const [h, m] = hm.split(":").map(Number);
@@ -10,6 +10,12 @@ const at = (hm: string): string => {
 export const APP = "/repos/charrette-app/.git";
 const RT = "refresh-tokens";
 const AL = "audit-log";
+const NM = "naming";
+const LP = "login-page";
+const TT = "theme-tokens";
+/** Each plan's run id: a post lands in its runner's run channel unless it is on Main (D18). */
+const RUN_OF: Record<string, number> = { [RT]: 1, [AL]: 2, [NM]: 3, [LP]: 4, [TT]: 5 };
+const runOf = (name: string): number => RUN_OF[name.slice(0, name.lastIndexOf("/"))] ?? 0;
 
 /** The runners' funny names (D43), fixed here; the Board picks them at random. */
 export const NICKS: Record<string, string> = {
@@ -19,6 +25,7 @@ export const NICKS: Record<string, string> = {
   [`${RT}/S5`]: "Dizzy Puffin",
   [`${AL}/S1`]: "Jolly Walrus",
   [`${AL}/S2`]: "Quiet Llama",
+  [`${NM}/critic`]: "Witty Heron",
 };
 const nickOf = (name: string): string => NICKS[name] ?? "orchestrator";
 
@@ -51,6 +58,7 @@ const runner = (
 };
 
 let seq = 0;
+/** A post in its author's run channel. */
 const ev = (hm: string, kind: SnapshotEvent["kind"], from: string, body: string, about: string | null = null): SnapshotEvent => ({
   seq: ++seq,
   at: at(hm),
@@ -58,6 +66,11 @@ const ev = (hm: string, kind: SnapshotEvent["kind"], from: string, body: string,
   from,
   body,
   about,
+  channel: runOf(from),
+});
+/** A post on Main: a run event, or a claim post across runs (D18). */
+const onMain = (hm: string, kind: SnapshotEvent["kind"], from: string, body: string, about: string | null = null): SnapshotEvent => ({
+  ...ev(hm, kind, from, body, about),
   channel: "main",
 });
 
@@ -88,18 +101,24 @@ const queue = (plan: string, slices: [string, string, string, string[]][]) =>
     runner: state === "running" ? `${plan}/${slice}` : null,
   }));
 
-export const RUNS = [
-  { run: 1, kind: "plan" as const, plan: RT, group: RT, code: "RT", title: "Sessions with refresh tokens", link: null, open: true, runners: 4, done: 2, of: 7 },
-  { run: 2, kind: "plan" as const, plan: AL, group: AL, code: "AL", title: "Audit log", link: AL_LINK, open: true, runners: 2, done: 0, of: 3 },
+export const RUNS: RunSummary[] = [
+  { run: 1, kind: "plan", plan: RT, group: RT, code: "RT", title: "Sessions with refresh tokens", link: null, open: true, runners: 4, done: 2, of: 7 },
+  { run: 2, kind: "plan", plan: AL, group: AL, code: "AL", title: "Audit log", link: AL_LINK, open: true, runners: 2, done: 0, of: 3 },
 ];
 
-/** A run of charrette-app closed earlier: the Board lists it with the open ones (D34). */
-const CLOSED_HERE = { run: 0, kind: "plan" as const, plan: "login-page", group: "login-page", code: "LP", title: "The login page", link: null, open: false, runners: 0, done: 4, of: 4 };
+/** A brainstorm open beside the plans: its seats hold no file (D3). */
+export const BRAINSTORM: RunSummary = { run: 3, kind: "brainstorm", plan: NM, group: NM, code: "NM", title: "Naming the kinds", link: null, open: true, runners: 1, done: 0, of: 1 };
+
+/** Runs of charrette-app closed earlier: the Board lists them with the open ones (D34, D46). */
+export const CLOSED: RunSummary[] = [
+  { run: 4, kind: "plan", plan: LP, group: LP, code: "LP", title: "The login page", link: null, open: false, runners: 0, done: 4, of: 4 },
+  { run: 5, kind: "brainstorm", plan: TT, group: TT, code: "TT", title: "Theme tokens", link: null, open: false, runners: 0, done: 2, of: 2 },
+];
 
 export const LIVE: BoardSnapshot = {
   repo: APP,
   name: "charrette-app",
-  runs: [CLOSED_HERE, ...RUNS],
+  runs: [...CLOSED, ...RUNS, BRAINSTORM],
   lock: null,
   roster: [
     runner(`${RT}/S3`, "The Session interface carries the refresh token", "Adding refreshToken to Session, then its two readers", "working", [["src/auth/session.ts", true], ["src/auth/session.test.ts"]], "14:02", 31),
@@ -110,16 +129,22 @@ export const LIVE: BoardSnapshot = {
     runner(`${AL}/S1`, "The audit table and its writer", "Writing the migration for audit_entries", "working", [["src/audit/audit.ts", true], ["migrations/0042_audit.sql"]], "14:06", 15),
     runner(`${AL}/S2`, "Every auth route writes an audit entry", "Adding audit() to the login and logout handlers", "working", [["src/routes/login.ts"]], "14:06", 11),
     runner(`${RT}/S2`, "The token store", "merged and ended", "ended", [], "14:01", 9, "14:09"),
+    runner(`${NM}/critic`, "The critic", "Reading the names proposed", "working", [], "14:04", 3),
   ],
   events: [
+    onMain("13:20", "event", `${LP}/orchestrator`, "closed: The login page"),
+    ev("13:18", "msg", `${LP}/S4`, "@orchestrator merged 9f0c1d2"),
+    ev("13:40", "msg", `${TT}/critic`, "Two names per token, not three."),
+    onMain("14:00", "event", `${RT}/orchestrator`, "opened: Sessions with refresh tokens"),
     ev("14:02", "event", `${RT}/S3`, "joined: the Session interface"),
     ev("14:03", "msg", `${RT}/S3`, "@all I'm adding `refreshToken: string | null` to `Session`. Readers I know of: `web/http/client.ts`.", "src/auth/session.ts"),
+    ev("14:04", "msg", `${NM}/critic`, "`kind` reads better than `type` on a run."),
     ev("14:05", "msg", `${RT}/S4`, "@S2 does `store.rotate()` return the new token or only write it?", "src/tokens/store.ts"),
     ev("14:06", "msg", `${RT}/S2`, "@S4 it returns it. Signature at `src/tokens/store.ts:12`.", "src/tokens/store.ts"),
-    ev("14:09", "event", `${RT}/S2`, "merged a41c9e2: rebase onto a41c9e2.\nfiles: src/tokens/store.ts"),
-    ev("14:12", "msg", `${AL}/S2`, "@RT·S4 I need one call at the top of every handler in `src/routes/auth.ts`. You hold it.", "src/routes/auth.ts"),
-    ev("14:12", "msg", `${RT}/S4`, "@AL·S2 yes, I add it.", "src/routes/auth.ts"),
-    ev("14:12", "agreement", `${RT}/S4`, "RT·S4 adds `audit(req, 'refresh')` in `src/routes/auth.ts`; AL·S2 does not touch the file.", "src/routes/auth.ts"),
+    onMain("14:09", "event", `${RT}/S2`, "merged a41c9e2: rebase onto a41c9e2.\nfiles: src/tokens/store.ts"),
+    onMain("14:12", "msg", `${AL}/S2`, "@RT·S4 I need one call at the top of every handler in `src/routes/auth.ts`. You hold it.", "src/routes/auth.ts"),
+    onMain("14:12", "msg", `${RT}/S4`, "@AL·S2 yes, I add it.", "src/routes/auth.ts"),
+    onMain("14:12", "agreement", `${RT}/S4`, "RT·S4 adds `audit(req, 'refresh')` in `src/routes/auth.ts`; AL·S2 does not touch the file.", "src/routes/auth.ts"),
     ev("14:13", "msg", `${RT}/S5`, "@S3 I read `Session` in the client. Is `expiresAt` staying a number?", "src/auth/session.ts"),
     ev("14:13", "msg", `${RT}/S3`, "@S5 yes, unchanged. Only the new field.", "src/auth/session.ts"),
   ],
@@ -130,6 +155,34 @@ export const LIVE: BoardSnapshot = {
 // the FileMap's rows, as the Board derives them from the claims: one holder each here
 LIVE.files = LIVE.roster.flatMap((r) => r.files.map((f) => ({ path: f.path, holders: [r.runner], interface: f.interface })));
 
+/** The same repository with only the brainstorm and the closed runs: no claims, no merge lock (D3). */
+export const BRAINSTORM_ONLY: BoardSnapshot = {
+  ...LIVE,
+  runs: [...CLOSED, BRAINSTORM],
+  roster: LIVE.roster.filter((r) => r.plan === NM),
+  events: LIVE.events.filter((e) => e.channel === "main" ? e.from.startsWith(`${LP}/`) : [3, 4, 5].includes(e.channel)),
+  queues: {},
+  files: [],
+};
 
+/** A second repository on the board, one plan open: RepoList lists both (D39). */
+export const OTHER = "/repos/charrette-site/.git";
+export const SITE: BoardSnapshot = {
+  repo: OTHER,
+  name: "charrette-site",
+  runs: [{ run: 7, kind: "plan", plan: "landing", group: "landing", code: "LA", title: "The landing page", link: null, open: true, runners: 1, done: 0, of: 2 }],
+  lock: null,
+  roster: [runner("landing/S1", "The hero", "Writing the hero", "working", [["site/hero.tsx"]], "14:03", 4)],
+  events: [onMain("14:03", "event", "landing/orchestrator", "opened: The landing page")],
+  queues: {},
+  files: [{ path: "site/hero.tsx", holders: ["landing/S1"], interface: false }],
+  flags: [],
+};
+
+/** The repositories as useBoard lists them. */
+export const REPOS: RepoSummary[] = [
+  { repo: APP, name: LIVE.name, runs: LIVE.runs },
+  { repo: OTHER, name: SITE.name, runs: SITE.runs },
+];
 
 export const at1414 = at("14:14");

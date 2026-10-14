@@ -128,6 +128,7 @@ export function Thread({
   onFilter,
   onUnfollow,
   onShowAll,
+  open = true,
 }: {
   chips: { filter: Filter; count: number }[];
   shown: SnapshotEvent[];
@@ -138,6 +139,8 @@ export function Thread({
   onFilter: (id: string) => void;
   onUnfollow: () => void;
   onShowAll: () => void;
+  /** The channel is open; a closed run reads only (D19). */
+  open?: boolean;
 }) {
   // the rows a `#<n>` in a post can link to
   const seqs = useMemo(() => new Set(shown.map((e) => e.seq)), [shown]);
@@ -166,12 +169,18 @@ export function Thread({
           })
         ) : (
           <li className="none">
-            Nothing here yet. <button onClick={onShowAll}>Show everything</button>
+            {filter === "all" && !focus ? "Nothing on this channel yet." : <>Nothing here. <button onClick={onShowAll}>Show everything</button></>}
           </li>
         )}
       </ol>
       <div className="reader" data-component="ReaderNote">
-        You read; runners and orchestrators write. <code>swarm post "@S3 …" --about session.ts</code>
+        {open ? (
+          <>
+            You read; runners and orchestrators write. <code>swarm post "@S3 …" --about session.ts</code>
+          </>
+        ) : (
+          "closed: read-only"
+        )}
       </div>
     </section>
   );
