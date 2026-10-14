@@ -28,7 +28,7 @@ major and the minor move only on the person's word.
 
 ## The build output is versioned on purpose
 
-`skills/aiview/dist/` (the UI, ~5 MB) and `skills/aiview/dist-cli/cli.mjs` (the CLI and
+`skills/companions/aiview/dist/` (the UI, ~5 MB) and `skills/companions/aiview/dist-cli/cli.mjs` (the CLI and
 server, ~44 KB, bundled by esbuild with no runtime dependencies) are committed.
 
 They have to be. An update installs into a *new, empty* cache directory; nothing carries
@@ -43,8 +43,8 @@ the old viewer.** Run the build before tagging, every time, and commit what it p
 ## The sequence
 
 ```bash
-cd skills/aiview && npm install && npm run build && npm test && cd ../..   # refresh dist/ + dist-cli/
-cd skills/swarm && npm install && npm run build && npm test && npm run test:app && cd ../..   # the board: dist/ + dist-cli/
+cd skills/companions/aiview && npm install && npm run build && npm test && cd ../../..   # refresh dist/ + dist-cli/
+cd skills/companions/swarm && npm install && npm run build && npm test && npm run test:app && cd ../../..   # the board: dist/ + dist-cli/
 node --test skills/review/pr-review/scripts/scope.test.mjs            # the review scope script
 node --test skills/project/write-conventions/scripts/rules.test.mjs # the conventions rules script
 node --test "skills/workbench/create-workbench/scripts/*.test.mjs" # the workbench page, writer and loader
@@ -86,7 +86,7 @@ Users with background marketplace refresh still need the second command and the 
 
 ## Notes
 
-- swarm ships as aiview does: `skills/swarm/dist/` (the page) and `skills/swarm/dist-cli/cli.mjs`
+- swarm ships as aiview does: `skills/companions/swarm/dist/` (the page) and `skills/companions/swarm/dist-cli/cli.mjs`
   (the CLI and the server) are committed, and a release that changes swarm's source without its
   build ships the old board.
 - `aiview mermaid-check` is its own bundle, `dist-cli/mermaid-check.mjs`, about 3.5 MB,

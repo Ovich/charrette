@@ -14,8 +14,8 @@ Every skill is one folder under `skills/`, opening on a `SKILL.md`; supporting f
 sit beside it, situational ones under `references/`. `project/` holds what a project
 has once and keeps, `verify/` its verification skill and the validation with the person, `workbench/` the pages worked on
 with the person during development and the project skills that feed them; the loop's phases group the rest,
-`architecture/`, `ui/`, `plan/`, `execute/`, `review/`; `interview/` and `whiteboard-defense/` sit at the root, as do
-the two tools, aiview (`skills/aiview/`, the documents) and swarm (`skills/swarm/`, the board a
+`architecture/`, `ui/`, `plan/`, `execute/`, `review/`; `interview/` and `whiteboard-defense/` sit at the root;
+`companions/` holds the two tools, aiview (`skills/companions/aiview/`, the documents) and swarm (`skills/companions/swarm/`, the board a
 swarm-mode plan runs on): each a CLI, a server and a UI, shipped as versioned bundles so an
 install never builds. The plugin sees a group only through the `skills`
 list in `.claude-plugin/plugin.json`: the default scan reads one level under `skills/`,
@@ -36,11 +36,11 @@ file the person was looking for. Refresh the cache with
 
 1. **MUST reference another skill by its name alone, the `<name>` skill.** The harness resolves a skill by name wherever it is installed; a path, relative or absolute, breaks on the next layout and is paid for at every load. A file inside another skill is named as that skill's `references/<topic>.md` or `scripts/<name>`.
 
-2. **MUST keep in `SKILL.md` only what every use of the skill needs, and put what one situation needs in `references/<topic>.md`, named in `SKILL.md` at the point where the situation arises, with the condition to read it stated there.** Everything in `SKILL.md` is paid for at every load, and a condition written inside a reference is read only by an agent that has already opened it. `skills/aiview/references/`, `skills/execute/execute-plan/references/`, `skills/ui/design-prototype/references/`.
+2. **MUST keep in `SKILL.md` only what every use of the skill needs, and put what one situation needs in `references/<topic>.md`, named in `SKILL.md` at the point where the situation arises, with the condition to read it stated there.** Everything in `SKILL.md` is paid for at every load, and a condition written inside a reference is read only by an agent that has already opened it. `skills/companions/aiview/references/`, `skills/execute/execute-plan/references/`, `skills/ui/design-prototype/references/`.
 
 3. **MUST write a description as the trigger and nothing else: what activates the skill, what it produces, what it excludes.** Method, mechanics and instructions to a loaded agent belong in the body, and the body carries no "when to use" section of its own. The router reads only the description; the agent reads the body only after.
 
-4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute/execute-plan/references/tracker.md`; diagram discipline is `skills/architecture/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/aiview/`; the board protocol is `skills/swarm/`; the orchestrator's charter, dispatch, briefs, roles and watching are `skills/orchestrate/`.
+4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute/execute-plan/references/tracker.md`; diagram discipline is `skills/architecture/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/companions/aiview/`; the board protocol is `skills/companions/swarm/`; the orchestrator's charter, dispatch, briefs, roles and watching are `skills/orchestrate/`.
 
 8. **MUST write a skill, its examples included, only in terms every project has, never a file, module or name from the project the change came from.** A skill loads in every project; a foreign name reads as a fact about the current codebase, and the agent looks for it. Abstract the case to the rule it taught, and the counterweight it needed.
 
@@ -48,7 +48,7 @@ file the person was looking for. Refresh the cache with
 
 ## aiview
 
-5. **MUST bundle a new runtime dependency into `dist-cli/` through `skills/aiview/build.mjs`, never require `node_modules` at runtime.** An installed plugin has no `node_modules`; a bare import fails only for users. `parse5` and `mermaid` are bundled this way, the checker as its own bundle.
+5. **MUST bundle a new runtime dependency into `dist-cli/` through `skills/companions/aiview/build.mjs`, never require `node_modules` at runtime.** An installed plugin has no `node_modules`; a bare import fails only for users. `parse5` and `mermaid` are bundled this way, the checker as its own bundle.
 
 6. **MUST bump `version` to the same value in `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, rebuild, and commit `dist/` and `dist-cli/` before pushing `main`.** Without the bump no existing user receives the change, and without the build they receive the old viewer. The sequence is `RELEASING.md`.
 

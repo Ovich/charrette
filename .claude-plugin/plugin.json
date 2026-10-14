@@ -24,6 +24,7 @@
     "./skills/execute",
     "./skills/verify",
     "./skills/workbench",
-    "./skills/review"
+    "./skills/review",
+    "./skills/companions"
   ]
 }
