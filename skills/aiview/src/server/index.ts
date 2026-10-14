@@ -236,12 +236,16 @@ export function startServer(
     if (a) {
       const doc = index.get(Number(a[1]));
       if (!doc) return send(res, 404, "not found", "text/plain");
-      // Real paths on both sides, so a link or junction inside the folder cannot lead out.
+      // A path that leaves the folder as written is refused before it touches the disk;
+      // then real paths on both sides, so a link or junction inside cannot lead out.
+      const dir = path.dirname(doc.abs_path);
+      const asked = path.resolve(dir, decodeURIComponent(a[2]));
+      if (asked !== dir && !asked.startsWith(dir + path.sep)) return send(res, 403, "forbidden", "text/plain");
       let base: string;
       let f: string;
       try {
-        base = fs.realpathSync(path.dirname(doc.abs_path));
-        f = fs.realpathSync(path.resolve(path.dirname(doc.abs_path), decodeURIComponent(a[2])));
+        base = fs.realpathSync(dir);
+        f = fs.realpathSync(asked);
       } catch {
         return send(res, 404, "not found", "text/plain");
       }
