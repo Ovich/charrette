@@ -2,6 +2,7 @@
 // Copied into the bench's own skill, `scripts/data-folder.mjs`, and imported by its feed.
 //
 //   derived feed  writeDerived(page, feed) -> { written, kept, pruned }
+//   log feed      appendEntry(page, entry) -> n (1-based), annotate(page, n, notes)
 //   any reader    readManifest(page) -> the committed manifest, or null
 //
 // `manifest.json` is the one commit point: data files are written first, content-hashed and
@@ -242,5 +243,45 @@ export function writeDerived(page, feed) {
     removeEmptyDirs(join(folder, "data"));
     removeEmptyDirs(join(folder, "shared"));
     return { written, kept, pruned };
+  });
+}
+
+const logFile = (dir, n) => `data/${dir}/${String(n).padStart(6, "0")}.json`;
+const writeManifest = (folder, manifest) =>
+  writeAtomically(join(folder, "manifest.json"), Buffer.from(JSON.stringify(manifest, null, 1), "utf8"));
+
+const readLogManifest = (page, folder) => {
+  const manifest = readManifest(page) ?? { schema: SCHEMA, kind: "log", count: 0, notes: [] };
+  if (manifest.kind !== "log") fail(folder, `a ${manifest.kind} sidecar is written whole, never appended to`);
+  return manifest;
+};
+
+/**
+ * Appends `entry` as entry count + 1 and returns that 1-based number. The entry is renamed in
+ * first (over any leftover of a dead writer past count), the manifest's count bumped last.
+ */
+export function appendEntry(page, entry) {
+  const folder = sidecarOf(page);
+  return withSidecarLock(page, (touch) => {
+    const manifest = readLogManifest(page, folder);
+    const n = manifest.count + 1;
+    writeAtomically(join(folder, logFile("entries", n)), toBytes(entry));
+    touch();
+    writeManifest(folder, { ...manifest, count: n });
+    return n;
+  });
+}
+
+/** Merges `notes` into entry `n`'s notes; throws when the log has no entry `n`. */
+export function annotate(page, n, notes) {
+  const folder = sidecarOf(page);
+  withSidecarLock(page, (touch) => {
+    const manifest = readLogManifest(page, folder);
+    if (!Number.isInteger(n) || n < 1 || n > manifest.count) fail(folder, `no entry ${n} to annotate (count ${manifest.count})`);
+    const path = join(folder, logFile("notes", n));
+    const merged = { ...(existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {}), ...notes };
+    writeAtomically(path, toBytes(merged));
+    touch();
+    if (!manifest.notes.includes(n)) writeManifest(folder, { ...manifest, notes: [...manifest.notes, n].sort((a, b) => a - b) });
   });
 }
