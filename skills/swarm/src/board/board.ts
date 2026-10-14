@@ -430,6 +430,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   upkeep("messages", "endorses", "endorses INTEGER");
   // 1 once the run's stale event is in main; any member call resets it (D19)
   upkeep("runs", "stale_flagged", "stale_flagged INTEGER NOT NULL DEFAULT 0");
+  // 1 once an orchestrator's quiet event is posted; its next call posts back and resets it (D15)
+  upkeep("participants", "quiet_flagged", "quiet_flagged INTEGER NOT NULL DEFAULT 0");
   // set when prune removed the run's contents; the row stays so its id is never reused (D61): never listed
   upkeep("runs", "pruned_at", "pruned_at TEXT");
   // the board event a message is (D59); null on plain posts and rows from before
@@ -888,6 +890,17 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     flagStale(at = new Date()) {
       const silentBefore = at.getTime() - STALE_MS;
       return transaction(() => {
+        // an orchestrator silent STALE_MS: one quiet event in its run, until it calls again (D15)
+        const quiet = db
+          .prepare("SELECT p.id, p.last_call, p.joined_at FROM participants p JOIN runs r ON r.id = p.run WHERE r.state = 'open' AND p.slice = ? AND p.ended_at IS NULL AND p.quiet_flagged = 0")
+          .all(ORCHESTRATOR) as Row[];
+        for (const o of quiet) {
+          const silentSince = Date.parse(String(o.last_call ?? o.joined_at));
+          if (silentSince >= silentBefore) continue;
+          const minutes = Math.floor((at.getTime() - silentSince) / 60_000);
+          insertMessage(participantById(Number(o.id)), `quiet ${minutes} min`, null, "event", [], { event: EVENTS.quiet.name });
+          db.prepare("UPDATE participants SET quiet_flagged = 1 WHERE id = ?").run(Number(o.id));
+        }
         const flagged: RunId[] = [];
         for (const r of db.prepare("SELECT id, plan FROM runs WHERE state = 'open' AND stale_flagged = 0 ORDER BY id").all() as Row[]) {
           const id = Number(r.id);
@@ -1318,6 +1331,9 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     db.prepare("UPDATE participants SET calls = calls + 1, last_call = ? WHERE id = ?").run(now(), p.id);
     // a member's call clears its run's stale mark, so a later silence flags again (D19)
     db.prepare("UPDATE runs SET stale_flagged = 0 WHERE id = ? AND stale_flagged = 1").run(p.run);
+    // an orchestrator marked quiet is back: one back event, and the mark cleared (D15)
+    if (Number(db.prepare("UPDATE participants SET quiet_flagged = 0 WHERE id = ? AND quiet_flagged = 1").run(p.id).changes) > 0 && runRow(p.run).state === "open")
+      insertMessage(participantById(p.id), "back", null, "event", [], { event: EVENTS.back.name });
     bump(participantById(p.id).repo);
   };
   // the verb and its count in one transaction: the page sees one change, and a refused call

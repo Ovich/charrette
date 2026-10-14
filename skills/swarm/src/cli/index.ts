@@ -30,8 +30,8 @@ const USAGE = [
   "  subscribe   [--as <member>] <events>                            # prints your subscriptions after",
   "  unsubscribe [--as <member>] <events>",
   "  doing   [--as <member>] <text>",
-  "  post    [--as <member>] <body> [--about <path|decision id>] [--main]   # prints the seq, (main) when it landed in main",
-  "  agree   [--as <member>] <terms> [--about <path|decision id>] [--main]  # prints the seq",
+  "  post    [--as <member>] <body> [--about <path|decision id>]   # prints the seq",
+  "  agree   [--as <member>] <terms> [--about <path|decision id>]  # prints the seq",
   "  endorse [--as <member>] <seq>                                   # backs an agreement; prints the endorsement's seq",
   "  read    <seq>",
   "  deliver [--as <member>]                                         # what you have not had: mentions in full, the rest one line",
@@ -350,7 +350,15 @@ const subscriptionsArg = (spec: string): Subscription[] => {
   }
 };
 
+/** Main is gone (D12): the conversation is one, a mention says who is meant. */
+const NO_MAIN = "there is no Main any more: the conversation is one; mention who you mean (@IW, @IW·SL3, @swarm)";
+
 async function main(board: Board): Promise<void> {
+  if ((args.verb === "post" || args.verb === "agree" || args.verb === "endorse") && args.has("--main")) {
+    console.error(NO_MAIN);
+    process.exitCode = 2;
+    return;
+  }
   switch (args.verb) {
     case "config": {
       const setting = args.positional[0];
