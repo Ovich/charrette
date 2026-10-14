@@ -155,13 +155,11 @@ p { margin: 0; }
 .label .hint button { color: var(--accent); }
 
 /* Roster: the one bold thing */
-.roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 10px; margin-bottom: 26px; }
 .card { position: relative; display: block; text-align: left; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); padding: 10px 12px 10px 15px; box-shadow: var(--shadow-sm); overflow: hidden; width: 100%; transition: box-shadow .15s, opacity .15s; }
 .card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: light-dark(hsl(var(--h) calc(var(--s) * 1%) 58%), hsl(var(--h) calc(var(--s) * .7%) 56%)); }
 .card.orch::before { background: var(--faint-foreground); }
 .card:hover { box-shadow: 0 0 0 1px var(--border), var(--shadow-sm); }
 .card[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); }
-.roster.focusing .card[aria-pressed="false"] { opacity: .45; }
 .card .top { display: flex; align-items: center; gap: 6px; }
 .state { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted-foreground); }
 .state i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
@@ -170,24 +168,18 @@ p { margin: 0; }
 .state.merging i { background: var(--foreground); }
 .state.watching i { background: var(--faint-foreground); }
 .state.done i, .state.ended i { background: var(--border); }
-.listen { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; font-size: 10.5px; color: var(--faint-foreground); }
-.listen svg { width: 11px; height: 11px; }
 .state.stale { color: var(--faint-foreground); }
 .state.stale i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint-foreground); animation: none; }
 @keyframes pulse { 50% { opacity: .35; } }
-.card .plan { display: block; font-size: 10.5px; color: var(--faint-foreground); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card .slice { display: block; font-size: 12.5px; font-weight: 600; line-height: 1.35; }
 .card .doing { display: block; font-size: 12px; color: var(--muted-foreground); line-height: 1.4; margin-top: 3px; min-height: 2.8em; }
-.card .wakes { display: block; font-size: 11px; color: var(--muted-foreground); margin-top: 2px; }
 .files { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 .file { font-size: 10.5px; line-height: 1.6; background: var(--surface-2); border-radius: 4px; padding: 0 5px; color: var(--muted-foreground); }
 .file.iface { color: var(--foreground); box-shadow: inset 0 -1.5px 0 var(--accent); }
 .file .shared { font-family: var(--font-sans); color: var(--faint-foreground); }
-.card .meta { font-size: 10.5px; line-height: 1.4; color: var(--faint-foreground); margin-top: 7px; display: flex; gap: 8px; }
 .card.done, .card.ended { box-shadow: none; background: var(--surface); }
 .card.done .slice, .card.ended .slice { color: var(--muted-foreground); }
 .card.waiting { background: var(--surface); }
-.card.new { animation: rise .45s ease-out; }
 @keyframes rise { from { transform: translateY(4px); opacity: 0; } }
 
 .panel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); overflow: hidden; min-width: 0; }
@@ -211,30 +203,18 @@ p { margin: 0; }
 .post-diagram .pd-error { margin: 0; font-size: 12px; color: var(--destructive, #c0392b); }
 .post-diagram .pd-toggle { font-size: 11px; color: var(--muted-foreground); text-decoration: underline; margin-top: 4px; }
 
-/* SL4b: the board page; rails (RepoList, ChannelRail), FileMap */
+/* SL7: the board page, the RepoList rail beside a column: tabs, agent strip, conversation (flex 1), claims row */
 .board-page { height: 100vh; display: flex; }
-.board-page > .content { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
-.board-page .roster { flex: none; max-height: 40vh; overflow-y: auto; }
-.board-page .panel { flex: 1; min-height: 240px; display: flex; flex-direction: column; }
-.board-page .filters, .board-page .reader { flex: none; }
-.board-page .run-lock { padding: 0 0 10px; }
+.board-page > .content { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .rail { flex: none; width: 210px; border-right: 1px solid var(--border); background: var(--surface); padding: 16px 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .rail .label { margin: 12px 6px 4px; }
 .rail .label:first-child { margin-top: 0; }
-.rail-row, .rail-toggle { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border-radius: 6px; padding: 4px 8px; font-size: 12.5px; color: var(--muted-foreground); }
-.rail-row:hover, .rail-toggle:hover { background: var(--surface-2); }
+.rail-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border-radius: 6px; padding: 4px 8px; font-size: 12.5px; color: var(--muted-foreground); }
+.rail-row:hover { background: var(--surface-2); }
 .rail-row[aria-current="true"] { background: var(--accent-soft); color: var(--foreground); font-weight: 500; }
 .rail-row .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rail-row .n, .rail-toggle .n { font-size: 10.5px; color: var(--faint-foreground); }
-.rail-toggle { margin-top: 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--faint-foreground); }
+.rail-row .n { font-size: 10.5px; color: var(--faint-foreground); }
 .notice { font-size: 12px; color: var(--muted-foreground); margin: 0 0 10px; }
-.board-page .panel.filemap { flex: none; min-height: 0; margin-top: 16px; padding: 10px 12px; }
-/* D5: collapsed, Files held is its header and the thread (flex: 1) takes the room; expanded, it scrolls under a cap */
-.board-page .panel.filemap[data-expanded="true"] { max-height: 40vh; overflow-y: auto; }
-.board-page .panel[data-component="Thread"] { flex: 1 1 auto; }
-.fm-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.fm-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.fm-holders { display: inline-flex; gap: 4px; margin-left: auto; }
 
 /* SL1 (posts): markdown in posts; a one-paragraph post flows inline as plain text did */
 .post-md p, .post-md li, .post-md td, .post-md th { white-space: pre-line; }
@@ -317,3 +297,22 @@ p { margin: 0; }
   .item .time, .event .time { display: none; }
   .item .text { grid-column: 1; }
 }
+
+
+/* SL7: the agent strip (D7, D20) and the claims row; the page a column: tabs, strip, conversation, claims */
+.agent-strip { flex: none; display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 10px; }
+.agent-strip .card { flex: none; width: 236px; }
+.agent-strip.following .card[aria-pressed="false"] { opacity: .45; }
+.agent-strip .card.ended, .agent-strip .card.done { opacity: .55; }
+.agent-strip .doing { min-height: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.state.quiet { color: var(--amber); }
+.state.quiet i { background: var(--amber); }
+.claims-row { flex: none; border-top: 1px solid var(--border); padding: 6px 0 0; }
+.claims-row[data-expanded="true"] { max-height: 30vh; overflow-y: auto; }
+.claims-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted-foreground); padding: 4px 0; }
+.claims-toggle .n { font-weight: 400; color: var(--faint-foreground); }
+.claims-list { list-style: none; margin: 0; padding: 0 0 6px 18px; display: flex; flex-direction: column; gap: 3px; }
+.claims-list li { display: flex; align-items: baseline; gap: 10px; font-size: 12px; }
+.claims-list .path { font-family: var(--font-mono, monospace); flex: none; width: 360px; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.claims-list .holders { display: inline-flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.claims-list .shared { color: var(--faint-foreground); }
