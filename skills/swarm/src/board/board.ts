@@ -19,8 +19,6 @@ export type { EventName, Subscription } from "./events.ts";
 export type SeatSpec = { id: string; title: string; role?: string; blockers: string[]; link?: string | null; on?: string[] };
 /** Kept: the plan's own word (D41). */
 export type SliceSpec = SeatSpec;
-/** Where a message lands (D18): its run's channel, or the repository's main channel. */
-export type Channel = { run: RunId } | "main";
 export type SliceState = "ready" | "running" | "done" | "blocked";
 export type Slice = SliceSpec & { state: SliceState };
 export type Declared = { path: string; interface: boolean }; // repository-relative
@@ -49,7 +47,7 @@ export interface Participant {
   plan: string;
   slice: string; // "orchestrator" for a run's orchestrator
   name: string; // "<plan>/<slice>"
-  nick: string; // the funny name given at join (D43); "orchestrator" for an orchestrator
+  nick: string; // the funny name given at join (D43), and to an orchestrator at open (plan D17)
   ended: boolean;
   worktree: string | null; // registered at join; null for the orchestrator
   /** A `wait --mentions` of this participant is pending (D49, D61). */
@@ -86,7 +84,8 @@ export interface Message {
   kind: MessageKind;
   mentions: string[]; // "<plan>/<slice>" or "<plan>/*"
   at: string;
-  channel: Channel;
+  /** The author's run: a run is a label on the item, not a place (plan D1, D13). */
+  run: RunId;
   /** The agreement an endorsement backs; null otherwise. */
   endorses: number | null;
   /** The board event it is, as posted (D59); null on a plain post and on rows from before. */
@@ -126,6 +125,8 @@ export type SnapshotRunner = {
   listening: boolean;
   /** Its subscriptions, as `formatSubscriptions` writes each (D59). */
   on: string[];
+  /** Its last call to the board, else when it joined (D20: quiet n min). */
+  lastCall: string;
 };
 /** What a merged event told, as data (D11): `rebase` holds or declared a changed file, `tell` is whom to tell of a resolved conflict. */
 export type MergedMeta = { rebase: string[]; tell: string[] };
@@ -137,7 +138,10 @@ export type SnapshotEvent = {
   from: string;
   body: string;
   about: string | null;
-  channel: "main" | RunId;
+  /** The author's run; an old main row (stored null) reads its author's run (D13). */
+  run: RunId;
+  /** Kept beside `run`, equal to it, for the page until it reads `run`. */
+  channel: RunId;
   event?: EventName | null;
   mentions?: string[];
   meta?: MergedMeta | null;
@@ -166,9 +170,9 @@ export interface Board {
   /** `done` also releases the slice runner's claims and lock: the orchestrator's way to free a stale runner. */
   setSliceState(run: RunId, slice: string, state: SliceState): void;
   /** A seat added mid-run (D60): after the last, `ready`; refused on an id already in the run, an
-   *  unknown blocker or a closed run. Posts an event in the run channel. */
+   *  unknown blocker or a closed run. Posts an event with the run. */
   addSlice(run: RunId, spec: SeatSpec): Slice;
-  /** Also archives the run's channel: read-only from then on, `run <n> is closed` (D19). Posts the `closed` event in main (D67). */
+  /** Also archives the run: read-only from then on, `run <n> is closed` (D19). Posts the `closed` event with the run, before it closes (D67). */
   closeRun(run: RunId): void;
   /** Past the retention: closed runs (closed_at older), their seats, members not referenced by a
    *  kept message, their channels and deliveries; main messages older, agreements and the
@@ -202,13 +206,13 @@ export interface Board {
   end(p: Participant): void;
   roster(repo: string): RosterEntry[];
 
-  /** To the author's run channel unless `channel: "main"` is asked or the message reaches another run (D18, D26). */
-  post(p: Participant, body: string, opts?: { about?: string; kind?: MessageKind; channel?: "run" | "main" }): Message;
+  /** Stored with the author's run, always (plan D1, D13). */
+  post(p: Participant, body: string, opts?: { about?: string; kind?: MessageKind }): Message;
   /** An agreement backed; throws on a message that is not an agreement, or on one's own. */
   endorse(p: Participant, seq: number): Message;
   /** `by`: the runner reading, when known, counted as a call of its own (D66). */
   read(seq: number, by?: Participant): Message;
-  deliver(p: Participant): Delivery; // own run channel + mentions of p (and urgent posts) in main; undelivered since last time; marks them delivered; stamps the last call
+  deliver(p: Participant): Delivery; // own run's items + what wakes p from any run (plan D2); undelivered since last time; marks them delivered; stamps the last call
   /** The first delivery, or empty on timeout or once `p` has ended (D49). `mentionsOnly`: only a
    *  message that mentions `p`, is urgent, or is an event `p` subscribed to (D59) ends it, and only those are marked delivered; the rest
    *  stays for the next `deliver`. A runner has one live wait (D64): a newer `wait` of `p`, from
@@ -421,7 +425,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   upkeep("slices", "link", "link TEXT");
   // what kind of work a run is (D25); a run from before is a plan run
   upkeep("runs", "kind", "kind TEXT NOT NULL DEFAULT 'plan'");
-  // a message's channel (D18, D31): its run, or null for main; today's thread becomes main
+  // a message's run (D31, plan D13): its author's run; null on an old main row, read as its author's run
   upkeep("messages", "run", "run INTEGER");
   upkeep("messages", "endorses", "endorses INTEGER");
   // 1 once the run's stale event is in main; any member call resets it (D19)
@@ -520,10 +524,18 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     })),
   });
 
-  /** A store from before D43 has runners with no funny name: their slice stands in. */
-  const nickOf = (r: Row): string => (String(r.slice) === ORCHESTRATOR ? ORCHESTRATOR : r.nick == null ? String(r.slice) : String(r.nick));
+  /** A store from before D43 has members with no funny name: their slice stands in (an orchestrator's before plan D17 too). */
+  const nickOf = (r: Row): string => (r.nick == null ? String(r.slice) : String(r.nick));
 
-  const subsOf = (r: Row): Subscription[] => JSON.parse(String(r.subs ?? "[]")) as Subscription[];
+  /** A subscription stored scoped `main` (before plan D1) reads as `any`. */
+  /** A funny name no active member of the repository carries (D43, plan D17), kept for the run. */
+  const unusedNick = (repo: string): string => {
+    const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL`).all(repo) as Row[];
+    return funnyName(rows.map(nickOf));
+  };
+
+  const subsOf = (r: Row): Subscription[] =>
+    (JSON.parse(String(r.subs ?? "[]")) as { event: Subscription["event"]; scope: string }[]).map((x) => ({ event: x.event, scope: x.scope === "run" ? "run" : "any" }));
 
   const PARTICIPANT_SQL = `SELECT p.*, r.repo, r.plan, r.kind FROM participants p JOIN runs r ON r.id = p.run`;
 
@@ -544,20 +556,24 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
 
   const participantById = (id: number): Participant => toParticipant(db.prepare(`${PARTICIPANT_SQL} WHERE p.id = ?`).get(id) as Row);
 
-  const toMessage = (r: Row): Message => ({
+  const toMessage = (r: Row): Message => {
+    const author = participantById(Number(r.author));
+    return {
     seq: Number(r.seq),
     repo: String(r.repo),
-    from: participantById(Number(r.author)).name,
+    from: author.name,
     body: String(r.body),
     about: r.about == null ? null : String(r.about),
     kind: String(r.kind) as MessageKind,
     mentions: JSON.parse(String(r.mentions)) as string[],
     at: String(r.at),
-    channel: r.run == null ? "main" : { run: Number(r.run) },
+    // an old main row (null) is labelled with its author's run (plan D13)
+    run: r.run == null ? author.run : Number(r.run),
     endorses: r.endorses == null ? null : Number(r.endorses),
     event: r.event == null || !Object.hasOwn(EVENTS, String(r.event)) ? null : (String(r.event) as EventName),
     meta: r.meta == null ? null : (JSON.parse(String(r.meta)) as MergedMeta),
-  });
+    };
+  };
 
   const lastSeq = (): number => Number((db.prepare("SELECT COALESCE(MAX(seq), 0) AS s FROM messages").get() as Row).s);
 
@@ -572,19 +588,6 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     return new Map(rows.map((r) => [nameHandle(nickOf(r)), `${r.plan}/${r.slice}`]));
   };
 
-  /** Where a message lands, decided at insert and never moved (D18, D26): main when asked, when
-   *  a mention names a member outside the author's run, or when an agreement or endorsement is
-   *  about a path members of another run hold or held; otherwise the author's run. */
-  const channelOf = (p: Participant, kind: MessageKind, about: string | null, mentions: string[], asked: "run" | "main"): RunId | null => {
-    if (asked === "main") return null;
-    if (mentions.some((m) => m.slice(0, m.lastIndexOf("/")) !== p.plan)) return null;
-    if ((kind === "agreement" || kind === "endorsement") && about) {
-      const rel = relPath(p.repo, about) ?? slashes(about);
-      if (rel && claims.heldInOtherRun(p, rel)) return null;
-    }
-    return p.run;
-  };
-
   /** `named` overrides mention parsing: the board's own notices name their targets. */
   const insertMessage = (
     p: Participant,
@@ -592,12 +595,13 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     about: string | null,
     kind: MessageKind,
     named?: string[],
-    extra: { channel?: "run" | "main"; endorses?: number; event?: EventName; meta?: MergedMeta } = {},
+    extra: { endorses?: number; event?: EventName; meta?: MergedMeta } = {},
   ): Message => {
     const mentions = named ?? (kind === "event" ? [] : parseMentions(body, p.plan, openPlans(p.repo), activeNames(p.repo)));
-    const run = channelOf(p, kind, about, mentions, extra.channel ?? "run");
-    // an archived channel is read-only (D19)
-    if (run != null && runRow(run).state === "closed") throw new Error(`run ${run} is closed`);
+    // every item is stored with its author's run (plan D1, D13)
+    const run = p.run;
+    // a closed run is read-only (D19)
+    if (runRow(run).state === "closed") throw new Error(`run ${run} is closed`);
     const r = db
       .prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at, by_board, run, endorses, event, meta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(p.repo, p.id, body, about, kind, JSON.stringify(mentions), now(), named ? 1 : 0, run, extra.endorses ?? null, extra.event ?? null, extra.meta ? JSON.stringify(extra.meta) : null);
@@ -656,23 +660,23 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
    *  `mentionsOnly`: only what mentions `p` or is urgent is taken and marked; the rest stays. */
   const deliverTo = (p: Participant, fromWait: boolean, mentionsOnly = false): Delivery => {
     const me = participantById(p.id);
-    // in main, an agreement or endorsement about a path the caller holds is for it too (D26)
+    // from any run, an agreement or endorsement about a path the caller holds is for it too (D26, plan D2)
     const named = (m: Message): boolean =>
       mentionsMe(m, me) ||
-      (m.channel === "main" && (m.kind === "agreement" || m.kind === "endorsement") && m.about != null && claims.holds(me, m.about));
+      ((m.kind === "agreement" || m.kind === "endorsement") && m.about != null && claims.holds(me, m.about));
     const messages = transaction(() => {
       const unseen = db
         .prepare(
           `SELECT m.* FROM messages m
-           WHERE m.repo = ? AND m.seq > ? AND m.author != ? AND (m.run = ? OR m.run IS NULL)
+           WHERE m.repo = ? AND m.seq > ? AND m.author != ?
              AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.participant = ? AND d.seq = m.seq)
            ORDER BY m.seq`,
         )
-        .all(me.repo, Number((db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id) as Row).since_seq), me.id, me.run, me.id) as Row[];
+        .all(me.repo, Number((db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id) as Row).since_seq), me.id, me.id) as Row[];
       // a wake (D59): a mention, an urgent post, or an event the caller subscribed to in its scope
       const woken = (r: Row): boolean => named(toMessage(r)) || wakes(toMessage(r), me, me.subscriptions);
-      // of main, only what wakes the caller (D18); of the run channel, everything
-      const heard = unseen.filter((r) => r.run != null || woken(r));
+      // of its own run, everything; of another run, only what wakes the caller (plan D2)
+      const heard = unseen.filter((r) => toMessage(r).run === me.run || woken(r));
       const rows = mentionsOnly ? heard.filter(woken) : heard;
       const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
       for (const r of rows) mark.run(me.id, Number(r.seq));
@@ -686,7 +690,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       return rows.map((r) => {
         const m = toMessage(r);
         const rel = r.by_board || m.kind !== "msg" || !m.about || !named(m) ? null : claims.askedAbout(me, Number(r.author), m);
-        return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}${m.channel === "main" ? " --main" : ""}` } : m;
+        return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}` } : m;
       });
     });
     // a wait --mentions gives what woke it in full; deliver, mentions in full and the rest one line
@@ -768,16 +772,17 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         const r = db.prepare("INSERT INTO runs (repo, kind, plan, title, link, opened_at) VALUES (?, ?, ?, ?, ?, ?)").run(repo, profile.kind, group, title, link ?? null, now());
         const run = Number(r.lastInsertRowid);
         seats.forEach((s, i) => insertSlice(run, s, i));
-        const orchestrator = db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at, subs) VALUES (?, ?, ?, ?, ?)").run(
+        // a funny name as a member gets at join (plan D17)
+        const orchestrator = db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at, subs, nick) VALUES (?, ?, ?, ?, ?, ?)").run(
           run,
           ORCHESTRATOR,
           lastSeq(),
           now(),
           JSON.stringify(profile.defaults.orchestrator),
+          unusedNick(repo),
         );
-        // in main, so a member subscribed to main:opened wakes (D69)
+        // stored with the run it opens; a member subscribed to any:opened wakes (D69)
         insertMessage(participantById(Number(orchestrator.lastInsertRowid)), `run ${run} opened: ${profile.kind} ${group}, ${title}`, null, "event", undefined, {
-          channel: "main",
           event: EVENTS.opened.name,
         });
         bump(repo);
@@ -819,10 +824,10 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     closeRun(run) {
       runRow(run);
       transaction(() => {
-        // in main, so a member subscribed to main:closed wakes (D67)
+        // stored with the run it closes, before it closes; a member subscribed to any:closed wakes (D67)
         const author = (db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run, ORCHESTRATOR) ??
           db.prepare("SELECT id FROM participants WHERE run = ? ORDER BY id LIMIT 1").get(run)) as Row | undefined;
-        if (author) insertMessage(participantById(Number(author.id)), `run ${run} closed`, null, "event", undefined, { channel: "main", event: EVENTS.closed.name });
+        if (author) insertMessage(participantById(Number(author.id)), `run ${run} closed`, null, "event", undefined, { event: EVENTS.closed.name });
         db.prepare("UPDATE runs SET state = 'closed', closed_at = ? WHERE id = ?").run(now(), run);
         bump(String(runRow(run).repo));
         db.prepare("UPDATE participants SET ended_at = COALESCE(ended_at, ?) WHERE run = ?").run(now(), run);
@@ -891,7 +896,6 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           const author = members.find((m) => String(m.slice) === ORCHESTRATOR) ?? members[0];
           const group = String(r.plan);
           insertMessage(participantById(Number(author.id)), `run ${id} (${group}) is stale: every member silent; close it or dispatch again`, null, "event", [`${group}/${ORCHESTRATOR}`], {
-            channel: "main",
             event: EVENTS.stale.name,
           });
           db.prepare("UPDATE runs SET stale_flagged = 1 WHERE id = ?").run(id);
@@ -921,11 +925,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         const seatRow = db.prepare("SELECT on_events FROM slices WHERE run = ? AND id = ?").get(run, slice) as Row | undefined;
         const seatOn = seatRow?.on_events != null ? parseOn(JSON.parse(String(seatRow.on_events)) as string[]) : null;
         const subs = JSON.stringify(on ?? seatOn ?? profile.defaults.member);
-        // a funny name no active runner of the repository carries (D43), kept for the run
-        const fresh = (): string => {
-          const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL`).all(String(r.repo)) as Row[];
-          return funnyName(rows.map(nickOf));
-        };
+        const fresh = (): string => unusedNick(String(r.repo));
         if (existing) {
           db.prepare("UPDATE participants SET doing = ?, files = ?, worktree = ?, ended_at = NULL, merged = 0, subs = ?, nick = COALESCE(nick, ?) WHERE id = ?").run(
             doing,
@@ -1028,7 +1028,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
 
     post(p, body, opts = {}) {
       const fresh = live(p);
-      const m = insertMessage(fresh, body, opts.about ?? null, opts.kind ?? "msg", undefined, { channel: opts.channel });
+      const m = insertMessage(fresh, body, opts.about ?? null, opts.kind ?? "msg");
       // posting is claiming (D7), on a kind with claims
       const claimed = profileOf(fresh.kind).claims ? claims.claimByPost(fresh, m) : null;
       return claimed ? { ...m, claimed } : m;
@@ -1216,6 +1216,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           calls: Number(r.calls ?? 0),
           listening: !ended && Number(r.listening) === 1,
           on: subsOf(r).map((x) => formatSubscriptions([x])),
+          lastCall: String(r.last_call ?? r.joined_at),
         };
       });
 
@@ -1230,7 +1231,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           from: m.from,
           body: m.body,
           about: m.about,
-          channel: m.channel === "main" ? ("main" as const) : m.channel.run,
+          run: m.run,
+          channel: m.run,
           event: m.event,
           mentions: m.mentions,
           meta: m.meta ?? null,

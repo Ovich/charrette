@@ -462,10 +462,9 @@ async function main(board: Board): Promise<void> {
       const m = board.post(p, body, {
         about: aboutArg(),
         kind: args.verb === "agree" ? "agreement" : "msg",
-        channel: args.has("--main") ? "main" : "run",
       });
       const unmatched = unmatchedLines(board, p, body);
-      emitHeard(p, { seq: m.seq, mentions: m.mentions, channel: m.channel, ...(unmatched.length ? { unmatched } : {}), ...(m.claimed ? { claimed: m.claimed } : {}) }, () => {
+      emitHeard(p, { seq: m.seq, mentions: m.mentions, run: m.run, ...(unmatched.length ? { unmatched } : {}), ...(m.claimed ? { claimed: m.claimed } : {}) }, () => {
         console.log(seqLine(m));
         // posting is claiming (D7)
         if (m.claimed) console.log(`claimed ${m.claimed.path}, shared with ${m.claimed.sharedWith.join(", ")}`);
@@ -479,7 +478,7 @@ async function main(board: Board): Promise<void> {
       const seq = Number(raw);
       if (!Number.isInteger(seq)) fail(`endorse takes a seq, got ${raw}`);
       const m = board.endorse(p, seq);
-      emitHeard(p, { seq: m.seq, endorses: m.endorses, channel: m.channel }, seqLine(m));
+      emitHeard(p, { seq: m.seq, endorses: m.endorses, run: m.run }, seqLine(m));
       break;
     }
     case "read": {

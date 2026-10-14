@@ -5,7 +5,8 @@ import type { Message, Participant } from "./board.ts";
 import { profileOf } from "./kinds.ts";
 
 export type EventName = "agreement" | "endorsement" | "merged" | "joined" | "ended" | "stale" | "opened" | "closed" | "urgent" | "flag";
-export type Scope = "run" | "main";
+/** `run`: the member's own run; `any`: every run of the project. */
+export type Scope = "run" | "any";
 export type Subscription = { event: EventName; scope: Scope };
 
 export interface EventDef {
@@ -31,7 +32,7 @@ export const EVENTS: Record<EventName, EventDef> = {
   joined: { name: "joined" },
   ended: { name: "ended" },
   stale: { name: "stale" },
-  // in main when a run opens: its kind, group and title (D69)
+  // when a run opens: its kind, group and title (D69)
   opened: { name: "opened" },
   closed: { name: "closed" },
   urgent: { name: "urgent", always: true },
@@ -57,23 +58,23 @@ export function eventOf(m: Message): EventName | null {
   return m.kind === "agreement" || m.kind === "endorsement" || m.kind === "urgent" ? m.kind : null;
 }
 
-/** "agreement,main:merged" (or a list of such); throws on an unknown name, listing the known ones. */
+/** "agreement,any:merged" (or a list of such; `main:` is read as `any:`); throws on an unknown name, listing the known ones. */
 export function parseSubscriptions(spec: string | string[]): Subscription[] {
   const parts = (Array.isArray(spec) ? spec : [spec]).flatMap((s) => s.split(",")).map((s) => s.trim()).filter(Boolean);
   const out: Subscription[] = [];
   for (const p of parts) {
-    const main = p.startsWith("main:");
-    const name = main ? p.slice(5) : p;
+    const prefix = /^(any|main):/.exec(p)?.[0];
+    const name = prefix ? p.slice(prefix.length) : p;
     if (!isEvent(name)) throw new Error(`unknown event ${name}: the events are ${NAMES.join(", ")}`);
-    const sub: Subscription = { event: name, scope: main ? "main" : "run" };
+    const sub: Subscription = { event: name, scope: prefix ? "any" : "run" };
     if (!out.some((o) => o.event === sub.event && o.scope === sub.scope)) out.push(sub);
   }
   return out;
 }
 
-/** "agreement, main:merged" */
+/** "agreement, any:merged" */
 export function formatSubscriptions(subs: Subscription[]): string {
-  return subs.map((s) => (s.scope === "main" ? `main:${s.event}` : s.event)).join(", ");
+  return subs.map((s) => (s.scope === "any" ? `any:${s.event}` : s.event)).join(", ");
 }
 
 /** Mentions `me` by name or its plan's @all. */
@@ -88,6 +89,5 @@ export function wakes(m: Message, me: Participant, subs: Subscription[]): boolea
   const e = eventOf(m);
   if (!e) return false;
   if (EVENTS[e].always) return true;
-  const scope: Scope | null = m.channel === "main" ? "main" : m.channel.run === me.run ? "run" : null;
-  return scope !== null && subs.some((s) => s.event === e && s.scope === scope);
+  return subs.some((s) => s.event === e && (s.scope === "any" || m.run === me.run));
 }
