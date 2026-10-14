@@ -32,6 +32,15 @@ export function RunnerName({ name, plan = true }: { name: string; plan?: boolean
   );
 }
 
+/** A flag's chip: FLAG in the danger colour, glowing (static under reduced motion). */
+export function FlagChip() {
+  return (
+    <span className="flag-chip" data-component="FlagChip" data-kind="flag">
+      flag
+    </span>
+  );
+}
+
 /** A plan's two letters (D30). */
 export function PlanCode({ plan }: { plan: string }) {
   return (
