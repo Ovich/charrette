@@ -3,40 +3,48 @@
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { openBoard, type Board, type Declared, type Delivery, type Flag, type Participant, type RosterEntry, type SliceSpec, type SliceState } from "../board/board.ts";
+import { openBoard, type Board, type Declared, type Delivery, type Flag, type Kind, type Message, type Participant, type RosterEntry, type SliceSpec, type SliceState } from "../board/board.ts";
+import { profileOf } from "../board/kinds.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
 import { portFrom, PORT_FILE, readServerStatus } from "../server/state.ts";
 import { parseArgs } from "./args.ts";
-import { fullText } from "./format.ts";
+import { fullText, seqLine } from "./format.ts";
 import { boardUrlFor, registerBoardDocument } from "./aiview-document.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
 
 const USAGE = [
-  "usage: swarm <verb> [--json]",
-  "  open    --plan <slug> --title <t> --slices <file.json> [--link <url>]   # opens a run, registers it in aiview in the plan's group, prints its id then the aiview URL (orchestrator)",
-  '          # the slices file: [{"id", "title", "blockers": [...], "link"?: "<slice document URL>"}]',
+  "usage: swarm <verb> [--json]        (swarm --help code: the claim and merge verbs)",
+  "  open    --kind plan|brainstorm --group <slug> --title <t> --seats <file.json> [--link <url>]   # opens a run, registers the project's board in aiview, prints the run id then the board's URL (orchestrator)",
+  "          # --plan <slug> --slices <file.json>: the same as --kind plan --group <slug> --seats <file.json>",
+  '          # the seats file: [{"id", "title", "role"?, "blockers": [...], "link"?: "<URL>"}]',
   "  slice   <id> --run <id> --state ready|running|done|blocked      # (orchestrator)",
   "  close   --run <id>                                              # (orchestrator)",
-  '  join    --run <id> --slice <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # prints the roster, then the command that starts your listener',
-  "  doing   [--as <runner>] <text>",
-  "  post    [--as <runner>] <body> [--about <path>]                 # prints the seq",
-  "  agree   [--as <runner>] <terms> [--about <path>]                # prints the seq",
+  '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # --slice <id> the same; prints the roster, then the command that starts your listener',
+  "  doing   [--as <member>] <text>",
+  "  post    [--as <member>] <body> [--about <path|decision id>] [--main]   # prints the seq, (main) when it landed in main",
+  "  agree   [--as <member>] <terms> [--about <path|decision id>] [--main]  # prints the seq",
+  "  endorse [--as <member>] <seq>                                   # backs an agreement; prints the endorsement's seq",
   "  read    <seq>",
-  "  deliver [--as <runner>]                                         # what you have not had: mentions in full, the rest one line",
-  "  wait    [--as <runner>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end; a newer wait supersedes it",
+  "  deliver [--as <member>]                                         # what you have not had: mentions in full, the rest one line",
+  "  wait    [--as <member>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end; a newer wait supersedes it",
   "          # --mentions: only a mention of you or an urgent post ends it; the rest stays for deliver",
   "  roster  [--repo <path>]",
+  "  end     [--as <member>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
+  "  serve   [--port <p>] [--detach]                 # the run pages aiview frames, on :4322 (SWARM_PORT)",
+  "  status                                                          # data home, the page's server, open runs",
+  "  config  retention [<days>]                                      # prints, or sets then prints, how many days closed runs and main's talk are kept",
+  "a member is <group>/<seat>, the orchestrator <group>/orchestrator; without --as, the runner joined from this worktree",
+].join("\n");
+
+/** The verbs of a kind with claims (a plan run's), apart from the core (D22). */
+const CODE_USAGE = [
+  "usage: swarm <verb> [--json]        the code verbs; refused on a run whose kind has no claims",
   "  claim   [--as <runner>] <path> [--interface]                    # before editing a file: exit 0 claimed, 3 held until you post about it",
   "  release [--as <runner>] <path>                                  # gives up a claim",
   "  merge-lock --onto <branch> [--as <runner>]                      # one merge at a time per repository; claims or flags what your branch wrote unclaimed",
   "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase and who was refused the lock, names whom to tell of a resolved conflict",
-  "  end     [--as <runner>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
-  "  serve   [--port <p>] [--detach]                 # the run pages aiview frames, on :4322 (SWARM_PORT)",
-  "  status                                                          # data home, the page's server, open runs",
-  "  config  retention [<days>]                                      # prints, or sets then prints, how many days closed runs and main's talk are kept",
-  "a runner is <plan>/<slice>, the orchestrator <plan>/orchestrator; without --as, the runner joined from this worktree",
 ].join("\n");
 
 class CliError extends Error {}
@@ -165,8 +173,20 @@ const rosterLine = (r: RosterEntry): string => {
   return `${who}${r.stale ? " (stale)" : ""}  run ${r.run}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}`;
 };
 
-const printDelivery = (d: Delivery): void => {
-  for (const m of d.full) console.log(fullText(m));
+/** A delivery as the member reads it: each agreement to back followed by its `endorse` line (D36). */
+const withEndorse = (me: Participant, d: Delivery): Delivery & { full: (Message & { endorse?: string })[] } => ({
+  ...d,
+  full: d.full.map((m) => {
+    const endorse = endorseLine(me, m);
+    return endorse ? { ...m, endorse } : m;
+  }),
+});
+
+const printDelivery = (d: Delivery & { full: (Message & { endorse?: string })[] }): void => {
+  for (const m of d.full) {
+    console.log(fullText(m));
+    if (m.endorse) console.log(m.endorse);
+  }
   for (const l of d.lines) console.log(l);
 };
 
@@ -207,11 +227,12 @@ function readSlices(file: string): SliceSpec[] {
   }
   const list = Array.isArray(raw) ? raw : (raw as { slices?: unknown }).slices;
   if (!Array.isArray(list)) return fail(`${file}: expected an array of {id, title, blockers}`);
-  return list.map((s: { id?: unknown; title?: unknown; blockers?: unknown; link?: unknown }) => {
+  return list.map((s: { id?: unknown; title?: unknown; role?: unknown; blockers?: unknown; link?: unknown }) => {
     if (typeof s.id !== "string") fail(`${file}: a slice without an id`);
     return {
       id: String(s.id),
       title: String(s.title ?? s.id),
+      ...(typeof s.role === "string" && s.role ? { role: s.role } : {}),
       blockers: Array.isArray(s.blockers) ? s.blockers.map(String) : [],
       link: typeof s.link === "string" && s.link ? s.link : null,
     };
@@ -229,6 +250,46 @@ function boardUpkeep(board: Board): void {
   }
 }
 const UPKEEP_EVERY_MS = 60 * 60 * 1000;
+/** `open`'s kind and group: `--plan <slug>` is `--kind plan --group <slug>` (D22). */
+function openKindAndGroup(): { kind: Kind; group: string } {
+  const raw = args.flag("--kind") ?? "plan";
+  let kind: Kind;
+  try {
+    kind = profileOf(raw).kind;
+  } catch (e) {
+    return fail(`open: ${(e as Error).message}`);
+  }
+  const plan = args.flag("--plan");
+  if (plan !== undefined && kind !== "plan") fail(`open: --plan means --kind plan; a ${kind} run takes --group <slug>`);
+  const group = args.flag("--group") ?? plan ?? fail(`open: --group <slug> is required (or --plan <slug> for a plan run)\n${USAGE}`);
+  return { kind, group };
+}
+
+/** `join`'s member id: `--seat` is `--slice` (D49); both, naming different ids, refused. */
+function joinedSeat(): string {
+  const seat = args.flag("--seat");
+  const slice = args.flag("--slice");
+  if (seat !== undefined && slice !== undefined && seat !== slice) fail(`join: --seat ${seat} and --slice ${slice} name different members; pass one`);
+  return seat ?? slice ?? fail(`--seat (or --slice) is required\n${USAGE}`);
+}
+
+/** The commands a member of a kind without worktree runs next, `--as` filled in (D21, D36). */
+const seatCommands = (as: string): string[] => {
+  const cli = self().join(" ");
+  const who = `--as ${shellWord(as)}`;
+  return [
+    `${cli} post "…" --about <D id> ${who}`,
+    `${cli} agree "…" --about <D id> ${who}`,
+    `${cli} endorse <seq> ${who}`,
+    `${cli} wait --mentions ${who}    # in the foreground, when waiting`,
+  ];
+};
+
+/** The line after a delivered agreement another member made, on a seat kind: how to back it (D36). */
+const endorseLine = (me: Participant, m: Message): string | null =>
+  profileOf(me.kind).member === "seat" && m.kind === "agreement" && m.from !== me.name
+    ? `back it: ${[...self(), "endorse", String(m.seq), "--as", shellWord(me.name)].join(" ")}`
+    : null;
 
 async function main(board: Board): Promise<void> {
   switch (args.verb) {
@@ -243,21 +304,23 @@ async function main(board: Board): Promise<void> {
     }
     case "open": {
       boardUpkeep(board);
-      const plan = need("--plan");
-      const run = board.openRun({ repo: repoOf(process.cwd()), group: plan, title: need("--title"), link: args.flag("--link") ?? null, seats: readSlices(need("--slices")) });
+      const { kind, group } = openKindAndGroup();
+      const plan = group;
+      const seatsFile = args.flag("--seats") ?? args.flag("--slices") ?? fail(`open: --seats <file.json> is required (or --slices)\n${USAGE}`);
+      const run = board.openRun({ repo: repoOf(process.cwd()), kind, group, title: need("--title"), link: args.flag("--link") ?? null, seats: readSlices(seatsFile) });
       // the person watches the run on the page: start it when none runs (US1, US6)
       const port = ensureServer();
       const page = port === null ? null : pageUrl(port);
       if (page === null) {
         console.error(`swarm: the page did not start (port ${portFrom(args.flag("--port"))} may be in use; swarm serve --detach --port <n>). The run is open.`);
-        emit({ run: run.id, repo: run.repo, plan: run.plan, url: null }, String(run.id));
+        emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url: null }, String(run.id));
         break;
       }
       // the person watches the project's board in aiview, pinned first (plan D17, D30, D39)
       const doc = registerBoardDocument({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run.repo, pageUrl: page });
       if (!doc.registered) console.error(`swarm: ${doc.reason}: open the URL`);
       const url = doc.registered ? doc.url : boardUrlFor(page, [run.repo]);
-      emit({ run: run.id, repo: run.repo, plan: run.plan, url }, `${run.id}\n${url}`);
+      emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url }, `${run.id}\n${url}`);
       break;
     }
     case "slice": {
@@ -277,16 +340,22 @@ async function main(board: Board): Promise<void> {
     case "join": {
       const { runner, roster } = board.join({
         run: runArg(),
-        slice: need("--slice"),
+        slice: joinedSeat(),
         doing: need("--doing"),
         files: [...args.list("--files"), ...args.flags("--file")].map(parseFile),
         worktree: worktreeOf(process.cwd()) ?? undefined,
       });
       // the runner's next step, last: its listener, started at once (D61)
       const next = listenNow(runner.name);
-      emit({ runner: runner.name, nick: runner.nick, roster, next }, () => {
+      // a kind without worktree: the checkout is shared, so every call names the member (D21, D36)
+      const shared = !profileOf(runner.kind).worktree;
+      const as = shared ? `pass --as ${runner.name} on every call: this checkout is shared, the board cannot tell you apart` : null;
+      const commands = shared ? seatCommands(runner.name) : null;
+      emit({ runner: runner.name, nick: runner.nick, roster, ...(shared ? { as: runner.name, commands } : {}), next }, () => {
         console.log(`you are ${runner.name}, ${runner.nick}: @${runner.slice} or @${runner.nick.replace(/\s+/g, "")} mentions you`);
         for (const r of roster) console.log(rosterLine(r));
+        if (as) console.log(as);
+        for (const c of commands ?? []) console.log(c);
         console.log(next);
       });
       break;
@@ -302,8 +371,21 @@ async function main(board: Board): Promise<void> {
     case "agree": {
       const p = caller(board);
       const body = args.positional.join(" ") || fail(`${args.verb}: nothing to say`);
-      const m = board.post(p, body, { about: args.flag("--about"), kind: args.verb === "agree" ? "agreement" : "msg" });
-      emitHeard(p, { seq: m.seq, mentions: m.mentions }, `#${m.seq}`);
+      const m = board.post(p, body, {
+        about: args.flag("--about"),
+        kind: args.verb === "agree" ? "agreement" : "msg",
+        channel: args.has("--main") ? "main" : "run",
+      });
+      emitHeard(p, { seq: m.seq, mentions: m.mentions, channel: m.channel }, seqLine(m));
+      break;
+    }
+    case "endorse": {
+      const p = caller(board);
+      const raw = (args.positional[0] ?? fail("endorse: which seq?")).replace(/^#/, "");
+      const seq = Number(raw);
+      if (!Number.isInteger(seq)) fail(`endorse takes a seq, got ${raw}`);
+      const m = board.endorse(p, seq);
+      emitHeard(p, { seq: m.seq, endorses: m.endorses, channel: m.channel }, seqLine(m));
       break;
     }
     case "read": {
@@ -322,7 +404,8 @@ async function main(board: Board): Promise<void> {
       break;
     }
     case "deliver": {
-      const d = board.deliver(caller(board));
+      const me = caller(board);
+      const d = withEndorse(me, board.deliver(me));
       emit(d, () => printDelivery(d));
       break;
     }
@@ -332,7 +415,7 @@ async function main(board: Board): Promise<void> {
       const timeout = raw === undefined ? undefined : Number(raw);
       if (timeout !== undefined && !(timeout >= 0)) fail(`--timeout takes milliseconds, got ${raw}`);
       const mentionsOnly = args.has("--mentions");
-      const d = await board.wait(p, { timeoutMs: timeout, mentionsOnly });
+      const d = withEndorse(p, await board.wait(p, { timeoutMs: timeout, mentionsOnly }));
       if (d.superseded) {
         emit(d, "superseded by a newer wait"); // a newer wait of this runner gets what arrives (D64)
         break;
@@ -451,6 +534,11 @@ async function main(board: Board): Promise<void> {
 if (!args.verb) {
   console.error(USAGE);
   process.exit(1);
+}
+if (args.verb === "--help") {
+  // the core verbs; `--help code` the claim and merge verbs (D22)
+  console.log(args.positional[0] === "code" ? CODE_USAGE : USAGE);
+  process.exit(0);
 }
 if (args.verb === "serve" && args.has("--detach")) {
   const st = readServerStatus();

@@ -222,7 +222,7 @@ test("--json on every verb parses", () => {
   const slices = path.join(toolRoot, "s.json");
   fs.writeFileSync(slices, SLICES);
   const opened = JSON.parse(run("open", "--plan", "review-tool", "--title", "T", "--slices", slices, "--json").stdout);
-  assert.deepEqual(Object.keys(opened).sort(), ["plan", "repo", "run", "url"]);
+  assert.deepEqual(Object.keys(opened).sort(), ["group", "kind", "plan", "repo", "run", "url"]);
   const id = String(opened.run);
   const as = ["--as", "review-tool/S3"];
   const verbs: string[][] = [
@@ -571,4 +571,163 @@ test("config retention prints 30, sets 7 that prune then uses, refuses 0", async
   } finally {
     board.close();
   }
+});
+
+// ---- kinds: open, join, post, endorse, delivery, code verbs, help (SL2) ----
+
+const SEATS = JSON.stringify([
+  { id: "architect", title: "the architect", role: "designs", blockers: [] },
+  { id: "skeptic", title: "the skeptic", role: "doubts", blockers: [] },
+]);
+
+const openBrainstorm = (group = "idea"): number => {
+  const seats = path.join(toolRoot, `${group}.seats.json`);
+  fs.writeFileSync(seats, SEATS);
+  const r = run("open", "--kind", "brainstorm", "--group", group, "--title", "An idea", "--seats", seats);
+  assert.equal(r.status, 0, r.stderr);
+  return Number(r.stdout.split("\n")[0].trim());
+};
+
+const joinSeat = (id: number, seat: string, ...extra: string[]) => run("join", "--run", String(id), "--seat", seat, "--doing", "thinking", ...extra);
+const seqOf = (out: string): string => out.match(/^#(\d+)/m)![1];
+
+test("open --kind brainstorm --group --seats opens a brainstorm run; a seat's role is accepted", () => {
+  const seats = path.join(toolRoot, "seats.json");
+  fs.writeFileSync(seats, SEATS);
+  const r = run("open", "--kind", "brainstorm", "--group", "idea", "--title", "An idea", "--seats", seats, "--json");
+  assert.equal(r.status, 0, r.stderr);
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.kind, "brainstorm");
+  assert.equal(out.group, "idea");
+  assert.equal(out.plan, "idea");
+  assert.equal(JSON.parse(run("status", "--json").stdout).runs, 1);
+});
+
+test("open refuses an unknown kind, --plan with a brainstorm kind, and a missing group", () => {
+  const seats = path.join(toolRoot, "seats.json");
+  fs.writeFileSync(seats, SEATS);
+  const nope = run("open", "--kind", "nope", "--group", "g", "--title", "t", "--seats", seats);
+  assert.equal(nope.status, 1);
+  assert.match(nope.stderr, /unknown kind nope: the kinds are plan, brainstorm/);
+  const both = run("open", "--kind", "brainstorm", "--plan", "g", "--title", "t", "--seats", seats);
+  assert.equal(both.status, 1);
+  assert.match(both.stderr, /--plan means --kind plan/);
+  const noGroup = run("open", "--kind", "brainstorm", "--title", "t", "--seats", seats);
+  assert.equal(noGroup.status, 1);
+  assert.match(noGroup.stderr, /--group <slug> is required/);
+});
+
+test("a seats file entry without an id is refused", () => {
+  const seats = path.join(toolRoot, "bad.json");
+  fs.writeFileSync(seats, JSON.stringify([{ title: "no id", role: "x" }]));
+  const r = run("open", "--kind", "brainstorm", "--group", "g", "--title", "t", "--seats", seats);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /without an id/);
+});
+
+test("join --seat is --slice; both naming different ids exit 1 (D49)", () => {
+  const id = openRun();
+  const r = run("join", "--run", String(id), "--seat", "S3", "--doing", "the page");
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /you are review-tool\/S3/);
+  const both = run("join", "--run", String(id), "--seat", "S5", "--slice", "S3", "--doing", "x");
+  assert.equal(both.status, 1);
+  assert.match(both.stderr, /--seat S5 and --slice S3 name different members/);
+});
+
+test("a seat joining from the shared checkout is told its --as and its next commands, the listener last", () => {
+  const id = openBrainstorm();
+  const r = joinSeat(id, "architect");
+  assert.equal(r.status, 0, r.stderr);
+  const lines = r.stdout.trimEnd().split("\n");
+  assert.match(lines[0], /^you are idea\/architect/);
+  assert.ok(lines.includes("pass --as idea/architect on every call: this checkout is shared, the board cannot tell you apart"));
+  for (const verb of ["post", "agree", "endorse", "wait --mentions"]) {
+    assert.ok(lines.some((l) => l.includes(` ${verb} `) && l.includes("--as idea/architect")), `${verb} line with --as`);
+  }
+  assert.doesNotMatch(r.stdout, /--slice/);
+  assert.match(lines.at(-1)!, /^start your listener now.* wait --mentions --as idea\/architect$/);
+  const json = JSON.parse(run("join", "--run", String(id), "--seat", "skeptic", "--doing", "doubting", "--json").stdout);
+  assert.equal(json.as, "idea/skeptic");
+  assert.equal(json.commands.length, 4);
+  assert.ok(json.commands.every((c: string) => c.includes("--as idea/skeptic")));
+});
+
+test("a seat's --files is refused by the board", () => {
+  const id = openBrainstorm();
+  const r = joinSeat(id, "architect", "--files", "src/x.ts");
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /join: a brainstorm run has no claims/);
+});
+
+test("post --main lands in main; a cross-run mention without --main lands there too", () => {
+  const id = openBrainstorm();
+  joinSeat(id, "architect");
+  const main = run("post", "hello all", "--main", "--as", "idea/architect");
+  assert.equal(main.status, 0, main.stderr);
+  assert.match(main.stdout, /^#\d+ \(main\)$/m);
+  const inRun = run("post", "in the run", "--about", "D3", "--as", "idea/architect");
+  assert.match(inRun.stdout, /^#\d+$/m);
+  const other = openRun();
+  run("join", "--run", String(other), "--slice", "S3", "--doing", "x");
+  const cross = run("post", "@review-tool/S3 a question", "--as", "idea/architect");
+  assert.equal(cross.status, 0, cross.stderr);
+  assert.match(cross.stdout, /^#\d+ \(main\)$/m);
+});
+
+test("endorse backs an agreement and prints its seq; a plain post exits 1", () => {
+  const id = openBrainstorm();
+  joinSeat(id, "architect");
+  joinSeat(id, "skeptic");
+  const agreed = run("agree", "we keep D3 because it is simple", "--about", "D3", "--as", "idea/architect");
+  const ok = run("endorse", `#${seqOf(agreed.stdout)}`, "--as", "idea/skeptic");
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.match(ok.stdout, /^#\d+/);
+  const plain = run("post", "just a note", "--as", "idea/architect");
+  const bad = run("endorse", seqOf(plain.stdout), "--as", "idea/skeptic");
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /is not an agreement/);
+});
+
+test("a seat's wait that receives an agreement prints the back-it line; a plan runner's does not", () => {
+  const id = openBrainstorm();
+  joinSeat(id, "architect");
+  joinSeat(id, "skeptic");
+  const agreed = run("agree", "@skeptic we keep D3", "--about", "D3", "--as", "idea/architect");
+  const w = run("wait", "--mentions", "--timeout", "2000", "--as", "idea/skeptic");
+  assert.equal(w.status, 0, w.stderr);
+  assert.match(w.stdout, new RegExp(`back it: node \\S+ endorse ${seqOf(agreed.stdout)} --as idea/skeptic`));
+  const plan = openRun();
+  run("join", "--run", String(plan), "--slice", "S3", "--doing", "x");
+  run("join", "--run", String(plan), "--slice", "S5", "--doing", "y");
+  run("agree", "@S5 S3 owns the page", "--as", "review-tool/S3");
+  const pw = run("wait", "--mentions", "--timeout", "2000", "--as", "review-tool/S5");
+  assert.equal(pw.status, 0, pw.stderr);
+  assert.match(pw.stdout, /S3 owns the page/);
+  assert.doesNotMatch(pw.stdout, /back it:/);
+});
+
+test("the code verbs, called by a seat, exit 1 naming the kind", () => {
+  const id = openBrainstorm();
+  joinSeat(id, "architect");
+  for (const argv of [["claim", "src/x.ts"], ["release", "src/x.ts"], ["merge-lock", "--onto", "main"], ["merged", "abc", "--files", "x"]]) {
+    const r = run(...argv, "--as", "idea/architect");
+    assert.equal(r.status, 1, argv.join(" "));
+    assert.match(r.stderr, new RegExp(`${argv[0]}: a brainstorm run has no claims`));
+  }
+});
+
+test("--help prints the core verbs, --help code the claim and merge verbs; no verb the core usage", () => {
+  const core = run("--help");
+  assert.equal(core.status, 0);
+  for (const v of ["open", "join", "post", "agree", "endorse", "wait"]) assert.match(core.stdout, new RegExp(`^  ${v} `, "m"));
+  for (const v of ["claim", "release", "merge-lock", "merged"]) assert.doesNotMatch(core.stdout, new RegExp(`^  ${v} `, "m"));
+  assert.match(core.stdout.trimEnd().split("\n").at(-1)!, /^a member is <group>\/<seat>, the orchestrator <group>\/orchestrator/);
+  const code = run("--help", "code");
+  assert.equal(code.status, 0);
+  for (const v of ["claim", "release", "merge-lock", "merged"]) assert.match(code.stdout, new RegExp(`^  ${v} `, "m"));
+  const none = run();
+  assert.equal(none.status, 1);
+  assert.match(none.stderr, /^  endorse /m);
+  assert.doesNotMatch(none.stderr, /^  claim /m);
 });
