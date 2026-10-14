@@ -80,26 +80,9 @@ export interface Scoped {
 /** A held file and its holders, in claim order (D40); `flag`: written outside a claim. */
 export type FileRow = { path: string; holders: string[]; iface: boolean; flag: boolean };
 
-/** RunPage's narrowing to one plan, kept only until Slice 4b removes RunPage with it. */
-export function scopeToPlan(snap: BoardSnapshot, plan: string): Scoped {
-  const ctx = mentionCtx(snap);
-  const inPlan = (name: string): boolean => splitRunner(name).plan === plan;
-  const roster = orderRoster(snap.roster.filter((r) => inPlan(r.runner)));
-  const events = snap.events.filter((e) => inPlan(e.from) || targets(e, ctx).some((t) => splitRunner(t).plan === plan));
-  const queues = Object.entries(snap.queues).filter(([p]) => p === plan);
-  const flagged = snap.flags.filter((f) => inPlan(f.runner));
-  const held: FileRow[] = snap.files
-    .map((f) => ({ path: f.path, holders: f.holders.filter(inPlan), iface: f.interface, flag: flagged.some((x) => x.path === f.path) }))
-    .filter((f) => f.holders.length > 0);
-  const unheld = [...new Set(flagged.map((f) => f.path))]
-    .filter((p) => !held.some((h) => h.path === p))
-    .map((p) => ({ path: p, holders: flagged.filter((f) => f.path === p).map((f) => f.runner), iface: false, flag: true }));
-  return { roster, events, queues, files: [...held, ...unheld] };
-}
-
 /** A channel: Main, or a run by its id (D18). */
 export type ChannelId = "main" | number;
-export type ChannelEntry = { id: ChannelId; title: string; kind: Kind | null; open: boolean; members: number };
+export type ChannelEntry = { id: ChannelId; title: string; code: string | null; kind: Kind | null; open: boolean; members: number };
 export type ChannelGroups = { main: ChannelEntry; plans: ChannelEntry[]; brainstorms: ChannelEntry[]; closed: ChannelEntry[] };
 
 const isActive = (r: SnapshotRunner): boolean => r.state !== "ended" && r.state !== "done";
@@ -119,11 +102,11 @@ const membersOf = (snap: BoardSnapshot, run: RunSummary): SnapshotRunner[] => sn
 /** The rail: Main, the open runs by kind, oldest first, and every closed run the snapshot holds,
  *  newest first (D19, D46). A kind is a plan when its profile has claims, else a brainstorm. */
 export function channels(snap: BoardSnapshot): ChannelGroups {
-  const entry = (r: RunSummary): ChannelEntry => ({ id: r.run, title: r.title, kind: knownProfile(r.kind) ? r.kind : null, open: r.open, members: membersOf(snap, r).length });
+  const entry = (r: RunSummary): ChannelEntry => ({ id: r.run, title: r.title, code: r.code, kind: knownProfile(r.kind) ? r.kind : null, open: r.open, members: membersOf(snap, r).length });
   const hasClaims = (r: RunSummary): boolean => knownProfile(r.kind)?.claims ?? false;
   const open = snap.runs.filter((r) => r.open).sort((a, b) => a.run - b.run);
   return {
-    main: { id: "main", title: "Main", kind: null, open: true, members: snap.roster.filter(isActive).length },
+    main: { id: "main", title: "Main", code: null, kind: null, open: true, members: snap.roster.filter(isActive).length },
     plans: open.filter(hasClaims).map(entry),
     brainstorms: open.filter((r) => !hasClaims(r)).map(entry),
     closed: snap.runs.filter((r) => !r.open).sort((a, b) => b.run - a.run).map(entry),

@@ -2,13 +2,16 @@
 // plans, the open brainstorms, then the closed runs, collapsed.
 import { useState } from "react";
 import type { ChannelEntry, ChannelGroups, ChannelId } from "../lib/view.ts";
-import { PlanCode } from "./chips.tsx";
 
 export function ChannelItem({ entry, selected, onSelect }: { entry: ChannelEntry; selected: boolean; onSelect: () => void }) {
   return (
     <button className="rail-row" data-component="ChannelItem" aria-current={selected ? "true" : undefined} onClick={onSelect}>
       <span className="t">{entry.title}</span>
-      {entry.code && <PlanCode plan={entry.code} />}
+      {entry.code && (
+        <span className="code" data-component="PlanCode">
+          {entry.code}
+        </span>
+      )}
       <span className="n" aria-label={`${entry.members} members`}>
         {entry.members}
       </span>
