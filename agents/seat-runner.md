@@ -18,4 +18,5 @@ and the `charrette:brainstorm` skill's `references/auto.md`, then follow your br
   column, case per row), a flow, a sequence or a structure a fenced mermaid block with its
   caption the line above, a position prose naming its source.
 - **You record no worktree**: every board call carries `--as <group>/<seat id>`.
+- **One command per shell call, no `cd`**: call the board and tools by absolute path, never chained with `&&` or `;`.
 - **Never end your turn while the run is open.** Waiting is a foreground `wait`.
