@@ -1,7 +1,8 @@
 # The shape of a bench's skill
 
-Text in `[brackets]` is filled from the definition. Every other sentence is carried as
-written.
+The bench skill records how the work is done: what the person and the agent aligned on, kept
+so it is never explained again, with the bench as its dev tool. Text in `[brackets]` is filled
+from the definition. Every other sentence is carried as written.
 
 ```markdown
 ---
@@ -19,8 +20,7 @@ This bench is a dev tool for iterating on ideas with the person: a clear UI for 
 
 **The page** is `[YYYY-MM-DD-bench.workbench.html]` in aiview, kind `workbench`
 ([the aiview link]). It is a working document of the data home and never enters this
-repository.[ One page per run: `page-template.html` beside this file is every page's code, made into
-a run's page by the feed's `init` and put back onto each page by its `refresh`.]
+repository. Its data is in the sidecar beside it, `[YYYY-MM-DD-bench.workbench/]`.
 
 ## Sources
 
@@ -33,9 +33,9 @@ The page works on these as the project produces them, never on a translation.
 ## Feed
 
 **[Derived | Log].** [Derived: `node .claude/skills/workbench-[bench]/scripts/feed.mjs [--watch]`
-rebuilds the data block from the sources. | Log: `node .claude/skills/workbench-[bench]/scripts/feed.mjs <verb>`
+rebuilds the runs from the sources. | Log: `node .claude/skills/workbench-[bench]/scripts/feed.mjs <verb>`
 appends one entry and never rewrites one; the page is the only record of the walk.]
-Only the feed writes the data block, through `scripts/data-block.mjs`.
+Only the feed writes the sidecar, through `scripts/data-folder.mjs`; views read it through the page's loader, `bench`.
 
 ## Iterating
 

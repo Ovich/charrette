@@ -1,9 +1,18 @@
 ---
 name: create-workbench
-description: "Use when a page is wanted to work on something with the person during development, fed the project's real data (comparing model answers, walking an agent call by call, measuring an output against its template), or when such a workbench has to change or its feed broke. Produces the page in aiview, kind `workbench`, and the project's `workbench-<bench>` skill with its feed and operating steps. Not for designing a product screen (design-prototype) or verifying user stories (verification-skill-create)."
+description: "Use when a page is wanted to work on something with the person during development, fed the project's real data (comparing model answers, walking an agent call by call, measuring an output against its template), when such a workbench has to change, be reworked or its feed broke, or mid-session when turns went into aligning with the person on how to do a kind of work that recurs and real project data could show it. Produces the page in aiview, kind `workbench`, and the project's `workbench-<bench>` skill with its feed and operating steps. Not for designing a product screen (design-prototype) or verifying user stories (verification-skill-create)."
 ---
 
 # Create a workbench
+
+**Some work is done with the person in the loop, and time goes into aligning on how to do
+it.** That alignment is kept as a skill, so the next session does not explain it all again;
+a workbench keeps it with a dev tool beside it, fed the project's real data. It is made at
+the start of the work or mid-session.
+
+**Mid-session, propose it in one line, at a pause**, when three things hold: the session
+spent turns aligning on how to do a kind of work, that work recurs, and real project data
+could show it. Build only on a yes; one no ends it for that work in the session.
 
 **A workbench is a dev tool for iterating on an idea, and it has two users**: the person, who
 needs a clear UI that opens on what is being tried now, and the agent, who needs the bench
@@ -28,7 +37,7 @@ was not seen.
   Never a second bench for one scope: one bench per question and the project's local
   skills grow with every plan.
 - **Read the sources before asking**: the files the project produces that the bench will
-  show (recordings, requests as sent, fixtures, templates), where they live, their exact
+  show (recordings, calls as sent, fixtures, templates), where they live, their exact
   shape, and the code that writes them.
 - **The watched browser**: a headed browser the person sees and the agent drives, a
   Playwright MCP over DevTools or a script over CDP. The project's own when it has one,
@@ -43,9 +52,9 @@ Each answer is written into the bench skill's head as it lands.
    agent walk, one family of screens), as wide as its sources allow, and the bench's
    label. The question at hand is its first view.
 2. **The sources**, each file or call, as the project produces it.
-3. **The feed's kind.** *Derived*: the block is rebuilt from the sources on every run.
+3. **The feed's kind.** *Derived*: the runs are rebuilt from the sources on every feed.
    *Log*: entries are appended and never rewritten, for data the project cannot produce
-   again (a request as sent during a walk). The page is then the only record.
+   again (a call as sent during a walk). The sidecar is then the only record.
 4. **What the person does on it**: compare, judge, pick, measure. The controls follow.
 5. **Whether operating it takes steps**: start the stack, hold a call, reset state,
    record an answer. Each becomes a script.
@@ -55,13 +64,14 @@ Each answer is written into the bench skill's head as it lands.
 1. **The page**: `node scripts/page.mjs <path> --label "<label>"`, at the path the `aiview`
    skill gives for `YYYY-MM-DD-<bench>.workbench.html`. Register it through the `aiview`
    skill: kind `workbench`, tags the bench and `trace` for a walk, group the
-   piece of work it serves. Open it in the watched browser. A bench that makes one page
-   per run (a walk, a session) keeps the page's code as `page-template.html` in its skill instead:
-   its feed's `init` makes each run's page from it, and its `refresh` puts a changed
-   `page-template.html` onto every page while keeping each page's data block.
-2. **The feed**: copy `scripts/data-block.mjs` into the bench skill's `scripts/` and write
-   `feed.mjs` over it. A derived feed calls `writeData` and takes `--watch`. A log feed
-   takes verbs that call `appendEntry` and `annotate`. Run it: aiview reloads the page.
+   piece of work it serves. Open it in the watched browser. The page carries Basecoat,
+   `jsonTree` and the loader, `bench`; the bench's code goes between its
+   `<!-- bench-code -->` markers, put on by the bench's `code.mjs`.
+2. **The feed**: copy `scripts/data-folder.mjs` into the bench skill's `scripts/` and write
+   `feed.mjs` over it. It writes the sidecar, the folder `YYYY-MM-DD-<bench>.workbench/`
+   beside the page. A derived feed calls `writeDerived` and takes `--watch`. A log feed, new
+   ones included, takes verbs that call `appendEntry` and `annotate`. Run it: the page updates
+   in place. Before writing the feed or a view, read `references/sidecar.md`.
 3. **Then one change at a time**: write it, read the screenshot, show the person, ask the
    next question.
 
@@ -82,8 +92,23 @@ Each answer is written into the bench skill's head as it lands.
 - **The data is the project's, as it is.** Copied byte for byte, never renamed, reshaped
   or summarised: the page adapts to the shape, so the bench stays as close to the real
   run as it can. A rendering that interprets the data is what the app already shows.
-- **Only the feed writes the data block.** The agent edits the page's code, never its data.
-- **Self-contained**: no CDN, no fetch, the page opens offline.
+- **Only the feed writes the sidecar.** The agent edits the page's code, never its data.
+- **No CDN; data only by relative fetch into the sidecar through aiview's bridge.**
+
+## The data standards
+
+One set every bench follows; the API and the thresholds are `references/sidecar.md`'s.
+
+- **The loader is the only reader.** A view reads through `bench`, never its own fetch.
+- **Views load what they need, on demand**: the manifest and one run at open, a side file
+  only when the view that needs it opens. The feed computes nothing a view can read.
+- **Every view is async**: drawn through `bench.view`, which sets `data-ready` when drawn and
+  renders the path and status on a fetch error.
+- **Never a blank**: a run being loaded shows `loading <run>`.
+- **Large data folds**: a long text folded with its size and a show button, a large run one
+  view at a time.
+- **Files are cached by name** in page memory, never fetched twice.
+- **The person's place is kept** (tab, run, view, controls) through `bench.state`.
 
 ## Ergonomic for the agent
 
@@ -104,6 +129,16 @@ Each answer is written into the bench skill's head as it lands.
 - **The bench's code is read by its marker**, never the whole page: Basecoat and the
   JSON reader are inlined above it and cost tokens for nothing.
 - **The feed writes only what a view shows.**
+- **`check.mjs` and `shot.mjs` load the page at its aiview URL, never `file://`**, wait on
+  `data-ready`, and fail on `data-error`.
+
+## Reworking an existing bench
+
+A bench whose data sits in the page (made before the sidecar, fed through
+`scripts/data-block.mjs`) opens and feeds as it did; no mechanism upgrades it. When it is next
+worked on, it is reworked to this shape: page made fresh by `page.mjs --replace` at the same
+path, code put back by `code.mjs`, sidecar filled by the feed. Read `references/sidecar.md`
+first; its last section is the order.
 
 ## The bench's skill
 
@@ -127,7 +162,7 @@ The page's URL, the skill's path, the sources and the feed's kind, what was walk
 | Thought | Reality |
 |---|---|
 | "I'll map the data to a cleaner shape for the page" | The page adapts to the project's shape. A translation hides what the app really produced, and drifts from it unseen. |
-| "Quicker to paste the data into the page" | Only the feed writes the block. A pasted copy is stale on the next run and nothing says so. |
+| "Quicker to paste the data into the page" | Only the feed writes the sidecar. A pasted copy is stale on the next run and nothing says so. |
 | "I'll keep the old view in case" | A dropped idea leaves with its view, its code and its feed fields, in the same change. A bench that only grows is slow for both users. |
 | "This JSON is small, a `<pre>` will do" | Every JSON goes through `jsonTree`, with its toolbar. One reader, read the same way everywhere. |
 | "The feed can sit next to the page in the data home" | It reads the project, so it lives in the project's skill. In the data home it breaks without anyone seeing. |
