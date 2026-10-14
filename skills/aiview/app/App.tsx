@@ -227,6 +227,7 @@ export function App() {
                   pointedVariant={pointer?.id === doc.id ? pointer.variant : undefined}
                   onClearPointer={stopPointing}
                   workbench={doc.kind === "workbench"}
+                  doc={doc}
                 />
               )}
               {format === "swarm" && response!.content !== null && (

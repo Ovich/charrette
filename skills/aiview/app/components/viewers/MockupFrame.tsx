@@ -7,6 +7,7 @@ import { withOverlay } from "../../lib/overlay.ts";
 import { mockupControls, withBridge } from "../../lib/bridge.ts";
 import { pointMessage, withSpotlight } from "../../lib/spotlight.ts";
 import { THEMES, type Theme, withTheme } from "../../lib/theme.ts";
+import { benchState, useBenchRelay, withBenchBridge } from "../../lib/bench-bridge.ts";
 
 const VIEWPORTS: Array<[string, number]> = [
   ["mobile", 390],
@@ -47,11 +48,17 @@ export interface MockupFrameProps {
   onClearPointer?: () => void;
   /** A workbench, a tool used at full size: no viewport and no Composition, the theme alone. */
   workbench?: boolean;
+  /** The document shown: a workbench reads its sidecar folder and keeps its place by it. */
+  doc?: { id: number; file_path: string };
+  /** Bumped when a workbench's feed commits: the frame is told, not reloaded. */
+  dataTick?: number;
 }
 
 const NONE: readonly string[] = [];
+const NO_DOC = { id: 0, file_path: "" };
+const NO_FRAME = { current: null };
 
-export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NONE, pointedVariant, onClearPointer, workbench = false }: MockupFrameProps) {
+export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NONE, pointedVariant, onClearPointer, workbench = false, doc, dataTick = 0 }:MockupFrameProps) {
   const [storedViewport, setViewport] = useState(() => stored("aiview.viewport", "full"));
   const [storedMode, setMode] = useState<MockupMode>(() =>
     stored("aiview.mockupMode", "rendered") === "composition" ? "composition" : "rendered",
@@ -154,7 +161,19 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
 
   // The theme is forced last, so it also normalises whatever the overlay and the bridge
   // brought with them: one pass over the html that actually reaches the frame.
-  const served = withTheme(withSpotlight(withBridge(mode === "composition" ? withOverlay(html, { bindings, target }) : html)), theme);
+  // A workbench gets the bench bridge instead of the variant bridge (mockups are never
+  // bridged, D6). Its place is read once per html, never on a set, which would reload it.
+  const benched = workbench && doc !== undefined;
+  const benchId = doc?.id ?? 0;
+  const bridged = useMemo(
+    () => (benched ? withBenchBridge(html, { state: benchState(benchId) }) : null),
+    [benched, html, benchId],
+  );
+  useBenchRelay(benched ? frame : NO_FRAME, doc ?? NO_DOC, benched ? dataTick : 0);
+  const served = withTheme(
+    withSpotlight(bridged ?? withBridge(mode === "composition" ? withOverlay(html, { bindings, target }) : html)),
+    theme,
+  );
   const bound = bindings?.sources.length ?? 0;
 
   return (
