@@ -5,7 +5,7 @@ description: "Use whenever execute-plan runs, as the plan's orchestrator: settli
 
 # Orchestrate a plan
 
-**This session holds the plan, the tracker, the briefs and the decisions; subagents do the work.** A subagent never edits the plan or the tracker.
+**Load the `orchestrate` skill with this one**: it holds the charter protocol, dispatch, briefs, watching and a member that stops on a finding. Here the kind's document is the plan, with its tracker; the charter is its *Mandate*; a member is a subagent per slice.
 
 ## The mandate
 
@@ -13,25 +13,14 @@ Read the plan's *Mandate* section. Ask what it leaves open before the first slic
 
 ## Dispatch
 
-**The mandate says `mode: swarm`**: the `swarm` skill's orchestrator side replaces *Forks* below and *Checking the run*, and `references/swarm.md` says what else changes here; read both before the first dispatch. Classic mode reads neither.
+**The mandate says `mode: swarm`**: the `swarm` skill's orchestrator side replaces *Forks* below and the `orchestrate` skill's *Watching*, and `references/swarm.md` says what else changes here; read both before the first dispatch. Classic mode reads neither.
 
-- **One subagent per slice**, on a subagent definition carrying the mandate's model and effort; the dispatch passes its model.
-- **The brief is the only thing sent**: where the work is, the mandate in force, and the testing prompt the `tests` answer gives. Never the plan, never a restatement of the slice document. Template: `references/brief.md`, read before the first dispatch.
-- **Check blockers before every dispatch.**
-- **Forks run at once**, one subagent each, each in its own git worktree (`isolation: "worktree"`), each with its own install and its base named in the brief. A merge conflict at the join means the fork was wrong: report both sides and redraw it. On Windows, set `git config core.longpaths true` before the first worktree removal.
-
-## Checking the run
-
-The completion notification ends a slice; it does not tell you the run is healthy. While subagents work:
-
-- **Every few minutes, run the digest** and look at it: `node <skill-dir>/scripts/watch-agents.mjs <subagents-dir> [--label <id>=<slice>] [--forbidden '<regex>']`. One line per live subagent: calls, idle time, last tool, last words. Never open a transcript whole; it exhausts this session's context. Transcripts live under `<claude home>/projects/<project>/<session id>/subagents/`.
-- **Report only what is news**: a stall (no new call in ten minutes), a `BREACH` of the brief's boundary, work clearly outside the slice document. `--forbidden` is the brief's boundary as a regex anchored on a command's verb, never a path.
-- **Steer only a drift from the brief**: one `SendMessage` naming the brief line it left. A subagent that drifts again is stopped and re-dispatched with the brief amended. Decisions the slice document leaves to the subagent are its own.
+- **One subagent per slice**, dispatched as the `orchestrate` skill says, with the brief of `references/brief.md`, read before the first dispatch: where the work is, the mandate in force, and the testing prompt the `tests` answer gives.
+- **Forks run at once**, one subagent each, each in its own worktree as the `orchestrate` skill says. A merge conflict at the join means the fork was wrong: report both sides and redraw it.
 
 ## A return
 
 - **A tick rests on what this session re-ran**: the slice's check, and what the testing prompt asked for.
-- **A subagent that stops on a finding is done.** Fix the plan or the slice document; never re-brief it past what it found.
 - **The slice's worktree is merged by a subagent**: its brief names the branch, the branch to merge into, the check to run on the result, and to stop and report on a conflict rather than resolve one. Re-run the check here, then tick; remove the worktree from the main checkout once the tick stands, and check the path is gone.
 
 ## Verification

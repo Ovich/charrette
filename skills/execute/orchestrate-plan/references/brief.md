@@ -1,8 +1,7 @@
 # The briefs
 
-**A brief says where the work is and what the mandate asks; nothing else.** Never the plan,
-never the design, the criteria or the seams (the slice document carries them), never
-encouragement.
+What a brief carries and never carries is the `orchestrate` skill's `references/brief.md`; the
+plan's templates follow.
 
 ## A slice
 
@@ -31,9 +30,7 @@ Carry out one slice document with the `execute-slice` skill.
 
 **The board line** only in swarm mode, without its marker; a classic brief has none.
 
-**The last line** only when the slice has a boundary the mandate does not draw: a directory it
-must not touch, a command it must not run, an environment it must not reach. The watch's
-`--forbidden` pattern is built from that sentence.
+**The last line** as the `orchestrate` skill's `references/brief.md` says.
 
 ## A merge
 

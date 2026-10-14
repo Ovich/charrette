@@ -20,7 +20,7 @@ everything said on the board. This file says what changes in this skill's own du
 ## Checking the run
 
 - **The board replaces the periodic check**: what each runner does, says and holds is there.
-  The digest (`scripts/watch-agents.mjs`) remains for a runner the board shows stale.
+  The digest (the `orchestrate` skill's `scripts/watch-agents.mjs`) remains for a runner the board shows stale.
 - **A runner's drift is answered on the board**, by the interrupt the `swarm` skill's orchestrator
   side describes, never by a private message alone.
 - **Two runners' agreements are theirs.** One that changes a decision the plan took becomes a row

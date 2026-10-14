@@ -1,10 +1,8 @@
 # The mandate
 
-Ask what is open in one message, the recommended answer first. Write the answers into the
-plan's *Mandate* section as `field: value` lines, and into the one line under the tracker:
+How the fields are asked, written and amended is the `orchestrate` skill's
+`references/charter.md`. The charter section is the plan's *Mandate*; the one line sits under the tracker:
 `mandate: mode classic · run through · one for the plan · delegated · opus · medium · tests at the plan end · verify off`.
-An amendment mid-run overwrites its field in both places, the decision's id beside it
-(`pace: run through, the person merges (D41)`), and reaches the next brief only.
 
 **`mode:`** first. Asked by the `write-plan` skill before the cut, since the plan differs by
 mode; asked here only for a plan that predates the field, where a plan cut for classic stays
@@ -37,8 +35,7 @@ slice is a pause.
 
 **`effort:`** when delegated, `low | medium | high | xhigh | max`: **medium** (recommended).
 The design is the plan's, but the subagent shapes the code around its slice and names what it
-adds. Effort is not an `Agent` parameter: it is carried by the subagent definition the dispatch
-names (`effort:` in its frontmatter). A dispatch naming none inherits the session's level.
+adds. How effort reaches a subagent: the `orchestrate` skill's *Dispatch*.
 
 **`tests:`** when the tests the plan names get written. The testing prompt each answer puts in
 the brief: `references/tests.md`.

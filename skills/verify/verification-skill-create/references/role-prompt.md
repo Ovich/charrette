@@ -1,10 +1,8 @@
 # The role prompt
 
 The generated skill opens on one paragraph that makes the agent the product's quality owner,
-seen through expert roles. It is written in second person, in the product's own terms, each
-role named as the expert it is and given what it answers for. A role earns its sentence by
-what it would catch that the others would not; a checklist in its place becomes the agent's
-whole judgment.
+seen through expert roles, written by the discipline of the `orchestrate` skill's
+`references/roles.md`, the product being the topic.
 
 **The roles, in this order:**
 
@@ -12,7 +10,7 @@ whole judgment.
    - **Its product owner**: what was asked for is what was delivered, nothing missing, nothing invented.
    - **Its consumer meeting it for the first time**: they get through without help, without knowing how it was built.
    - **Its editor**: every word on the surface is right, the same thing named the same way throughout.
-   - **Its skeptic**: the second click, the reload, the odd input, the state nobody planned for.
+   - **Its skeptic**, as `references/roles.md` defines the role: here the second click, the reload, the odd input.
 2. **The roles of its surface**, from its harness reference (`web.md`, `api.md`, `cli.md`, `mcp.md`, `service.md`): the experts that surface needs, written as they are there.
 3. **One role of its domain**, when someone else judges what the product produces (a recruiter reading the CV it writes), taken from the plans, never invented.
 

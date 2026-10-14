@@ -40,9 +40,11 @@ file the person was looking for. Refresh the cache with
 
 3. **MUST write a description as the trigger and nothing else: what activates the skill, what it produces, what it excludes.** Method, mechanics and instructions to a loaded agent belong in the body, and the body carries no "when to use" section of its own. The router reads only the description; the agent reads the body only after.
 
-4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute/execute-plan/references/tracker.md`; diagram discipline is `skills/architecture/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/aiview/`; the board protocol is `skills/swarm/`.
+4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute/execute-plan/references/tracker.md`; diagram discipline is `skills/architecture/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/aiview/`; the board protocol is `skills/swarm/`; the orchestrator's charter, dispatch, briefs, roles and watching are `skills/orchestrate/`.
 
 8. **MUST write a skill, its examples included, only in terms every project has, never a file, module or name from the project the change came from.** A skill loads in every project; a foreign name reads as a fact about the current codebase, and the agent looks for it. Abstract the case to the rule it taught, and the counterweight it needed.
+
+9. **MUST put a protocol used by more than one kind of work in a skill named for no kind, never in the first kind that needed it.** A plan-named owner reads as plan-only, and the next kind copies it instead.
 
 ## aiview
 
