@@ -16,7 +16,7 @@ import {
   type UpdatePatch,
 } from "../core/db.ts";
 import { listComponents, resolveBindings } from "../core/bind.ts";
-import { isHtml, readDoc } from "../core/paths.ts";
+import { isHtml, readDoc, sidecarOf } from "../core/paths.ts";
 import { pointerHash, isName, unknownNames } from "../core/pointer.ts";
 import type { ShowResponse } from "../core/api.ts";
 import { projectForCwd } from "../core/projects.ts";
@@ -564,6 +564,18 @@ function cmdUse(): void {
   }
 }
 
+/** Rename a file or folder; on another volume (EXDEV), copy it recursively and then
+ *  drop the original. Any other error (EPERM on a held file) is thrown, not retried. */
+function moveAcrossVolumes(from: string, to: string): void {
+  try {
+    fs.renameSync(from, to);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "EXDEV") throw e;
+    fs.cpSync(from, to, { recursive: true });
+    fs.rmSync(from, { recursive: true });
+  }
+}
+
 /** Refile a document: `--project` puts it in another project, bare pulls a stray back
  *  into its own project's directory. The project IS the directory (D14), so this is
  *  the only way to reclassify one — and the caller names a project, never a path. */
@@ -594,26 +606,30 @@ function cmdMove(): void {
       console.error(`already there: ${from}`);
       continue;
     }
+    // A workbench carries its sidecar `<stem>/` with it; the sidecar is never in the index.
+    const sidecarFrom = sidecarOf(from);
+    const sidecarDest = sidecarOf(dest);
+    const carriesSidecar = sidecarFrom !== null && fs.existsSync(sidecarFrom);
     // File already at the destination with a stale row: a previous run moved the
-    // file and then failed to write the index. Re-point the row and carry on.
+    // file (and its sidecar, if it had one) and then failed to write the index.
+    // Re-point the row and carry on.
     const orphaned = !fs.existsSync(from) && fs.existsSync(dest);
     if (!fs.existsSync(from) && !orphaned) {
       console.error(`missing file, not moved: ${from}`);
       continue;
     }
-    if (fs.existsSync(dest) && !orphaned) {
-      console.error(`target exists, skipped: ${dest}`);
-      continue;
+    if (!orphaned) {
+      const taken = [dest, ...(carriesSidecar ? [sidecarDest!] : [])].filter((p) => fs.existsSync(p));
+      if (taken.length) {
+        const named = carriesSidecar ? `${dest} and ${sidecarDest}` : dest;
+        console.error(`target exists (${taken.join(", ")}), skipped: ${named}`);
+        continue;
+      }
     }
     fs.mkdirSync(dir, { recursive: true });
     if (!orphaned) {
-      try {
-        fs.renameSync(from, dest);
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code !== "EXDEV") throw e;
-        fs.copyFileSync(from, dest); // different volume: copy, then drop the original
-        fs.rmSync(from);
-      }
+      moveAcrossVolumes(from, dest);
+      if (carriesSidecar) moveAcrossVolumes(sidecarFrom!, sidecarDest!);
     }
     const d = index.move(row.id, dest)!;
     moved.push(d);

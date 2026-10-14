@@ -22,6 +22,12 @@ export const isSwarm = (file: string): boolean => /\.swarm\.json$/i.test(file);
 /** What a swarm document's file holds: the run, and the URL of its page on swarm's server. */
 export type SwarmDocument = { run: string; url: string };
 
+/** A workbench's sidecar, `<stem>/` beside `<stem>.html` (the page's path minus `.html`),
+ *  for a `.workbench.html`; null for any other document. Whether it exists is the caller's. */
+export function sidecarOf(absPath: string): string | null {
+  return /\.workbench\.html$/i.test(absPath) ? absPath.replace(/\.html$/i, "") : null;
+}
+
 export type DocFormat = "markdown" | "html" | "pdf" | "swarm";
 export const formatOf = (file: string): DocFormat =>
   isHtml(file) ? "html" : isPdf(file) ? "pdf" : isSwarm(file) ? "swarm" : "markdown";
