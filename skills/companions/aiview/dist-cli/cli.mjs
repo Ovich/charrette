@@ -11148,7 +11148,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
           if (d instanceof Error) reject(d);
           else resolve(d);
         };
-        const check2 = () => {
+        const check3 = () => {
           if (settled) return;
           try {
             if (participantById(p.id).ended) return finish({ full: [], lines: [] });
@@ -11159,10 +11159,10 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
             finish(e);
           }
         };
-        watcher = fs8.watch(signal, check2);
-        poll = setInterval(check2, WAIT_POLL_MS);
+        watcher = fs8.watch(signal, check3);
+        poll = setInterval(check3, WAIT_POLL_MS);
         if (timeoutMs !== void 0) timer = setTimeout(() => finish({ full: [], lines: [] }), timeoutMs);
-        check2();
+        check3();
       });
     },
     checkEdit(p, file, opts2 = {}) {
@@ -11299,7 +11299,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       listeners.add(listener);
       if (!watching) {
         versions = readVersions();
-        const check2 = () => {
+        const check3 = () => {
           let next;
           try {
             next = readVersions();
@@ -11310,8 +11310,8 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
           versions = next;
           for (const repo of moved) for (const l of [...listeners]) l(repo);
         };
-        const watcher = fs8.watch(signal, check2);
-        const poll = setInterval(check2, WAIT_POLL_MS);
+        const watcher = fs8.watch(signal, check3);
+        const poll = setInterval(check3, WAIT_POLL_MS);
         watcher.unref?.();
         poll.unref?.();
         watching = { close: () => (watcher.close(), clearInterval(poll)) };
@@ -12197,6 +12197,78 @@ function sync(text, t) {
   return { text: next, changed: next !== text };
 }
 
+// src/core/plan.ts
+var STATUS = /^\s*>?\s*(\*\*)?status(\*\*)?\s*:\s*(.*)$/i;
+var APPROVED = /^approved\b/i;
+var CONFIRMED = /defaults confirmed\s*:\s*([^;]*)/i;
+var DECISIONS = /^#{2,3}\s*(\d+\.\s*)?decisions\b/i;
+var HEADING = /^#{1,6}\s/;
+var DEFAULT_SOURCE = /\bagent'?s? default\b/i;
+var cell = (s) => s.replace(/[`*_]/g, "").trim();
+var cells = (row) => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(cell);
+var isRule = (row) => /^\s*\|?[\s:|-]+\|?\s*$/.test(row) && row.includes("-");
+function readDecisions(lines) {
+  const start = lines.findIndex((l) => DECISIONS.test(l));
+  if (start < 0) return [];
+  const out = [];
+  let header;
+  for (let i = start + 1; i < lines.length && !HEADING.test(lines[i]); i++) {
+    const l = lines[i];
+    if (!l.trim().startsWith("|")) {
+      if (header && out.length) break;
+      continue;
+    }
+    if (isRule(l)) continue;
+    const row = cells(l);
+    if (!header) {
+      header = row.map((h) => h.toLowerCase());
+      continue;
+    }
+    const at = (name) => row[header.indexOf(name)] ?? "";
+    const id = at("id");
+    if (id) out.push({ id, kind: at("kind").toLowerCase(), source: at("source"), line: i + 1 });
+  }
+  return out;
+}
+function readApproval(text) {
+  const lines = text.split("\n");
+  const statusIdx = lines.findIndex((l) => STATUS.test(l));
+  const status = statusIdx < 0 ? "" : STATUS.exec(lines[statusIdx])[3].trim();
+  const decisions = readDecisions(lines);
+  const defaults = decisions.filter((d) => DEFAULT_SOURCE.test(d.source)).sort((a, b) => Number(b.kind === "contract") - Number(a.kind === "contract"));
+  const named = CONFIRMED.exec(status)?.[1]?.trim();
+  const confirmed = named === void 0 ? void 0 : /^all\b/i.test(named) ? defaults.map((d) => d.id) : named.split(/[\s,]+/).map(cell).filter((s) => s && !/^none$/i.test(s));
+  return {
+    status,
+    statusLine: statusIdx + 1,
+    approved: APPROVED.test(status),
+    confirmed,
+    decisions,
+    defaults
+  };
+}
+function check2(plan) {
+  if (!plan.statusLine) return [{ line: 1, text: 'no status line: `> **Status**: draft | approved: <who>, <date>, "<words>"`' }];
+  if (!plan.approved) return [];
+  const out = [];
+  const ids = (ds) => ds.map((d) => `${d.id}${d.kind === "contract" ? " (contract)" : ""}`).join(", ");
+  if (plan.defaults.length && plan.confirmed === void 0) {
+    out.push({
+      line: plan.statusLine,
+      text: `approved, but ${plan.defaults.length} agent default(s) were never confirmed: ${ids(plan.defaults)}; list them to the person and add "defaults confirmed: <ids>" to the status`
+    });
+    return out;
+  }
+  const confirmed = new Set(plan.confirmed ?? []);
+  const unconfirmed = plan.defaults.filter((d) => !confirmed.has(d.id));
+  if (unconfirmed.length)
+    out.push({ line: plan.statusLine, text: `agent default(s) approved without confirmation: ${ids(unconfirmed)}` });
+  const known = new Set(plan.defaults.map((d) => d.id));
+  for (const id of confirmed)
+    if (!known.has(id)) out.push({ line: plan.statusLine, text: `${id} is confirmed in the status, but no decision row with source agent default has that id` });
+  return out;
+}
+
 // src/cli/index.ts
 var LF = String.fromCharCode(10);
 var CRLF = String.fromCharCode(13, 10);
@@ -12225,6 +12297,7 @@ var USAGE = [
   "  mermaid-check <file|#id>                 # parse every mermaid block; warn on a missing caption or an unlabeled fork; exit 1 if one fails",
   "  tracker check <file|#id>                 # a plan's tracker judged against itself; exit 1 if anything disagrees",
   "  tracker sync <file|#id>                  # rewrite the class lines from the glyphs, the one place a step's state is written twice",
+  "  plan check <file|#id>                    # a plan's approval against its decisions: warns on agent defaults never confirmed; always exit 0",
   "  init                                     # create the data home; report where everything lives"
 ].join("\n");
 var registerOpts = () => ({
@@ -12903,6 +12976,36 @@ function cmdTracker() {
   });
   if (findings.length) process.exit(1);
 }
+function cmdPlan() {
+  const ref = args.positional[0] === "check" ? args.positional[1] : args.positional[0];
+  if (!ref) {
+    console.error("usage: aiview plan check <file|#id>");
+    process.exit(1);
+  }
+  const abs = resolveRef(ref)?.abs_path ?? path12.resolve(ref);
+  if (!fs11.existsSync(abs)) {
+    console.error(`no such file: ${abs}`);
+    process.exit(1);
+  }
+  const plan = readApproval(fs11.readFileSync(abs, "utf8").split(CRLF).join(LF));
+  const findings = check2(plan);
+  emit(
+    {
+      file: path12.basename(abs),
+      approved: plan.approved,
+      decisions: plan.decisions.length,
+      defaults: plan.defaults.map((d) => ({ id: d.id, kind: d.kind, line: d.line })),
+      confirmed: plan.confirmed ?? null,
+      findings
+    },
+    () => {
+      for (const f of findings) console.log(`warn  line ${f.line}  ${f.text}`);
+      const state = plan.approved ? "approved" : "not approved";
+      const tail = !plan.defaults.length ? "no agent defaults" : plan.approved ? `${plan.defaults.length} agent default(s), ${findings.length ? "not all confirmed" : "all confirmed"}` : `${plan.defaults.length} agent default(s) to list at approval: ${plan.defaults.map((d) => d.id).join(", ")}`;
+      console.log(`${findings.length ? "warn" : "ok"}  ${state}, ${plan.decisions.length} decisions, ${tail}`);
+    }
+  );
+}
 switch (args.verb) {
   case "pending":
     cmdPending();
@@ -12930,6 +13033,9 @@ switch (args.verb) {
     break;
   case "tracker":
     cmdTracker();
+    break;
+  case "plan":
+    cmdPlan();
     break;
   case "add":
     cmdAdd();

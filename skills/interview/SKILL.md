@@ -36,5 +36,10 @@ recommended option first and marked, each option with the trade-off that decides
 a closing line that takes a number or a rejection of the frame. A decision left unasked
 is one the implementation makes silently.
 
+**The short mode**, offered whenever the full interview would be skipped: three questions
+at most, on the decisions that change an output (kind `contract`) only, each with the
+recommendation first. Every decision it leaves unasked is closed as the agent's default,
+and named so.
+
 **Close in chat**, once understanding is shared: every decision with its status and source. The caller decides where
 that goes. **The caller writes decisions as rows**: read `references/decisions.md`.

@@ -609,3 +609,19 @@ test("mermaid-check: discipline warnings do not fail the run", () => {
   assert.equal(j.warnings, 2);
   assert.equal(j.results[1].warnings.length, 0);
 });
+
+test("plan check: warns on unconfirmed agent defaults, never fails the run", () => {
+  const head = (status: string) =>
+    `# p, plan\n\n> **Status**: ${status}\n\n## 8. Decisions\n| id | Kind | Decision | Status | Source | Slice |\n|---|---|---|---|---|---|\n| D1 | contract | x | agreed | agent default | 1 |\n`;
+  const md = write("docs/JOBS/p.plan.md", head(`approved: Ada, 2026-10-14, "yes"`));
+  const r = run("plan", "check", md);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /warn\s+line 3\s+approved, but 1 agent default\(s\) were never confirmed: D1 \(contract\)/);
+  const j = JSON.parse(run("plan", "check", md, "--json").stdout);
+  assert.equal(j.findings.length, 1);
+  assert.deepEqual(j.defaults.map((d: { id: string }) => d.id), ["D1"]);
+
+  const ok = write("docs/JOBS/q.plan.md", head(`approved: Ada, 2026-10-14, "yes"; defaults confirmed: D1`));
+  assert.match(run("plan", "check", ok).stdout, /ok\s+approved, 1 decisions, 1 agent default\(s\), all confirmed/);
+  assert.match(run("plan", "check", write("docs/JOBS/r.plan.md", head("draft"))).stdout, /to list at approval: D1/);
+});

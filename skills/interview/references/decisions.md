@@ -16,7 +16,8 @@ The core every decisions table shares, whatever document holds it:
 - **Depends on**: the ids it rests on, or nothing.
 - **Status**: `agreed` · `open` · `deferred` · `ruled (by whom)` · `for the person`.
 - **Source**: where it was settled: `Q<n>` (a question), `#<seq>` (an agreement on the board),
-  the person's words, or `agent, delegated`.
+  the person's words, `agent, delegated` (the person left it to the agent), or `agent default`
+  (the person was never asked: shown to them before they approve).
 
 A document adds its own columns after these, never between them: a brainstorm board adds
 `Log`, a plan adds `Kind` and `Slice`.
