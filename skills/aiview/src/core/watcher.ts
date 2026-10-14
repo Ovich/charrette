@@ -8,6 +8,7 @@
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
+import { sidecarOf } from "./paths.ts";
 
 export interface WatchableDoc {
   id: number;
@@ -26,11 +27,6 @@ export interface DataChangedEvent {
 /** The only file of a sidecar whose change is news; a feed writes `.tmp` and renames over it. */
 const SIDECAR_MANIFEST = "manifest.json";
 
-/** `<dir>/<stem>` for `<dir>/<stem>.workbench.html`, else null. */
-function sidecarDirOf(absPath: string): string | null {
-  const m = path.basename(absPath).match(/^(.+)\.workbench\.html$/i);
-  return m ? path.join(path.dirname(absPath), m[1]) : null;
-}
 
 /** resolve(dir, filename) -> the watched doc that file belongs to, if any. */
 export type DocResolver = (dir: string, filename: string) => WatchableDoc | undefined;
@@ -56,7 +52,7 @@ export class DocWatcher extends EventEmitter {
 
   ensureWatch(doc: WatchableDoc): void {
     const dir = path.dirname(doc.abs_path);
-    const sidecar = sidecarDirOf(doc.abs_path);
+    const sidecar = sidecarOf(doc.abs_path);
     if (sidecar) {
       let inDir = this.benches.get(dir);
       if (!inDir) this.benches.set(dir, (inDir = new Map()));
@@ -67,7 +63,7 @@ export class DocWatcher extends EventEmitter {
     try {
       const w = fs.watch(dir, (_event, name) => {
         if (!name) return;
-        // `<stem>` (no extension) is the sidecar folder: arm its watch, never a page change.
+        // `<stem>`, the page name less `.html`, is the sidecar folder: arm its watch, never a page change.
         const bench = this.benches.get(dir)?.get(String(name));
         if (bench) {
           this.ensureSidecarWatch(bench);
@@ -85,7 +81,7 @@ export class DocWatcher extends EventEmitter {
 
   /** Watch `<stem>/` of a `.workbench.html` when it exists; emits "data-changed" on manifest.json only. */
   ensureSidecarWatch(doc: WatchableDoc): void {
-    const dir = sidecarDirOf(doc.abs_path);
+    const dir = sidecarOf(doc.abs_path);
     if (!dir || this.sidecars.has(dir)) return;
     try {
       if (!fs.statSync(dir).isDirectory()) return;
