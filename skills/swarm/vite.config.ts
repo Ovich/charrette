@@ -18,6 +18,6 @@ export default defineConfig({
     environment: "jsdom",
     // the page as the swarm server serves it
     environmentOptions: { jsdom: { url: "http://localhost:4322/" } },
-    include: ["**/*.test.tsx"],
+    include: ["**/*.test.tsx", "**/*.test.ts"],
   },
 });

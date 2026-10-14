@@ -3,7 +3,7 @@
 // rail and the plan document beside it for the queue, so neither is here, nor a top bar.
 import { useMemo, useState } from "react";
 import { useRun } from "./hooks/useRun.ts";
-import { feed, filters, lit, mentionCtx, nicksOf, scope } from "./lib/view.ts";
+import { feed, filters, lit, mentionCtx, nicksOf, scopeToPlan } from "./lib/view.ts";
 import { NicksContext } from "./components/chips.tsx";
 import { MergeLock } from "./components/MergeLock.tsx";
 import { Roster } from "./components/Roster.tsx";
@@ -18,8 +18,8 @@ export function RunPage({ run }: { run: number }) {
 
   const summary = snapshot?.runs.find((r) => r.run === run) ?? null;
   // a run is its plan on the board: its runners are `<plan>/<slice>`, cross-plan mentions of them included
-  const view = useMemo(() => (snapshot && summary ? scope(snapshot, summary.plan) : null), [snapshot, summary]);
-  const ctx = useMemo(() => (snapshot ? mentionCtx(snapshot) : { plans: [], names: new Map<string, string>() }), [snapshot]);
+  const view = useMemo(() => (snapshot && summary ? scopeToPlan(snapshot, summary.plan) : null), [snapshot, summary]);
+  const ctx = useMemo(() => (snapshot ? mentionCtx(snapshot) : { groups: [], names: new Map<string, string>() }), [snapshot]);
   const nicks = useMemo(() => (snapshot ? nicksOf(snapshot) : new Map<string, string>()), [snapshot]);
   const chips = useMemo(() => (view ? filters(view.events).map((f) => ({ filter: f, count: view.events.filter(f.test).length })) : []), [view]);
   const activeFilter = chips.some((c) => c.filter.id === filter) ? filter : "all";

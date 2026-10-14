@@ -61,12 +61,23 @@ export function startServer(board: Board, options: ServeOptions): http.Server {
     const p = url.pathname;
     try {
       if (p === "/events") return sse.add(res);
-      if (p === "/api/run") {
-        // one run's repository snapshot, the page scopes it (plan D2): the view aiview frames
-        const id = Number(url.searchParams.get("id"));
-        const repo = board.repos().find((r) => r.runs.some((x) => x.run === id));
-        if (!repo) return json(res, { error: `no run ${url.searchParams.get("id")}` }, 404);
-        return json(res, { run: id, snapshot: board.snapshot(repo.repo) });
+      if (p === "/api/board" || p === "/api/run") {
+        // one repository's whole board, the page picks the channel (D18, D39); /api/run?id= kept as ?run=
+        const run = url.searchParams.get(p === "/api/run" ? "id" : "run");
+        const key = url.searchParams.get("repo");
+        const repos = board.repos();
+        let repo: string | undefined;
+        if (run !== null) {
+          repo = repos.find((r) => r.runs.some((x) => x.run === Number(run)))?.repo;
+          if (!repo) return json(res, { error: `no run ${run}` }, 404);
+        } else if (key !== null) {
+          repo = repos.find((r) => r.repo === key)?.repo;
+          if (!repo) return json(res, { error: `no repository ${key}` }, 404);
+        } else {
+          repo = repos[0]?.repo; // the most recently active: repos() lists it first
+          if (!repo) return json(res, { error: "no repository on the board" }, 404);
+        }
+        return json(res, { repos, snapshot: board.snapshot(repo) });
       }
       if (p.startsWith("/api/")) return json(res, { error: `no route ${p}` }, 404);
       return serveStatic(res, p);

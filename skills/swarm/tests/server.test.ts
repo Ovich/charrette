@@ -68,19 +68,44 @@ function listen(until: (events: { type: string; repo?: string }[]) => boolean, m
   });
 }
 
-test("the old page's routes are gone: /api/repos and /api/board answer 404 (plan D6)", async () => {
+const OTHER = "/repos/two/.git";
+type BoardBody = { repos: { repo: string }[]; snapshot: BoardSnapshot };
+
+test("the old page's /api/repos is gone: it answers 404 (plan D6)", async () => {
   writer.openRun({ repo: REPO, group: "review-tool", title: "Review tool", seats: SLICES });
-  for (const route of ["/api/repos", `/api/board?repo=${encodeURIComponent(REPO)}`]) assert.equal((await fetch(`${base}${route}`)).status, 404, route);
+  assert.equal((await fetch(`${base}/api/repos`)).status, 404);
 });
 
-test("GET /api/run returns the run's repository snapshot; an unknown run is a 404", async () => {
-  const run = writer.runs()[0];
+test("GET /api/board?repo= answers that repository's board and every repository; an unknown key is a 404 naming it", async () => {
+  const r = await fetch(`${base}/api/board?repo=${encodeURIComponent(REPO)}`);
+  assert.equal(r.status, 200);
+  const body = (await r.json()) as BoardBody;
+  assert.equal(body.snapshot.repo, REPO);
+  assert.ok(body.repos.some((x) => x.repo === REPO));
+  const missing = await fetch(`${base}/api/board?repo=${encodeURIComponent("/nowhere/.git")}`);
+  assert.equal(missing.status, 404);
+  assert.deepEqual(await missing.json(), { error: "no repository /nowhere/.git" });
+});
+
+test("GET /api/board?run= resolves the run's repository; with no parameter, the most recently active one", async () => {
+  const first = writer.runs().find((x) => x.repo === REPO)!;
+  writer.openRun({ repo: OTHER, group: "other", title: "Other", seats: [] });
+  const byRun = (await (await fetch(`${base}/api/board?run=${first.id}`)).json()) as BoardBody;
+  assert.equal(byRun.snapshot.repo, REPO);
+  const latest = (await (await fetch(`${base}/api/board`)).json()) as BoardBody;
+  assert.equal(latest.snapshot.repo, OTHER);
+  const missing = await fetch(`${base}/api/board?run=999`);
+  assert.equal(missing.status, 404);
+  assert.deepEqual(await missing.json(), { error: "no run 999" });
+});
+
+test("GET /api/run?id= still answers, as /api/board?run=", async () => {
+  const run = writer.runs().find((x) => x.repo === REPO)!;
   const r = await fetch(`${base}/api/run?id=${run.id}`);
   assert.equal(r.status, 200);
-  const body = (await r.json()) as { run: number; snapshot: BoardSnapshot };
-  assert.equal(body.run, run.id);
+  const body = (await r.json()) as BoardBody;
   assert.equal(body.snapshot.repo, REPO);
-  assert.ok(body.snapshot.runs.some((x) => x.run === run.id));
+  assert.deepEqual(body, await (await fetch(`${base}/api/board?run=${run.id}`)).json());
   const missing = await fetch(`${base}/api/run?id=999`);
   assert.equal(missing.status, 404);
   assert.deepEqual(await missing.json(), { error: "no run 999" });
