@@ -316,3 +316,5 @@ p { margin: 0; }
 .claims-list .path { font-family: var(--font-mono, monospace); flex: none; width: 360px; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .claims-list .holders { display: inline-flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
 .claims-list .shared { color: var(--faint-foreground); }
+/* a run's code in the tab row and the archive: coloured text, no box (the generic .code draws one) */
+.run .code, .archive .arow .code { border: 0; border-radius: 0; padding: 0; background: none; }
