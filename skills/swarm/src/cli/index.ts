@@ -236,10 +236,38 @@ const emitHeard = (p: Participant, json: object, human: string | (() => void)): 
   });
 };
 
-/** `<path>`, `<path>:inside` or `<path>:interface`. */
+/** The file a relative path means (D6): from the current folder when it exists there, else from
+ *  the repository root when it exists there; neither refuses, unless `--new` creates it here. */
+function resolveClaimPath(file: string): string {
+  if (path.isAbsolute(file)) return file;
+  const here = path.resolve(file);
+  if (fs.existsSync(here)) return here;
+  const root = worktreeOf(process.cwd());
+  const fromRoot = root ? path.resolve(root, file) : null;
+  if (fromRoot && fs.existsSync(fromRoot)) return fromRoot;
+  if (args.has("--new")) return here;
+  return fail(`no such file: ${here}${fromRoot && fromRoot !== here ? ` nor ${fromRoot}` : ""}; pass --new if you are creating it`);
+}
+
+/** Repository-relative, forward slashes: what the board stores and every answer names. */
+function repoRelative(abs: string): string {
+  const root = worktreeOf(process.cwd());
+  const rel = root ? path.relative(root, abs) : abs;
+  return rel.split(path.sep).join("/");
+}
+
+/** `--about`: a path (it has a slash) resolved and made repository-relative; a decision id or a bare name as given. */
+function aboutArg(): string | undefined {
+  const about = args.flag("--about");
+  if (about === undefined || !/[\\/]/.test(about)) return about;
+  return repoRelative(resolveClaimPath(about));
+}
+
+/** `<path>`, `<path>:inside` or `<path>:interface`, the path resolved (D6). */
 function parseFile(spec: string): Declared {
   const m = spec.match(/^(.*):(interface|inside)$/);
-  return m ? { path: m[1], interface: m[2] === "interface" } : { path: spec, interface: false };
+  const d = m ? { path: m[1], interface: m[2] === "interface" } : { path: spec, interface: false };
+  return { ...d, path: repoRelative(resolveClaimPath(d.path)) };
 }
 
 function readSlices(file: string): SliceSpec[] {
@@ -432,13 +460,15 @@ async function main(board: Board): Promise<void> {
       const p = caller(board);
       const body = args.positional.join(" ") || fail(`${args.verb}: nothing to say`);
       const m = board.post(p, body, {
-        about: args.flag("--about"),
+        about: aboutArg(),
         kind: args.verb === "agree" ? "agreement" : "msg",
         channel: args.has("--main") ? "main" : "run",
       });
       const unmatched = unmatchedLines(board, p, body);
-      emitHeard(p, { seq: m.seq, mentions: m.mentions, channel: m.channel, ...(unmatched.length ? { unmatched } : {}) }, () => {
+      emitHeard(p, { seq: m.seq, mentions: m.mentions, channel: m.channel, ...(unmatched.length ? { unmatched } : {}), ...(m.claimed ? { claimed: m.claimed } : {}) }, () => {
         console.log(seqLine(m));
+        // posting is claiming (D7)
+        if (m.claimed) console.log(`claimed ${m.claimed.path}, shared with ${m.claimed.sharedWith.join(", ")}`);
         for (const line of unmatched) console.log(line);
       });
       break;
@@ -512,7 +542,9 @@ async function main(board: Board): Promise<void> {
     case "claim": {
       const p = caller(board);
       const file = args.positional[0] ?? fail("claim: which path?");
-      const verdict = board.checkEdit(p, path.resolve(file), { interface: args.has("--interface") });
+      const abs = resolveClaimPath(file);
+      const rel = repoRelative(abs);
+      const verdict = board.checkEdit(p, abs, { interface: args.has("--interface") });
       // held (D41): exit 3, the runner posts about the path and claims again
       if (!verdict.allowed) process.exitCode = 3;
       emitHeard(p, verdict, () => {
@@ -521,15 +553,16 @@ async function main(board: Board): Promise<void> {
         const also = verdict.notice
           ? verdict.sharedWith.map((o) => `${o.runner} · ${board.participant(o.runner)?.nick ?? "?"}: ${o.doing}`).join("; ")
           : "";
-        console.log(also ? `claimed ${file}, also held by ${also}` : `claimed ${file}`);
+        console.log(also ? `claimed ${rel}, also held by ${also}` : `claimed ${rel}`);
       });
       break;
     }
     case "release": {
       const p = caller(board);
       const file = args.positional[0] ?? fail("release: which path?");
-      board.release(p, path.resolve(file));
-      emit({ runner: p.name, released: file }, `${p.name} released ${file}`);
+      const abs = resolveClaimPath(file);
+      board.release(p, abs);
+      emit({ runner: p.name, released: repoRelative(abs) }, `${p.name} released ${repoRelative(abs)}`);
       break;
     }
     case "merge-lock": {
@@ -539,7 +572,7 @@ async function main(board: Board): Promise<void> {
       // what the branch wrote without a claim, committed or not, before the lock; a flag informs, never blocks
       const reconciled = p.worktree ? branchChangedIn(p.worktree, onto) : [];
       const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
-      const r = board.lockMerge(p);
+      const r = board.lockMerge(p, onto);
       emit({ runner: p.name, ...r, reconciled, flags }, () => {
         printReconciled(reconciled, flags);
         console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait --mentions for its merged event`);

@@ -25,7 +25,10 @@ export interface Claims {
   checkEdit(p: Participant, file: string, opts?: { interface?: boolean }): EditAllowed | EditHeld;
   reconcileWrites(p: Participant, changed: string[]): Flag[];
   release(p: Participant, file: string): void;
-  lockMerge(p: Participant): { granted: true } | { granted: false; holder: string };
+  /** `onto`: the branch the merge lands in, recorded with the lock for the merged event (D9). */
+  lockMerge(p: Participant, onto?: string): { granted: true } | { granted: false; holder: string };
+  /** After a refused claim, `m` (by `p`, about the path, mentioning a holder) makes `p` a sharer, as the second claim would (D7). */
+  claimByPost(p: Participant, m: Message): PostClaim | null;
   merged(p: Participant, sha: string, files: string[]): Sharer[];
   /** join's declared files, claimed where free */
   claimDeclared(p: Participant, files: Declared[]): void;
@@ -41,6 +44,9 @@ export interface Claims {
   /** `p` holds `about` (a path, or its tail) now. */
   holds(p: Participant, about: string): boolean;
 }
+
+/** What a post settled: the claimed path and its other holders' names. */
+export type PostClaim = { path: string; sharedWith: string[] };
 
 type Row = Record<string, unknown>;
 type ClaimRow = { participant: number; kind: string; since: number };
@@ -107,10 +113,17 @@ export function claimsOf(deps: ClaimsDeps): Claims {
       });
     });
   };
+  /** The other holders `me` is told of, once per runner and path (D40). */
+  const noticeOf = (me: Participant, rel: string, people: Participant[]): string | null => {
+    const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
+    const fresh = people.filter((o) => Number(told.run(me.repo, rel, me.id, o.id).changes) > 0);
+    return fresh.length ? fresh.map((o) => `${rel} is also held by ${o.name}: ${doingOf(o.id)}`).join("; ") : null;
+  };
   const releaseAll = (id: number): void => {
     const owner = db.prepare("SELECT r.repo FROM participants p JOIN runs r ON r.id = p.run WHERE p.id = ?").get(id) as Row | undefined;
     const claims = Number(db.prepare("DELETE FROM claims WHERE participant = ?").run(id).changes);
     const locks = Number(db.prepare("DELETE FROM merge_locks WHERE participant = ?").run(id).changes);
+    db.prepare("DELETE FROM claim_requests WHERE participant = ?").run(id);
     clearFlags();
     if (owner && claims + locks > 0) bump(String(owner.repo));
   };
@@ -129,6 +142,26 @@ export function claimsOf(deps: ClaimsDeps): Claims {
     lockWaitersFreedBy(p) {
       const held = db.prepare("SELECT 1 FROM merge_locks WHERE repo = ? AND participant = ?").get(p.repo, p.id) !== undefined;
       return held ? takeLockWaiters(p.repo).filter((n) => n !== p.name) : [];
+    },
+
+    claimByPost(me, m) {
+      if ((m.kind !== "msg" && m.kind !== "agreement") || !m.about) return null;
+      const about = fold(relPath(me.repo, m.about) ?? slashes(m.about));
+      return transaction((): PostClaim | null => {
+        const asked = (db.prepare("SELECT path, kind FROM claim_requests WHERE repo = ? AND participant = ?").all(me.repo, me.id) as Row[]).find((r) => {
+          const x = fold(String(r.path));
+          return x === about || x.endsWith(`/${about}`);
+        });
+        if (!asked) return null;
+        const rel = String(asked.path);
+        const others = holdersOf(me.repo, rel).filter((c) => c.participant !== me.id);
+        // the holder gone: the request stands for the next claim, which finds the path free
+        if (!others.length || !hasPostedAbout(me, rel, others)) return null;
+        hold(me, rel, String(asked.kind) === "interface" ? "interface" : "inside");
+        db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
+        const people = others.map((c) => participantById(c.participant));
+        return { path: rel, sharedWith: people.map((o) => o.name) };
+      });
     },
 
     claimDeclared(p, files) {
@@ -185,6 +218,11 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         if (!all.some((c) => c.participant === me.id)) {
           // the first edit of a file another runner holds: held until the runner has said what it changes (D41)
           if (!hasPostedAbout(me, rel, others)) {
+            // the refused request: a post that settles it claims it (D7)
+            db.prepare(
+              `INSERT INTO claim_requests (repo, path, participant, kind) VALUES (?, ?, ?, ?)
+               ON CONFLICT (repo, path, participant) DO UPDATE SET kind = CASE WHEN claim_requests.kind = 'interface' THEN 'interface' ELSE excluded.kind END`,
+            ).run(me.repo, rel, me.id, kind);
             const who = people.map((o) => `${o.name} (${o.nick}: ${doingOf(o.id)})`).join(", ");
             const at = people.map((o) => `@${o.name}`).join(" ");
             return {
@@ -197,12 +235,9 @@ export function claimsOf(deps: ClaimsDeps): Claims {
           }
         }
         hold(me, rel, kind); // a new holder, or an `inside` claim widened to an interface
+        db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
         const sharedWith = people.map((o) => ({ runner: o.name, doing: doingOf(o.id) }));
-        // told once per runner and path
-        const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
-        const fresh = people.filter((o) => Number(told.run(me.repo, rel, me.id, o.id).changes) > 0);
-        const notice = fresh.length ? fresh.map((o) => `${rel} is also held by ${o.name}: ${doingOf(o.id)}`).join("; ") : null;
-        return { allowed: true, sharedWith, notice };
+        return { allowed: true, sharedWith, notice: noticeOf(me, rel, people) };
       });
     },
 
@@ -211,6 +246,8 @@ export function claimsOf(deps: ClaimsDeps): Claims {
       // one transaction: the page sees one change however many files
       return transaction(() => {
         const flag = db.prepare("INSERT OR IGNORE INTO flags (repo, path, participant) VALUES (?, ?, ?)");
+        // one flag post per writer, path and holder, whichever of merge-lock or end finds it first (D8)
+        const posted = db.prepare("INSERT OR IGNORE INTO flag_posts (repo, path, participant, holder) VALUES (?, ?, ?, ?)");
         for (const file of changed) {
           const rel = relPath(me.repo, file);
           if (!rel) continue;
@@ -224,12 +261,15 @@ export function claimsOf(deps: ClaimsDeps): Claims {
           if (taken || others.length) flag.run(me.repo, rel, me.id);
           if (!others.length) continue;
           const holder = participantById(others[0].participant);
+          if (Number(posted.run(me.repo, rel, me.id, holder.id).changes) === 0) continue;
+          // a board event, so the page shows it as one (D10); mentions: the holder, then the writer
           const m = insertMessage(
             me,
             `@${holder.name} @${me.name} flag: ${me.name} wrote ${rel} outside its claim; ${holder.name} holds it. Settle it here.`,
             rel,
-            "msg",
+            "event",
             [holder.name, me.name],
+            { event: EVENTS.flag.name },
           );
           flags.push({ path: rel, holder: holder.name, seq: m.seq });
         }
@@ -248,17 +288,20 @@ export function claimsOf(deps: ClaimsDeps): Claims {
       });
     },
 
-    lockMerge(me) {
+    lockMerge(me, onto) {
       return transaction(() => {
         const r = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo) as Row | undefined;
         if (r && Number(r.participant) !== me.id && isLive(Number(r.participant))) {
           db.prepare("INSERT OR IGNORE INTO lock_waiters (repo, participant) VALUES (?, ?)").run(me.repo, me.id);
           return { granted: false as const, holder: participantById(Number(r.participant)).name };
         }
-        if (r && Number(r.participant) === me.id) return { granted: true as const };
+        if (r && Number(r.participant) === me.id) {
+          if (onto) db.prepare("UPDATE merge_locks SET onto = ? WHERE repo = ?").run(onto, me.repo);
+          return { granted: true as const };
+        }
         // a new holder: the waiters on the one before are not this one's (D65)
         db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(me.repo);
-        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at) VALUES (?, ?, ?)").run(me.repo, me.id, now());
+        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at, onto) VALUES (?, ?, ?, ?)").run(me.repo, me.id, now(), onto ?? null);
         bump(me.repo);
         return { granted: true as const };
       });
@@ -271,13 +314,15 @@ export function claimsOf(deps: ClaimsDeps): Claims {
       const iface = new Set<string>();
       const sharers: Sharer[] = [];
       let waiters: string[] = [];
+      let onto: string | null = null;
       // one transaction: the page sees the merge as one change
       transaction(() => {
         transaction(() => {
-          const lock = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo) as Row | undefined;
+          const lock = db.prepare("SELECT participant, onto FROM merge_locks WHERE repo = ?").get(me.repo) as Row | undefined;
           if (lock && Number(lock.participant) !== me.id && isLive(Number(lock.participant))) {
             throw new Error(`the merge lock is held by ${participantById(Number(lock.participant)).name}, not ${me.name}`);
           }
+          if (lock && Number(lock.participant) === me.id && lock.onto != null) onto = String(lock.onto);
           db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
           db.prepare("UPDATE participants SET merged = 1 WHERE id = ?").run(me.id);
           waiters = takeLockWaiters(me.repo).filter((n) => n !== me.name);
@@ -306,7 +351,7 @@ export function claimsOf(deps: ClaimsDeps): Claims {
           .filter((r) => profileOf(String(r.kind)).claims)
           .map((r) => String(r.plan));
         const all = iface.size ? openPlans.map((plan) => `${plan}/*`) : [];
-        const lines = [`merged ${sha}: rebase onto ${sha}.`];
+        const lines = [`merged ${sha}${onto ? ` into ${onto}` : ""}: rebase your branch onto it.`];
         if (told.size) lines.push(`${[...told].map((n) => `@${n}`).join(" ")}: you hold or declared a file it changed.`);
         if (iface.size) lines.push(`@all interface changed: ${[...iface].join(", ")}.`);
         if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);

@@ -46,7 +46,13 @@ beforeEach(async () => {
   repo = path.join(toolRoot, "repo");
   fs.mkdirSync(repo);
   git(repo, "init", "-q");
-  git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "root");
+  // the files the tests claim and post about: a claim of a path that exists nowhere is refused (D6)
+  for (const f of ["a", "b", "held", "holds", "mine", "nobody", "page", "x", "board/board"]) {
+    fs.mkdirSync(path.dirname(path.join(repo, "src", `${f}.ts`)), { recursive: true });
+    fs.writeFileSync(path.join(repo, "src", `${f}.ts`), "export {};\n");
+  }
+  git(repo, "add", ".");
+  git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "root");
 });
 
 afterEach(() => {

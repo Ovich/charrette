@@ -348,7 +348,7 @@ test("merged mentions every other holder of a shared path", () => {
   board.lockMerge(s3);
   board.merged(s3, "abc123", ["src/a.ts"]);
   const m = board.deliver(s5).full[0];
-  assert.match(m.body, /rebase onto abc123/);
+  assert.match(m.body, /^merged abc123: rebase your branch onto it./);
   assert.deepEqual([...m.mentions].sort(), ["review-tool/S1", "review-tool/S5"]);
   assert.equal(board.deliver(s1).full[0].seq, m.seq);
 });
@@ -506,7 +506,7 @@ test("merged releases the lock and mentions holders and declarers", () => {
   assert.equal(forS5.length, 1);
   assert.equal(forS1.length, 1);
   assert.equal(forS5[0].seq, forS1[0].seq);
-  assert.match(forS5[0].body, /rebase onto abc123/);
+  assert.match(forS5[0].body, /^merged abc123: rebase your branch onto it./);
   assert.deepEqual([...forS5[0].mentions].sort(), ["review-tool/S1", "review-tool/S5"]);
   // S3 neither holds nor declared src/b.ts: one line, not in full
   const forS3 = board.deliver(s3);
@@ -527,7 +527,7 @@ test("an interface file in a merge is announced to @all", () => {
     const d = board.deliver(p);
     assert.equal(d.full.length, 1, `${p.name} got the announcement in full`);
     assert.match(d.full[0].body, /@all interface changed: src\/api\.ts/);
-    assert.match(d.full[0].body, /rebase onto def456/);
+    assert.match(d.full[0].body, /^merged def456: rebase your branch onto it./);
   }
 });
 
@@ -539,7 +539,7 @@ test("a plan merge of an interface file never mentions a brainstorm seat subscri
   board.deliver(seat);
   board.lockMerge(s3);
   board.merged(s3, "def456", [path.join(wt("s3"), "src", "api.ts")]);
-  const event = board.snapshot(REPO).events.find((e) => /rebase onto def456/.test(e.body))!;
+  const event = board.snapshot(REPO).events.find((e) => /^merged def456: rebase your branch onto it./.test(e.body))!;
   assert.ok(!board.read(event.seq).mentions.includes("topic/*"), "the seat's run is not @all-ed");
   assert.notEqual(event.channel, "main");
   const { wakes } = await import("../src/board/events.ts");

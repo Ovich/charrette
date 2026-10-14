@@ -4,7 +4,7 @@
 import type { Message, Participant } from "./board.ts";
 import { profileOf } from "./kinds.ts";
 
-export type EventName = "agreement" | "endorsement" | "merged" | "joined" | "ended" | "stale" | "opened" | "closed" | "urgent";
+export type EventName = "agreement" | "endorsement" | "merged" | "joined" | "ended" | "stale" | "opened" | "closed" | "urgent" | "flag";
 export type Scope = "run" | "main";
 export type Subscription = { event: EventName; scope: Scope };
 
@@ -35,6 +35,17 @@ export const EVENTS: Record<EventName, EventDef> = {
   opened: { name: "opened" },
   closed: { name: "closed" },
   urgent: { name: "urgent", always: true },
+  // a write outside the writer's claim on a path another holds (D10); mentions: the holder, then the writer
+  flag: {
+    name: "flag",
+    next: (m, me, cli) => {
+      const [holder, writer] = m.mentions;
+      if (!m.about || !holder || !writer) return null;
+      if (me.name === holder) return `settle it: ${cli} agree ${word(`@${writer} <who changes what>`)} --about ${word(m.about)}`;
+      if (me.name === writer) return `settle it: ${cli} post ${word(`@${holder} <what you change>`)} --about ${word(m.about)}`;
+      return null;
+    },
+  },
 };
 
 const NAMES = Object.keys(EVENTS) as EventName[];

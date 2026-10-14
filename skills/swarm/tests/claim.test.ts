@@ -91,9 +91,9 @@ afterEach(() => {
 
 test("claim on a free path claims it, exit 0; another runner is then held on it", () => {
   running();
-  const r = swarm(wtA, "claim", "src/new.ts");
+  const r = swarm(wtA, "claim", "src/new.ts", "--new");
   assert.deepEqual([r.status, answer(r.stdout), r.stderr], [0, "claimed src/new.ts\n", ""]);
-  const held = swarm(wtB, "claim", "src/new.ts");
+  const held = swarm(wtB, "claim", "src/new.ts", "--new");
   assert.equal(held.status, 3);
   assert.match(held.stdout, /src\/new\.ts is also held by review-tool\/S3/);
 });
@@ -146,7 +146,7 @@ test("the claimer's post reaches the holder ending on the agreement to answer wi
 
 test("claim --interface claims the path as an interface", async () => {
   running();
-  assert.equal(answer(cli(wtA, "claim", "src/api.ts", "--interface")), "claimed src/api.ts\n");
+  assert.equal(answer(cli(wtA, "claim", "src/api.ts", "--interface", "--new")), "claimed src/api.ts\n");
   const board = await openBoard(path.join(home, "swarm.sqlite"));
   try {
     const files = board.snapshot(board.repos()[0].repo).files;
@@ -203,7 +203,7 @@ test("merge-lock reconciles the branch's commits against --onto: a never-claimed
   assert.deepEqual(out.filter((l) => l.startsWith("reconciled ")), ["reconciled src/new.ts"]);
   assert.ok(out.some((l) => l.startsWith("granted: ")), out.join("\n"));
   // claimed: another runner is now held on it
-  assert.equal(swarm(wtA, "claim", "src/new.ts").status, 3);
+  assert.equal(swarm(wtA, "claim", "src/new.ts", "--new").status, 3);
 });
 
 test("merge-lock flags a committed file another runner holds, mentioning both, and still grants the lock (D59)", () => {
@@ -231,7 +231,7 @@ test("merge-lock claims both paths of a committed rename, and an uncommitted wri
   const r = JSON.parse(cli(wtB, "merge-lock", "--onto", "main", "--json"));
   assert.equal(r.granted, true);
   assert.deepEqual([...r.reconciled].sort(), ["src/old.ts", "src/renamed.ts", "src/wip.ts"]);
-  for (const f of ["src/old.ts", "src/renamed.ts", "src/wip.ts"]) assert.equal(swarm(wtA, "claim", f).status, 3, f);
+  for (const f of ["src/old.ts", "src/renamed.ts", "src/wip.ts"]) assert.equal(swarm(wtA, "claim", f, "--new").status, 3, f);
 });
 
 test("merge-lock without --onto says it is required and grants nothing (D59)", () => {

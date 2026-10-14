@@ -94,6 +94,8 @@ export interface Message {
   /** On delivery only, to a holder of `about` when a runner that did not hold it posted about it:
    *  the agreement that answers it (D62). */
   answer?: string;
+  /** On post only: the refused claim this post settled (D7). */
+  claimed?: { path: string; sharedWith: string[] };
 }
 
 /** Mentions in full, the rest one line each. `superseded`: a newer `wait` of the same runner
@@ -206,7 +208,7 @@ export interface Board {
   /** Paths written outside the claim: a free one is claimed, a held one flagged on the thread. */
   reconcileWrites(p: Participant, changed: string[]): Flag[];
   release(p: Participant, path: string): void;
-  lockMerge(p: Participant): { granted: true } | { granted: false; holder: string };
+  lockMerge(p: Participant, onto?: string): { granted: true } | { granted: false; holder: string };
   /** Releases the lock; tells whoever holds or declared one of `files` to rebase onto `sha`,
    *  every plan on the repository when one of them is an interface (D26). Returns, for each
    *  merged path, every other runner that holds it, or held it during `p`'s run (D63). */
@@ -352,6 +354,22 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       participant INTEGER NOT NULL,
       PRIMARY KEY (repo, path, participant)
     );
+    -- a claim refused as held: the post that settles it claims it (D7)
+    CREATE TABLE IF NOT EXISTS claim_requests (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      PRIMARY KEY (repo, path, participant)
+    );
+    -- a flag posted, once per writer, path and holder (D8)
+    CREATE TABLE IF NOT EXISTS flag_posts (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      holder INTEGER NOT NULL,
+      PRIMARY KEY (repo, path, participant, holder)
+    );
     -- a version per repository, moved by every write: what onChange compares (D39)
     CREATE TABLE IF NOT EXISTS changes (
       repo TEXT PRIMARY KEY,
@@ -380,6 +398,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   // 1: written by the board itself in a runner's name (a flag, a merge notice), never a runner's own word
   upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
   upkeep("runs", "link", "link TEXT");
+  // the branch a merge lands in, named by merge-lock --onto (D9)
+  upkeep("merge_locks", "onto", "onto TEXT");
   upkeep("slices", "link", "link TEXT");
   // what kind of work a run is (D25); a run from before is a plan run
   upkeep("runs", "kind", "kind TEXT NOT NULL DEFAULT 'plan'");
@@ -816,7 +836,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         for (const run of runIds) {
           for (const r of db.prepare("SELECT id FROM participants WHERE run = ?").all(run) as Row[]) {
             const id = Number(r.id);
-            for (const table of ["claim_log", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries"]) {
+            for (const table of ["claim_log", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries", "claim_requests", "flag_posts"]) {
               db.prepare(`DELETE FROM ${table} WHERE participant = ?`).run(id);
             }
             db.prepare("DELETE FROM notices WHERE other = ?").run(id);
@@ -989,7 +1009,10 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
 
     post(p, body, opts = {}) {
       const fresh = live(p);
-      return insertMessage(fresh, body, opts.about ?? null, opts.kind ?? "msg", undefined, { channel: opts.channel });
+      const m = insertMessage(fresh, body, opts.about ?? null, opts.kind ?? "msg", undefined, { channel: opts.channel });
+      // posting is claiming (D7), on a kind with claims
+      const claimed = profileOf(fresh.kind).claims ? claims.claimByPost(fresh, m) : null;
+      return claimed ? { ...m, claimed } : m;
     },
 
     endorse(p, seq) {
@@ -1079,8 +1102,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       claims.release(gated(live(p), "release"), file);
     },
 
-    lockMerge(p) {
-      return claims.lockMerge(gated(live(p), "merge-lock"));
+    lockMerge(p, onto) {
+      return claims.lockMerge(gated(live(p), "merge-lock"), onto);
     },
 
     merged(p, sha, files) {
