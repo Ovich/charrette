@@ -272,6 +272,20 @@ describe("sidebar ordering", () => {
     expect(sidebarEntries([...docs, gone], g)[0]).toMatchObject({ type: "doc" });
   });
 
+  test("a swarm document older than every other entry is first; the rest keep today's order (swarm D17)", () => {
+    const board = doc({ id: 50, kind: "swarm", group_slug: null, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" });
+    const flat = doc({ id: 51, group_slug: null, created_at: "2026-08-24T00:00:00Z", updated_at: "2026-08-24T12:00:00Z" });
+    const entries = sidebarEntries([...docs, flat, board], g);
+    expect(entries.map((e) => (e.type === "doc" ? e.doc.id : e.slug))).toEqual([50, 51, "project-selector", "aiview-webapp"]);
+  });
+
+  test("two swarm documents keep activity order between them, both first", () => {
+    const older = doc({ id: 60, kind: "swarm", group_slug: null, updated_at: "2026-02-01T00:00:00Z" });
+    const newer = doc({ id: 61, kind: "swarm", group_slug: null, updated_at: "2026-03-01T00:00:00Z" });
+    const entries = sidebarEntries([older, ...docs, newer], g);
+    expect(entries.slice(0, 2).map((e) => e.type === "doc" && e.doc.id)).toEqual([61, 60]);
+  });
+
   test("members inside a group still read oldest-first", () => {
     const group = sidebarEntries(docs, g).find((e) => e.type === "group" && e.slug === "aiview-webapp");
     expect((group as { docs: { id: number }[] }).docs.map((d) => d.id)).toEqual([11, 14]);
@@ -428,7 +442,7 @@ describe("swarm document", () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(""))));
     const { SwarmDocumentView } = await import("./App.tsx");
     render(<SwarmDocumentView content={JSON.stringify({ run: "7", url: "http://127.0.0.1:4777/run/7" })} />);
-    const frame = await screen.findByTitle("swarm run");
+    const frame = await screen.findByTitle("swarm board");
     expect(frame.getAttribute("src")).toMatch(/^http:\/\/127\.0\.0\.1:4777\/run\/7/);
     expect(frame.className).toContain("h-[calc(100vh-10rem)]");
     expect(document.querySelector('[data-component="SwarmThemeToggle"]')).toBeTruthy();

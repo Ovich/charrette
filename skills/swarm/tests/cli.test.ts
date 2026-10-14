@@ -83,52 +83,118 @@ test("open then join prints the roster", () => {
   assert.match(r.stdout, /review-tool\/orchestrator/);
 });
 
-/** A stand-in for aiview's CLI: `path` answers a file in `<toolRoot>/docs`, `open` logs its argv. */
-const fakeAiview = (): { launcher: string; log: string } => {
+/** A stand-in for aiview's CLI over an index in `<toolRoot>/index.json`: `status` answers project
+ *  `p`, `path` a file in `<toolRoot>/docs`, `open` registers (the same id on a second open), `list`
+ *  and `remove` read and change the index; every call's argv is logged. */
+const fakeAiview = (): { launcher: string; log: string; index: string } => {
   const launcher = path.join(toolRoot, "fake-aiview.mjs");
   const log = path.join(toolRoot, "aiview.log");
+  const index = path.join(toolRoot, "index.json");
+  fs.writeFileSync(index, "[]");
   fs.writeFileSync(
     launcher,
     `import fs from "node:fs"; import path from "node:path";
-const [verb, arg] = process.argv.slice(2);
+const argv = process.argv.slice(2).filter((a) => a !== "--json");
+const [verb, arg] = argv;
 fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)) + "\\n");
-if (verb === "path") { const dir = path.join(${JSON.stringify(toolRoot)}, "docs"); fs.mkdirSync(dir, { recursive: true }); console.log(JSON.stringify({ path: path.join(dir, arg), dir, project: "p" })); }
-else if (verb === "open") console.log(JSON.stringify({ id: 7, url: "http://localhost:4321/#doc=7" }));
+const indexFile = ${JSON.stringify(index)};
+const docs = JSON.parse(fs.readFileSync(indexFile, "utf8"));
+const kindOf = (f) => path.basename(f).split(".").slice(-2, -1)[0];
+if (verb === "status") console.log(JSON.stringify({ cwdProject: "p" }));
+else if (verb === "path") { const dir = path.join(${JSON.stringify(toolRoot)}, "docs"); fs.mkdirSync(dir, { recursive: true }); console.log(JSON.stringify({ path: path.join(dir, arg), dir, project: "p" })); }
+else if (verb === "open") {
+  let d = docs.find((x) => x.file_path === arg);
+  if (!d) { d = { id: docs.reduce((m, x) => Math.max(m, x.id), 6) + 1, file_path: arg, kind: kindOf(arg), project: "p" }; docs.push(d); fs.writeFileSync(indexFile, JSON.stringify(docs)); }
+  console.log(JSON.stringify({ id: d.id, url: "http://localhost:4321/#doc=" + d.id }));
+}
+else if (verb === "list") console.log(JSON.stringify(docs.filter((d) => d.kind === argv[argv.indexOf("--kind") + 1])));
+else if (verb === "remove") {
+  const ids = argv.slice(1).map((r) => Number(r.replace("#", "")));
+  fs.writeFileSync(indexFile, JSON.stringify(docs.filter((d) => !ids.includes(d.id))));
+  console.log(JSON.stringify({ removed: docs.filter((d) => ids.includes(d.id)) }));
+}
 else process.exit(1);
 `,
   );
-  return { launcher, log };
+  return { launcher, log, index };
 };
 
-const openWith = (aiview: string) => {
+const aiviewCalls = (log: string): string[][] => fs.readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
+const boardFile = () => path.join(toolRoot, "docs", "swarm.swarm.json");
+const boardRepos = (): string[] => new URL((JSON.parse(fs.readFileSync(boardFile(), "utf8")) as { url: string }).url).searchParams.getAll("repo");
+const indexed = (index: string) => JSON.parse(fs.readFileSync(index, "utf8")) as { file_path: string; kind: string }[];
+
+const openWith = (aiview: string, cwd = repo) => {
   const slices = path.join(toolRoot, "s.json");
   fs.writeFileSync(slices, SLICES);
-  return spawnSync(process.execPath, [CLI, "open", "--plan", "review-tool", "--title", "A plan", "--slices", slices], {
-    cwd: repo,
+  return spawnSync(process.execPath, [CLI, "open", "--plan", "review-tool", "--title", "A plan", "--slices", slices, "--json"], {
+    cwd,
     encoding: "utf8",
     env: { ...env(), SWARM_AIVIEW: aiview },
   });
 };
 
-test("open writes the run's swarm document and registers it in the plan's group in aiview", () => {
+test("the first open writes the project's board document with ?repo= and registers it with no group (D17, D30)", () => {
   const { launcher, log } = fakeAiview();
   const r = openWith(launcher);
   assert.equal(r.status, 0, r.stderr);
-  const [id, url] = r.stdout.trim().split("\n");
-  assert.equal(url, "http://localhost:4321/#doc=7");
-  const calls = fs.readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
-  const name = calls[0][1];
-  assert.match(name, new RegExp(`^\\d{4}-\\d{2}-\\d{2}-review-tool-run-${id}\\.swarm\\.json$`));
-  const file = path.join(toolRoot, "docs", name);
-  assert.deepEqual(calls[1], ["open", file, "--group", "review-tool-plan", "--json"]);
-  assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), { run: Number(id), url: `http://localhost:${port}/?run=${id}` });
+  const out = JSON.parse(r.stdout) as { url: string; repo: string };
+  assert.equal(out.url, "http://localhost:4321/#doc=7");
+  const url = new URL((JSON.parse(fs.readFileSync(boardFile(), "utf8")) as { url: string }).url);
+  assert.equal(`${url.origin}${url.pathname}`, `http://localhost:${port}/`);
+  assert.deepEqual(boardRepos(), [out.repo]);
+  const calls = aiviewCalls(log);
+  assert.deepEqual(calls.find((c) => c[0] === "path"), ["path", "swarm.swarm.json", "--project", "p", "--json"]);
+  assert.deepEqual(calls.find((c) => c[0] === "open"), ["open", boardFile(), "--kind", "swarm", "--json"]);
 });
 
-test("open without aiview prints the run's page and says to open it", () => {
+test("a second open in the same repository writes nothing new and prints the same document", () => {
+  const { launcher, index } = fakeAiview();
+  const first = JSON.parse(openWith(launcher).stdout) as { url: string };
+  const before = fs.readFileSync(boardFile(), "utf8");
+  const mtime = fs.statSync(boardFile()).mtimeMs;
+  const second = openWith(launcher);
+  assert.equal(second.status, 0, second.stderr);
+  assert.equal((JSON.parse(second.stdout) as { url: string }).url, first.url);
+  assert.equal(fs.readFileSync(boardFile(), "utf8"), before);
+  assert.equal(fs.statSync(boardFile()).mtimeMs, mtime);
+  assert.deepEqual(fs.readdirSync(path.join(toolRoot, "docs")), ["swarm.swarm.json"]);
+  assert.equal(indexed(index).length, 1);
+});
+
+test("an open in a second repository of the project adds its repo to the board's URL; still one document (D39)", () => {
+  const { launcher, index } = fakeAiview();
+  const first = JSON.parse(openWith(launcher).stdout) as { url: string; repo: string };
+  const other = path.join(toolRoot, "other");
+  fs.mkdirSync(other);
+  git(other, "init", "-q");
+  git(other, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "root");
+  const r = openWith(launcher, other);
+  assert.equal(r.status, 0, r.stderr);
+  const second = JSON.parse(r.stdout) as { url: string; repo: string };
+  assert.notEqual(second.repo, first.repo);
+  assert.equal(second.url, first.url);
+  assert.deepEqual(boardRepos(), [first.repo, second.repo]);
+  assert.equal(indexed(index).length, 1);
+});
+
+test("open retires the per-run swarm documents of earlier runs from the index", () => {
+  const { launcher, log, index } = fakeAiview();
+  const old = path.join(toolRoot, "docs", "2026-10-01-review-tool-run-3.swarm.json");
+  const plan = path.join(toolRoot, "docs", "a.plan.md");
+  fs.writeFileSync(index, JSON.stringify([{ id: 3, file_path: old, kind: "swarm", project: "p" }, { id: 4, file_path: plan, kind: "plan", project: "p" }]));
+  const r = openWith(launcher);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(aiviewCalls(log).some((c) => c[0] === "remove" && c.includes("#3")));
+  assert.deepEqual(indexed(index).map((d) => d.file_path).sort(), [plan, boardFile()].sort());
+});
+
+test("open without aiview prints the board's URL and says why", () => {
   const r = openWith(path.join(toolRoot, "none.mjs"));
   assert.equal(r.status, 0, r.stderr);
-  const [id, url] = r.stdout.trim().split("\n");
-  assert.equal(url, `http://localhost:${port}/?run=${id}`);
+  const out = JSON.parse(r.stdout) as { url: string; repo: string };
+  assert.equal(new URL(out.url).origin, `http://localhost:${port}`);
+  assert.deepEqual(new URL(out.url).searchParams.getAll("repo"), [out.repo]);
   assert.match(r.stderr, /aiview not found: open the URL/);
 });
 
@@ -473,14 +539,15 @@ test("open starts the server when none runs and prints the page's URL", async ()
   assert.equal(r.status, 0, r.stderr);
   const [id, url] = r.stdout.trim().split("\n");
   assert.ok(Number(id) > 0);
-  assert.equal(url, `http://localhost:${port}/?run=${id}`);
+  assert.equal(new URL(url).origin + new URL(url).pathname, `http://localhost:${port}/`);
+  assert.equal(new URL(url).searchParams.getAll("repo").length, 1);
   assert.equal(status().server.running, true);
   const body = (await (await fetch(`http://127.0.0.1:${port}/api/run?id=${id}`)).json()) as { run: number };
   assert.equal(body.run, Number(id));
   // a second run reuses the server
   const again = run("open", "--plan", "swarm", "--title", "T", "--slices", slices, "--json");
   const second = JSON.parse(again.stdout);
-  assert.equal(second.url, `http://localhost:${port}/?run=${second.run}`);
+  assert.deepEqual(new URL(second.url).searchParams.getAll("repo"), [second.repo]);
 });
 
 // The retention setting (D32): read, set, refuse; prune uses what was set.

@@ -8,7 +8,7 @@ import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
 import { portFrom, PORT_FILE, readServerStatus } from "../server/state.ts";
 import { parseArgs } from "./args.ts";
 import { fullText } from "./format.ts";
-import { registerRunDocument } from "./aiview-document.ts";
+import { boardUrlFor, registerBoardDocument } from "./aiview-document.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
@@ -137,8 +137,6 @@ function ensureServer(): number | null {
 }
 
 const pageUrl = (port: number): string => `http://localhost:${port}/`;
-/** One run's page, the one aiview frames. */
-const runPageUrl = (port: number, run: number): string => `${pageUrl(port)}?run=${run}`;
 /** The tool's folder (swarm.mjs's), the aiview skill beside it. */
 const toolRoot = (): string => process.env.SWARM_ROOT ?? path.dirname(path.resolve(process.argv[1]));
 
@@ -249,16 +247,16 @@ async function main(board: Board): Promise<void> {
       const run = board.openRun({ repo: repoOf(process.cwd()), group: plan, title: need("--title"), link: args.flag("--link") ?? null, seats: readSlices(need("--slices")) });
       // the person watches the run on the page: start it when none runs (US1, US6)
       const port = ensureServer();
-      const page = port === null ? null : runPageUrl(port, run.id);
+      const page = port === null ? null : pageUrl(port);
       if (page === null) {
         console.error(`swarm: the page did not start (port ${portFrom(args.flag("--port"))} may be in use; swarm serve --detach --port <n>). The run is open.`);
         emit({ run: run.id, repo: run.repo, plan: run.plan, url: null }, String(run.id));
         break;
       }
-      // the person watches the run in aiview, in the plan's group (plan D2, D3)
-      const doc = registerRunDocument({ toolRoot: toolRoot(), plan, run: run.id, pageUrl: page, date: new Date().toISOString().slice(0, 10) });
+      // the person watches the project's board in aiview, pinned first (plan D17, D30, D39)
+      const doc = registerBoardDocument({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run.repo, pageUrl: page });
       if (!doc.registered) console.error(`swarm: ${doc.reason}: open the URL`);
-      const url = doc.registered ? doc.url : page;
+      const url = doc.registered ? doc.url : boardUrlFor(page, [run.repo]);
       emit({ run: run.id, repo: run.repo, plan: run.plan, url }, `${run.id}\n${url}`);
       break;
     }

@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.tsx";
 import { THEMES, type Theme } from "../../lib/theme.ts";
 
-// A swarm document is one run, framed live from swarm's own server: aiview reads only the
+// A swarm document is the project's board, framed live from swarm's own server: aiview reads only the
 // URL its file names, never swarm's store. Full height, no viewport and no Composition: an
 // app, used at full size, as a workbench is.
 
-/** The run's page URL a swarm document's file names, or null when the file holds none. */
+/** The board page URL a swarm document's file names, or null when the file holds none. */
 export function swarmUrlOf(content: string): string | null {
   try {
     const parsed = JSON.parse(content) as { url?: unknown } | null;
@@ -81,7 +81,7 @@ export function SwarmFrame({ url }: SwarmFrameProps) {
           ))}
         </ToggleGroup>
       </div>
-      {reach === "loading" && <p className="text-muted-foreground">Reaching the run's page…</p>}
+      {reach === "loading" && <p className="text-muted-foreground">Reaching the board…</p>}
       {reach === "unreachable" && (
         <p className="text-muted-foreground" data-component="SwarmUnreachable">
           The board's server is not running: <code className="font-mono text-[12px]">swarm serve --detach</code>
@@ -89,7 +89,7 @@ export function SwarmFrame({ url }: SwarmFrameProps) {
       )}
       {reach === "framed" && (
         <iframe
-          title="swarm run"
+          title="swarm board"
           src={themedSwarmUrl(url, theme)}
           className="block h-[calc(100vh-10rem)] w-full max-w-full rounded-[10px] border border-border bg-background"
         />

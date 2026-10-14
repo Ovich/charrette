@@ -13,7 +13,8 @@ export const docActivity = (d: DocumentWithState): string => d.updated_at ?? d.l
  *  - grouped docs collapse into one container entry per group
  *  - members inside a group read oldest-first (the board that started it on top)
  *  - every entry sorts by its most recently changed member, newest first — so the
- *    group holding the latest document is on top */
+ *    group holding the latest document is on top
+ *  - a swarm document (the project's board) comes before all of them, whatever its age */
 export function sidebarEntries(
   docs: DocumentWithState[],
   groups: Record<string, string>,
@@ -36,5 +37,7 @@ export function sidebarEntries(
   }
   const activity = (e: SidebarEntry): string =>
     e.type === "doc" ? docActivity(e.doc) : e.docs.reduce((m, d) => (docActivity(d) > m ? docActivity(d) : m), "");
-  return entries.sort((a, b) => activity(b).localeCompare(activity(a)));
+  // the project's swarm board is pinned above every other entry (swarm plan D17)
+  const pinned = (e: SidebarEntry): number => (e.type === "doc" && e.doc.kind === "swarm" ? 0 : 1);
+  return entries.sort((a, b) => pinned(a) - pinned(b) || activity(b).localeCompare(activity(a)));
 }
