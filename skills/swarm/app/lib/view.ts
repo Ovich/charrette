@@ -52,9 +52,8 @@ export const mentionCtx = (snap: BoardSnapshot): MentionCtx => ({
   ),
 });
 
-/** Each runner's funny name (D43), by `<plan>/<slice>`; orchestrators have none. */
-export const nicksOf = (snap: BoardSnapshot): Map<string, string> =>
-  new Map(snap.roster.filter((r) => r.slice !== ORCHESTRATOR).map((r) => [r.runner, r.nick]));
+/** Each member's funny name (D43), by `<plan>/<slice>`, the orchestrators' included (plan D17). */
+export const nicksOf = (snap: BoardSnapshot): Map<string, string> => new Map(snap.roster.map((r) => [r.runner, r.nick]));
 
 /** Whom a message names, resolved as the Board resolves it. */
 export const targets = (e: SnapshotEvent, ctx: MentionCtx): string[] => parseMentions(e.body, splitRunner(e.from).plan, ctx.groups, ctx.names);
