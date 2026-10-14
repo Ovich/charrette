@@ -1,8 +1,10 @@
-// Writes a new workbench page: Basecoat and the JSON reader (`jsonTree`) inlined, the bench bar opening on the label, an
-// empty data block for the feed, and the bridge from aiview's theme switch to Basecoat's
-// `.dark`. The bench's own code goes in the last script, under its marker.
-//   node page.mjs <YYYY-MM-DD-<bench>.workbench.html> --label "<label>"
-// Refuses to overwrite: a bench that exists is changed, never regenerated.
+// Writes a workbench page: Basecoat, the JSON reader (`jsonTree`) and the `bench` loader inlined, the
+// bench bar opening on the label, and the bridge from aiview's theme switch to Basecoat's `.dark`.
+// The page holds no data: the loader reads the sidecar through aiview. The bench's own code sits
+// between the `<!-- bench-code -->` markers, just before </body>.
+//   node page.mjs <YYYY-MM-DD-<bench>.workbench.html> --label "<label>" [--replace]
+// Refuses to overwrite, except --replace on a page carrying a bench-code block: the page is
+// remade at the same path (same aiview id and link), that block kept verbatim.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,15 +13,31 @@ const args = process.argv.slice(2);
 const out = args.find((a) => !a.startsWith("--") && args[args.indexOf(a) - 1] !== "--label");
 const label = args[args.indexOf("--label") + 1];
 if (!out || !args.includes("--label") || !label) {
-  console.error('usage: node page.mjs <file.workbench.html> --label "<label>"');
+  console.error('usage: node page.mjs <file.workbench.html> --label "<label>" [--replace]');
   process.exit(2);
 }
 if (!out.endsWith(".workbench.html")) {
   console.error(`page.mjs: ${out} must end in .workbench.html, so aiview files it as kind workbench`);
   process.exit(2);
 }
+const BENCH_CODE = /<!-- bench-code -->[\s\S]*?<!-- \/bench-code -->/;
+const replace = args.includes("--replace");
+let benchCode = `<!-- bench-code -->
+<script>
+  // ---- the bench: draws its views with the bench loader (bench.view, bench.run, …) ----
+</script>
+<!-- /bench-code -->`;
 if (existsSync(out)) {
-  console.error(`page.mjs: ${out} exists; change the bench, do not regenerate it`);
+  const kept = replace && readFileSync(out, "utf8").match(BENCH_CODE);
+  if (!kept) {
+    console.error(replace
+      ? `page.mjs: ${out} has no <!-- bench-code --> block; --replace remakes only a bench page`
+      : `page.mjs: ${out} exists; change the bench, or remake its page with --replace`);
+    process.exit(1);
+  }
+  benchCode = kept[0];
+} else if (replace) {
+  console.error(`page.mjs: ${out} does not exist; --replace remakes an existing page`);
   process.exit(1);
 }
 
@@ -30,6 +48,7 @@ const js = readFileSync(join(assets, "basecoat.min.js"), "utf8").replace(/<\/scr
 const jsonTreeDir = join(assets, "../json-tree");
 const treeCss = readFileSync(join(jsonTreeDir, "json-tree.css"), "utf8");
 const treeJs = readFileSync(join(jsonTreeDir, "json-tree.js"), "utf8").replace(/<\/script/gi, "<\\/script");
+const benchJs = readFileSync(join(assets, "../bench/bench.js"), "utf8").replace(/<\/script/gi, "<\\/script");
 const text = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const page = `<!doctype html>
@@ -55,9 +74,9 @@ const page = `<!doctype html>
   <div class="bench-tools" id="bench-tools"></div>
 </header>
 <main class="bench" id="bench"></main>
-<script id="data" type="application/json">null</script>
 <script data-basecoat>${js}</script>
 <script data-json-tree>${treeJs}</script>
+<script data-bench>${benchJs}</script>
 <script>
   // aiview forces its theme by rewriting the media query text, this one included, so the
   // page follows the viewer's switch as well as the machine's.
@@ -65,9 +84,8 @@ const page = `<!doctype html>
   const applyScheme = () => document.documentElement.classList.toggle("dark", scheme.matches);
   applyScheme();
   scheme.addEventListener("change", applyScheme);
-  const DATA = JSON.parse(document.getElementById("data").textContent);
-  // ---- the bench: renders DATA as the project produced it ----
 </script>
+${benchCode}
 </body>
 </html>
 `;
