@@ -306,7 +306,8 @@ p { margin: 0; }
 
 /* SL7: the agent strip (D7, D20) and the claims row; the page a column: tabs, strip, conversation, claims */
 /* the cards wrap onto as many rows as they need, never a horizontal scroll */
-.agent-strip { flex: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 10px; padding: 12px 2px; }
+/* two rows at most, the rest scrolled to: rows of one height so the cap is exact */
+.agent-strip { --row: 77px; flex: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); grid-auto-rows: var(--row); gap: 10px; padding: 12px 2px; max-height: calc(2 * var(--row) + 10px + 24px); overflow-y: auto; }
 .agent-strip .card { min-width: 0; }
 .agent-strip.following .card[aria-pressed="false"] { opacity: .45; }
 .agent-strip .card.ended, .agent-strip .card.done { opacity: .55; }
