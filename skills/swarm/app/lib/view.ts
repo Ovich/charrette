@@ -439,7 +439,8 @@ export function conversation(snap: BoardSnapshot, pick: Pick): Item[] {
   const ctx = mentionCtx(snap);
   const picked = pick.run == null ? null : (snap.runs.find((r) => r.run === pick.run) ?? null);
   const members = new Set(picked ? membersOf(snap, picked).map((m) => m.runner) : []);
-  const namesPicked = (e: SnapshotEvent): boolean => !!picked && targets(e, ctx).some((t) => members.has(t) || t === `${picked.group}/*`);
+  // the board's stored mentions (a flag's holder and writer) or the body's
+  const namesPicked = (e: SnapshotEvent): boolean => !!picked && [...(e.mentions ?? []), ...targets(e, ctx)].some((t) => members.has(t) || t === `${picked.group}/*`);
   const items: Item[] = [];
   for (const e of [...snap.events].sort((a, b) => a.seq - b.seq)) {
     const run = runOf(snap, e);
