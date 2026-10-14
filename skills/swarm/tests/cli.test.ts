@@ -223,7 +223,7 @@ test("status --json lists each open run with its kind; the text names the kind (
   const id = openRun();
   const s = JSON.parse(run("status", "--json").stdout);
   assert.equal(s.runs, 1);
-  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan" }]);
+  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", members: [{ name: "review-tool/orchestrator", nick: "orchestrator", worktree: null }] }]);
   assert.match(run("status").stdout, new RegExp(`run ${id}  plan  review-tool  A plan`));
 });
 
@@ -808,4 +808,35 @@ test("slice add adds a slice mid-run that can be joined; a duplicate id and a cl
 test("--help names --on, subscribe, unsubscribe, slice add and the known events", () => {
   const h = run("--help");
   for (const w of ["--on", "subscribe", "unsubscribe", "slice   add", "agreement, endorsement, merged"]) assert.ok(h.stdout.includes(w), w);
+});
+
+test("a mention naming nobody is told to its author, closest names offered; the message is unchanged (D63)", () => {
+  const id = String(openRun());
+  const s3 = JSON.parse(run("join", "--run", id, "--slice", "S3", "--doing", "the page", "--json").stdout);
+  const nick = s3.nick.replace(/\s+/g, "");
+  const r = run("post", "@S4 and @S3 and @orchestrator and @all: the header", "--as", "review-tool/S3");
+  assert.equal(r.status, 0, r.stderr);
+  const lines = r.stdout.split("\n");
+  assert.match(lines[0], /^#\d+/);
+  assert.equal(lines[1], `@S4 matched nobody on the board: did you mean @review-tool/S3 or @${nick}, @review-tool/orchestrator?`);
+  assert.ok(!r.stdout.includes("@S3 matched") && !r.stdout.includes("@orchestrator matched") && !r.stdout.includes("@all matched"), r.stdout);
+  assert.equal(run("read", seqOf(r.stdout)).stdout.includes("@S4 and @S3"), true);
+  const agreed = run("agree", "@Nobody owns it", "--as", "review-tool/S3", "--json");
+  assert.equal(agreed.status, 0, agreed.stderr);
+  assert.equal(JSON.parse(agreed.stdout).unmatched[0].startsWith("@Nobody matched nobody on the board"), true);
+  const clean = JSON.parse(run("post", `@${nick} fine`, "--as", "review-tool/S3", "--json").stdout);
+  assert.equal(clean.unmatched, undefined);
+});
+
+test("roster --json and status --json give each member's worktree, null for a seat (D64)", () => {
+  const id = String(openRun());
+  run("join", "--run", id, "--slice", "S3", "--doing", "the page");
+  const roster = JSON.parse(run("roster", "--json").stdout).roster as { name: string; worktree: string | null }[];
+  const s3 = roster.find((m) => m.name === "review-tool/S3")!;
+  assert.ok(s3.worktree && fs.realpathSync(s3.worktree) === fs.realpathSync(repo), String(s3.worktree));
+  const seat = openBrainstorm();
+  assert.equal(joinSeat(seat, "skeptic").status, 0);
+  const open = JSON.parse(run("status", "--json").stdout).open as { run: number; members: { name: string; worktree: string | null }[] }[];
+  assert.ok(open.find((r) => r.run === Number(id))!.members.some((m) => m.name === "review-tool/S3" && m.worktree !== null));
+  assert.ok(open.find((r) => r.run === seat)!.members.filter((m) => m.name.endsWith("/skeptic")).every((m) => m.worktree === null));
 });

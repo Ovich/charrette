@@ -10,6 +10,7 @@ import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
 import { portFrom, PORT_FILE, readServerStatus } from "../server/state.ts";
 import { parseArgs } from "./args.ts";
 import { fullText, seqLine } from "./format.ts";
+import { nameHandle, unmatchedMentions } from "../board/mentions.ts";
 import { boardUrlFor, registerBoardDocument } from "./aiview-document.ts";
 
 const args = parseArgs(process.argv.slice(2));
@@ -212,6 +213,19 @@ const listenNow = (runner: string): string =>
 
 /** A verb's output, then the listener line when the caller has no `wait --mentions` pending and has
  *  not ended (D61), once per call; --json carries it as `next`. */
+/** One line per `@…` of `body` that names no member (D63): the closest active names, at most three. */
+const unmatchedLines = (board: Board, p: Participant, body: string): string[] => {
+  const roster = board.roster(p.repo);
+  const runners = roster.filter((r) => r.slice !== "orchestrator");
+  const plans = [...new Set(roster.map((r) => r.plan))];
+  const names = new Map(runners.map((r) => [nameHandle(r.nick), r.name]));
+  const nickOf = new Map(runners.map((r) => [r.name, r.nick.replace(/\s+/g, "")]));
+  return unmatchedMentions(body, p.plan, plans, names).map(({ name, closest }) => {
+    const guesses = closest.map((c) => (nickOf.has(c) ? `@${c} or @${nickOf.get(c)}` : `@${c}`));
+    return `@${name} matched nobody on the board${guesses.length ? `: did you mean ${guesses.join(", ")}?` : ""}`;
+  });
+};
+
 const emitHeard = (p: Participant, json: object, human: string | (() => void)): void => {
   const next = !p.ended && !p.listening ? listenNow(p.name) : null;
   emit(next ? { ...json, next } : json, () => {
@@ -415,7 +429,11 @@ async function main(board: Board): Promise<void> {
         kind: args.verb === "agree" ? "agreement" : "msg",
         channel: args.has("--main") ? "main" : "run",
       });
-      emitHeard(p, { seq: m.seq, mentions: m.mentions, channel: m.channel }, seqLine(m));
+      const unmatched = unmatchedLines(board, p, body);
+      emitHeard(p, { seq: m.seq, mentions: m.mentions, channel: m.channel, ...(unmatched.length ? { unmatched } : {}) }, () => {
+        console.log(seqLine(m));
+        for (const line of unmatched) console.log(line);
+      });
       break;
     }
     case "endorse": {
@@ -551,7 +569,10 @@ async function main(board: Board): Promise<void> {
     case "status": {
       const runs = board.runs();
       const server = readServerStatus();
-      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, runs: runs.length, open: runs.map((r) => ({ run: r.id, kind: r.kind, group: r.plan, title: r.title })) }, () => {
+      // each member's worktree, null for a seat or an orchestrator (D64)
+      const membersOf = (r: (typeof runs)[number]) => board.roster(r.repo).filter((m) => m.run === r.id).map((m) => ({ name: m.name, nick: m.nick, worktree: m.worktree }));
+      const open = runs.map((r) => ({ run: r.id, kind: r.kind, group: r.plan, title: r.title, members: membersOf(r) }));
+      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, runs: runs.length, open }, () => {
         console.log(`home    ${DATA_ROOT}`);
         console.log(`sqlite  ${SQLITE_PATH}`);
         console.log(

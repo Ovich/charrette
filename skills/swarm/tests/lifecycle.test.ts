@@ -50,6 +50,8 @@ const closedAgo = (run: number, ms: number): void => {
   board.closeRun(run);
   raw.prepare("UPDATE runs SET closed_at = ? WHERE id = ?").run(ago(ms), run);
   raw.prepare("UPDATE messages SET at = ? WHERE run = ?").run(ago(ms + DAY), run);
+  // the closed event, in main, dates from the close (D67)
+  raw.prepare("UPDATE messages SET at = ? WHERE run IS NULL AND event = 'closed' AND body = ?").run(ago(ms), `run ${run} closed`);
 };
 
 test("a closed run's channel refuses a post; its messages stay readable", () => {
@@ -79,7 +81,8 @@ test("prune removes a run closed past the retention with its seats, channel and 
 
   const removed = board.prune();
   assert.equal(removed.runs, 1);
-  assert.equal(count("SELECT COUNT(*) AS n FROM runs WHERE id = ?", old.run.id), 0);
+  // the row stays, stamped, so its id is never handed out again (D61)
+  assert.equal(count("SELECT COUNT(*) AS n FROM runs WHERE id = ? AND pruned_at IS NOT NULL", old.run.id), 1);
   assert.equal(count("SELECT COUNT(*) AS n FROM slices WHERE run = ?", old.run.id), 0);
   assert.equal(count("SELECT COUNT(*) AS n FROM participants WHERE run = ?", old.run.id), 0);
   assert.equal(count("SELECT COUNT(*) AS n FROM messages WHERE run = ?", old.run.id), 0);
@@ -88,6 +91,31 @@ test("prune removes a run closed past the retention with its seats, channel and 
   assert.ok(count("SELECT COUNT(*) AS n FROM messages WHERE run = ?", recent.run.id) > 0);
   assert.deepEqual(board.runs().map((r) => r.id), [open.run.id]);
   assert.ok(count("SELECT COUNT(*) AS n FROM messages WHERE run = ?", open.run.id) > 0);
+});
+
+test("a pruned run's id is never given to a new run, and the page lists it nowhere (D61)", () => {
+  const a = runWithMembers("a");
+  closedAgo(a.run.id, 31 * DAY);
+  assert.equal(board.prune().runs, 1);
+  const b = runWithMembers("b");
+  assert.ok(b.run.id > a.run.id, `${b.run.id} > ${a.run.id}`);
+  assert.deepEqual(board.snapshot(REPO).runs.map((r) => r.run), [b.run.id]);
+  assert.ok(!board.repos().some((r) => r.runs.some((x) => x.run === a.run.id)));
+  assert.ok(!board.runs().some((r) => r.id === a.run.id));
+});
+
+test("close posts the closed event in main: a member subscribed to main:closed wakes (D67)", async () => {
+  const { run } = runWithMembers("alpha");
+  const other = board.openRun({ repo: REPO, group: "beta", title: "beta", seats: SEATS });
+  const watcher = board.join({ run: other.id, slice: "S1", doing: "watching", files: [], on: [{ event: "closed", scope: "main" }] }).runner;
+  board.deliver(watcher);
+  board.closeRun(run.id);
+  const closed = board.snapshot(REPO).events.filter((e) => e.kind === "event" && e.body === `run ${run.id} closed`);
+  assert.equal(closed.length, 1);
+  assert.equal(closed[0].channel, "main");
+  const { wakes } = await import("../src/board/events.ts");
+  const m = board.read(closed[0].seq);
+  assert.ok(wakes(m, watcher, [{ event: "closed", scope: "main" }]));
 });
 
 test("prune removes main's old talk, keeps agreements and their endorsements, and the pruned author of one", () => {

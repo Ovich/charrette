@@ -331,6 +331,12 @@ test("release drops one holder of a shared path", () => {
   assert.match((v as { refusal: string }).refusal, /^src\/a\.ts is also held by review-tool\/S5 \(/);
 });
 
+test("a file declared at join while another runner holds it shows under both holders (D62)", () => {
+  const { run } = claimed();
+  board.join({ run: run.id, slice: "S1", doing: "board", files: [{ path: "src/a.ts", interface: true }], worktree: wt("s1") });
+  assert.deepEqual(board.snapshot(REPO).files.find((f) => f.path === "src/a.ts")!.holders, ["review-tool/S3", "review-tool/S1"]);
+});
+
 test("merged mentions every other holder of a shared path", () => {
   const { run, s3, s5 } = claimed();
   const s1 = board.join({ run: run.id, slice: "S1", doing: "board", files: [], worktree: wt("s1") }).runner;

@@ -67,6 +67,13 @@ test("a board with a plan open shows FileMap and MergeLock, even on a brainstorm
   expect(within(screen.getByRole("region", { name: "Files held" })).getByText("src/routes/auth.ts")).toBeTruthy();
 });
 
+test("FileMap lists every holder of a shared file (D62)", () => {
+  const shared = { ...LIVE, files: [...LIVE.files, { path: "src/shared.ts", holders: [LIVE.roster[1].runner, LIVE.roster[2].runner], interface: true }] };
+  show([APP], 1, [shared]);
+  const row = within(screen.getByRole("region", { name: "Files held" })).getByText("src/shared.ts").closest("li")!;
+  expect(row.querySelectorAll('[data-component="RunnerTag"]').length).toBe(2);
+});
+
 test("ClosedChannels is collapsed, lists every closed run, and a closed thread reads only", () => {
   show([APP], null);
   const toggle = rail().getByRole("button", { name: /Closed/ });

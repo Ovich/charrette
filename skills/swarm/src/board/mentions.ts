@@ -44,3 +44,38 @@ export function parseMentions(body: string, senderPlan: string, plans: string[],
   }
   return [...out];
 }
+
+const editDistance = (a: string, b: string): number => {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) row.push(Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)));
+    prev = row;
+  }
+  return prev[b.length];
+};
+
+/**
+ * The `@…` tokens of a body that name no member (D63), each with the closest members, at most
+ * three, as `<plan>/<slice>`. A member is an active runner (`names`, as `parseMentions` takes it)
+ * or the orchestrator of an open plan; `@all`, `@<plan>/all` and a funny name always match.
+ */
+export function unmatchedMentions(body: string, senderPlan: string, plans: string[], names?: ReadonlyMap<string, string>): { name: string; closest: string[] }[] {
+  const handleOf = new Map([...(names ?? new Map<string, string>())].map(([handle, runner]) => [runner, handle]));
+  const members = new Set([...handleOf.keys(), ...[senderPlan, ...plans].map((p) => `${p}/orchestrator`)]);
+  const out: { name: string; closest: string[] }[] = [];
+  const seen = new Set<string>();
+  for (const m of body.matchAll(MENTION)) {
+    const token = m[1].replace(/[.\-]+$/, "");
+    if (seen.has(token)) continue;
+    seen.add(token);
+    if (names?.has(token.toLowerCase())) continue;
+    const targets = parseMentions(`@${token}`, senderPlan, plans, names);
+    if (targets.length && targets.every((t) => t.endsWith("/*") || members.has(t))) continue;
+    const wanted = token.split(/[/·]/).pop()!.toLowerCase();
+    const gap = (member: string): number =>
+      Math.min(editDistance(wanted, member.slice(member.lastIndexOf("/") + 1).toLowerCase()), editDistance(wanted, handleOf.get(member) ?? member));
+    out.push({ name: token, closest: [...members].sort((a, b) => gap(a) - gap(b)).slice(0, 3) });
+  }
+  return out;
+}

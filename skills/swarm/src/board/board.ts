@@ -74,6 +74,7 @@ export interface RosterEntry {
   files: Declared[];
   stale: boolean; // no tool call for ten minutes (D31)
   subscriptions: Subscription[];
+  worktree: string | null; // null for a seat or an orchestrator (D64)
 }
 
 export interface Message {
@@ -149,11 +150,12 @@ export interface Board {
   /** A seat added mid-run (D60): after the last, `ready`; refused on an id already in the run, an
    *  unknown blocker or a closed run. Posts an event in the run channel. */
   addSlice(run: RunId, spec: SeatSpec): Slice;
-  /** Also archives the run's channel: read-only from then on, `run <n> is closed` (D19). */
+  /** Also archives the run's channel: read-only from then on, `run <n> is closed` (D19). Posts the `closed` event in main (D67). */
   closeRun(run: RunId): void;
   /** Past the retention: closed runs (closed_at older), their seats, members not referenced by a
    *  kept message, their channels and deliveries; main messages older, agreements and the
-   *  endorsements of kept agreements kept. Open runs never. `now` for tests (D19, D20). */
+   *  endorsements of kept agreements kept. Open runs never. The run's row stays, stamped `pruned_at`,
+   *  never listed, so its id is never reused (D61). `now` for tests (D19, D20). */
   prune(now?: Date): { messages: number; runs: number };
   /** Reads, or writes then reads, a board setting. retention-days: a positive integer, default 30 (D32). */
   setting(name: "retention-days", value?: number): number;
@@ -386,7 +388,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   upkeep("messages", "endorses", "endorses INTEGER");
   // 1 once the run's stale event is in main; any member call resets it (D19)
   upkeep("runs", "stale_flagged", "stale_flagged INTEGER NOT NULL DEFAULT 0");
-  // set when prune removed the run but kept it as the author of a kept agreement: never listed
+  // set when prune removed the run's contents; the row stays so its id is never reused (D61): never listed
   upkeep("runs", "pruned_at", "pruned_at TEXT");
   // the board event a message is (D59); null on plain posts and rows from before
   upkeep("messages", "event", "event TEXT");
@@ -773,6 +775,10 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     closeRun(run) {
       runRow(run);
       transaction(() => {
+        // in main, so a member subscribed to main:closed wakes (D67)
+        const author = (db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run, ORCHESTRATOR) ??
+          db.prepare("SELECT id FROM participants WHERE run = ? ORDER BY id LIMIT 1").get(run)) as Row | undefined;
+        if (author) insertMessage(participantById(Number(author.id)), `run ${run} closed`, null, "event", undefined, { channel: "main", event: EVENTS.closed.name });
         db.prepare("UPDATE runs SET state = 'closed', closed_at = ? WHERE id = ?").run(now(), run);
         bump(String(runRow(run).repo));
         db.prepare("UPDATE participants SET ended_at = COALESCE(ended_at, ?) WHERE run = ?").run(now(), run);
@@ -803,7 +809,6 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           touched.add(String(m.repo));
         }
         for (const run of runIds) {
-          let authorsKept = 0;
           for (const r of db.prepare("SELECT id FROM participants WHERE run = ?").all(run) as Row[]) {
             const id = Number(r.id);
             for (const table of ["claim_log", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries"]) {
@@ -811,12 +816,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
             }
             db.prepare("DELETE FROM notices WHERE other = ?").run(id);
             // a member authoring a kept message stays, so the message still reads its author
-            if (db.prepare("SELECT 1 FROM messages WHERE author = ? LIMIT 1").get(id)) authorsKept++;
-            else db.prepare("DELETE FROM participants WHERE id = ?").run(id);
+            if (!db.prepare("SELECT 1 FROM messages WHERE author = ? LIMIT 1").get(id)) db.prepare("DELETE FROM participants WHERE id = ?").run(id);
           }
           db.prepare("DELETE FROM slices WHERE run = ?").run(run);
-          if (authorsKept) db.prepare("UPDATE runs SET pruned_at = ? WHERE id = ?").run(at.toISOString(), run);
-          else db.prepare("DELETE FROM runs WHERE id = ?").run(run);
+          // the row stays, stamped: its id is never handed to a new run (D61)
+          db.prepare("UPDATE runs SET pruned_at = ? WHERE id = ?").run(at.toISOString(), run);
         }
         for (const repo of touched) bump(repo);
         return { messages: doomed.length, runs: runIds.length };
@@ -974,6 +978,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         files: JSON.parse(String(r.files)) as Declared[],
         stale: Date.parse(String(r.last_call ?? r.joined_at)) < cutoff,
         subscriptions: subsOf(r),
+        worktree: r.worktree == null ? null : String(r.worktree),
       }));
     },
 
@@ -1116,6 +1121,17 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         f.holders.push(`${c.plan}/${c.slice}`);
         f.interface ||= c.kind === "interface";
         files.set(f.path, f);
+      }
+      // a file a live runner declared at join but could not claim, held by another: it holds it too (D62);
+      // one it claimed and released since does not come back
+      const everClaimed = db.prepare("SELECT 1 FROM claim_log WHERE repo = ? AND path = ? AND participant = ?");
+      for (const r of people) {
+        if (String(r.slice) === ORCHESTRATOR || !isLive(Number(r.id))) continue;
+        const name = `${r.plan}/${r.slice}`;
+        for (const d of JSON.parse(String(r.files)) as Declared[]) {
+          const f = files.get(relPath(repo, d.path) ?? d.path);
+          if (f && !f.holders.includes(name) && !everClaimed.get(repo, f.path, Number(r.id))) f.holders.push(name);
+        }
       }
       const sharedBy = (path: string, id: number): boolean => live.some((c) => String(c.path) === path && Number(c.participant) !== id);
 
