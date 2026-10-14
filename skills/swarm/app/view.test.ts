@@ -8,7 +8,7 @@ const run = (id: number, kind: "plan" | "brainstorm", group: string, open = true
 });
 const member = (group: string, slice: string, state: SnapshotRunner["state"] = "working"): SnapshotRunner => ({
   runner: `${group}/${slice}`, nick: `Nick ${slice}`, plan: group, slice, title: slice, doing: "", state, stale: false,
-  files: [], joined: "2026-10-14T10:00:00Z", ended: null, calls: 0, listening: false,
+  files: [], joined: "2026-10-14T10:00:00Z", ended: null, calls: 0, listening: false, on: [],
 });
 let seq = 0;
 const post = (channel: "main" | number, from: string, body: string): SnapshotEvent => ({

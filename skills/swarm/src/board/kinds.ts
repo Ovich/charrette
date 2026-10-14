@@ -1,3 +1,5 @@
+import type { Subscription } from "./events.ts";
+
 // What kind of work a run is, and what that kind allows (D25, D40). A new kind is a row here.
 
 export type Kind = "plan" | "brainstorm";
@@ -11,11 +13,15 @@ export interface KindProfile {
   worktree: boolean;
   /** what join and the help call a member */
   member: "runner" | "seat";
+  /** the subscriptions a member gets when neither `--on` nor its seat row names any (D59) */
+  defaults: { member: Subscription[]; orchestrator: Subscription[] };
 }
 
+const run = (...events: Subscription["event"][]): Subscription[] => events.map((event) => ({ event, scope: "run" }));
+
 export const PROFILES: Record<Kind, KindProfile> = {
-  plan: { kind: "plan", claims: true, mergeLock: true, worktree: true, member: "runner" },
-  brainstorm: { kind: "brainstorm", claims: false, mergeLock: false, worktree: false, member: "seat" },
+  plan: { kind: "plan", claims: true, mergeLock: true, worktree: true, member: "runner", defaults: { member: [], orchestrator: run("merged", "ended", "stale") } },
+  brainstorm: { kind: "brainstorm", claims: false, mergeLock: false, worktree: false, member: "seat", defaults: { member: [], orchestrator: run("agreement", "endorsement", "ended", "stale") } },
 };
 
 /** The profile of `kind`; throws on an unknown kind, listing the known ones. */

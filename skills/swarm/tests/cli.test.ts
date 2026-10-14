@@ -747,3 +747,65 @@ test("open keeps the project's board in aiview's index, aiview listing paths rel
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(indexed(index).map((d) => d.file_path), [boardFile()]);
 });
+
+// SL12: subscriptions (D59) and slices added mid-run (D60)
+test("join --on with an unknown event exits 1 listing the known ones; --on stores both", () => {
+  const id = openBrainstorm();
+  const bad = joinSeat(id, "architect", "--on", "agreed");
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, closed, urgent/);
+  const ok = joinSeat(id, "architect", "--on", "agreement,main:merged");
+  assert.equal(ok.status, 0, ok.stderr);
+  const roster = run("roster");
+  assert.match(roster.stdout, /idea\/architect .*on: agreement, main:merged/);
+});
+
+test("subscribe and unsubscribe print the member's subscriptions after", () => {
+  const id = openBrainstorm();
+  joinSeat(id, "architect");
+  const s = run("subscribe", "agreement,main:merged", "--as", "idea/architect");
+  assert.equal(s.status, 0, s.stderr);
+  assert.match(s.stdout, /idea\/architect wakes on: agreement, main:merged/);
+  const u = run("unsubscribe", "agreement", "--as", "idea/architect");
+  assert.match(u.stdout, /wakes on: main:merged$/m);
+  const bad = run("subscribe", "nope", "--as", "idea/architect");
+  assert.equal(bad.status, 1);
+});
+
+test("a seat subscribed through its seats row wakes on an agreement with no mention, and the output carries back it", () => {
+  const seats = path.join(toolRoot, "on.seats.json");
+  fs.writeFileSync(seats, JSON.stringify([
+    { id: "architect", title: "the architect", blockers: [] },
+    { id: "skeptic", title: "the skeptic", blockers: [], on: ["agreement"] },
+  ]));
+  const r = run("open", "--kind", "brainstorm", "--group", "idea", "--title", "An idea", "--seats", seats);
+  assert.equal(r.status, 0, r.stderr);
+  const id = Number(r.stdout.split("\n")[0].trim());
+  joinSeat(id, "architect");
+  joinSeat(id, "skeptic");
+  const agreed = run("agree", "we keep D3", "--about", "D3", "--as", "idea/architect");
+  const w = run("wait", "--mentions", "--timeout", "3000", "--as", "idea/skeptic");
+  assert.equal(w.status, 0, w.stderr);
+  assert.match(w.stdout, new RegExp(`back it: node \\S+ endorse ${seqOf(agreed.stdout)} --as idea/skeptic`));
+});
+
+test("slice add adds a slice mid-run that can be joined; a duplicate id and a closed run exit 1", () => {
+  const id = openRun();
+  const a = run("slice", "add", "S7", "--run", String(id), "--title", "the late one", "--blockers", "S3");
+  assert.equal(a.status, 0, a.stderr);
+  assert.match(a.stdout, /^S7 added$/m);
+  const j = run("join", "--run", String(id), "--slice", "S7", "--doing", "late");
+  assert.equal(j.status, 0, j.stderr);
+  const dup = run("slice", "add", "S7", "--run", String(id), "--title", "again");
+  assert.equal(dup.status, 1);
+  assert.match(dup.stderr, /already in run/);
+  run("close", "--run", String(id));
+  const closed = run("slice", "add", "S8", "--run", String(id), "--title", "x");
+  assert.equal(closed.status, 1);
+  assert.match(closed.stderr, /is closed/);
+});
+
+test("--help names --on, subscribe, unsubscribe, slice add and the known events", () => {
+  const h = run("--help");
+  for (const w of ["--on", "subscribe", "unsubscribe", "slice   add", "agreement, endorsement, merged"]) assert.ok(h.stdout.includes(w), w);
+});

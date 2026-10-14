@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { openBoard, type Board, type Declared, type Delivery, type Flag, type Kind, type Message, type Participant, type RosterEntry, type SliceSpec, type SliceState } from "../board/board.ts";
 import { profileOf } from "../board/kinds.ts";
+import { EVENTS, eventOf, formatSubscriptions, parseSubscriptions, type Subscription } from "../board/events.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
 import { portFrom, PORT_FILE, readServerStatus } from "../server/state.ts";
 import { parseArgs } from "./args.ts";
@@ -18,10 +19,14 @@ const USAGE = [
   "usage: swarm <verb> [--json]        (swarm --help code: the claim and merge verbs)",
   "  open    --kind plan|brainstorm --group <slug> --title <t> --seats <file.json> [--link <url>]   # opens a run, registers the project's board in aiview, prints the run id then the board's URL (orchestrator)",
   "          # --plan <slug> --slices <file.json>: the same as --kind plan --group <slug> --seats <file.json>",
-  '          # the seats file: [{"id", "title", "role"?, "blockers": [...], "link"?: "<URL>"}]',
+  '          # the seats file: [{"id", "title", "role"?, "blockers": [...], "link"?: "<URL>", "on"?: ["agreement", …]}]',
   "  slice   <id> --run <id> --state ready|running|done|blocked      # (orchestrator)",
+  "  slice   add <id> --run <id> --title <t> [--blockers a,b] [--link <url>] [--role <r>] [--on <events>]   # adds a slice or seat mid-run (orchestrator)",
   "  close   --run <id>                                              # (orchestrator)",
   '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # --slice <id> the same; prints the roster, then the command that starts your listener',
+  "          # --on <events>: what wakes your wait --mentions besides mentions and urgent posts, e.g. agreement,main:merged; else the seat row's on, else the kind's defaults",
+  "  subscribe   [--as <member>] <events>                            # prints your subscriptions after",
+  "  unsubscribe [--as <member>] <events>",
   "  doing   [--as <member>] <text>",
   "  post    [--as <member>] <body> [--about <path|decision id>] [--main]   # prints the seq, (main) when it landed in main",
   "  agree   [--as <member>] <terms> [--about <path|decision id>] [--main]  # prints the seq",
@@ -29,12 +34,13 @@ const USAGE = [
   "  read    <seq>",
   "  deliver [--as <member>]                                         # what you have not had: mentions in full, the rest one line",
   "  wait    [--as <member>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end; a newer wait supersedes it",
-  "          # --mentions: only a mention of you or an urgent post ends it; the rest stays for deliver",
+  "          # --mentions: only a mention of you, an urgent post or an event you subscribed to ends it; the rest stays for deliver",
   "  roster  [--repo <path>]",
   "  end     [--as <member>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
   "  serve   [--port <p>] [--detach]                 # the run pages aiview frames, on :4322 (SWARM_PORT)",
   "  status                                                          # data home, the page's server, open runs",
   "  config  retention [<days>]                                      # prints, or sets then prints, how many days closed runs and main's talk are kept",
+  `events: ${Object.keys(EVENTS).join(", ")}; main:<event> for one posted in main`,
   "a member is <group>/<seat>, the orchestrator <group>/orchestrator; without --as, the runner joined from this worktree",
 ].join("\n");
 
@@ -170,15 +176,18 @@ const rosterLine = (r: RosterEntry): string => {
   const files = r.files.map((f) => (f.interface ? `${f.path} (interface)` : f.path)).join(", ");
   // the funny name beside the runner (D43); an orchestrator is its name alone
   const who = r.slice === "orchestrator" ? r.name : `${r.nick} · ${r.name}`;
-  return `${who}${r.stale ? " (stale)" : ""}  run ${r.run}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}`;
+  const on = r.subscriptions.length ? `  on: ${formatSubscriptions(r.subscriptions)}` : "";
+  return `${who}${r.stale ? " (stale)" : ""}  run ${r.run}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}${on}`;
 };
 
-/** A delivery as the member reads it: each agreement to back followed by its `endorse` line (D36). */
-const withEndorse = (me: Participant, d: Delivery): Delivery & { full: (Message & { endorse?: string })[] } => ({
+/** A delivery as the member reads it: each event followed by the line its registry row gives (D36, D59). */
+const withNext = (me: Participant, d: Delivery): Delivery & { full: (Message & { endorse?: string })[] } => ({
   ...d,
   full: d.full.map((m) => {
-    const endorse = endorseLine(me, m);
-    return endorse ? { ...m, endorse } : m;
+    const e = eventOf(m);
+    const line = e ? (EVENTS[e].next?.(m, me, self().join(" ")) ?? null) : null;
+    // `endorse`: the JSON field the back-it line has always had
+    return line ? { ...m, endorse: line } : m;
   }),
 });
 
@@ -227,7 +236,7 @@ function readSlices(file: string): SliceSpec[] {
   }
   const list = Array.isArray(raw) ? raw : (raw as { slices?: unknown }).slices;
   if (!Array.isArray(list)) return fail(`${file}: expected an array of {id, title, blockers}`);
-  return list.map((s: { id?: unknown; title?: unknown; role?: unknown; blockers?: unknown; link?: unknown }) => {
+  return list.map((s: { id?: unknown; title?: unknown; role?: unknown; blockers?: unknown; link?: unknown; on?: unknown }) => {
     if (typeof s.id !== "string") fail(`${file}: a slice without an id`);
     return {
       id: String(s.id),
@@ -235,6 +244,7 @@ function readSlices(file: string): SliceSpec[] {
       ...(typeof s.role === "string" && s.role ? { role: s.role } : {}),
       blockers: Array.isArray(s.blockers) ? s.blockers.map(String) : [],
       link: typeof s.link === "string" && s.link ? s.link : null,
+      ...(Array.isArray(s.on) ? { on: s.on.map(String) } : {}),
     };
   });
 }
@@ -285,11 +295,14 @@ const seatCommands = (as: string): string[] => {
   ];
 };
 
-/** The line after a delivered agreement another member made, on a seat kind: how to back it (D36). */
-const endorseLine = (me: Participant, m: Message): string | null =>
-  profileOf(me.kind).member === "seat" && m.kind === "agreement" && m.from !== me.name
-    ? `back it: ${[...self(), "endorse", String(m.seq), "--as", shellWord(me.name)].join(" ")}`
-    : null;
+/** `--on`/`subscribe`'s events; an unknown name fails, listing the known ones (D59). */
+const subscriptionsArg = (spec: string): Subscription[] => {
+  try {
+    return parseSubscriptions(spec);
+  } catch (e) {
+    return fail((e as Error).message);
+  }
+};
 
 async function main(board: Board): Promise<void> {
   switch (args.verb) {
@@ -324,6 +337,23 @@ async function main(board: Board): Promise<void> {
       break;
     }
     case "slice": {
+      if (args.positional[0] === "add") {
+        const id = args.positional[1] ?? fail(`slice add: which id?\n${USAGE}`);
+        const run = runArg();
+        const on = args.flag("--on");
+        if (on !== undefined) subscriptionsArg(on);
+        const role = args.flag("--role");
+        const added = board.addSlice(run, {
+          id,
+          title: need("--title"),
+          ...(role ? { role } : {}),
+          blockers: args.list("--blockers"),
+          link: args.flag("--link") ?? null,
+          ...(on !== undefined ? { on: on.split(",").map((x) => x.trim()).filter(Boolean) } : {}),
+        });
+        emit({ run, slice: added }, `${id} added`);
+        break;
+      }
       const id = args.positional[0] ?? fail(`slice: which slice?\n${USAGE}`);
       const run = runArg();
       const state = need("--state") as SliceState;
@@ -344,6 +374,7 @@ async function main(board: Board): Promise<void> {
         doing: need("--doing"),
         files: [...args.list("--files"), ...args.flags("--file")].map(parseFile),
         worktree: worktreeOf(process.cwd()) ?? undefined,
+        ...(args.flag("--on") !== undefined ? { on: subscriptionsArg(args.flag("--on")!) } : {}),
       });
       // the runner's next step, last: its listener, started at once (D61)
       const next = listenNow(runner.name);
@@ -358,6 +389,14 @@ async function main(board: Board): Promise<void> {
         for (const c of commands ?? []) console.log(c);
         console.log(next);
       });
+      break;
+    }
+    case "subscribe":
+    case "unsubscribe": {
+      const p = caller(board);
+      const subs = subscriptionsArg(args.positional.join(",") || fail(`${args.verb}: which events?`));
+      const after = args.verb === "subscribe" ? board.subscribe(p, subs) : board.unsubscribe(p, subs);
+      emitHeard(p, { runner: p.name, subscriptions: after }, `${p.name} wakes on: ${formatSubscriptions(after) || "mentions and urgent posts only"}`);
       break;
     }
     case "doing": {
@@ -405,7 +444,7 @@ async function main(board: Board): Promise<void> {
     }
     case "deliver": {
       const me = caller(board);
-      const d = withEndorse(me, board.deliver(me));
+      const d = withNext(me, board.deliver(me));
       emit(d, () => printDelivery(d));
       break;
     }
@@ -415,7 +454,7 @@ async function main(board: Board): Promise<void> {
       const timeout = raw === undefined ? undefined : Number(raw);
       if (timeout !== undefined && !(timeout >= 0)) fail(`--timeout takes milliseconds, got ${raw}`);
       const mentionsOnly = args.has("--mentions");
-      const d = withEndorse(p, await board.wait(p, { timeoutMs: timeout, mentionsOnly }));
+      const d = withNext(p, await board.wait(p, { timeoutMs: timeout, mentionsOnly }));
       if (d.superseded) {
         emit(d, "superseded by a newer wait"); // a newer wait of this runner gets what arrives (D64)
         break;

@@ -49,6 +49,11 @@ function RunnerCard({
       <span className="plan">{planTitle}</span>
       <span className="slice">{orch ? "Feeds the swarm" : p.title}</span>
       <span className="doing">{p.doing}</span>
+      {p.on.length > 0 && (
+        <span className="wakes" data-component="WakesOn">
+          wakes on: {p.on.join(", ")}
+        </span>
+      )}
       {p.files.length > 0 && (
         <span className="files">
           {p.files.map((f) => (

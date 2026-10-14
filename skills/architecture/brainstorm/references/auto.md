@@ -17,7 +17,7 @@ as the `orchestrate` skill's `references/charter.md` says.
 |---|---|---|
 | topic | one line + the brief | from the ask |
 | questions | the initial decisions rows, status open | from the ask, ordered as a tree |
-| seats | the skeptic (fixed) + free-form topic seats, one row each: seat id, role prompt in full, written as the `orchestrate` skill's `references/roles.md` says | skeptic + 2 to 3 |
+| seats | the skeptic (fixed) + free-form topic seats, one row each: seat id, role prompt in full, written as the `orchestrate` skill's `references/roles.md` says, and the events that wake it (`on`, the seats file's field): the skeptic `on: ["agreement"]`, so every agreement reaches it unmentioned; a topic seat none | skeptic + 2 to 3 |
 | seat cap | the most seats | 4 |
 | evidence | a set, for all or per seat: `codebase`, `documents`, `web`, `connected`, or `none` | `codebase, documents` |
 | experiments | yes · no; on yes, each seat its own sandbox outside the repository, only its recipe comes back | no |

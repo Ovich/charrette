@@ -26,7 +26,8 @@ A seat that ends its turn is not woken by its listener: it is gone.
 5. **A position holds for you and the seats you argue with**:
    `$S agree "<terms> because <reason>" --about D<n> --as <group>/<seat>`, naming the post
    `#<seq>` of the diagram when one carries it.
-6. **As the skeptic**, an agreement reaching you ends on its line `back it: … endorse <seq>
+6. **As the skeptic**, your seats row subscribes you to `agreement`, so every agreement of the
+   run wakes your listener, mentioned or not. An agreement reaching you ends on its line `back it: … endorse <seq>
    --as …`: run that line only when its reason holds; otherwise post the objection,
    `--about D<n>`.
 7. **A new question**: `$S post "@orchestrator new question: …" --as <group>/<seat>`.
@@ -44,5 +45,9 @@ A seat that ends its turn is not woken by its listener: it is gone.
 - **`$S doing "<text>" --as <group>/<seat>`** when you turn to another question.
 - **`$S deliver --as <group>/<seat>`** gives what you have not had; `$S read <n> --as
   <group>/<seat>` a message in full.
-- **`$S roster --as <group>/<seat>`** for who sits where.
+- **`$S roster --as <group>/<seat>`** for who sits where, and what wakes each.
+- **What wakes your `wait --mentions`**: a mention, an urgent post, and the events you are
+  subscribed to (your seats row's `on`, or `join --on`). Change them with
+  `$S subscribe <events> --as <group>/<seat>` or `unsubscribe`; `$S --help` lists the events,
+  `main:<event>` for one posted in main.
 - **Talk across runs** goes to main: `post --main`.

@@ -38,6 +38,7 @@ const runner = (
   joined: string,
   calls: number,
   ended: string | null = null,
+  on: string[] = [],
 ): SnapshotRunner => {
   const i = name.lastIndexOf("/");
   return {
@@ -54,6 +55,7 @@ const runner = (
     ended: ended === null ? null : at(ended),
     calls,
     listening: false,
+    on,
   };
 };
 
@@ -129,7 +131,7 @@ export const LIVE: BoardSnapshot = {
     runner(`${AL}/S1`, "The audit table and its writer", "Writing the migration for audit_entries", "working", [["src/audit/audit.ts", true], ["migrations/0042_audit.sql"]], "14:06", 15),
     runner(`${AL}/S2`, "Every auth route writes an audit entry", "Adding audit() to the login and logout handlers", "working", [["src/routes/login.ts"]], "14:06", 11),
     runner(`${RT}/S2`, "The token store", "merged and ended", "ended", [], "14:01", 9, "14:09"),
-    runner(`${NM}/critic`, "The critic", "Reading the names proposed", "working", [], "14:04", 3),
+    runner(`${NM}/critic`, "The critic", "Reading the names proposed", "working", [], "14:04", 3, null, ["agreement"]),
   ],
   events: [
     onMain("13:20", "event", `${LP}/orchestrator`, "closed: The login page"),

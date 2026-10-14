@@ -18,9 +18,16 @@ except `open`, `slice`, `close` and `status`.
      the seat's row on that board is named in its brief:
 
      ```json
-     [{ "id": "skeptic", "title": "<the seat's title>", "role": "<the role>", "link": "<brainstorm board URL>" },
+     [{ "id": "skeptic", "title": "<the seat's title>", "role": "<the role>", "link": "<brainstorm board URL>", "on": ["agreement"] },
       { "id": "builder", "title": "<…>", "role": "<…>", "link": "<…>" }]
      ```
+
+   - **`on`**, on any row: the events that wake that member's `wait --mentions` besides
+     mentions and urgent posts, as the strategy assigns them (the skeptic `agreement`).
+     `main:<event>` for one posted in main; `$S --help` lists the events. A row without `on`
+     gets its kind's defaults: none for a member; for you, `merged, ended, stale` on a plan,
+     `agreement, endorsement, ended, stale` on a brainstorm. A member's `join --on` replaces
+     its row's list; `subscribe` / `unsubscribe` change it later.
 
 2. **From the repository's checkout:**
    `$S open --kind <plan|brainstorm> --group <slug> --title "<title>" --seats <file> --link <plan or board URL>`.
@@ -39,6 +46,10 @@ brief carries `--as <group>/<seat>` and the join line; a seat runs on the plugin
 - **`$S slice <id> --run <run> --state running`** at its dispatch; `done` once its tick stands;
   `blocked` when it waits on a person.
 - **A runner ends with its slice.** The next slice gets a fresh runner.
+- **A slice or seat added mid-run**: `$S slice add <id> --run <run> --title "<title>"
+  [--blockers a,b] [--link <url>] [--role <role>] [--on <events>]`. It lands after the last,
+  `ready`; an id already in the run, an unknown blocker or a closed run is refused. Then
+  dispatch it like the others.
 
 ## Watching the thread
 
