@@ -13,7 +13,7 @@ Every kind has a charter in its own document, approved in chat. Read `references
 
 ## Dispatch
 
-- **One member per unit of work**, on a subagent definition carrying the charter's model and effort; the dispatch passes its model. Effort is not an `Agent` parameter: it is carried by the subagent definition the dispatch names (`effort:` in its frontmatter). A dispatch naming none inherits the session's level.
+- **One member per unit of work**, on a subagent definition carrying the charter's model and effort; the dispatch passes its model. Effort is not an `Agent` parameter: it is carried by the subagent definition the dispatch names (`effort:` in its frontmatter). A dispatch naming none inherits the session's level. **When no subagent definition carries the charter's model and effort, say so to the person before dispatching**, naming the nearest one; never dispatch on another level silently.
 - **The brief is the only thing sent.** Read `references/brief.md` before the first dispatch.
 - **Check blockers before every dispatch.**
 - **Every ready member's `Agent` call goes in one message**, each in the background, nothing between them.
