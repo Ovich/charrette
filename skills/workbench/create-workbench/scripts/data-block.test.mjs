@@ -29,7 +29,8 @@ test("a derived feed rewrites the block, and data cannot close the script", () =
   writeData(page, { answer: "second" });
   assert.deepEqual(readData(page), { answer: "second" });
   writeData(page, { answer: "</script><b>raw</b>" });
-  assert.equal(readFileSync(page, "utf8").match(/<\/script>/g).length, 3);
+  const block = readFileSync(page, "utf8").match(/<script id="data" type="application\/json">([\s\S]*?)<\/script>/)[1];
+  assert.doesNotMatch(block, /<\/script/i);
   assert.equal(readData(page).answer, "</script><b>raw</b>");
 });
 
