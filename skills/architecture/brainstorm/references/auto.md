@@ -73,7 +73,8 @@ board; seats only debate.**
 
 - **An agreement the skeptic endorsed**: its row `agreed`, `Source` the agreement's `#<seq>`;
   a diagram it names (seats post mermaid on the thread) promoted to *Diagrams* through the
-  `write-diagrams` skill; the human part refreshed.
+  `write-diagrams` skill, its caption line above the fence as that skill says, then
+  `aiview mermaid-check` with no warning; the human part refreshed.
 - **N exchanges on one question without one**: an escalation. With `arbiter: orchestrator`,
   post the ruling and its reason on the thread; it stands only once the skeptic endorses it,
   and is marked `ruled (by orchestrator)` in the row and in *For you*. With `arbiter: person`,
