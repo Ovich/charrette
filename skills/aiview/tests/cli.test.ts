@@ -1,4 +1,4 @@
-import { test, beforeEach, afterEach } from "node:test";
+import { describe, test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -312,6 +312,74 @@ test("bare move pulls a stray back into its own project's directory", () => {
   run("add", stray, "--project", "CIIP");
   const moved = JSON.parse(run("move", "#1", "--json").stdout).moved[0];
   assert.equal(moved.file_path, "docs/CIIP/a.spec.md");
+});
+
+describe("move a workbench", () => {
+  const runWith = (preload: string[], ...argv: string[]) =>
+    spawnSync(process.execPath, [...preload, CLI, ...argv], {
+      encoding: "utf8",
+      env: { ...process.env, AIVIEW_ROOT: toolRoot, CHARRETTE_HOME: toolRoot },
+    });
+  const at = (...p: string[]) => path.join(toolRoot, "docs", ...p);
+  const bench = (name: string, withSidecar: boolean) => {
+    run("project", "add", "A");
+    run("project", "add", "B");
+    const page = write(`docs/A/${name}.workbench.html`, "<title>b</title>");
+    if (withSidecar) {
+      write(`docs/A/${name}.workbench/manifest.json`, "{}");
+      write(`docs/A/${name}.workbench/data/t/r/x.json`, "1");
+    }
+    run("add", page);
+    return page;
+  };
+
+  test("the page and its sidecar move together", () => {
+    const page = bench("one", true);
+    assert.equal(run("move", "#1", "--project", "B").status, 0);
+    assert.ok(fs.existsSync(at("B", "one.workbench.html")));
+    assert.ok(fs.existsSync(at("B", "one.workbench", "data", "t", "r", "x.json")));
+    assert.ok(!fs.existsSync(page));
+    assert.ok(!fs.existsSync(at("A", "one.workbench")));
+  });
+
+  test("without a sidecar, the page alone moves", () => {
+    bench("two", false);
+    assert.equal(run("move", "#1", "--project", "B").status, 0);
+    assert.ok(fs.existsSync(at("B", "two.workbench.html")));
+    assert.ok(!fs.existsSync(at("B", "two.workbench")));
+  });
+
+  test("a destination taken: nothing moves", () => {
+    const page = bench("three", true);
+    fs.mkdirSync(at("B", "three.workbench"), { recursive: true });
+    run("move", "#1", "--project", "B");
+    assert.ok(fs.existsSync(page));
+    assert.ok(fs.existsSync(at("A", "three.workbench", "manifest.json")));
+    assert.ok(!fs.existsSync(at("B", "three.workbench.html")));
+    assert.equal(JSON.parse(run("list", "--all", "--json").stdout)[0].project, "A");
+  });
+
+  test("across volumes (EXDEV): copied, then the source removed", () => {
+    const page = bench("four", true);
+    const exdev = `data:text/javascript,${encodeURIComponent(
+      'import fs from "node:fs"; fs.renameSync = () => { const e = new Error("EXDEV"); e.code = "EXDEV"; throw e; };',
+    )}`;
+    assert.equal(runWith(["--import", exdev], "move", "#1", "--project", "B").status, 0);
+    assert.ok(fs.existsSync(at("B", "four.workbench.html")));
+    assert.ok(fs.existsSync(at("B", "four.workbench", "data", "t", "r", "x.json")));
+    assert.ok(!fs.existsSync(page));
+    assert.ok(!fs.existsSync(at("A", "four.workbench")));
+  });
+
+  test("an orphan (moved on disk, the row stale) is re-pointed", () => {
+    const page = bench("five", true);
+    fs.mkdirSync(at("B"), { recursive: true });
+    fs.renameSync(page, at("B", "five.workbench.html"));
+    fs.renameSync(at("A", "five.workbench"), at("B", "five.workbench"));
+    const moved = JSON.parse(run("move", "#1", "--project", "B", "--json").stdout).moved[0];
+    assert.equal(moved.abs_path, at("B", "five.workbench.html"));
+    assert.ok(fs.existsSync(at("B", "five.workbench", "manifest.json")));
+  });
 });
 
 test("update --project points at move instead of silently doing nothing", () => {
