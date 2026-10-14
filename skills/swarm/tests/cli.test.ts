@@ -218,6 +218,14 @@ test("the roster shows a runner's funny name beside it; open keeps the links (D4
   }
 });
 
+test("status --json lists each open run with its kind; the text names the kind (D58)", () => {
+  const id = openRun();
+  const s = JSON.parse(run("status", "--json").stdout);
+  assert.equal(s.runs, 1);
+  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan" }]);
+  assert.match(run("status").stdout, new RegExp(`run ${id}  plan  review-tool  A plan`));
+});
+
 test("--json on every verb parses", () => {
   const slices = path.join(toolRoot, "s.json");
   fs.writeFileSync(slices, SLICES);

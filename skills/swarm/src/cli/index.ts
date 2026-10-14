@@ -512,7 +512,7 @@ async function main(board: Board): Promise<void> {
     case "status": {
       const runs = board.runs();
       const server = readServerStatus();
-      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, runs: runs.length }, () => {
+      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, runs: runs.length, open: runs.map((r) => ({ run: r.id, kind: r.kind, group: r.plan, title: r.title })) }, () => {
         console.log(`home    ${DATA_ROOT}`);
         console.log(`sqlite  ${SQLITE_PATH}`);
         console.log(
@@ -520,7 +520,7 @@ async function main(board: Board): Promise<void> {
         );
         if (!runs.length) console.log("no open run");
         for (const r of runs) {
-          console.log(`run ${r.id}  ${r.plan}  ${r.title}  ${r.repo}`);
+          console.log(`run ${r.id}  ${r.kind}  ${r.plan}  ${r.title}  ${r.repo}`);
           for (const s of r.slices) console.log(`  ${s.id} ${s.state}  ${s.title}${s.blockers.length ? `  blocked by ${s.blockers.join(", ")}` : ""}`);
         }
       });
