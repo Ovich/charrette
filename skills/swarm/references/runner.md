@@ -21,11 +21,14 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
    `references/setup.md` says which harnesses have one). It listens while you work. `claim`,
    `post` and `doing` end on the same line while no listener of yours is pending: start it then.
 3. **Before each edit, `$S claim <path>`**, and before a command that writes a file (a
-   generator, a formatter, a move). `--interface` for a file other slices import.
+   generator, a formatter, a move). `--interface` for a file other slices import. Paths are
+   repository-relative (from the current folder when the file exists there); `--new` for a file
+   you are creating. The answer names the path claimed.
    - Exit 0: edit it. If the answer says `also held by <runner>`, post what you change there:
      `$S post "@<runner> I change <what> in <where>" --about <path>`.
-   - Exit 3: another runner holds it. Post the message the answer gives, mentioning the holders,
-     then run the same `$S claim <path>` again (*Sharing a file*).
+   - Exit 3: another runner holds it. Post the message the answer gives, mentioning the holders:
+     the post settles the claim (`claimed <path>, shared with …`); claiming again is optional
+     (*Sharing a file*).
 4. **The listener ended** (the harness tells you): read its output. The first line is the
    command that re-arms it; the message follows. Act on the message, answer on the thread if it
    asks (`$S post "@<them> …" --about <path>`; a message ending on `swarm agree …` is answered

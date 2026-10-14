@@ -2,7 +2,7 @@
 // second module that sees SQL. The Board's verbs of the same names delegate here after the
 // kind gate; behaviour and wording are the board's, moved, not rewritten.
 import type { DatabaseSync } from "node:sqlite";
-import type { Declared, EditAllowed, EditHeld, Flag, Message, MessageKind, Participant, Sharer } from "./board.ts";
+import type { Declared, EditAllowed, MergedMeta, EditHeld, Flag, Message, MessageKind, Participant, Sharer } from "./board.ts";
 import { type EventName, EVENTS } from "./events.ts";
 import { profileOf } from "./kinds.ts";
 
@@ -14,7 +14,7 @@ export interface ClaimsDeps {
   lastSeq(): number;
   participantById(id: number): Participant;
   isLive(id: number): boolean;
-  insertMessage(p: Participant, body: string, about: string | null, kind: MessageKind, named?: string[], extra?: { event?: EventName }): Message;
+  insertMessage(p: Participant, body: string, about: string | null, kind: MessageKind, named?: string[], extra?: { event?: EventName; meta?: MergedMeta }): Message;
   relPath(repo: string, file: string): string | null;
   fold(s: string): string;
   slashes(rel: string): string;
@@ -356,7 +356,6 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         if (iface.size) lines.push(`@all interface changed: ${[...iface].join(", ")}.`);
         if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);
         lines.push(`files: ${rels.join(", ") || "-"}`);
-        insertMessage(me, lines.join("\n"), null, "event", [...new Set([...told, ...waiters, ...all])], { event: EVENTS.merged.name });
         // whom to tell of a resolved conflict (D63): a holder from any run, or one of this run that held it
         for (const rel of rels) {
           const ids = new Set(holdersOf(me.repo, rel).map((c) => c.participant));
@@ -367,6 +366,8 @@ export function claimsOf(deps: ClaimsDeps): Claims {
           ids.delete(me.id);
           for (const id of ids) sharers.push({ path: rel, runner: participantById(id).name });
         }
+        const meta: MergedMeta = { rebase: [...told], tell: [...new Set(sharers.map((o) => o.runner))] };
+        insertMessage(me, lines.join("\n"), null, "event", [...new Set([...told, ...waiters, ...all])], { event: EVENTS.merged.name, meta });
       });
       return sharers;
     },

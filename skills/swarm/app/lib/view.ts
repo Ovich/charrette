@@ -172,6 +172,9 @@ const FLAG_BODY = /flag:\s*(\S+)\s+wrote\s+(\S+)\s+outside its claim;\s*(\S+)\s+
 /** The flag a post raises, or null. Read from the body, which old rows (a plain message) and
  *  the `flag` event share. */
 export function flagOf(e: SnapshotEvent): FlagLine | null {
+  // the board's own name for it (D11): mentions are the holder, then the writer
+  if (e.event === "flag" && e.about && e.mentions && e.mentions.length >= 2) return { writer: e.mentions[1], path: e.about, holder: e.mentions[0] };
+  // a row from before D11: the body says it
   if (e.kind !== "event" && e.kind !== "msg") return null;
   const m = FLAG_BODY.exec(e.body);
   return m ? { writer: m[1], path: e.about ?? m[2], holder: m[3] } : null;
@@ -204,6 +207,8 @@ export function flagAnswer(flag: SnapshotEvent, events: SnapshotEvent[]): FlagAn
 /** Whom a merged event told: `rebase`, the holders its body names; `tell`, those its author then
  *  told of a resolved conflict (`@<them> I resolved <file>`), before its next merge. */
 export function mergedRecipients(e: SnapshotEvent, events: SnapshotEvent[], ctx: MentionCtx): { rebase: string[]; tell: string[] } {
+  // stored with the event (D11); parsed from the thread only on a row from before
+  if (e.meta) return { rebase: [...e.meta.rebase], tell: [...e.meta.tell] };
   const plan = splitRunner(e.from).plan;
   const holdersLine = e.body.split(/\r?\n/).find((l) => l.includes("you hold or declared a file it changed")) ?? "";
   const rebase = [...new Set(parseMentions(holdersLine, plan, ctx.groups, ctx.names))];

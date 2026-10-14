@@ -94,6 +94,8 @@ export interface Message {
   /** On delivery only, to a holder of `about` when a runner that did not hold it posted about it:
    *  the agreement that answers it (D62). */
   answer?: string;
+  /** A merged event's recipients as data (D11); null elsewhere and on rows from before. */
+  meta?: MergedMeta | null;
   /** On post only: the refused claim this post settled (D7). */
   claimed?: { path: string; sharedWith: string[] };
 }
@@ -125,7 +127,21 @@ export type SnapshotRunner = {
   /** Its subscriptions, as `formatSubscriptions` writes each (D59). */
   on: string[];
 };
-export type SnapshotEvent = { seq: number; at: string; kind: MessageKind; from: string; body: string; about: string | null; channel: "main" | RunId };
+/** What a merged event told, as data (D11): `rebase` holds or declared a changed file, `tell` is whom to tell of a resolved conflict. */
+export type MergedMeta = { rebase: string[]; tell: string[] };
+/** `event`, `mentions`, `meta`: absent on rows written before D11. */
+export type SnapshotEvent = {
+  seq: number;
+  at: string;
+  kind: MessageKind;
+  from: string;
+  body: string;
+  about: string | null;
+  channel: "main" | RunId;
+  event?: EventName | null;
+  mentions?: string[];
+  meta?: MergedMeta | null;
+};
 export type QueueSlice = { slice: string; title: string; link: string | null; state: string; blockers: string[]; runner: string | null };
 /** A held file and every runner holding it, in claim order (D40): the FileMap's rows. */
 export type SnapshotFile = { path: string; holders: string[]; interface: boolean };
@@ -398,6 +414,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   // 1: written by the board itself in a runner's name (a flag, a merge notice), never a runner's own word
   upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
   upkeep("runs", "link", "link TEXT");
+  // a board event's data beside its text: a merged event's recipients (D11)
+  upkeep("messages", "meta", "meta TEXT");
   // the branch a merge lands in, named by merge-lock --onto (D9)
   upkeep("merge_locks", "onto", "onto TEXT");
   upkeep("slices", "link", "link TEXT");
@@ -538,6 +556,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     channel: r.run == null ? "main" : { run: Number(r.run) },
     endorses: r.endorses == null ? null : Number(r.endorses),
     event: r.event == null || !Object.hasOwn(EVENTS, String(r.event)) ? null : (String(r.event) as EventName),
+    meta: r.meta == null ? null : (JSON.parse(String(r.meta)) as MergedMeta),
   });
 
   const lastSeq = (): number => Number((db.prepare("SELECT COALESCE(MAX(seq), 0) AS s FROM messages").get() as Row).s);
@@ -573,15 +592,15 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     about: string | null,
     kind: MessageKind,
     named?: string[],
-    extra: { channel?: "run" | "main"; endorses?: number; event?: EventName } = {},
+    extra: { channel?: "run" | "main"; endorses?: number; event?: EventName; meta?: MergedMeta } = {},
   ): Message => {
     const mentions = named ?? (kind === "event" ? [] : parseMentions(body, p.plan, openPlans(p.repo), activeNames(p.repo)));
     const run = channelOf(p, kind, about, mentions, extra.channel ?? "run");
     // an archived channel is read-only (D19)
     if (run != null && runRow(run).state === "closed") throw new Error(`run ${run} is closed`);
     const r = db
-      .prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at, by_board, run, endorses, event) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(p.repo, p.id, body, about, kind, JSON.stringify(mentions), now(), named ? 1 : 0, run, extra.endorses ?? null, extra.event ?? null);
+      .prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at, by_board, run, endorses, event, meta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(p.repo, p.id, body, about, kind, JSON.stringify(mentions), now(), named ? 1 : 0, run, extra.endorses ?? null, extra.event ?? null, extra.meta ? JSON.stringify(extra.meta) : null);
     const seq = Number(r.lastInsertRowid);
     bump(p.repo);
     return board.read(seq);
@@ -1204,7 +1223,18 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         db.prepare("SELECT * FROM (SELECT * FROM messages WHERE repo = ? ORDER BY seq DESC LIMIT ?) ORDER BY seq").all(repo, EVENTS_SHOWN) as Row[]
       ).map((r) => {
         const m = toMessage(r);
-        return { seq: m.seq, at: m.at, kind: m.kind, from: m.from, body: m.body, about: m.about, channel: m.channel === "main" ? ("main" as const) : m.channel.run };
+        return {
+          seq: m.seq,
+          at: m.at,
+          kind: m.kind,
+          from: m.from,
+          body: m.body,
+          about: m.about,
+          channel: m.channel === "main" ? ("main" as const) : m.channel.run,
+          event: m.event,
+          mentions: m.mentions,
+          meta: m.meta ?? null,
+        };
       });
 
       const nameOf = new Map(people.map((r) => [`${r.run}/${r.slice}`, `${r.plan}/${r.slice}`]));

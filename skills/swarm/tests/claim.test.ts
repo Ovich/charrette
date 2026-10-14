@@ -301,3 +301,64 @@ test("across runs: merge notices to another run's holders land in main", async (
     board.close();
   }
 });
+
+// D6: a relative path from the current folder, else from the repository root; neither is refused unless --new.
+test("from a subfolder: a root-relative path lands on the root file, a cwd-relative one on its file; the answer names it (D6)", () => {
+  running();
+  const sub = path.join(wtA, "src");
+  assert.equal(answer(cli(sub, "claim", "src/old.ts")), "claimed src/old.ts\n");
+  fs.writeFileSync(path.join(sub, "here.ts"), "export {};\n");
+  assert.equal(answer(cli(sub, "claim", "here.ts")), "claimed src/here.ts\n");
+});
+
+test("a path that exists from neither folder exits 1 naming both tries; --new claims it from the current folder (D6)", () => {
+  running();
+  const sub = path.join(wtA, "src");
+  const r = swarm(sub, "claim", "src/ghost.ts");
+  assert.equal(r.status, 1);
+  assert.ok(r.stderr.includes(path.join(sub, "src", "ghost.ts")) && r.stderr.includes(path.join(wtA, "src", "ghost.ts")), r.stderr);
+  assert.match(r.stderr, /--new/);
+  assert.equal(answer(cli(sub, "claim", "ghost.ts", "--new")), "claimed src/ghost.ts\n");
+  assert.equal(swarm(wtA, "release", "src/nope.ts").status, 1, "release resolves the same way");
+  assert.equal(swarm(sub, "post", "x", "--about", "src/nope.ts").status, 1, "so does --about");
+});
+
+test("after a held claim, the post about the path mentioning the holder claims it; the second claim still works (D7)", () => {
+  running();
+  assert.equal(swarm(wtB, "claim", "src/a.ts").status, 3);
+  const out = cli(wtB, "post", "@S3 I add isExpired() at the end", "--about", "src/a.ts");
+  assert.match(out, /^claimed src\/a\.ts, shared with review-tool\/S3$/m);
+  assert.equal(swarm(wtB, "claim", "src/a.ts").status, 0);
+});
+
+test("a flag is posted once, whether merge-lock or end finds it; it is the flag event with its settle line (D8, D10)", async () => {
+  running();
+  fs.writeFileSync(path.join(wtB, "src", "a.ts"), "// S3's\n");
+  commit(wtB, "a");
+  assert.equal(JSON.parse(cli(wtB, "merge-lock", "--onto", "main", "--json")).flags.length, 1);
+  assert.deepEqual(JSON.parse(cli(wtB, "end", "--json")).flags, []);
+  const heard = cli(wtA, "deliver");
+  assert.match(heard, /settle it: .* agree "@review-tool\/S5 <who changes what>" --about src\/a\.ts/);
+  const board = await openBoard(path.join(home, "swarm.sqlite"));
+  try {
+    const flags = board.snapshot(board.repos()[0].repo).events.filter((e) => /flag:/.test(e.body));
+    assert.equal(flags.length, 1);
+    assert.deepEqual([flags[0].kind, flags[0].event, flags[0].mentions], ["event", "flag", ["review-tool/S3", "review-tool/S5"]]);
+  } finally {
+    board.close();
+  }
+});
+
+test("the merged event names the branch from merge-lock --onto and stores whom it told (D9, D11)", async () => {
+  running();
+  cli(wtB, "merge-lock", "--onto", "main");
+  cli(wtB, "merged", "abc123", "--files", "src/a.ts");
+  const board = await openBoard(path.join(home, "swarm.sqlite"));
+  try {
+    const merged = board.snapshot(board.repos()[0].repo).events.find((e) => e.event === "merged")!;
+    assert.match(merged.body, /^merged abc123 into main: rebase your branch onto it\.\n/);
+    assert.deepEqual(merged.meta, { rebase: ["review-tool/S3"], tell: ["review-tool/S3"] });
+  } finally {
+    board.close();
+  }
+});

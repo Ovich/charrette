@@ -115,6 +115,12 @@ describe("flags (D10)", () => {
     expect(flagOf(events[0])).toBeNull();
   });
 
+  test("a flag event is read from its event name and mentions first, whatever its body (D11)", () => {
+    const named: SnapshotEvent = { ...at(30, "event", "p/S1", "reworded"), event: "flag", mentions: ["p/S2", "p/S1"] };
+    expect(flagOf(named)).toEqual({ writer: "p/S1", path: P, holder: "p/S2" });
+    expect(flagOf({ ...at(31, "event", "p/S1", "merged x: rebase your branch onto it."), event: "merged", mentions: [] })).toBeNull();
+  });
+
   test("Flags shows the flags and the posts answering them, and counts the flags", () => {
     const f = filters(events).find((x) => x.id === "flags")!;
     expect(f.label).toBe("Flags");
@@ -151,5 +157,15 @@ describe("a merged event's recipients", () => {
     ];
     const ctx = mentionCtx(board([run(1, "plan", "p")]));
     expect(mergedRecipients(merged, events, ctx)).toEqual({ rebase: ["p/S2", "p/S3"], tell: ["p/S2"] });
+  });
+
+  test("the recipients stored with the event win over the thread (D11)", () => {
+    const merged: SnapshotEvent = {
+      seq: 1, at: "2026-10-14T10:00:00Z", kind: "event", from: "p/S1", channel: 1, about: null, event: "merged", mentions: ["p/S2"],
+      body: "merged abc into main: rebase your branch onto it.\n@p/S2: you hold or declared a file it changed.\nfiles: a.ts",
+      meta: { rebase: ["p/S2"], tell: ["p/S7"] },
+    };
+    const ctx = mentionCtx(board([run(1, "plan", "p")]));
+    expect(mergedRecipients(merged, [merged], ctx)).toEqual({ rebase: ["p/S2"], tell: ["p/S7"] });
   });
 });
