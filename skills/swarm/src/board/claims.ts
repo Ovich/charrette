@@ -353,7 +353,7 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         const all = iface.size ? openPlans.map((plan) => `${plan}/*`) : [];
         const lines = [`merged ${sha}${onto ? ` into ${onto}` : ""}: rebase your branch onto it.`];
         if (told.size) lines.push(`${[...told].map((n) => `@${n}`).join(" ")}: you hold or declared a file it changed.`);
-        if (iface.size) lines.push(`@all interface changed: ${[...iface].join(", ")}.`);
+        if (iface.size) lines.push(`@swarm interface changed: ${[...iface].join(", ")}.`);
         if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);
         lines.push(`files: ${rels.join(", ") || "-"}`);
         // whom to tell of a resolved conflict (D63): a holder from any run, or one of this run that held it

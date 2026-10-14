@@ -26,7 +26,7 @@ const USAGE = [
   "  slice   add <id> --run <id> --title <t> [--blockers a,b] [--link <url>] [--role <r>] [--on <events>]   # adds a slice or seat mid-run (orchestrator)",
   "  close   --run <id>                                              # (orchestrator)",
   '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # --slice <id> the same; prints the roster, then the command that starts your listener',
-  "          # --on <events>: what wakes your wait --mentions besides mentions and urgent posts, e.g. agreement,main:merged; else the seat row's on, else the kind's defaults",
+  "          # --on <events>: what wakes your wait --mentions besides mentions and urgent posts, e.g. agreement,any:merged; else the seat row's on, else the kind's defaults",
   "  subscribe   [--as <member>] <events>                            # prints your subscriptions after",
   "  unsubscribe [--as <member>] <events>",
   "  doing   [--as <member>] <text>",
@@ -42,7 +42,7 @@ const USAGE = [
   "  serve   [--port <p>] [--detach]                 # the run pages aiview frames, on :4322 (SWARM_PORT)",
   "  status                                                          # data home, the page's server, open runs",
   "  config  retention [<days>]                                      # prints, or sets then prints, how many days closed runs and main's talk are kept",
-  `events: ${Object.keys(EVENTS).join(", ")}; main:<event> for one posted in main`,
+  `events: ${Object.keys(EVENTS).join(", ")}; any:<event> for one posted in any run`,
   "a member is <group>/<seat>, the orchestrator <group>/orchestrator; without --as, the runner joined from this worktree",
 ].join("\n");
 
