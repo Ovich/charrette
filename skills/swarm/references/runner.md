@@ -49,7 +49,9 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
       such file, on `if you resolved a conflict in <file>, tell them: swarm post "@<them> I
       resolved <file>: <how>" --about <file>`. For each file you resolved, run that post with
       `<how>` filled in.
-   4. Run the slice's check on the rebased branch, then merge into `<target>` as the brief says.
+   4. Run the slice's check on the rebased branch, then fast-forward `<target>` from your own
+      worktree: `git push . HEAD:<target>`, never forced. A refused push means `<target>` moved:
+      rebase again.
    5. `$S merged <sha> --files <every path the merge changed>`, then at once
       `$S post "@orchestrator merged <sha>"`, before your report: the orchestrator checks your
       slice from that post. After a change to an *interface* file, `$S post "@all <what changed

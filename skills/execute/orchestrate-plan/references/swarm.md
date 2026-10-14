@@ -34,6 +34,7 @@ everything said on the board. This file says what changes in this skill's own du
 - **A runner that stopped on a finding ended on the board.** Fix the plan or the slice document,
   then dispatch the slice to a fresh runner.
 - **Remove its worktree** from the main checkout once the tick stands, as in classic mode.
+- **Leave the plan's branch checked out nowhere** while the run is open (detach the main checkout): a runner fast-forwards it from its own worktree, and git refuses to move a branch checked out elsewhere. Re-run each check in a detached worktree of its own.
 
 ## The close
 

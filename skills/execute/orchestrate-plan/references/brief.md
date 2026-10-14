@@ -26,7 +26,7 @@ Carry out one slice document with the `execute-slice` skill.
 | `one per slice` | open a draft `<title>` (`gh pr create --draft`) on your first commit, push as you go. |
 | `one for the plan`, open | none. Commit to your branch; the orchestrator joins it into `<branch>`. |
 | `one for the plan`, not yet open | open a draft `<title>` (`gh pr create --draft`) on your first commit; every later slice pushes to it. |
-| `mode: swarm` | none. Merge your branch into `<branch>` in `<checkout>` yourself, under the board's lock, as the `swarm` skill's runner side says. |
+| `mode: swarm` | none. Merge yourself, under the board's lock, as the `swarm` skill's runner side says: rebase onto `<branch>`, run your check, then from your worktree `git push . HEAD:<branch>` (fast-forward only, never force). |
 
 **The board line** only in swarm mode, without its marker; a classic brief has none.
 
