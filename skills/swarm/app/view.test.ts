@@ -1,7 +1,7 @@
 // The board page's view model (plan D1, D7, D8, D13-D16, D18, D20), on snapshots built here.
 import { describe, expect, test } from "vitest";
 import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../src/board/board.ts";
-import { agents, archive, claimRows, conversation, flagAnswer, flagOf, mentionCtx, mergedRecipients, runTabs, type Item } from "./lib/view.ts";
+import { agents, archive, claimRows, conversation, feed, filters, flagAnswer, flagOf, mentionCtx, mergedRecipients, runTabs, type Item } from "./lib/view.ts";
 
 const AT = "2026-10-14T10:00:00Z";
 const run = (id: number, group: string, code: string, open = true): RunSummary => ({
@@ -222,10 +222,34 @@ describe("flags (D10)", () => {
     expect(flagOf({ ...at(31, "event", "p/S1", "merged x: rebase your branch onto it."), event: "merged", mentions: [] })).toBeNull();
   });
 
+  test("Flags shows the flags and the posts answering them, and counts the flags", () => {
+    const f = filters(events).find((x) => x.id === "flags")!;
+    expect(f.label).toBe("Flags");
+    expect(events.filter(f.test).map((e) => e.seq)).toEqual([10, 12, 13, 20]);
+    expect(events.filter(f.counts!).length).toBe(2);
+    expect(filters(events.slice(0, 1)).some((x) => x.id === "flags")).toBe(false);
+  });
+
   test("settled by an agreement, answered by a post, open otherwise", () => {
     expect(flagAnswer(oldFlag, events)).toEqual({ state: "settled", seq: 13 });
     expect(flagAnswer(oldFlag, events.filter((e) => e.kind !== "agreement"))).toEqual({ state: "answered", seq: 12 });
     expect(flagAnswer(newFlag, events)).toEqual({ state: "open" });
+  });
+});
+
+describe("the filters and the feed (kept for the filter row's return)", () => {
+  test("Everything shows all, Messages only drops board events, Agreements keeps agreements; following narrows", () => {
+    const events = [
+      item(1, "alpha/S1", "talk"),
+      item(1, "alpha/S1", "joined: x", { kind: "event" }),
+      item(2, "beta/S2", "@AL·S1 agreed", { kind: "agreement" }),
+      item(2, "beta/S2", "beta alone"),
+    ];
+    const ctx = mentionCtx(board(RUNS, ROSTER, events));
+    expect(feed(events, "all", null, ctx).length).toBe(4);
+    expect(feed(events, "talk", null, ctx).map((e) => e.body)).toEqual(["talk", "@AL·S1 agreed", "beta alone"]);
+    expect(feed(events, "agreements", null, ctx).map((e) => e.body)).toEqual(["@AL·S1 agreed"]);
+    expect(feed(events, "all", "alpha/S1", ctx).map((e) => e.body)).toEqual(["talk", "joined: x", "@AL·S1 agreed"]);
   });
 });
 
