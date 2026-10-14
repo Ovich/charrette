@@ -7,7 +7,7 @@ out, and the header says which. A small change's section is a sentence.
 ```markdown
 # <topic>, plan
 
-> **Status**: draft | approved: <who>, <date>, in their words
+> **Status**: draft | approved: <who>, <date>, in their words; defaults confirmed: <ids>
 > **Delivers**: the increment, in one sentence, and what is accepted as proof of it
 > **Hard rule**: what must not change, when there is one
 > **Read against**: `<branch>` at `<sha>`; every `file:line` cited holds there
@@ -50,7 +50,10 @@ The recipes the experiments handed back.
 One series, `D1` onward, continuing the project's numbering. Kinds: purpose, module (with
 its state, as write-slice names them), architecture, contract, clarification. Open
 questions are rows with status open and an owner. A departure from a rule is a row naming
-what is owed for it.
+what is owed for it. Source: where the decision came from, `interview`, a board, the code
+read, or `agent default` for one the person was never asked; the status line names the
+defaults they confirmed, and `aiview plan check <plan>` warns on an approved plan whose
+defaults it does not name.
 
 # Execution
 

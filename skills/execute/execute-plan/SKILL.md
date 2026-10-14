@@ -40,3 +40,5 @@ Stop for exactly three things:
 ## The close
 
 With a roadmap, say the plan finished and the roadmap may need redrawing; the person confirms the slot landed. When the plan delivered something a person looks at, recommend going over it with them through the `validate-delivery` skill.
+
+List the decisions whose source is `agent default` that shipped, and ask whether any is to be revisited; when one of them is a `contract`, recommend the `validate-delivery` skill even if nothing was delivered for a person to look at.

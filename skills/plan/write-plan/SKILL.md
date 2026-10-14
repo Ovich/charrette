@@ -11,13 +11,13 @@ once, there, and each slice carries its part of it verbatim, narrowed to its sco
 **No code in the repository for the thing being planned until the plan is approved.**
 
 1. **Open `YYYY-MM-DD-<topic>.plan.md` before the first question**, through the `aiview` skill: kind `plan`, tags = topic, in the group aiview gives a plan, shared with its slices. With a roadmap, the slot's slug is a tag. Its two parts, Design and Execution, are `references/skeleton.md`, read before writing the first section. A board on the topic is the starting point: its agreed decisions become rows and are not asked again.
-2. **Run the `interview` skill** on the decisions table, and write each section as its decisions land. A request that is several independent systems is split first, one plan each. One plan per increment: it stops where the next increment would begin.
+2. **Run the `interview` skill** on the decisions table, and write each section as its decisions land. If the person declines it, offer its short mode; a decision still unasked is a row with source `agent default`. A request that is several independent systems is split first, one plan each. One plan per increment: it stops where the next increment would begin.
 3. **Every major area is a deep module**, designed as the `deepen-module` skill says, in the plan's modules section. A module the interview cannot settle there gets its own `module` document, and the plan quotes its entry.
 4. **When no row is open, ask once what else this should cover.**
 5. **Ask the mode before the cut**, the recommended answer first: `mode: classic` (recommended), the slices run one after another and forks proved apart, or `mode: swarm`, every slice dispatched at once, the runners coordinating on the board of the `swarm` skill. The answer is the mandate's first field. **In swarm mode, read `references/swarm.md` now**: it changes the cut, the tracker and when the slice documents are written.
 6. **Cut the slices** as the `write-slice` skill's `references/cutting.md` says, **and draw the tracker** to `references/tracker.md`, from `references/tracker-skeleton.md`, both read first. The `execute-plan` skill keeps it from then on. `aiview mermaid-check <plan>` and `aiview tracker check <plan>` after every edit.
 7. **Close the interview with the orchestrator's mandate**: the questions of the `orchestrate-plan` skill's `references/mandate.md`, the answers in the plan's *Mandate* section and in the one line under the tracker. An answer that changes the cut, `tests: at the plan end`, is carried out then, as that reference says: the test slice drawn, the slice headings following.
-8. **Stop and ask the person to approve the plan.** Then one slice document per slice, with `write-slice`.
+8. **Stop and ask the person to approve the plan.** The request opens on the `agent default` rows, numbered, `contract` ones first, "4 decisions are mine: … confirm them, or name the ones to change", and the link to the plan comes after the list. The approval goes in the status line with the defaults it confirmed, then `aiview plan check <plan>`. Then one slice document per slice, with `write-slice`.
 
 ## Red flags
 
