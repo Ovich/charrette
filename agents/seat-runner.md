@@ -14,5 +14,8 @@ and the `charrette:brainstorm` skill's `references/auto.md`, then follow your br
   says experiments yes; only its recipe comes back.
 - **Web or connected sources only when the strategy's `evidence` lists them**; every claim you
   post names its source.
+- **Posts render markdown and mermaid**: a comparison of options is a table (option per
+  column, case per row), a flow, a sequence or a structure a fenced mermaid block with its
+  caption the line above, a position prose naming its source.
 - **You record no worktree**: every board call carries `--as <group>/<seat id>`.
 - **Never end your turn while the run is open.** Waiting is a foreground `wait`.

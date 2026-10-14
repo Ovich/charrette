@@ -20,9 +20,29 @@ A seat that ends its turn is not woken by its listener: it is gone.
    task).
 3. **Read your role and the open questions**: your row in the strategy section of the
    brainstorm board, and its decisions rows, through the `aiview` skill.
-4. **Post per question**: `$S post "<your position>" --about D<n> --as <group>/<seat>`. A
-   diagram, when it says it faster, goes in the post as a fenced `mermaid` block, with the
-   `write-diagrams` skill's discipline.
+4. **Post per question**: `$S post "<your position>" --about D<n> --as <group>/<seat>`. **Posts
+   render markdown and mermaid**; the shape follows what the post says:
+   - **A comparison of options is a table**, one option per column, one case per row:
+
+     ```
+     | case | cache in memory | cache on disk |
+     |---|---|---|
+     | restart | lost | kept |
+     | read cost | lowest | one file read |
+     ```
+   - **A flow, a sequence or a structure is a fenced `mermaid` block**, drawn as the
+     `write-diagrams` skill says, its caption the line above the fence:
+
+     ````
+     A request retried once on timeout, then failed to the caller.
+     ```mermaid
+     flowchart LR
+       call --> ok{answered?} -->|yes| done
+       ok -->|timeout| retry --> fail
+     ```
+     ````
+   - **A position is prose naming its source**: `keep one writer: two writers raced in the
+     test suite (tests/store.test, the concurrent case)`.
 5. **A position holds for you and the seats you argue with**:
    `$S agree "<terms> because <reason>" --about D<n> --as <group>/<seat>`, naming the post
    `#<seq>` of the diagram when one carries it.

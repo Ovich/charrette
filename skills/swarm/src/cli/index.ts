@@ -298,6 +298,9 @@ function joinedSeat(): string {
   return seat ?? slice ?? fail(`--seat (or --slice) is required\n${USAGE}`);
 }
 
+/** What a seat's join tells it of its posts, before the listener line (D2). */
+const SEAT_POSTS_DRAW = "posts render markdown and mermaid: compare in a table, draw a flow as a mermaid block";
+
 /** The commands a member of a kind without worktree runs next, `--as` filled in (D21, D36). */
 const seatCommands = (as: string): string[] => {
   const cli = self().join(" ");
@@ -397,11 +400,14 @@ async function main(board: Board): Promise<void> {
       const shared = !profileOf(runner.kind).worktree;
       const as = shared ? `pass --as ${runner.name} on every call: this checkout is shared, the board cannot tell you apart` : null;
       const commands = shared ? seatCommands(runner.name) : null;
-      emit({ runner: runner.name, nick: runner.nick, roster, ...(shared ? { as: runner.name, commands } : {}), next }, () => {
+      // a seat posts what it compares as a table, what flows as mermaid: low-effort seats do what the board prints (D2)
+      const drawing = profileOf(runner.kind).member === "seat" ? SEAT_POSTS_DRAW : null;
+      emit({ runner: runner.name, nick: runner.nick, roster, ...(shared ? { as: runner.name, commands } : {}), ...(drawing ? { drawing } : {}), next }, () => {
         console.log(`you are ${runner.name}, ${runner.nick}: @${runner.slice} or @${runner.nick.replace(/\s+/g, "")} mentions you`);
         for (const r of roster) console.log(rosterLine(r));
         if (as) console.log(as);
         for (const c of commands ?? []) console.log(c);
+        if (drawing) console.log(drawing);
         console.log(next);
       });
       break;
