@@ -12,6 +12,7 @@ import { parseArgs } from "./args.ts";
 import { fullText, seqLine } from "./format.ts";
 import { nameHandle, unmatchedMentions } from "../board/mentions.ts";
 import { boardUrlFor, registerBoardDocument } from "./aiview-document.ts";
+import { unclaimedLines } from "./unclaimed.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
@@ -116,7 +117,7 @@ function branchChangedIn(worktree: string, onto: string): string[] {
 
 /** The reconcile's lines: each file, then each flag on the thread (D58, D59). */
 const printReconciled = (reconciled: string[], flags: Flag[]): void => {
-  for (const file of reconciled) console.log(`reconciled ${file}`);
+  for (const line of unclaimedLines(reconciled)) console.log(line);
   for (const f of flags) console.log(`#${f.seq} flagged: you wrote ${f.path} outside your claim; ${f.holder} holds it. Settle it with @${f.holder} on the thread.`);
 };
 
