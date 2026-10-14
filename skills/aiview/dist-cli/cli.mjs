@@ -92,6 +92,9 @@ function repoRootOf(start) {
     dir = parent;
   }
 }
+function sidecarOf(absPath) {
+  return /\.workbench\.html$/i.test(absPath) ? absPath.replace(/\.html$/i, "") : null;
+}
 function kindFromName(file) {
   const parts = path3.basename(file).split(".");
   return parts.length >= 3 ? parts[parts.length - 2].toLowerCase() : "";
@@ -8805,13 +8808,20 @@ var init_serverstate = __esm({
 import { EventEmitter } from "node:events";
 import fs5 from "node:fs";
 import path6 from "node:path";
-var DocWatcher;
+var SIDECAR_MANIFEST, DocWatcher;
 var init_watcher = __esm({
   "src/core/watcher.ts"() {
     "use strict";
+    init_paths();
+    SIDECAR_MANIFEST = "manifest.json";
     DocWatcher = class extends EventEmitter {
       watched = /* @__PURE__ */ new Map();
       timers = /* @__PURE__ */ new Map();
+      /** sidecar dir -> its watch; dropped on error, re-armed on the next `<stem>` event. */
+      sidecars = /* @__PURE__ */ new Map();
+      dataTimers = /* @__PURE__ */ new Map();
+      /** page dir -> stem -> the workbench doc, so a `<stem>` event there arms its sidecar. */
+      benches = /* @__PURE__ */ new Map();
       /** host id -> absolute paths of the files it was composed from, replaced on each resolve. */
       sources = /* @__PURE__ */ new Map();
       resolve;
@@ -8823,15 +8833,49 @@ var init_watcher = __esm({
       }
       ensureWatch(doc) {
         const dir = path6.dirname(doc.abs_path);
+        const sidecar = sidecarOf(doc.abs_path);
+        if (sidecar) {
+          let inDir = this.benches.get(dir);
+          if (!inDir) this.benches.set(dir, inDir = /* @__PURE__ */ new Map());
+          inDir.set(path6.basename(sidecar), doc);
+          this.ensureSidecarWatch(doc);
+        }
         if (this.watched.has(dir)) return;
         try {
           const w = fs5.watch(dir, (_event, name) => {
             if (!name) return;
+            const bench = this.benches.get(dir)?.get(String(name));
+            if (bench) {
+              this.ensureSidecarWatch(bench);
+              return;
+            }
             const hit = this.resolve(dir, String(name));
             if (hit) this.schedule(hit.id);
             for (const id of this.hostsOf(path6.resolve(dir, String(name)))) this.schedule(id);
           });
           this.watched.set(dir, w);
+        } catch (e) {
+          console.error(`watch failed for ${dir}: ${e.message}`);
+        }
+      }
+      /** Watch `<stem>/` of a `.workbench.html` when it exists; emits "data-changed" on manifest.json only. */
+      ensureSidecarWatch(doc) {
+        const dir = sidecarOf(doc.abs_path);
+        if (!dir || this.sidecars.has(dir)) return;
+        try {
+          if (!fs5.statSync(dir).isDirectory()) return;
+        } catch {
+          return;
+        }
+        try {
+          const w = fs5.watch(dir, (_event, name) => {
+            if (name && String(name) === SIDECAR_MANIFEST) this.scheduleData(doc.id);
+          });
+          w.on("error", () => {
+            w.close();
+            this.sidecars.delete(dir);
+          });
+          this.sidecars.set(dir, w);
         } catch (e) {
           console.error(`watch failed for ${dir}: ${e.message}`);
         }
@@ -8855,9 +8899,21 @@ var init_watcher = __esm({
           setTimeout(() => this.emit("changed", { id }), this.debounceMs)
         );
       }
+      scheduleData(id) {
+        clearTimeout(this.dataTimers.get(id));
+        this.dataTimers.set(
+          id,
+          setTimeout(() => this.emit("data-changed", { id }), this.debounceMs)
+        );
+      }
       close() {
         for (const t of this.timers.values()) clearTimeout(t);
         this.timers.clear();
+        for (const t of this.dataTimers.values()) clearTimeout(t);
+        this.dataTimers.clear();
+        for (const w of this.sidecars.values()) w.close();
+        this.sidecars.clear();
+        this.benches.clear();
         for (const w of this.watched.values()) w.close();
         this.watched.clear();
         this.sources.clear();
@@ -8954,6 +9010,9 @@ function startServer(index, { port, open, startDoc, toolRoot = TOOL_ROOT, writeS
   watcher.on("changed", ({ id }) => {
     index.touch(id);
     sse.broadcast({ type: "changed", id });
+  });
+  watcher.on("data-changed", ({ id }) => {
+    sse.broadcast({ type: "data-changed", id });
   });
   for (const d of index.all()) if (d.exists) watcher.ensureWatch(d);
   const send = (res, status, body, type = "application/json; charset=utf-8") => {
@@ -9069,10 +9128,19 @@ function startServer(index, { port, open, startDoc, toolRoot = TOOL_ROOT, writeS
     if (a) {
       const doc = index.get(Number(a[1]));
       if (!doc) return send(res, 404, "not found", "text/plain");
-      const base = path7.dirname(doc.abs_path);
-      const f = path7.resolve(base, decodeURIComponent(a[2]));
+      const dir = path7.dirname(doc.abs_path);
+      const asked = path7.resolve(dir, decodeURIComponent(a[2]));
+      if (asked !== dir && !asked.startsWith(dir + path7.sep)) return send(res, 403, "forbidden", "text/plain");
+      let base;
+      let f;
+      try {
+        base = fs6.realpathSync(dir);
+        f = fs6.realpathSync(asked);
+      } catch {
+        return send(res, 404, "not found", "text/plain");
+      }
       if (f !== base && !f.startsWith(base + path7.sep)) return send(res, 403, "forbidden", "text/plain");
-      if (!fs6.existsSync(f) || !fs6.statSync(f).isFile()) return send(res, 404, "not found", "text/plain");
+      if (!fs6.statSync(f).isFile()) return send(res, 404, "not found", "text/plain");
       return send(res, 200, fs6.readFileSync(f), MIME[path7.extname(f).toLowerCase()] ?? "application/octet-stream");
     }
     const r = p.match(/^\/api\/raw\/(\d+)$/);
@@ -9963,6 +10031,15 @@ known: ${known.join(", ")}` : ""}`);
     index.close();
   }
 }
+function moveAcrossVolumes(from, to) {
+  try {
+    fs7.renameSync(from, to);
+  } catch (e) {
+    if (e.code !== "EXDEV") throw e;
+    fs7.cpSync(from, to, { recursive: true });
+    fs7.rmSync(from, { recursive: true });
+  }
+}
 function cmdMove() {
   if (!args.positional.length) {
     console.error("usage: aiview move <file|#id>... [--project <slug>]");
@@ -9991,24 +10068,26 @@ known: ${known.join(", ")}` : ""}`);
       console.error(`already there: ${from}`);
       continue;
     }
+    const sidecarFrom = sidecarOf(from);
+    const sidecarDest = sidecarOf(dest);
+    const carriesSidecar = sidecarFrom !== null && fs7.existsSync(sidecarFrom);
     const orphaned = !fs7.existsSync(from) && fs7.existsSync(dest);
     if (!fs7.existsSync(from) && !orphaned) {
       console.error(`missing file, not moved: ${from}`);
       continue;
     }
-    if (fs7.existsSync(dest) && !orphaned) {
-      console.error(`target exists, skipped: ${dest}`);
-      continue;
+    if (!orphaned) {
+      const taken = [dest, ...carriesSidecar ? [sidecarDest] : []].filter((p) => fs7.existsSync(p));
+      if (taken.length) {
+        const named = carriesSidecar ? `${dest} and ${sidecarDest}` : dest;
+        console.error(`target exists (${taken.join(", ")}), skipped: ${named}`);
+        continue;
+      }
     }
     fs7.mkdirSync(dir, { recursive: true });
     if (!orphaned) {
-      try {
-        fs7.renameSync(from, dest);
-      } catch (e) {
-        if (e.code !== "EXDEV") throw e;
-        fs7.copyFileSync(from, dest);
-        fs7.rmSync(from);
-      }
+      moveAcrossVolumes(from, dest);
+      if (carriesSidecar) moveAcrossVolumes(sidecarFrom, sidecarDest);
     }
     const d = index.move(row.id, dest);
     moved.push(d);

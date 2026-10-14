@@ -47,7 +47,7 @@ cd skills/aiview && npm install && npm run build && npm test && cd ../..   # ref
 cd skills/swarm && npm install && npm run build && npm test && npm run test:app && cd ../..   # the board: dist/ + dist-cli/
 node --test skills/review/pr-review/scripts/scope.test.mjs            # the review scope script
 node --test skills/project/write-conventions/scripts/rules.test.mjs # the conventions rules script
-node --test skills/workbench/create-workbench/scripts/data-block.test.mjs # the workbench page and data block
+node --test "skills/workbench/create-workbench/scripts/*.test.mjs" # the workbench page, writer and loader
 # bump "version" to the SAME value in both:
 #   .claude-plugin/plugin.json
 #   .claude-plugin/marketplace.json
