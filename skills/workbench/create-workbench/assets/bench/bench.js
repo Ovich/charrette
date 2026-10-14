@@ -181,10 +181,7 @@
     for (const [path, held] of sideFiles) if (!liveFiles.has(held.runFile)) sideFiles.delete(path);
     for (const cb of fedListeners) cb();
   }
-  window.addEventListener("message", (e) => {
-    const type = e.data && (e.data.type || e.data);
-    if (type === "aiview:data-changed") fed();
-  });
+  // The bridge turns the app's `aiview:data-changed` message into this window event.
   window.addEventListener("aiview:data-changed", () => fed());
 
   // ---- the person's place, kept by aiview per document ----
@@ -193,11 +190,9 @@
       const s = window.aiview && window.aiview.state;
       return s && Object.prototype.hasOwnProperty.call(s, key) ? String(s[key]) : null;
     },
+    // The bridge's state posts each set up as `aiview:state`; aiview keeps it per document.
     set(key, value) {
-      if (!window.aiview) return;
-      window.aiview.state = window.aiview.state || {};
-      window.aiview.state[key] = String(value);
-      window.parent.postMessage({ type: "aiview:state", key, value: String(value) }, "*");
+      if (window.aiview && window.aiview.state) window.aiview.state[key] = String(value);
     },
   };
 
