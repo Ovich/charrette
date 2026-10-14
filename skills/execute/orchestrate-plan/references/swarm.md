@@ -9,10 +9,10 @@ everything said on the board. This file says what changes in this skill's own du
 - **Open the run on the board before the first dispatch**, every slice and its blockers in it.
 - **Every slice whose blockers are done is dispatched at once**, no cap, one subagent each, each in
   its own git worktree (`isolation: "worktree"`). A slice whose blockers land later is dispatched
-  then, to a fresh subagent. How the calls are sent is the `swarm` skill's orchestrator side.
+  then, to a fresh subagent. How the calls are sent is the `orchestrate` skill's.
 - **The brief carries the board line and the swarm pull request line** (`references/brief.md`).
   The subagent definition is the same as in classic mode: the board line tells it to load the
-  `swarm` skill.
+  `swarm` skill, runner side.
 - **Every subagent a swarm run sends joins its board**: a slice, a fix drawn from a verification, a
   slice added mid-run. Its brief carries the board line and a slice id on the run (`slice <id> --run
   <run> --state running` first); a brief without one is a classic dispatch and is not sent.
