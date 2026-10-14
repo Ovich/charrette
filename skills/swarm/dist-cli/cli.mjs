@@ -242,6 +242,8 @@ function planCode(plan) {
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
   return (words[0][0] + words[1][0]).toUpperCase();
 }
+var isCodeShaped = (token) => /^[A-Za-z]{2}$/.test(token);
+var plansOfCode = (code, plans) => plans.filter((plan) => planCode(plan) === code.toUpperCase());
 var MENTION = /(?<![\w@])@([A-Za-z0-9][\w.\-]*(?:[\/·][A-Za-z0-9][\w.\-]*)?)/g;
 var nameHandle = (nick) => nick.replace(/\s+/g, "").toLowerCase();
 function parseMentions(body, senderPlan, plans, names) {
@@ -257,8 +259,12 @@ function parseMentions(body, senderPlan, plans, names) {
     } else if (token.includes("\xB7")) {
       const [code, slice] = token.split("\xB7");
       for (const plan of plans) if (planCode(plan) === code.toUpperCase()) out.add(`${plan}/${slice === "all" ? "*" : slice}`);
-    } else if (token === "all") {
+    } else if (token === "swarm") {
       out.add(`${senderPlan}/*`);
+    } else if (token === "all") {
+      continue;
+    } else if (isCodeShaped(token) && plansOfCode(token, plans).length) {
+      for (const plan of plansOfCode(token, plans)) out.add(`${plan}/*`);
     } else {
       out.add(`${senderPlan}/${token}`);
     }
@@ -284,8 +290,17 @@ function unmatchedMentions(body, senderPlan, plans, names) {
     if (seen.has(token)) continue;
     seen.add(token);
     if (names?.has(token.toLowerCase())) continue;
+    if (token === "all") {
+      out.push({ name: token, closest: ["swarm"] });
+      continue;
+    }
     const targets = parseMentions(`@${token}`, senderPlan, plans, names);
     if (targets.length && targets.every((t) => t.endsWith("/*") || members.has(t))) continue;
+    if (isCodeShaped(token)) {
+      const codes = [...new Set(plans.map(planCode))];
+      out.push({ name: token, closest: codes.sort((a, b) => editDistance(token.toUpperCase(), a) - editDistance(token.toUpperCase(), b)).slice(0, 3) });
+      continue;
+    }
     const wanted = token.split(/[/·]/).pop().toLowerCase();
     const gap = (member) => Math.min(editDistance(wanted, member.slice(member.lastIndexOf("/") + 1).toLowerCase()), editDistance(wanted, handleOf.get(member) ?? member));
     out.push({ name: token, closest: [...members].sort((a, b) => gap(a) - gap(b)).slice(0, 3) });
@@ -318,7 +333,10 @@ var EVENTS = {
   joined: { name: "joined" },
   ended: { name: "ended" },
   stale: { name: "stale" },
-  // in main when a run opens: its kind, group and title (D69)
+  // an orchestrator silent STALE_MS, posted once in its run (D15); "back" when it calls again
+  quiet: { name: "quiet" },
+  back: { name: "back" },
+  // when a run opens: its kind, group and title (D69)
   opened: { name: "opened" },
   closed: { name: "closed" },
   urgent: { name: "urgent", always: true },
@@ -344,16 +362,16 @@ function parseSubscriptions(spec) {
   const parts = (Array.isArray(spec) ? spec : [spec]).flatMap((s) => s.split(",")).map((s) => s.trim()).filter(Boolean);
   const out = [];
   for (const p of parts) {
-    const main2 = p.startsWith("main:");
-    const name = main2 ? p.slice(5) : p;
+    const prefix = /^(any|main):/.exec(p)?.[0];
+    const name = prefix ? p.slice(prefix.length) : p;
     if (!isEvent(name)) throw new Error(`unknown event ${name}: the events are ${NAMES.join(", ")}`);
-    const sub = { event: name, scope: main2 ? "main" : "run" };
+    const sub = { event: name, scope: prefix ? "any" : "run" };
     if (!out.some((o) => o.event === sub.event && o.scope === sub.scope)) out.push(sub);
   }
   return out;
 }
 function formatSubscriptions(subs) {
-  return subs.map((s) => s.scope === "main" ? `main:${s.event}` : s.event).join(", ");
+  return subs.map((s) => s.scope === "any" ? `any:${s.event}` : s.event).join(", ");
 }
 function mentions(m, me) {
   return m.mentions.includes(me.name) || m.mentions.includes(`${me.plan}/*`);
@@ -364,8 +382,7 @@ function wakes(m, me, subs) {
   const e = eventOf(m);
   if (!e) return false;
   if (EVENTS[e].always) return true;
-  const scope = m.channel === "main" ? "main" : m.channel.run === me.run ? "run" : null;
-  return scope !== null && subs.some((s) => s.event === e && s.scope === scope);
+  return subs.some((s) => s.event === e && (s.scope === "any" || m.run === me.run));
 }
 
 // src/board/claims.ts
@@ -618,7 +635,7 @@ function claimsOf(deps) {
         const all = iface.size ? openPlans.map((plan) => `${plan}/*`) : [];
         const lines = [`merged ${sha}${onto ? ` into ${onto}` : ""}: rebase your branch onto it.`];
         if (told.size) lines.push(`${[...told].map((n) => `@${n}`).join(" ")}: you hold or declared a file it changed.`);
-        if (iface.size) lines.push(`@all interface changed: ${[...iface].join(", ")}.`);
+        if (iface.size) lines.push(`@swarm interface changed: ${[...iface].join(", ")}.`);
         if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);
         lines.push(`files: ${rels.join(", ") || "-"}`);
         for (const rel of rels) {
@@ -878,6 +895,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
   upkeep("messages", "run", "run INTEGER");
   upkeep("messages", "endorses", "endorses INTEGER");
   upkeep("runs", "stale_flagged", "stale_flagged INTEGER NOT NULL DEFAULT 0");
+  upkeep("participants", "quiet_flagged", "quiet_flagged INTEGER NOT NULL DEFAULT 0");
   upkeep("runs", "pruned_at", "pruned_at TEXT");
   upkeep("messages", "event", "event TEXT");
   upkeep("participants", "subs", "subs TEXT NOT NULL DEFAULT '[]'");
@@ -956,8 +974,12 @@ async function openBoard(dbPath = SQLITE_PATH) {
       state: String(s.state)
     }))
   });
-  const nickOf = (r) => String(r.slice) === ORCHESTRATOR ? ORCHESTRATOR : r.nick == null ? String(r.slice) : String(r.nick);
-  const subsOf = (r) => JSON.parse(String(r.subs ?? "[]"));
+  const nickOf = (r) => r.nick == null ? String(r.slice) : String(r.nick);
+  const unusedNick = (repo) => {
+    const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL`).all(repo);
+    return funnyName(rows.map(nickOf));
+  };
+  const subsOf = (r) => JSON.parse(String(r.subs ?? "[]")).map((x) => ({ event: x.event, scope: x.scope === "run" ? "run" : "any" }));
   const PARTICIPANT_SQL = `SELECT p.*, r.repo, r.plan, r.kind FROM participants p JOIN runs r ON r.id = p.run`;
   const toParticipant = (r) => ({
     id: Number(r.id),
@@ -974,39 +996,34 @@ async function openBoard(dbPath = SQLITE_PATH) {
     subscriptions: subsOf(r)
   });
   const participantById = (id) => toParticipant(db.prepare(`${PARTICIPANT_SQL} WHERE p.id = ?`).get(id));
-  const toMessage = (r) => ({
-    seq: Number(r.seq),
-    repo: String(r.repo),
-    from: participantById(Number(r.author)).name,
-    body: String(r.body),
-    about: r.about == null ? null : String(r.about),
-    kind: String(r.kind),
-    mentions: JSON.parse(String(r.mentions)),
-    at: String(r.at),
-    channel: r.run == null ? "main" : { run: Number(r.run) },
-    endorses: r.endorses == null ? null : Number(r.endorses),
-    event: r.event == null || !Object.hasOwn(EVENTS, String(r.event)) ? null : String(r.event),
-    meta: r.meta == null ? null : JSON.parse(String(r.meta))
-  });
+  const toMessage = (r) => {
+    const author = participantById(Number(r.author));
+    return {
+      seq: Number(r.seq),
+      repo: String(r.repo),
+      from: author.name,
+      body: String(r.body),
+      about: r.about == null ? null : String(r.about),
+      kind: String(r.kind),
+      mentions: JSON.parse(String(r.mentions)),
+      at: String(r.at),
+      // an old main row (null) is labelled with its author's run (plan D13)
+      run: r.run == null ? author.run : Number(r.run),
+      endorses: r.endorses == null ? null : Number(r.endorses),
+      event: r.event == null || !Object.hasOwn(EVENTS, String(r.event)) ? null : String(r.event),
+      meta: r.meta == null ? null : JSON.parse(String(r.meta))
+    };
+  };
   const lastSeq = () => Number(db.prepare("SELECT COALESCE(MAX(seq), 0) AS s FROM messages").get().s);
   const openPlans = (repo) => db.prepare("SELECT DISTINCT plan FROM runs WHERE repo = ? AND state = 'open'").all(repo).map((r) => String(r.plan));
   const activeNames = (repo) => {
     const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL AND p.slice != '${ORCHESTRATOR}'`).all(repo);
     return new Map(rows.map((r) => [nameHandle(nickOf(r)), `${r.plan}/${r.slice}`]));
   };
-  const channelOf = (p, kind, about, mentions2, asked) => {
-    if (asked === "main") return null;
-    if (mentions2.some((m) => m.slice(0, m.lastIndexOf("/")) !== p.plan)) return null;
-    if ((kind === "agreement" || kind === "endorsement") && about) {
-      const rel = relPath(p.repo, about) ?? slashes(about);
-      if (rel && claims.heldInOtherRun(p, rel)) return null;
-    }
-    return p.run;
-  };
   const insertMessage = (p, body, about, kind, named, extra = {}) => {
     const mentions2 = named ?? (kind === "event" ? [] : parseMentions(body, p.plan, openPlans(p.repo), activeNames(p.repo)));
-    const run2 = channelOf(p, kind, about, mentions2, extra.channel ?? "run");
-    if (run2 != null && runRow(run2).state === "closed") throw new Error(`run ${run2} is closed`);
+    const run2 = p.run;
+    if (runRow(run2).state === "closed") throw new Error(`run ${run2} is closed`);
     const r = db.prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at, by_board, run, endorses, event, meta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(p.repo, p.id, body, about, kind, JSON.stringify(mentions2), now(), named ? 1 : 0, run2, extra.endorses ?? null, extra.event ?? null, extra.meta ? JSON.stringify(extra.meta) : null);
     const seq = Number(r.lastInsertRowid);
     bump(p.repo);
@@ -1044,16 +1061,16 @@ async function openBoard(dbPath = SQLITE_PATH) {
   const claims = claimsOf({ db, transaction, bump, now, lastSeq, participantById, isLive, insertMessage, relPath, fold, slashes, doingOf });
   const deliverTo = (p, fromWait, mentionsOnly = false) => {
     const me = participantById(p.id);
-    const named = (m) => mentions(m, me) || m.channel === "main" && (m.kind === "agreement" || m.kind === "endorsement") && m.about != null && claims.holds(me, m.about);
+    const named = (m) => mentions(m, me) || (m.kind === "agreement" || m.kind === "endorsement") && m.about != null && claims.holds(me, m.about);
     const messages = transaction(() => {
       const unseen = db.prepare(
         `SELECT m.* FROM messages m
-           WHERE m.repo = ? AND m.seq > ? AND m.author != ? AND (m.run = ? OR m.run IS NULL)
+           WHERE m.repo = ? AND m.seq > ? AND m.author != ?
              AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.participant = ? AND d.seq = m.seq)
            ORDER BY m.seq`
-      ).all(me.repo, Number(db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id).since_seq), me.id, me.run, me.id);
+      ).all(me.repo, Number(db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id).since_seq), me.id, me.id);
       const woken = (r) => named(toMessage(r)) || wakes(toMessage(r), me, me.subscriptions);
-      const heard = unseen.filter((r) => r.run != null || woken(r));
+      const heard = unseen.filter((r) => toMessage(r).run === me.run || woken(r));
       const rows = mentionsOnly ? heard.filter(woken) : heard;
       const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
       for (const r of rows) mark.run(me.id, Number(r.seq));
@@ -1065,7 +1082,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
       return rows.map((r) => {
         const m = toMessage(r);
         const rel = r.by_board || m.kind !== "msg" || !m.about || !named(m) ? null : claims.askedAbout(me, Number(r.author), m);
-        return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}${m.channel === "main" ? " --main" : ""}` } : m;
+        return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}` } : m;
       });
     });
     const full = (m) => named(m) || mentionsOnly && wakes(m, me, me.subscriptions);
@@ -1131,15 +1148,15 @@ async function openBoard(dbPath = SQLITE_PATH) {
         const r = db.prepare("INSERT INTO runs (repo, kind, plan, title, link, opened_at) VALUES (?, ?, ?, ?, ?, ?)").run(repo, profile.kind, group, title, link ?? null, now());
         const run2 = Number(r.lastInsertRowid);
         seats.forEach((s, i) => insertSlice(run2, s, i));
-        const orchestrator = db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at, subs) VALUES (?, ?, ?, ?, ?)").run(
+        const orchestrator = db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at, subs, nick) VALUES (?, ?, ?, ?, ?, ?)").run(
           run2,
           ORCHESTRATOR,
           lastSeq(),
           now(),
-          JSON.stringify(profile.defaults.orchestrator)
+          JSON.stringify(profile.defaults.orchestrator),
+          unusedNick(repo)
         );
         insertMessage(participantById(Number(orchestrator.lastInsertRowid)), `run ${run2} opened: ${profile.kind} ${group}, ${title}`, null, "event", void 0, {
-          channel: "main",
           event: EVENTS.opened.name
         });
         bump(repo);
@@ -1179,7 +1196,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
       runRow(run2);
       transaction(() => {
         const author = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, ORCHESTRATOR) ?? db.prepare("SELECT id FROM participants WHERE run = ? ORDER BY id LIMIT 1").get(run2);
-        if (author) insertMessage(participantById(Number(author.id)), `run ${run2} closed`, null, "event", void 0, { channel: "main", event: EVENTS.closed.name });
+        if (author) insertMessage(participantById(Number(author.id)), `run ${run2} closed`, null, "event", void 0, { event: EVENTS.closed.name });
         db.prepare("UPDATE runs SET state = 'closed', closed_at = ? WHERE id = ?").run(now(), run2);
         bump(String(runRow(run2).repo));
         db.prepare("UPDATE participants SET ended_at = COALESCE(ended_at, ?) WHERE run = ?").run(now(), run2);
@@ -1232,6 +1249,14 @@ async function openBoard(dbPath = SQLITE_PATH) {
     flagStale(at = /* @__PURE__ */ new Date()) {
       const silentBefore = at.getTime() - STALE_MS;
       return transaction(() => {
+        const quiet = db.prepare("SELECT p.id, p.last_call, p.joined_at FROM participants p JOIN runs r ON r.id = p.run WHERE r.state = 'open' AND p.slice = ? AND p.ended_at IS NULL AND p.quiet_flagged = 0").all(ORCHESTRATOR);
+        for (const o of quiet) {
+          const silentSince = Date.parse(String(o.last_call ?? o.joined_at));
+          if (silentSince >= silentBefore) continue;
+          const minutes = Math.floor((at.getTime() - silentSince) / 6e4);
+          insertMessage(participantById(Number(o.id)), `quiet ${minutes} min`, null, "event", [], { event: EVENTS.quiet.name });
+          db.prepare("UPDATE participants SET quiet_flagged = 1 WHERE id = ?").run(Number(o.id));
+        }
         const flagged = [];
         for (const r of db.prepare("SELECT id, plan FROM runs WHERE state = 'open' AND stale_flagged = 0 ORDER BY id").all()) {
           const id = Number(r.id);
@@ -1240,7 +1265,6 @@ async function openBoard(dbPath = SQLITE_PATH) {
           const author = members.find((m) => String(m.slice) === ORCHESTRATOR) ?? members[0];
           const group = String(r.plan);
           insertMessage(participantById(Number(author.id)), `run ${id} (${group}) is stale: every member silent; close it or dispatch again`, null, "event", [`${group}/${ORCHESTRATOR}`], {
-            channel: "main",
             event: EVENTS.stale.name
           });
           db.prepare("UPDATE runs SET stale_flagged = 1 WHERE id = ?").run(id);
@@ -1265,10 +1289,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
           const seatRow = db.prepare("SELECT on_events FROM slices WHERE run = ? AND id = ?").get(run2, slice);
           const seatOn = seatRow?.on_events != null ? parseSubscriptions(JSON.parse(String(seatRow.on_events))) : null;
           const subs = JSON.stringify(on ?? seatOn ?? profile.defaults.member);
-          const fresh = () => {
-            const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL`).all(String(r.repo));
-            return funnyName(rows.map(nickOf));
-          };
+          const fresh = () => unusedNick(String(r.repo));
           if (existing) {
             db.prepare("UPDATE participants SET doing = ?, files = ?, worktree = ?, ended_at = NULL, merged = 0, subs = ?, nick = COALESCE(nick, ?) WHERE id = ?").run(
               doing,
@@ -1354,7 +1375,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
     },
     post(p, body, opts = {}) {
       const fresh = live(p);
-      const m = insertMessage(fresh, body, opts.about ?? null, opts.kind ?? "msg", void 0, { channel: opts.channel });
+      const m = insertMessage(fresh, body, opts.about ?? null, opts.kind ?? "msg");
       const claimed = profileOf(fresh.kind).claims ? claims.claimByPost(fresh, m) : null;
       return claimed ? { ...m, claimed } : m;
     },
@@ -1501,7 +1522,8 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
           ended: r.ended_at == null ? null : String(r.ended_at),
           calls: Number(r.calls ?? 0),
           listening: !ended && Number(r.listening) === 1,
-          on: subsOf(r).map((x) => formatSubscriptions([x]))
+          on: subsOf(r).map((x) => formatSubscriptions([x])),
+          lastCall: String(r.last_call ?? r.joined_at)
         };
       });
       const events = db.prepare("SELECT * FROM (SELECT * FROM messages WHERE repo = ? ORDER BY seq DESC LIMIT ?) ORDER BY seq").all(repo, EVENTS_SHOWN).map((r) => {
@@ -1513,7 +1535,8 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
           from: m.from,
           body: m.body,
           about: m.about,
-          channel: m.channel === "main" ? "main" : m.channel.run,
+          run: m.run,
+          channel: m.run,
           event: m.event,
           mentions: m.mentions,
           meta: m.meta ?? null
@@ -1583,6 +1606,8 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
   const countCall = (p) => {
     db.prepare("UPDATE participants SET calls = calls + 1, last_call = ? WHERE id = ?").run(now(), p.id);
     db.prepare("UPDATE runs SET stale_flagged = 0 WHERE id = ? AND stale_flagged = 1").run(p.run);
+    if (Number(db.prepare("UPDATE participants SET quiet_flagged = 0 WHERE id = ? AND quiet_flagged = 1").run(p.id).changes) > 0 && runRow(p.run).state === "open")
+      insertMessage(participantById(p.id), "back", null, "event", [], { event: EVENTS.back.name });
     bump(participantById(p.id).repo);
   };
   const counted = (verb) => (p, ...rest) => transaction(() => {
@@ -1672,7 +1697,7 @@ function parseArgs(argv) {
 }
 
 // src/cli/format.ts
-var seqLine = (m) => `#${m.seq}${m.channel === "main" ? " (main)" : ""}`;
+var seqLine = (m) => `#${m.seq}`;
 var fullText = (m) => {
   const kind = m.kind === "msg" ? "" : ` (${m.kind})`;
   const about = m.about ? ` about ${m.about}` : "";
@@ -1785,12 +1810,12 @@ var USAGE = [
   "  slice   add <id> --run <id> --title <t> [--blockers a,b] [--link <url>] [--role <r>] [--on <events>]   # adds a slice or seat mid-run (orchestrator)",
   "  close   --run <id>                                              # (orchestrator)",
   '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,\u2026"]   # --slice <id> the same; prints the roster, then the command that starts your listener',
-  "          # --on <events>: what wakes your wait --mentions besides mentions and urgent posts, e.g. agreement,main:merged; else the seat row's on, else the kind's defaults",
+  "          # --on <events>: what wakes your wait --mentions besides mentions and urgent posts, e.g. agreement,any:merged; else the seat row's on, else the kind's defaults",
   "  subscribe   [--as <member>] <events>                            # prints your subscriptions after",
   "  unsubscribe [--as <member>] <events>",
   "  doing   [--as <member>] <text>",
-  "  post    [--as <member>] <body> [--about <path|decision id>] [--main]   # prints the seq, (main) when it landed in main",
-  "  agree   [--as <member>] <terms> [--about <path|decision id>] [--main]  # prints the seq",
+  "  post    [--as <member>] <body> [--about <path|decision id>]   # prints the seq",
+  "  agree   [--as <member>] <terms> [--about <path|decision id>]  # prints the seq",
   "  endorse [--as <member>] <seq>                                   # backs an agreement; prints the endorsement's seq",
   "  read    <seq>",
   "  deliver [--as <member>]                                         # what you have not had: mentions in full, the rest one line",
@@ -1801,7 +1826,7 @@ var USAGE = [
   "  serve   [--port <p>] [--detach]                 # the run pages aiview frames, on :4322 (SWARM_PORT)",
   "  status                                                          # data home, the page's server, open runs",
   "  config  retention [<days>]                                      # prints, or sets then prints, how many days closed runs and main's talk are kept",
-  `events: ${Object.keys(EVENTS).join(", ")}; main:<event> for one posted in main`,
+  `events: ${Object.keys(EVENTS).join(", ")}; any:<event> for one posted in any run`,
   "a member is <group>/<seat>, the orchestrator <group>/orchestrator; without --as, the runner joined from this worktree"
 ].join("\n");
 var CODE_USAGE = [
@@ -2043,7 +2068,13 @@ var subscriptionsArg = (spec) => {
     return fail(e.message);
   }
 };
+var NO_MAIN = "there is no Main any more: the conversation is one; mention who you mean (@IW, @IW\xB7SL3, @swarm)";
 async function main(board) {
+  if ((args.verb === "post" || args.verb === "agree" || args.verb === "endorse") && args.has("--main")) {
+    console.error(NO_MAIN);
+    process.exitCode = 2;
+    return;
+  }
   switch (args.verb) {
     case "config": {
       const setting = args.positional[0];
@@ -2154,11 +2185,10 @@ ${USAGE}`);
       const body = args.positional.join(" ") || fail(`${args.verb}: nothing to say`);
       const m = board.post(p, body, {
         about: aboutArg(),
-        kind: args.verb === "agree" ? "agreement" : "msg",
-        channel: args.has("--main") ? "main" : "run"
+        kind: args.verb === "agree" ? "agreement" : "msg"
       });
       const unmatched = unmatchedLines(board, p, body);
-      emitHeard(p, { seq: m.seq, mentions: m.mentions, channel: m.channel, ...unmatched.length ? { unmatched } : {}, ...m.claimed ? { claimed: m.claimed } : {} }, () => {
+      emitHeard(p, { seq: m.seq, mentions: m.mentions, run: m.run, ...unmatched.length ? { unmatched } : {}, ...m.claimed ? { claimed: m.claimed } : {} }, () => {
         console.log(seqLine(m));
         if (m.claimed) console.log(`claimed ${m.claimed.path}, shared with ${m.claimed.sharedWith.join(", ")}`);
         for (const line of unmatched) console.log(line);
@@ -2171,7 +2201,7 @@ ${USAGE}`);
       const seq = Number(raw);
       if (!Number.isInteger(seq)) fail(`endorse takes a seq, got ${raw}`);
       const m = board.endorse(p, seq);
-      emitHeard(p, { seq: m.seq, endorses: m.endorses, channel: m.channel }, seqLine(m));
+      emitHeard(p, { seq: m.seq, endorses: m.endorses, run: m.run }, seqLine(m));
       break;
     }
     case "read": {
