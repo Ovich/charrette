@@ -1,26 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { annotate, appendEntry, readData, writeData } from "./data-block.mjs";
 
-const here = import.meta.dirname;
+// data-block.mjs stays for pages made before the sidecar (D13, US4): its tests build an
+// old-shape page themselves, page.mjs no longer writes a data block.
 const fresh = () => {
   const page = join(mkdtempSync(join(tmpdir(), "bench-")), "2026-01-01-probe.workbench.html");
-  execFileSync(process.execPath, [join(here, "page.mjs"), page, "--label", "Probe <bench>"]);
+  writeFileSync(page, '<!doctype html><html><body><script id="data" type="application/json">null</script></body></html>');
   return page;
 };
 
-test("page.mjs writes a self-contained page opening on the label, and refuses to overwrite", () => {
-  const page = fresh();
-  const html = readFileSync(page, "utf8");
-  assert.match(html, /<span class="bench-label">Probe &lt;bench&gt;<\/span>/);
-  assert.match(html, /<style data-basecoat>/);
-  assert.doesNotMatch(html, /<script src=|<link [^>]*href="http/);
-  assert.equal(readData(page), null);
-  assert.throws(() => execFileSync(process.execPath, [join(here, "page.mjs"), page, "--label", "x"], { stdio: "pipe" }));
+test("an old-shape page reads its empty block as null", () => {
+  assert.equal(readData(fresh()), null);
 });
 
 test("a derived feed rewrites the block, and data cannot close the script", () => {
