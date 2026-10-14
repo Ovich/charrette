@@ -203,8 +203,9 @@ export function writeDerived(page, feed) {
     }
     const dropped = new Set(); // run folders past keepRuns: gone now, whatever the previous manifest said
     for (const [tab, runs] of Object.entries(feed.tabs ?? {})) {
-      const live = runs.slice(Math.max(0, runs.length - keepRuns));
-      for (const run of runs.slice(0, runs.length - live.length)) dropped.add(`data/${tab}/${run.name}/`);
+      // A tab's runs come newest first (D3): the first keepRuns are kept, the rest pruned.
+      const live = runs.slice(0, keepRuns);
+      for (const run of runs.slice(keepRuns)) dropped.add(`data/${tab}/${run.name}/`);
       manifest.tabs[tab] = {
         runs: live.map((run) => {
           const dir = `data/${tab}/${run.name}`;
