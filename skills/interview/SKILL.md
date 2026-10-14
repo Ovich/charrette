@@ -37,4 +37,4 @@ a closing line that takes a number or a rejection of the frame. A decision left 
 is one the implementation makes silently.
 
 **Close in chat**, once understanding is shared: every decision with its status and source. The caller decides where
-that goes.
+that goes. **The caller writes decisions as rows**: read `references/decisions.md`.

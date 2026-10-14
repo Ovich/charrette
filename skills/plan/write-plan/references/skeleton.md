@@ -47,6 +47,7 @@ The recipes the experiments handed back.
 
 ## 8. Decisions
 | id | Kind | Decision | Status | Source | Slice |
+The row core of the `interview` skill's `references/decisions.md`, plus `Kind` and `Slice`.
 One series, `D1` onward, continuing the project's numbering. Kinds: purpose, module (with
 its state, as write-slice names them), architecture, contract, clarification. Open
 questions are rows with status open and an owner. A departure from a rule is a row naming

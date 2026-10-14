@@ -62,6 +62,8 @@ $A open "$F" --tag <topic>
 
 **A skill that produces documents says "through the `aiview` skill"**, then states only its document's metadata: kind, tags, group, and a start time that predates the file. Command syntax and directories stay here.
 
+**A document opens on a part written for a person who was not there** (a brainstorm board, and any kind that adopts it): `references/human-part.md`.
+
 **To describe the viewer, a mode or a toolbar to the person**: `references/viewer.md`.
 
 ## Red flags
