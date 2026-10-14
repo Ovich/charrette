@@ -82,7 +82,7 @@ export type FileRow = { path: string; holders: string[]; iface: boolean; flag: b
 
 /** A channel: Main, or a run by its id (D18). */
 export type ChannelId = "main" | number;
-export type ChannelEntry = { id: ChannelId; title: string; code: string | null; kind: Kind | null; open: boolean; members: number };
+export type ChannelEntry = { id: ChannelId; title: string; code: string | null; kind: Kind | null; open: boolean; entries: number };
 export type ChannelGroups = { main: ChannelEntry; plans: ChannelEntry[]; brainstorms: ChannelEntry[]; closed: ChannelEntry[] };
 
 const isActive = (r: SnapshotRunner): boolean => r.state !== "ended" && r.state !== "done";
@@ -99,18 +99,28 @@ function knownProfile(kind: string): KindProfile | null {
 /** A run's members: the roster entries of its group. */
 const membersOf = (snap: BoardSnapshot, run: RunSummary): SnapshotRunner[] => snap.roster.filter((r) => r.plan === run.group);
 
+/** A channel's count: the entries its thread shows under Everything, events included. */
+const entriesIn = (snap: BoardSnapshot, channel: ChannelId): number => snap.events.filter((e) => e.channel === channel).length;
+
 /** The rail: Main, the open runs by kind, oldest first, and every closed run the snapshot holds,
  *  newest first (D19, D46). A kind is a plan when its profile has claims, else a brainstorm. */
 export function channels(snap: BoardSnapshot): ChannelGroups {
-  const entry = (r: RunSummary): ChannelEntry => ({ id: r.run, title: r.title, code: r.code, kind: knownProfile(r.kind) ? r.kind : null, open: r.open, members: membersOf(snap, r).length });
+  const entry = (r: RunSummary): ChannelEntry => ({ id: r.run, title: r.title, code: r.code, kind: knownProfile(r.kind) ? r.kind : null, open: r.open, entries: entriesIn(snap, r.run) });
   const hasClaims = (r: RunSummary): boolean => knownProfile(r.kind)?.claims ?? false;
   const open = snap.runs.filter((r) => r.open).sort((a, b) => a.run - b.run);
   return {
-    main: { id: "main", title: "Main", code: null, kind: null, open: true, members: snap.roster.filter(isActive).length },
+    main: { id: "main", title: "Main", code: null, kind: null, open: true, entries: entriesIn(snap, "main") },
     plans: open.filter(hasClaims).map(entry),
     brainstorms: open.filter((r) => !hasClaims(r)).map(entry),
     closed: snap.runs.filter((r) => !r.open).sort((a, b) => b.run - a.run).map(entry),
   };
+}
+
+/** The channel a page opens on with no run asked for: Main while a run is open, else the most
+ *  recently closed run, so a board whose runs all closed opens on what happened. */
+export function defaultChannel(snap: BoardSnapshot): ChannelId {
+  if (snap.runs.some((r) => r.open) || snap.runs.length === 0) return "main";
+  return Math.max(...snap.runs.map((r) => r.run));
 }
 
 const openProfiles = (snap: BoardSnapshot): KindProfile[] => snap.runs.filter((r) => r.open).flatMap((r) => knownProfile(r.kind) ?? []);

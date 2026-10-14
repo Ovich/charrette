@@ -167,6 +167,9 @@ export const BRAINSTORM_ONLY: BoardSnapshot = {
   files: [],
 };
 
+/** The same repository once every run has closed: the page opens on the newest closed run. */
+export const ALL_CLOSED: BoardSnapshot = { ...LIVE, runs: CLOSED, roster: [], queues: {}, files: [], lock: null };
+
 /** A second repository on the board, one plan open: RepoList lists both (D39). */
 export const OTHER = "/repos/charrette-site/.git";
 export const SITE: BoardSnapshot = {

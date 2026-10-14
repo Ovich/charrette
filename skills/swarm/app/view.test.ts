@@ -1,7 +1,7 @@
 // The board page's view functions (D3, D18, D46), on snapshots built here.
 import { describe, expect, test } from "vitest";
 import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../src/board/board.ts";
-import { channels, scope, showsClaims, showsMergeLock } from "./lib/view.ts";
+import { channels, defaultChannel, feed, mentionCtx, scope, showsClaims, showsMergeLock } from "./lib/view.ts";
 
 const run = (id: number, kind: "plan" | "brainstorm", group: string, open = true): RunSummary => ({
   run: id, kind, plan: group, group, code: "XX", title: `${group} title`, link: null, open, runners: 0, done: 0, of: 0,
@@ -64,5 +64,29 @@ describe("scope", () => {
     expect(s.events.map((e) => e.body)).toEqual(["in q"]);
     expect(s.roster.map((r) => r.runner)).toEqual(["q/S2", "q/S3"]);
     expect(s.files[0].holders).toEqual(["p/S1", "q/S2"]);
+  });
+});
+
+describe("the rail's counts and the default channel", () => {
+  const ev = (channel: "main" | number, kind: SnapshotEvent["kind"]): SnapshotEvent => ({ ...post(channel, "p/S1", "x"), kind });
+  const snap = board(
+    [run(1, "plan", "p"), run(2, "plan", "q", false)],
+    [member("p", "S1")],
+    [ev("main", "event"), ev("main", "event"), ev("main", "msg"), ev(1, "event"), ev(1, "msg"), ev(2, "agreement")],
+  );
+
+  test("each channel counts what its thread shows under Everything, events included", () => {
+    const g = channels(snap);
+    const shown = (c: "main" | number) => feed(scope(snap, c).events, "all", null, mentionCtx(snap)).length;
+    expect(g.main.entries).toBe(3);
+    expect(g.main.entries).toBe(shown("main"));
+    expect(g.plans[0].entries).toBe(shown(1));
+    expect(g.closed[0].entries).toBe(shown(2));
+  });
+
+  test("Main while a run is open or none exists, else the newest closed run", () => {
+    expect(defaultChannel(snap)).toBe("main");
+    expect(defaultChannel(board([]))).toBe("main");
+    expect(defaultChannel(board([run(3, "plan", "a", false), run(7, "brainstorm", "b", false)]))).toBe(7);
   });
 });

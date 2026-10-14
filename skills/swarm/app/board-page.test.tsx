@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { BoardSnapshot } from "../src/board/board.ts";
 import type { BoardState } from "./hooks/useBoard.ts";
-import { APP, BRAINSTORM_ONLY, CLOSED, LIVE, OTHER, REPOS, SITE } from "./fixtures.ts";
+import { ALL_CLOSED, APP, BRAINSTORM_ONLY, CLOSED, LIVE, OTHER, REPOS, SITE } from "./fixtures.ts";
 
 const source = vi.hoisted(() => ({
   calls: [] as { repo: string | null; run: number | null }[],
@@ -21,9 +21,16 @@ vi.mock("./hooks/useBoard.ts", () => ({
 }));
 
 import { BoardPage } from "./BoardPage.tsx";
+import { FILEMAP_EXPANDED_KEY } from "./components/FileMap.tsx";
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
+  try {
+    localStorage.clear();
+  } catch {
+    /* none */
+  }
   source.calls = [];
 });
 
@@ -33,6 +40,7 @@ const show = (repos: string[], run: number | null, boards: BoardSnapshot[] = [LI
 };
 const rail = () => within(screen.getByRole("navigation", { name: "Channels" }));
 const current = () => rail().getAllByRole("button").find((b) => b.getAttribute("aria-current") === "true");
+const expandFiles = () => fireEvent.click(screen.getByRole("button", { name: /Files held/ }));
 const thread = () => within(screen.getByRole("region", { name: "The thread" }));
 
 test("run selects its channel", () => {
@@ -45,6 +53,59 @@ test("run selects its channel", () => {
 test("no run selects Main", () => {
   show([APP], null);
   expect(current()?.textContent).toContain("Main");
+});
+
+test("no run and no open run selects the newest closed run, Closed expanded", () => {
+  show([APP], null, [ALL_CLOSED]);
+  expect(current()?.textContent).toContain("Theme tokens");
+  expect(rail().getByRole("button", { name: /Closed/ }).getAttribute("aria-expanded")).toBe("true");
+  expect(thread().getByText(/Two names per token/)).toBeTruthy();
+});
+
+test("a run in the URL wins over the newest closed run", () => {
+  show([APP], 4, [ALL_CLOSED]);
+  expect(current()?.textContent).toContain("The login page");
+});
+
+test("Main's count in the rail is the entries Main's thread shows, events included", () => {
+  show([APP], null);
+  const main = rail().getAllByRole("button").find((b) => b.textContent?.startsWith("Main"))!;
+  const onMain = LIVE.events.filter((e) => e.channel === "main").length;
+  expect(onMain).toBeGreaterThan(0);
+  expect(main.querySelector(".n")?.textContent).toBe(String(onMain));
+});
+
+test("Files held is collapsed by default, its header counting files and shared files (D5)", () => {
+  const shared = { ...LIVE, files: [...LIVE.files, { path: "src/shared.ts", holders: [LIVE.roster[1].runner, LIVE.roster[2].runner], interface: true }] };
+  show([APP], 1, [shared]);
+  const header = screen.getByRole("button", { name: /Files held/ });
+  expect(header.getAttribute("aria-expanded")).toBe("false");
+  expect(header.textContent).toBe(`Files held · ${shared.files.length} · 1 shared`);
+  expect(within(screen.getByRole("region", { name: "Files held" })).queryByText("src/shared.ts")).toBeNull();
+  expandFiles();
+  expect(within(screen.getByRole("region", { name: "Files held" })).getByText("src/shared.ts")).toBeTruthy();
+});
+
+test("expanding Files held is remembered across renders", () => {
+  show([APP], 1);
+  expandFiles();
+  expect(localStorage.getItem(FILEMAP_EXPANDED_KEY)).toBe("1");
+  cleanup();
+  show([APP], 1);
+  expect(screen.getByRole("button", { name: /Files held/ }).getAttribute("aria-expanded")).toBe("true");
+});
+
+test("Files held falls back to collapsed when storage throws, and still expands", () => {
+  vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    throw new Error("blocked");
+  });
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new Error("blocked");
+  });
+  show([APP], 1);
+  expect(screen.getByRole("button", { name: /Files held/ }).getAttribute("aria-expanded")).toBe("false");
+  expandFiles();
+  expect(screen.getByRole("button", { name: /Files held/ }).getAttribute("aria-expanded")).toBe("true");
 });
 
 test("an unknown run selects Main and says so", () => {
@@ -64,12 +125,14 @@ test("a board with a plan open shows FileMap and MergeLock, even on a brainstorm
   const { container } = show([APP], 3);
   expect(container.querySelector('[data-component="FileMap"]')).toBeTruthy();
   expect(screen.getByText("merge lock free")).toBeTruthy();
+  expandFiles();
   expect(within(screen.getByRole("region", { name: "Files held" })).getByText("src/routes/auth.ts")).toBeTruthy();
 });
 
 test("FileMap lists every holder of a shared file (D62)", () => {
   const shared = { ...LIVE, files: [...LIVE.files, { path: "src/shared.ts", holders: [LIVE.roster[1].runner, LIVE.roster[2].runner], interface: true }] };
   show([APP], 1, [shared]);
+  expandFiles();
   const row = within(screen.getByRole("region", { name: "Files held" })).getByText("src/shared.ts").closest("li")!;
   expect(row.querySelectorAll('[data-component="RunnerTag"]').length).toBe(2);
 });

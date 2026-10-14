@@ -3,7 +3,7 @@
 // repository and the merge lock while an open run's kind has one (D3).
 import { useMemo, useState } from "react";
 import { useBoard } from "./hooks/useBoard.ts";
-import { channels, feed, filters, lit, mentionCtx, nicksOf, scope, showsClaims, showsMergeLock, type ChannelId } from "./lib/view.ts";
+import { channels, defaultChannel, feed, filters, lit, mentionCtx, nicksOf, scope, showsClaims, showsMergeLock, type ChannelId } from "./lib/view.ts";
 import { NicksContext } from "./components/chips.tsx";
 import { ChannelRail } from "./components/ChannelRail.tsx";
 import { FileMap } from "./components/FileMap.tsx";
@@ -16,7 +16,8 @@ const NONE = new Set<never>();
 
 export function BoardPage({ repos, run }: { repos: string[]; run: number | null }) {
   const [query, setQuery] = useState<{ repo: string | null; run: number | null }>({ repo: run === null ? (repos[0] ?? null) : null, run });
-  const [channel, setChannel] = useState<ChannelId>(run ?? "main");
+  // null: no channel chosen yet, the page opens on defaultChannel; a run in the URL always wins
+  const [channel, setChannel] = useState<ChannelId | null>(run);
   const [focus, setFocus] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
   const board = useBoard(query);
@@ -30,7 +31,8 @@ export function BoardPage({ repos, run }: { repos: string[]; run: number | null 
   }
   const groups = useMemo(() => (snapshot ? channels(snapshot) : null), [snapshot]);
   const known = (c: ChannelId): boolean => c === "main" || !!snapshot?.runs.some((r) => r.run === c);
-  const selected: ChannelId = known(channel) ? channel : "main";
+  const wanted: ChannelId = channel ?? (snapshot ? defaultChannel(snapshot) : "main");
+  const selected: ChannelId = known(wanted) ? wanted : "main";
   const view = useMemo(() => (snapshot ? scope(snapshot, selected) : null), [snapshot, selected]);
   const ctx = useMemo(() => (snapshot ? mentionCtx(snapshot) : { groups: [], names: new Map<string, string>() }), [snapshot]);
   const nicks = useMemo(() => (snapshot ? nicksOf(snapshot) : new Map<string, string>()), [snapshot]);
@@ -45,7 +47,9 @@ export function BoardPage({ repos, run }: { repos: string[]; run: number | null 
   };
   const pickRepo = (repo: string): void => {
     setQuery({ repo, run: null });
-    select("main");
+    setChannel(null);
+    setFocus(null);
+    setFilter("all");
   };
 
   if (board.error && missingRun === null) return <div className="content">{board.error}</div>;

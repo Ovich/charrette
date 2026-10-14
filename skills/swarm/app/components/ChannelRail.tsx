@@ -12,8 +12,8 @@ export function ChannelItem({ entry, selected, onSelect }: { entry: ChannelEntry
           {entry.code}
         </span>
       )}
-      <span className="n" aria-label={`${entry.members} members`}>
-        {entry.members}
+      <span className="n" aria-label={`${entry.entries} entries`}>
+        {entry.entries}
       </span>
     </button>
   );
