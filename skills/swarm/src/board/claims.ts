@@ -36,6 +36,8 @@ export interface Claims {
   askedAbout(me: Participant, author: number, m: Message): string | null;
   /** `rel` is held, or was held during the run, by a member of a run other than `p`'s. */
   heldInOtherRun(p: Participant, rel: string): boolean;
+  /** `p` holds `about` (a path, or its tail) now. */
+  holds(p: Participant, about: string): boolean;
 }
 
 type Row = Record<string, unknown>;
@@ -150,6 +152,16 @@ export function claimsOf(deps: ClaimsDeps): Claims {
       const rows = db
         .prepare("SELECT l.path FROM claim_log l JOIN participants q ON q.id = l.participant WHERE l.repo = ? AND q.run != ?")
         .all(p.repo, p.run) as Row[];
+      return rows.some((r) => {
+        const x = fold(String(r.path));
+        return x === f || x.endsWith(`/${f}`);
+      });
+    },
+
+    holds(p, about) {
+      const f = fold(relPath(p.repo, about) ?? slashes(about));
+      if (!f) return false;
+      const rows = db.prepare("SELECT path FROM claims WHERE repo = ? AND participant = ?").all(p.repo, p.id) as Row[];
       return rows.some((r) => {
         const x = fold(String(r.path));
         return x === f || x.endsWith(`/${f}`);

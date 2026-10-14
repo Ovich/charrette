@@ -58,6 +58,7 @@ const ev = (hm: string, kind: SnapshotEvent["kind"], from: string, body: string,
   from,
   body,
   about,
+  channel: "main",
 });
 
 const RT_SLICES: [string, string, string, string[]][] = [
@@ -88,12 +89,12 @@ const queue = (plan: string, slices: [string, string, string, string[]][]) =>
   }));
 
 export const RUNS = [
-  { run: 1, plan: RT, code: "RT", title: "Sessions with refresh tokens", link: null, open: true, runners: 4, done: 2, of: 7 },
-  { run: 2, plan: AL, code: "AL", title: "Audit log", link: AL_LINK, open: true, runners: 2, done: 0, of: 3 },
+  { run: 1, kind: "plan" as const, plan: RT, group: RT, code: "RT", title: "Sessions with refresh tokens", link: null, open: true, runners: 4, done: 2, of: 7 },
+  { run: 2, kind: "plan" as const, plan: AL, group: AL, code: "AL", title: "Audit log", link: AL_LINK, open: true, runners: 2, done: 0, of: 3 },
 ];
 
 /** A run of charrette-app closed earlier: the Board lists it with the open ones (D34). */
-const CLOSED_HERE = { run: 0, plan: "login-page", code: "LP", title: "The login page", link: null, open: false, runners: 0, done: 4, of: 4 };
+const CLOSED_HERE = { run: 0, kind: "plan" as const, plan: "login-page", group: "login-page", code: "LP", title: "The login page", link: null, open: false, runners: 0, done: 4, of: 4 };
 
 export const LIVE: BoardSnapshot = {
   repo: APP,

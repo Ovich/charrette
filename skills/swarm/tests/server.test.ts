@@ -69,7 +69,7 @@ function listen(until: (events: { type: string; repo?: string }[]) => boolean, m
 }
 
 test("the old page's routes are gone: /api/repos and /api/board answer 404 (plan D6)", async () => {
-  writer.openRun({ repo: REPO, plan: "review-tool", title: "Review tool", slices: SLICES });
+  writer.openRun({ repo: REPO, group: "review-tool", title: "Review tool", seats: SLICES });
   for (const route of ["/api/repos", `/api/board?repo=${encodeURIComponent(REPO)}`]) assert.equal((await fetch(`${base}${route}`)).status, 404, route);
 });
 

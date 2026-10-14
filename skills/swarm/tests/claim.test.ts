@@ -241,3 +241,50 @@ test("merge-lock without --onto says it is required and grants nothing (D59)", (
   assert.match(r.stderr, /--onto is required/);
   assert.ok(cli(wtA, "merge-lock", "--onto", "main").includes("granted: "), "the lock is still free");
 });
+
+// Claims across runs (D26): global per repository; what crosses runs lands in main.
+const crossRuns = async () => {
+  const board = await openBoard(path.join(home, "cross.sqlite"));
+  const REPO = "/repos/one/.git";
+  const seats = [{ id: "S3", title: "x", blockers: [] }];
+  const a = board.openRun({ repo: REPO, group: "review-tool", title: "A", seats });
+  const b = board.openRun({ repo: REPO, group: "swarm", title: "B", seats });
+  const mine = board.join({ run: a.id, slice: "S3", doing: "page", files: [] }).runner;
+  const theirs = board.join({ run: b.id, slice: "S3", doing: "schema", files: [{ path: "src/x.ts", interface: true }] }).runner;
+  board.deliver(mine);
+  board.deliver(theirs);
+  return { board, mine, theirs };
+};
+
+test("across runs: the post that opens a held file lands in main and opens it; the agreement reaches the claimer", async () => {
+  const { board, mine, theirs } = await crossRuns();
+  try {
+    assert.equal(board.checkEdit(mine, "src/x.ts").allowed, false);
+    const ask = board.post(mine, "@swarm/S3 I add a helper to src/x.ts", { about: "src/x.ts" });
+    assert.equal(ask.channel, "main");
+    assert.deepEqual(board.deliver(theirs).full.map((m) => m.seq), [ask.seq]);
+    assert.equal(board.checkEdit(mine, "src/x.ts").allowed, true);
+    const agreed = board.post(theirs, "review-tool/S3 adds the helper at the end", { about: "src/x.ts", kind: "agreement" });
+    assert.equal(agreed.channel, "main");
+    assert.deepEqual(board.deliver(mine).full.map((m) => m.seq), [agreed.seq]);
+  } finally {
+    board.close();
+  }
+});
+
+test("across runs: merge notices to another run's holders land in main", async () => {
+  const { board, mine, theirs } = await crossRuns();
+  try {
+    board.post(mine, "@swarm/S3 I add a helper", { about: "src/x.ts" });
+    assert.equal(board.checkEdit(mine, "src/x.ts").allowed, true);
+    board.deliver(theirs);
+    assert.equal(board.lockMerge(mine).granted, true);
+    board.merged(mine, "abc123", ["src/x.ts"]);
+    const got = board.deliver(theirs).full;
+    assert.equal(got.length, 1);
+    assert.equal(got[0].channel, "main");
+    assert.match(got[0].body, /merged abc123/);
+  } finally {
+    board.close();
+  }
+});

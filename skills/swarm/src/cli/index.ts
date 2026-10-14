@@ -223,7 +223,7 @@ async function main(board: Board): Promise<void> {
   switch (args.verb) {
     case "open": {
       const plan = need("--plan");
-      const run = board.openRun({ repo: repoOf(process.cwd()), plan, title: need("--title"), link: args.flag("--link") ?? null, slices: readSlices(need("--slices")) });
+      const run = board.openRun({ repo: repoOf(process.cwd()), group: plan, title: need("--title"), link: args.flag("--link") ?? null, seats: readSlices(need("--slices")) });
       // the person watches the run on the page: start it when none runs (US1, US6)
       const port = ensureServer();
       const page = port === null ? null : runPageUrl(port, run.id);
