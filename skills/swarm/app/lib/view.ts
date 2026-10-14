@@ -1,5 +1,5 @@
-// What the page shows, as pure functions of the snapshot and the three selections App owns:
-// the run it is scoped to, the runner it follows, the filter. No child computes any of it.
+// What the page shows, as pure functions of the snapshot and what the page picks: the run's
+// tab and the member followed. No child computes any of it.
 import type { BoardSnapshot, SnapshotEvent, SnapshotRunner, RunId, RunSummary } from "../../src/board/board.ts";
 import type { Kind } from "../../src/board/kinds.ts";
 import { nameHandle, parseMentions, planCode } from "../../src/board/mentions.ts";
@@ -38,7 +38,6 @@ export function hhmm(iso: string): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-export const basename = (p: string): string => p.split(/[\\/]/).pop() ?? p;
 
 // ── mentions and members ────────────────────────────────────────────────────────────
 
@@ -82,15 +81,6 @@ export function involves(e: SnapshotEvent, runner: string | null, ctx: MentionCt
   const { plan } = splitRunner(runner);
   return targets(e, ctx).some((t) => t === runner || t === `${plan}/*`);
 }
-
-/** Lit with the accent stripe: another's message that names the followed runner. */
-export const lit = (e: SnapshotEvent, runner: string | null, ctx: MentionCtx): boolean =>
-  !!runner && e.kind !== "event" && e.from !== runner && involves(e, runner, ctx);
-
-// ── the filters ─────────────────────────────────────────────────────────────────────
-
-/** `counts`: what the chip counts, when not what it shows (Flags counts its flags alone). */
-export type Filter = { id: string; label: string; file: boolean; test: (e: SnapshotEvent) => boolean; counts?: (e: SnapshotEvent) => boolean };
 
 // ── flags, and the talk they start (D10) ────────────────────────────────────────────
 
@@ -150,39 +140,6 @@ export function mergedRecipients(e: SnapshotEvent, events: SnapshotEvent[], ctx:
     for (const t of parseMentions(x.body, plan, ctx.groups, ctx.names)) if (!tell.includes(t)) tell.push(t);
   }
   return { rebase, tell };
-}
-
-function flagsFilter(events: SnapshotEvent[]): Filter[] {
-  const flags = events.filter(isFlag);
-  if (!flags.length) return [];
-  const shown = new Set<number>(flags.map((e) => e.seq));
-  for (const f of flags) for (const a of answersOf(f, events)) shown.add(a.seq);
-  return [{ id: "flags", label: "Flags", file: false, test: (e) => shown.has(e.seq), counts: isFlag }];
-}
-
-/** Everything, Messages only, Agreements, Flags while the channel has any (each flag and the posts
- *  answering it), then the three files most talked about. */
-export function filters(events: SnapshotEvent[]): Filter[] {
-  const counts = new Map<string, number>();
-  for (const e of events) if (e.about) counts.set(e.about, (counts.get(e.about) ?? 0) + 1);
-  const top = [...counts.entries()]
-    .map(([f, n], i) => ({ f, n, i }))
-    .sort((a, b) => b.n - a.n || a.i - b.i)
-    .slice(0, 3)
-    .map((x) => x.f);
-  return [
-    { id: "all", label: "Everything", file: false, test: () => true },
-    { id: "talk", label: "Messages only", file: false, test: (e) => e.kind !== "event" },
-    { id: "agreements", label: "Agreements", file: false, test: (e) => e.kind === "agreement" },
-    ...flagsFilter(events),
-    ...top.map((f) => ({ id: `file:${f}`, label: basename(f), file: true, test: (e: SnapshotEvent) => e.about === f || e.body.includes(basename(f)) })),
-  ];
-}
-
-/** The feed: scoped events through the filter, then through the runner followed. */
-export function feed(events: SnapshotEvent[], filter: string, runner: string | null, ctx: MentionCtx): SnapshotEvent[] {
-  const f = filters(events).find((x) => x.id === filter) ?? filters(events)[0];
-  return events.filter(f.test).filter((e) => involves(e, runner, ctx));
 }
 
 
