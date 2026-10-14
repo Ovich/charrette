@@ -50,7 +50,7 @@ export function shouldLoad(
 }
 
 export function App() {
-  const { docs, groups, projects, activeProject, startId, version, connection, changedTick, changedId, shownTick, shown, showDoneTick } = useDocuments();
+  const { docs, groups, projects, activeProject, startId, version, connection, changedTick, changedId, dataTick, dataId, shownTick, shown, showDoneTick } = useDocuments();
   const [pointer, setPointer] = useState<Pointer | null>(hashPointer);
   const [currentId, setCurrentId] = useState<number | null>(() => hashPointer()?.id ?? null);
   const [response, setResponse] = useState<DocumentResponse | null>(null);
@@ -228,6 +228,7 @@ export function App() {
                   onClearPointer={stopPointing}
                   workbench={doc.kind === "workbench"}
                   doc={doc}
+                  dataTick={dataId === doc.id ? dataTick : 0}
                 />
               )}
               {format === "swarm" && response!.content !== null && (
