@@ -4,7 +4,7 @@
 import type { Message, Participant } from "./board.ts";
 import { profileOf } from "./kinds.ts";
 
-export type EventName = "agreement" | "endorsement" | "merged" | "joined" | "ended" | "stale" | "closed" | "urgent";
+export type EventName = "agreement" | "endorsement" | "merged" | "joined" | "ended" | "stale" | "opened" | "closed" | "urgent";
 export type Scope = "run" | "main";
 export type Subscription = { event: EventName; scope: Scope };
 
@@ -31,6 +31,8 @@ export const EVENTS: Record<EventName, EventDef> = {
   joined: { name: "joined" },
   ended: { name: "ended" },
   stale: { name: "stale" },
+  // in main when a run opens: its kind, group and title (D69)
+  opened: { name: "opened" },
   closed: { name: "closed" },
   urgent: { name: "urgent", always: true },
 };

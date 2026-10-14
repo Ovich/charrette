@@ -52,6 +52,8 @@ const closedAgo = (run: number, ms: number): void => {
   raw.prepare("UPDATE messages SET at = ? WHERE run = ?").run(ago(ms + DAY), run);
   // the closed event, in main, dates from the close (D67)
   raw.prepare("UPDATE messages SET at = ? WHERE run IS NULL AND event = 'closed' AND body = ?").run(ago(ms), `run ${run} closed`);
+  // the opened event, in main, dates from before it (D69)
+  raw.prepare("UPDATE messages SET at = ? WHERE run IS NULL AND event = 'opened' AND body LIKE ?").run(ago(ms + DAY), `run ${run} opened:%`);
 };
 
 test("a closed run's channel refuses a post; its messages stay readable", () => {
@@ -102,6 +104,19 @@ test("a pruned run's id is never given to a new run, and the page lists it nowhe
   assert.deepEqual(board.snapshot(REPO).runs.map((r) => r.run), [b.run.id]);
   assert.ok(!board.repos().some((r) => r.runs.some((x) => x.run === a.run.id)));
   assert.ok(!board.runs().some((r) => r.id === a.run.id));
+});
+
+test("open posts the opened event in main, naming kind, group and title: a member subscribed to main:opened wakes (D69)", async () => {
+  const { run: first } = runWithMembers("alpha");
+  const watcher = board.join({ run: first.id, slice: "S1", doing: "watching", files: [], on: [{ event: "opened", scope: "main" }] }).runner;
+  board.deliver(watcher);
+  const run = board.openRun({ repo: REPO, kind: "brainstorm", group: "beta", title: "Beta topic", seats: SEATS });
+  const opened = board.snapshot(REPO).events.filter((e) => e.kind === "event" && e.body.startsWith(`run ${run.id} opened`));
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0].channel, "main");
+  assert.equal(opened[0].body, `run ${run.id} opened: brainstorm beta, Beta topic`);
+  const { wakes } = await import("../src/board/events.ts");
+  assert.ok(wakes(board.read(opened[0].seq), watcher, [{ event: "opened", scope: "main" }]));
 });
 
 test("close posts the closed event in main: a member subscribed to main:closed wakes (D67)", async () => {

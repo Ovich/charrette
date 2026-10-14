@@ -729,13 +729,18 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         const r = db.prepare("INSERT INTO runs (repo, kind, plan, title, link, opened_at) VALUES (?, ?, ?, ?, ?, ?)").run(repo, profile.kind, group, title, link ?? null, now());
         const run = Number(r.lastInsertRowid);
         seats.forEach((s, i) => insertSlice(run, s, i));
-        db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at, subs) VALUES (?, ?, ?, ?, ?)").run(
+        const orchestrator = db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at, subs) VALUES (?, ?, ?, ?, ?)").run(
           run,
           ORCHESTRATOR,
           lastSeq(),
           now(),
           JSON.stringify(profile.defaults.orchestrator),
         );
+        // in main, so a member subscribed to main:opened wakes (D69)
+        insertMessage(participantById(Number(orchestrator.lastInsertRowid)), `run ${run} opened: ${profile.kind} ${group}, ${title}`, null, "event", undefined, {
+          channel: "main",
+          event: EVENTS.opened.name,
+        });
         bump(repo);
         return run;
       });

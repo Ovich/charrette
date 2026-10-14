@@ -753,7 +753,7 @@ test("join --on with an unknown event exits 1 listing the known ones; --on store
   const id = openBrainstorm();
   const bad = joinSeat(id, "architect", "--on", "agreed");
   assert.equal(bad.status, 1);
-  assert.match(bad.stderr, /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, closed, urgent/);
+  assert.match(bad.stderr, /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, opened, closed, urgent/);
   const ok = joinSeat(id, "architect", "--on", "agreement,main:merged");
   assert.equal(ok.status, 0, ok.stderr);
   const roster = run("roster");
