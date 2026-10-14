@@ -137,7 +137,17 @@ export interface Board {
   openRun(input: { repo: string; kind?: Kind; group: string; title: string; link?: string | null; seats: SeatSpec[] }): Run;
   /** `done` also releases the slice runner's claims and lock: the orchestrator's way to free a stale runner. */
   setSliceState(run: RunId, slice: string, state: SliceState): void;
+  /** Also archives the run's channel: read-only from then on, `run <n> is closed` (D19). */
   closeRun(run: RunId): void;
+  /** Past the retention: closed runs (closed_at older), their seats, members not referenced by a
+   *  kept message, their channels and deliveries; main messages older, agreements and the
+   *  endorsements of kept agreements kept. Open runs never. `now` for tests (D19, D20). */
+  prune(now?: Date): { messages: number; runs: number };
+  /** Reads, or writes then reads, a board setting. retention-days: a positive integer, default 30 (D32). */
+  setting(name: "retention-days", value?: number): number;
+  /** Flags in main, once, each open run whose every member made no call for ten minutes;
+   *  a call by a member clears its run's mark. Returns the runs flagged now. */
+  flagStale(now?: Date): RunId[];
   /** The open runs, every repository. */
   runs(): Run[];
 
@@ -185,7 +195,7 @@ export interface Board {
   merged(p: Participant, sha: string, files: string[]): Sharer[];
 
   // the page (D39)
-  /** Every repository with an open run or one of the machine's last ten closed runs (D34). */
+  /** Every repository with an open run or a closed run within the retention (D46); a run kept only as a pruned author never. */
   repos(): RepoSummary[];
   /** Everything the page draws for one repository; throws `no repository <id>` for one it does not list. */
   snapshot(repo: string): BoardSnapshot;
@@ -202,8 +212,8 @@ const ORCHESTRATOR = "orchestrator";
 const WAIT_POLL_MS = 1000;
 const LINE_WIDTH = 100;
 const STALE_MS = 10 * 60 * 1000;
-/** The page lists the machine's last this many closed runs (D34). */
-const CLOSED_LISTED = 10;
+const RETENTION_DEFAULT_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
 /** The page shows the last this many messages of a thread. */
 const EVENTS_SHOWN = 500;
 const CASELESS = process.platform === "win32";
@@ -329,6 +339,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       repo TEXT PRIMARY KEY,
       version INTEGER NOT NULL
     );
+    -- board settings (D32): retention-days
+    CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
     -- the identities and hook_seen tables, left in stores from before D58, are no longer read or written
   `);
   // Schema upkeep for stores created by earlier versions: add a column when it is missing.
@@ -356,6 +368,10 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   // a message's channel (D18, D31): its run, or null for main; today's thread becomes main
   upkeep("messages", "run", "run INTEGER");
   upkeep("messages", "endorses", "endorses INTEGER");
+  // 1 once the run's stale event is in main; any member call resets it (D19)
+  upkeep("runs", "stale_flagged", "stale_flagged INTEGER NOT NULL DEFAULT 0");
+  // set when prune removed the run but kept it as the author of a kept agreement: never listed
+  upkeep("runs", "pruned_at", "pruned_at TEXT");
   db.exec("CREATE INDEX IF NOT EXISTS messages_channel ON messages (repo, run, seq)");
   // a store from before D40 keys a claim by path alone: rebuild it keyed by holder too
   const claimKey = (db.prepare("PRAGMA table_info(claims)").all() as { name: string; pk: number }[]).find((c) => c.name === "participant");
@@ -513,6 +529,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   ): Message => {
     const mentions = named ?? (kind === "event" ? [] : parseMentions(body, p.plan, openPlans(p.repo), activeNames(p.repo)));
     const run = channelOf(p, kind, about, mentions, extra.channel ?? "run");
+    // an archived channel is read-only (D19)
+    if (run != null && runRow(run).state === "closed") throw new Error(`run ${run} is closed`);
     const r = db
       .prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at, by_board, run, endorses) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(p.repo, p.id, body, about, kind, JSON.stringify(mentions), now(), named ? 1 : 0, run, extra.endorses ?? null);
@@ -609,15 +627,17 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     };
   };
 
-  // The page's view (D34, D39): open runs and the machine's last ten closed ones.
+  const retentionDays = (): number => {
+    const r = db.prepare("SELECT value FROM settings WHERE name = 'retention-days'").get() as Row | undefined;
+    return r ? Number(r.value) : RETENTION_DEFAULT_DAYS;
+  };
+  const retentionCutoff = (at: Date): string => new Date(at.getTime() - retentionDays() * DAY_MS).toISOString();
+
+  // The page's view (D39, D46): open runs and every closed run within the retention.
   const listedRuns = (): Row[] =>
     db
-      .prepare(
-        `SELECT * FROM runs WHERE state = 'open'
-           OR id IN (SELECT id FROM runs WHERE state = 'closed' ORDER BY closed_at DESC, id DESC LIMIT ?)
-         ORDER BY id`,
-      )
-      .all(CLOSED_LISTED) as Row[];
+      .prepare("SELECT * FROM runs WHERE pruned_at IS NULL AND (state = 'open' OR (state = 'closed' AND closed_at >= ?)) ORDER BY id")
+      .all(retentionCutoff(new Date())) as Row[];
   const runSummary = (r: Row): RunSummary => {
     const id = Number(r.id);
     const count = (sql: string): number => Number((db.prepare(sql).get(id) as Row).n);
@@ -686,6 +706,78 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         bump(String(runRow(run).repo));
         db.prepare("UPDATE participants SET ended_at = COALESCE(ended_at, ?) WHERE run = ?").run(now(), run);
         for (const p of db.prepare("SELECT id FROM participants WHERE run = ?").all(run) as Row[]) claims.releaseAll(Number(p.id));
+      });
+    },
+
+    prune(at = new Date()) {
+      return transaction(() => {
+        const cutoff = retentionCutoff(at);
+        const expired = db.prepare("SELECT id, repo FROM runs WHERE state = 'closed' AND closed_at < ? AND pruned_at IS NULL").all(cutoff) as Row[];
+        const touched = new Set(expired.map((r) => String(r.repo)));
+        const runIds = expired.map((r) => Number(r.id));
+        const inExpired = runIds.length ? `run IN (${runIds.join(", ")})` : "0";
+        // kept: every agreement in main, and the endorsements of those agreements (D20)
+        const doomed = db
+          .prepare(
+            `SELECT seq, repo FROM messages WHERE ${inExpired}
+               OR (run IS NULL AND at < ? AND kind != 'agreement'
+                   AND NOT (kind = 'endorsement' AND endorses IN (SELECT seq FROM messages WHERE run IS NULL AND kind = 'agreement')))`,
+          )
+          .all(cutoff) as Row[];
+        const dropDeliveries = db.prepare("DELETE FROM deliveries WHERE seq = ?");
+        const dropMessage = db.prepare("DELETE FROM messages WHERE seq = ?");
+        for (const m of doomed) {
+          dropDeliveries.run(Number(m.seq));
+          dropMessage.run(Number(m.seq));
+          touched.add(String(m.repo));
+        }
+        for (const run of runIds) {
+          let authorsKept = 0;
+          for (const r of db.prepare("SELECT id FROM participants WHERE run = ?").all(run) as Row[]) {
+            const id = Number(r.id);
+            for (const table of ["claim_log", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries"]) {
+              db.prepare(`DELETE FROM ${table} WHERE participant = ?`).run(id);
+            }
+            db.prepare("DELETE FROM notices WHERE other = ?").run(id);
+            // a member authoring a kept message stays, so the message still reads its author
+            if (db.prepare("SELECT 1 FROM messages WHERE author = ? LIMIT 1").get(id)) authorsKept++;
+            else db.prepare("DELETE FROM participants WHERE id = ?").run(id);
+          }
+          db.prepare("DELETE FROM slices WHERE run = ?").run(run);
+          if (authorsKept) db.prepare("UPDATE runs SET pruned_at = ? WHERE id = ?").run(at.toISOString(), run);
+          else db.prepare("DELETE FROM runs WHERE id = ?").run(run);
+        }
+        for (const repo of touched) bump(repo);
+        return { messages: doomed.length, runs: runIds.length };
+      });
+    },
+
+    setting(name, value) {
+      if (name !== "retention-days") throw new Error(`unknown setting ${name}`);
+      if (value !== undefined) {
+        if (!Number.isInteger(value) || value < 1) throw new Error(`${name} takes a positive whole number of days, got ${value}`);
+        db.prepare("INSERT INTO settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value").run(name, String(value));
+      }
+      return retentionDays();
+    },
+
+    flagStale(at = new Date()) {
+      const silentBefore = at.getTime() - STALE_MS;
+      return transaction(() => {
+        const flagged: RunId[] = [];
+        for (const r of db.prepare("SELECT id, plan FROM runs WHERE state = 'open' AND stale_flagged = 0 ORDER BY id").all() as Row[]) {
+          const id = Number(r.id);
+          const members = db.prepare("SELECT id, slice, last_call, joined_at FROM participants WHERE run = ? AND ended_at IS NULL").all(id) as Row[];
+          if (!members.length || members.some((m) => Date.parse(String(m.last_call ?? m.joined_at)) >= silentBefore)) continue;
+          const author = members.find((m) => String(m.slice) === ORCHESTRATOR) ?? members[0];
+          const group = String(r.plan);
+          insertMessage(participantById(Number(author.id)), `run ${id} (${group}) is stale: every member silent; close it or dispatch again`, null, "event", [`${group}/${ORCHESTRATOR}`], {
+            channel: "main",
+          });
+          db.prepare("UPDATE runs SET stale_flagged = 1 WHERE id = ?").run(id);
+          flagged.push(id);
+        }
+        return flagged;
       });
     },
 
@@ -1058,6 +1150,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   // `reconcileWrites` is part of `merge-lock` and `end`, not a call.
   const countCall = (p: Participant): void => {
     db.prepare("UPDATE participants SET calls = calls + 1, last_call = ? WHERE id = ?").run(now(), p.id);
+    // a member's call clears its run's stale mark, so a later silence flags again (D19)
+    db.prepare("UPDATE runs SET stale_flagged = 0 WHERE id = ? AND stale_flagged = 1").run(p.run);
     bump(participantById(p.id).repo);
   };
   // the verb and its count in one transaction: the page sees one change, and a refused call

@@ -35,6 +35,7 @@ const USAGE = [
   "  end     [--as <runner>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
   "  serve   [--port <p>] [--detach]                 # the run pages aiview frames, on :4322 (SWARM_PORT)",
   "  status                                                          # data home, the page's server, open runs",
+  "  config  retention [<days>]                                      # prints, or sets then prints, how many days closed runs and main's talk are kept",
   "a runner is <plan>/<slice>, the orchestrator <plan>/orchestrator; without --as, the runner joined from this worktree",
 ].join("\n");
 
@@ -219,9 +220,31 @@ function readSlices(file: string): SliceSpec[] {
   });
 }
 
+/** The board's upkeep (D19, D45): prune past the retention, then flag stale runs. A failure is
+ *  told on stderr and never stops the verb it runs before. */
+function boardUpkeep(board: Board): void {
+  try {
+    board.prune();
+    board.flagStale();
+  } catch (e) {
+    console.error(`swarm: upkeep failed: ${(e as Error).message}`);
+  }
+}
+const UPKEEP_EVERY_MS = 60 * 60 * 1000;
+
 async function main(board: Board): Promise<void> {
   switch (args.verb) {
+    case "config": {
+      const setting = args.positional[0];
+      if (setting !== "retention") fail(`config: the one setting is retention\n${USAGE}`);
+      const raw = args.positional[1];
+      const value = raw === undefined ? undefined : Number(raw);
+      const days = board.setting("retention-days", value);
+      emit({ retention: days }, String(days));
+      break;
+    }
     case "open": {
+      boardUpkeep(board);
       const plan = need("--plan");
       const run = board.openRun({ repo: repoOf(process.cwd()), group: plan, title: need("--title"), link: args.flag("--link") ?? null, seats: readSlices(need("--slices")) });
       // the person watches the run on the page: start it when none runs (US1, US6)
@@ -444,7 +467,11 @@ if (args.verb === "serve" && args.has("--detach")) {
 } else if (args.verb === "serve") {
   // the server holds its Board for its whole life
   const { startServer } = await import("../server/index.ts");
-  startServer(await openBoard(), { port: portFrom(args.flag("--port")) });
+  const board = await openBoard();
+  boardUpkeep(board);
+  // hourly while the server runs (D45); never what keeps the process alive
+  setInterval(() => boardUpkeep(board), UPKEEP_EVERY_MS).unref();
+  startServer(board, { port: portFrom(args.flag("--port")) });
 } else {
   const board = await openBoard();
   try {

@@ -482,3 +482,26 @@ test("open starts the server when none runs and prints the page's URL", async ()
   const second = JSON.parse(again.stdout);
   assert.equal(second.url, `http://localhost:${port}/?run=${second.run}`);
 });
+
+// The retention setting (D32): read, set, refuse; prune uses what was set.
+test("config retention prints 30, sets 7 that prune then uses, refuses 0", async () => {
+  const read = run("config", "retention");
+  assert.equal(read.status, 0, read.stderr);
+  assert.equal(read.stdout.trim(), "30");
+  const set = run("config", "retention", "7");
+  assert.equal(set.status, 0, set.stderr);
+  assert.equal(set.stdout.trim(), "7");
+  assert.equal(run("config", "retention").stdout.trim(), "7");
+  const refused = run("config", "retention", "0");
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /positive whole number/);
+  const board = await openBoard(path.join(toolRoot, "swarm.sqlite"));
+  try {
+    assert.equal(board.setting("retention-days"), 7);
+    const r = board.openRun({ repo: "/repos/x/.git", group: "g", title: "T", seats: [] });
+    board.closeRun(r.id);
+    assert.equal(board.prune(new Date(Date.now() + 8 * 24 * 60 * 60 * 1000)).runs, 1);
+  } finally {
+    board.close();
+  }
+});

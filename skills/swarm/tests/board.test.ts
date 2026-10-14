@@ -613,7 +613,7 @@ test("a pending mentions-only wait is listening, the state still working; a plai
   assert.equal(s5Of().state, "working");
 });
 
-test("a closed run stays in repos() among the last ten", () => {
+test("a closed run stays in repos() within the retention, however many closed after it (D46)", () => {
   const first = board.openRun({ repo: REPO, group: "old", title: "Old", seats: SLICES });
   board.closeRun(first.id);
   const open = board.openRun({ repo: "/repos/two/.git", group: "live", title: "Live", seats: SLICES });
@@ -621,10 +621,10 @@ test("a closed run stays in repos() among the last ten", () => {
   assert.deepEqual(repos.map((r) => r.repo), ["/repos/two/.git", REPO], "a repository with an open run first");
   assert.deepEqual(repos[1].runs.map((r) => [r.plan, r.open]), [["old", false]]);
   assert.equal(board.snapshot(REPO).roster.find((r) => r.runner === "old/orchestrator")!.state, "done");
-  // ten later closed runs push it out; the open one stays
+  // ten later closed runs no longer push it out; the open one stays first
   for (let i = 0; i < 10; i++) board.closeRun(board.openRun({ repo: "/repos/three/.git", group: `p${i}`, title: "x", seats: SLICES }).id);
   repos = board.repos();
-  assert.deepEqual(repos.map((r) => r.repo), ["/repos/two/.git", "/repos/three/.git"]);
+  assert.deepEqual(repos.map((r) => r.repo), ["/repos/two/.git", "/repos/three/.git", REPO]);
   assert.equal(repos[1].runs.length, 10);
   assert.ok(repos[0].runs.some((r) => r.run === open.id));
 });
