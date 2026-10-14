@@ -159,9 +159,74 @@ export const lit = (e: SnapshotEvent, runner: string | null, ctx: MentionCtx): b
 
 // ── the filters ─────────────────────────────────────────────────────────────────────
 
-export type Filter = { id: string; label: string; file: boolean; test: (e: SnapshotEvent) => boolean };
+/** `counts`: what the chip counts, when not what it shows (Flags counts its flags alone). */
+export type Filter = { id: string; label: string; file: boolean; test: (e: SnapshotEvent) => boolean; counts?: (e: SnapshotEvent) => boolean };
 
-/** Everything, Messages only, Agreements, then the three files most talked about. */
+// ── flags, and the talk they start (D10) ────────────────────────────────────────────
+
+/** A flag's parts: who wrote the path outside a claim, and who holds it. */
+export type FlagLine = { writer: string; path: string; holder: string };
+
+const FLAG_BODY = /flag:\s*(\S+)\s+wrote\s+(\S+)\s+outside its claim;\s*(\S+)\s+holds? it/;
+
+/** The flag a post raises, or null. Read from the body, which old rows (a plain message) and
+ *  the `flag` event share. */
+export function flagOf(e: SnapshotEvent): FlagLine | null {
+  if (e.kind !== "event" && e.kind !== "msg") return null;
+  const m = FLAG_BODY.exec(e.body);
+  return m ? { writer: m[1], path: e.about ?? m[2], holder: m[3] } : null;
+}
+
+export const isFlag = (e: SnapshotEvent): boolean => flagOf(e) !== null;
+
+/** The posts that answer a flag: after it, `--about` its path, an agreement by anyone or a post
+ *  by one of its two runners; never another flag or a board event. */
+export function answersOf(flag: SnapshotEvent, events: SnapshotEvent[]): SnapshotEvent[] {
+  const f = flagOf(flag);
+  if (!f) return [];
+  return events.filter(
+    (e) => e.seq > flag.seq && e.about === f.path && e.kind !== "event" && !isFlag(e) && (e.kind === "agreement" || e.from === f.writer || e.from === f.holder),
+  );
+}
+
+/** Settled by the first agreement that answers it, else answered by the first post, else open. */
+export type FlagAnswer = { state: "settled" | "answered"; seq: number } | { state: "open" };
+
+export function flagAnswer(flag: SnapshotEvent, events: SnapshotEvent[]): FlagAnswer {
+  const answers = answersOf(flag, events);
+  const agreed = answers.find((e) => e.kind === "agreement");
+  if (agreed) return { state: "settled", seq: agreed.seq };
+  return answers.length ? { state: "answered", seq: answers[0].seq } : { state: "open" };
+}
+
+// ── a merged event's recipients ─────────────────────────────────────────────────────
+
+/** Whom a merged event told: `rebase`, the holders its body names; `tell`, those its author then
+ *  told of a resolved conflict (`@<them> I resolved <file>`), before its next merge. */
+export function mergedRecipients(e: SnapshotEvent, events: SnapshotEvent[], ctx: MentionCtx): { rebase: string[]; tell: string[] } {
+  const plan = splitRunner(e.from).plan;
+  const holdersLine = e.body.split(/\r?\n/).find((l) => l.includes("you hold or declared a file it changed")) ?? "";
+  const rebase = [...new Set(parseMentions(holdersLine, plan, ctx.groups, ctx.names))];
+  const tell: string[] = [];
+  for (const x of events) {
+    if (x.seq <= e.seq || x.from !== e.from) continue;
+    if (x.kind === "event" && eventLine(x.body).word === "merged") break;
+    if (!/\bI resolved\b/.test(x.body)) continue;
+    for (const t of parseMentions(x.body, plan, ctx.groups, ctx.names)) if (!tell.includes(t)) tell.push(t);
+  }
+  return { rebase, tell };
+}
+
+function flagsFilter(events: SnapshotEvent[]): Filter[] {
+  const flags = events.filter(isFlag);
+  if (!flags.length) return [];
+  const shown = new Set<number>(flags.map((e) => e.seq));
+  for (const f of flags) for (const a of answersOf(f, events)) shown.add(a.seq);
+  return [{ id: "flags", label: "Flags", file: false, test: (e) => shown.has(e.seq), counts: isFlag }];
+}
+
+/** Everything, Messages only, Agreements, Flags while the channel has any (each flag and the posts
+ *  answering it), then the three files most talked about. */
 export function filters(events: SnapshotEvent[]): Filter[] {
   const counts = new Map<string, number>();
   for (const e of events) if (e.about) counts.set(e.about, (counts.get(e.about) ?? 0) + 1);
@@ -174,6 +239,7 @@ export function filters(events: SnapshotEvent[]): Filter[] {
     { id: "all", label: "Everything", file: false, test: () => true },
     { id: "talk", label: "Messages only", file: false, test: (e) => e.kind !== "event" },
     { id: "agreements", label: "Agreements", file: false, test: (e) => e.kind === "agreement" },
+    ...flagsFilter(events),
     ...top.map((f) => ({ id: `file:${f}`, label: basename(f), file: true, test: (e: SnapshotEvent) => e.about === f || e.body.includes(basename(f)) })),
   ];
 }

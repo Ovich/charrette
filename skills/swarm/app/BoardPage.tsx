@@ -36,7 +36,7 @@ export function BoardPage({ repos, run }: { repos: string[]; run: number | null 
   const view = useMemo(() => (snapshot ? scope(snapshot, selected) : null), [snapshot, selected]);
   const ctx = useMemo(() => (snapshot ? mentionCtx(snapshot) : { groups: [], names: new Map<string, string>() }), [snapshot]);
   const nicks = useMemo(() => (snapshot ? nicksOf(snapshot) : new Map<string, string>()), [snapshot]);
-  const chips = useMemo(() => (view ? filters(view.events).map((f) => ({ filter: f, count: view.events.filter(f.test).length })) : []), [view]);
+  const chips = useMemo(() => (view ? filters(view.events).map((f) => ({ filter: f, count: view.events.filter(f.counts ?? f.test).length })) : []), [view]);
   const activeFilter = chips.some((c) => c.filter.id === filter) ? filter : "all";
   const shown = useMemo(() => (view ? feed(view.events, activeFilter, focus, ctx) : []), [view, activeFilter, focus, ctx]);
 
@@ -79,6 +79,8 @@ export function BoardPage({ repos, run }: { repos: string[]; run: number | null 
               <Thread
                 chips={chips}
                 shown={shown}
+                channelEvents={view.events}
+                ctx={ctx}
                 filter={activeFilter}
                 focus={focus}
                 isLit={(e) => lit(e, focus, ctx)}

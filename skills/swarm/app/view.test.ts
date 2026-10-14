@@ -1,7 +1,7 @@
 // The board page's view functions (D3, D18, D46), on snapshots built here.
 import { describe, expect, test } from "vitest";
 import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../src/board/board.ts";
-import { channels, defaultChannel, feed, mentionCtx, scope, showsClaims, showsMergeLock } from "./lib/view.ts";
+import { channels, defaultChannel, feed, filters, flagAnswer, flagOf, mentionCtx, mergedRecipients, scope, showsClaims, showsMergeLock } from "./lib/view.ts";
 
 const run = (id: number, kind: "plan" | "brainstorm", group: string, open = true): RunSummary => ({
   run: id, kind, plan: group, group, code: "XX", title: `${group} title`, link: null, open, runners: 0, done: 0, of: 0,
@@ -88,5 +88,68 @@ describe("the rail's counts and the default channel", () => {
     expect(defaultChannel(snap)).toBe("main");
     expect(defaultChannel(board([]))).toBe("main");
     expect(defaultChannel(board([run(3, "plan", "a", false), run(7, "brainstorm", "b", false)]))).toBe(7);
+  });
+});
+
+describe("flags (D10)", () => {
+  const P = "a.ts";
+  const at = (s: number, kind: SnapshotEvent["kind"], from: string, body: string, about: string | null = P): SnapshotEvent => ({
+    seq: s, at: "2026-10-14T10:00:00Z", kind, from, body, about, channel: 1,
+  });
+  const flagBody = "@p/S2 @p/S1 flag: p/S1 wrote a.ts outside its claim; p/S2 holds it. Settle it here.";
+  const oldFlag = at(10, "msg", "p/S1", flagBody);
+  const newFlag = at(20, "event", "p/S1", flagBody);
+  const events = [
+    at(5, "msg", "p/S1", "before the flag"),
+    oldFlag,
+    at(11, "msg", "p/S9", "a bystander on a.ts"),
+    at(12, "msg", "p/S2", "@S1 I keep the top half"),
+    at(13, "agreement", "p/S2", "S1 the bottom, S2 the top"),
+    at(14, "msg", "p/S1", "elsewhere", "b.ts"),
+    newFlag,
+  ];
+
+  test("a flag is read from its body, as an old message or the flag event", () => {
+    expect(flagOf(oldFlag)).toEqual({ writer: "p/S1", path: P, holder: "p/S2" });
+    expect(flagOf(newFlag)).toEqual({ writer: "p/S1", path: P, holder: "p/S2" });
+    expect(flagOf(events[0])).toBeNull();
+  });
+
+  test("Flags shows the flags and the posts answering them, and counts the flags", () => {
+    const f = filters(events).find((x) => x.id === "flags")!;
+    expect(f.label).toBe("Flags");
+    expect(events.filter(f.test).map((e) => e.seq)).toEqual([10, 12, 13, 20]);
+    expect(events.filter(f.counts!).length).toBe(2);
+    expect(filters(events.slice(0, 1)).some((x) => x.id === "flags")).toBe(false);
+  });
+
+  test("settled by an agreement, answered by a post, open otherwise", () => {
+    expect(flagAnswer(oldFlag, events)).toEqual({ state: "settled", seq: 13 });
+    expect(flagAnswer(oldFlag, events.filter((e) => e.kind !== "agreement"))).toEqual({ state: "answered", seq: 12 });
+    expect(flagAnswer(newFlag, events)).toEqual({ state: "open" });
+  });
+
+  test("a flag counts in its channel's rail entry", () => {
+    const snap = board([run(1, "plan", "p")], [], events);
+    expect(channels(snap).plans[0].entries).toBe(events.length);
+  });
+});
+
+describe("a merged event's recipients", () => {
+  test("rebase from the holders line, tell from the author's resolved-conflict posts before its next merge", () => {
+    const merged: SnapshotEvent = {
+      seq: 1, at: "2026-10-14T10:00:00Z", kind: "event", from: "p/S1", channel: 1, about: null,
+      body: "merged abc: rebase onto abc.\n@p/S2 @p/S3: you hold or declared a file it changed.\nfiles: a.ts",
+    };
+    const after = (seq: number, from: string, body: string, kind: SnapshotEvent["kind"] = "msg"): SnapshotEvent => ({ ...merged, seq, from, body, kind });
+    const events = [
+      merged,
+      after(2, "p/S1", "@p/S2 I resolved a.ts: kept both"),
+      after(3, "p/S9", "@p/S4 I resolved b.ts: x"),
+      after(4, "p/S1", "merged def: rebase onto def.", "event"),
+      after(5, "p/S1", "@p/S3 I resolved c.ts: y"),
+    ];
+    const ctx = mentionCtx(board([run(1, "plan", "p")]));
+    expect(mergedRecipients(merged, events, ctx)).toEqual({ rebase: ["p/S2", "p/S3"], tell: ["p/S2"] });
   });
 });
