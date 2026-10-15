@@ -513,6 +513,8 @@ var ORCHESTRATOR = "orchestrator";
 var WAIT_POLL_MS = 1e3;
 var LINE_WIDTH = 100;
 var STALE_MS = 10 * 60 * 1e3;
+var UPKEEP_EVERY_MS = 5 * 60 * 1e3;
+var LAST_UPKEEP = "last-upkeep";
 var RETENTION_DEFAULT_DAYS = 30;
 var DAY_MS = 24 * 60 * 60 * 1e3;
 var EVENTS_SHOWN = 500;
@@ -648,7 +650,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
       repo TEXT PRIMARY KEY,
       version INTEGER NOT NULL
     );
-    -- board settings (D32): retention-days
+    -- board settings (D32): retention-days; the board's own last-upkeep (D16)
     CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
     -- the identities and hook_seen tables, left in stores from before D58, are no longer read or written
   `);
@@ -1023,6 +1025,22 @@ async function openBoard(dbPath = SQLITE_PATH) {
         db.prepare("INSERT INTO settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value").run(name, String(value));
       }
       return retentionDays();
+    },
+    upkeepIfDue(at = /* @__PURE__ */ new Date()) {
+      const due = () => {
+        const r = db.prepare("SELECT value FROM settings WHERE name = ?").get(LAST_UPKEEP);
+        return !(at.getTime() - Date.parse(String(r?.value)) < UPKEEP_EVERY_MS);
+      };
+      if (!due()) return false;
+      const recorded = transaction(() => {
+        if (!due()) return false;
+        db.prepare("INSERT INTO settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value").run(LAST_UPKEEP, at.toISOString());
+        return true;
+      });
+      if (!recorded) return false;
+      board.prune(at);
+      board.flagStale(at);
+      return true;
     },
     flagStale(at = /* @__PURE__ */ new Date()) {
       const silentBefore = at.getTime() - STALE_MS;
@@ -1584,6 +1602,7 @@ function unclaimedLines(paths) {
 // src/cli/index.ts
 var args = parseArgs(process.argv.slice(2));
 var asJson = args.has("--json");
+var WAIT_UPKEEP_TICK_MS = 1e3;
 var USAGE = [
   "usage: swarm <verb> [--json]        (swarm --help code: the claim and merge verbs)",
   "  open    --kind plan|brainstorm --group <slug> --title <t> --seats <file.json> [--link <url>]   # opens a run, registers the project's board in aiview, prints the run id then the board's URL (orchestrator)",
@@ -1778,8 +1797,7 @@ function readSlices(file) {
 }
 function boardUpkeep(board) {
   try {
-    board.prune();
-    board.flagStale();
+    board.upkeepIfDue();
   } catch (e) {
     console.error(`swarm: upkeep failed: ${e.message}`);
   }
@@ -1842,7 +1860,6 @@ ${USAGE}`);
       break;
     }
     case "open": {
-      boardUpkeep(board);
       const { kind, group } = openKindAndGroup();
       const plan = group;
       const seatsFile = args.flag("--seats") ?? args.flag("--slices") ?? fail(`open: --seats <file.json> is required (or --slices)
@@ -1981,7 +1998,8 @@ ${USAGE}`);
       const timeout = raw === void 0 ? void 0 : Number(raw);
       if (timeout !== void 0 && !(timeout >= 0)) fail(`--timeout takes milliseconds, got ${raw}`);
       const mentionsOnly = args.has("--mentions");
-      const d = withNext(p, await board.wait(p, { timeoutMs: timeout, mentionsOnly }));
+      const upkeepTicks = setInterval(() => boardUpkeep(board), WAIT_UPKEEP_TICK_MS);
+      const d = withNext(p, await board.wait(p, { timeoutMs: timeout, mentionsOnly }).finally(() => clearInterval(upkeepTicks)));
       if (d.superseded) {
         emit(d, "superseded by a newer wait");
         break;
@@ -2103,6 +2121,7 @@ ${USAGE}`);
 } else {
   const board = await openBoard();
   try {
+    boardUpkeep(board);
     await main(board);
   } catch (e) {
     console.error(e instanceof CliError ? e.message : `swarm: ${e.message}`);

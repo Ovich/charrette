@@ -184,6 +184,10 @@ export interface Board {
   /** Flags in main, once, each open run whose every member made no call for ten minutes;
    *  a call by a member clears its run's mark. Returns the runs flagged now. */
   flagStale(now?: Date): RunId[];
+  /** The board's upkeep when due (D16): `prune` then `flagStale`, when the last upkeep, kept in the
+   *  store for every process, is older than UPKEEP_EVERY_MS. The time is recorded first, so a
+   *  process due at the same moment skips, and a failure waits for the next due upkeep. True when it ran. */
+  upkeepIfDue(now?: Date): boolean;
   /** The open runs, every repository. */
   runs(): Run[];
 
@@ -252,6 +256,10 @@ const ORCHESTRATOR = "orchestrator";
 const WAIT_POLL_MS = 1000;
 const LINE_WIDTH = 100;
 const STALE_MS = 10 * 60 * 1000;
+/** The board's upkeep runs at most this often, from any process (D16). */
+export const UPKEEP_EVERY_MS = 5 * 60 * 1000;
+/** The settings row holding the last upkeep's time, ISO: the board's own, never a user setting. */
+const LAST_UPKEEP = "last-upkeep";
 const RETENTION_DEFAULT_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** The page shows the last this many messages of a thread. */
@@ -395,7 +403,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       repo TEXT PRIMARY KEY,
       version INTEGER NOT NULL
     );
-    -- board settings (D32): retention-days
+    -- board settings (D32): retention-days; the board's own last-upkeep (D16)
     CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
     -- the identities and hook_seen tables, left in stores from before D58, are no longer read or written
   `);
@@ -885,6 +893,25 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         db.prepare("INSERT INTO settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value").run(name, String(value));
       }
       return retentionDays();
+    },
+
+    upkeepIfDue(at = new Date()) {
+      // never ran, or an unreadable time: due
+      const due = (): boolean => {
+        const r = db.prepare("SELECT value FROM settings WHERE name = ?").get(LAST_UPKEEP) as Row | undefined;
+        return !(at.getTime() - Date.parse(String(r?.value)) < UPKEEP_EVERY_MS);
+      };
+      // a plain read first: a pending wait asks every tick, and only a due upkeep takes the write lock
+      if (!due()) return false;
+      const recorded = transaction(() => {
+        if (!due()) return false; // another process recorded it between the read and the lock
+        db.prepare("INSERT INTO settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value").run(LAST_UPKEEP, at.toISOString());
+        return true;
+      });
+      if (!recorded) return false;
+      board.prune(at);
+      board.flagStale(at);
+      return true;
     },
 
     flagStale(at = new Date()) {

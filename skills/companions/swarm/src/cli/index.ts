@@ -15,6 +15,8 @@ import { unclaimedLines } from "./unclaimed.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
+/** How often a pending wait asks whether the board's upkeep is due; only a due one does any work. */
+const WAIT_UPKEEP_TICK_MS = 1000;
 
 const USAGE = [
   "usage: swarm <verb> [--json]        (swarm --help code: the claim and merge verbs)",
@@ -258,12 +260,12 @@ function readSlices(file: string): SliceSpec[] {
   });
 }
 
-/** The board's upkeep (D19, D45): prune past the retention, then flag stale runs. A failure is
- *  told on stderr and never stops the verb it runs before. */
+/** The board's upkeep, when due (D19, D45, companions-merge D16): prune past the retention, then
+ *  flag stale runs and quiet orchestrators. Before every verb and on each tick of a pending wait;
+ *  a failure is told on stderr and never stops the verb. */
 function boardUpkeep(board: Board): void {
   try {
-    board.prune();
-    board.flagStale();
+    board.upkeepIfDue();
   } catch (e) {
     console.error(`swarm: upkeep failed: ${(e as Error).message}`);
   }
@@ -336,7 +338,6 @@ async function main(board: Board): Promise<void> {
       break;
     }
     case "open": {
-      boardUpkeep(board);
       const { kind, group } = openKindAndGroup();
       const plan = group;
       const seatsFile = args.flag("--seats") ?? args.flag("--slices") ?? fail(`open: --seats <file.json> is required (or --slices)\n${USAGE}`);
@@ -478,7 +479,9 @@ async function main(board: Board): Promise<void> {
       const timeout = raw === undefined ? undefined : Number(raw);
       if (timeout !== undefined && !(timeout >= 0)) fail(`--timeout takes milliseconds, got ${raw}`);
       const mentionsOnly = args.has("--mentions");
-      const d = withNext(p, await board.wait(p, { timeoutMs: timeout, mentionsOnly }));
+      // a run whose members all wait still gets its quiet and stale events: the wait keeps the upkeep going
+      const upkeepTicks = setInterval(() => boardUpkeep(board), WAIT_UPKEEP_TICK_MS);
+      const d = withNext(p, await board.wait(p, { timeoutMs: timeout, mentionsOnly }).finally(() => clearInterval(upkeepTicks)));
       if (d.superseded) {
         emit(d, "superseded by a newer wait"); // a newer wait of this runner gets what arrives (D64)
         break;
@@ -612,6 +615,7 @@ if (args.verb === "serve") {
 } else {
   const board = await openBoard();
   try {
+    boardUpkeep(board);
     await main(board);
   } catch (e) {
     console.error(e instanceof CliError ? e.message : `swarm: ${(e as Error).message}`);
