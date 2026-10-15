@@ -659,12 +659,13 @@ function computeRun(db, r, now, silentAfterMs) {
     return { ...base, brainstorm };
   }
   if (kind !== "plan") return base;
-  const timesMs = recorded ? people.flatMap((p) => {
-    if (orchestrators.has(Number(p.id))) return [];
+  const sliceMembers = people.filter((p) => !orchestrators.has(Number(p.id)));
+  const timesMs = sliceMembers.flatMap((p) => {
+    if (!recorded) return Number(p.merged ?? 0) === 1 && p.ended_at != null ? [ms(p.ended_at) - ms(p.joined_at)] : [];
     const mergedAt = merges.filter((m) => Number(m.participant) === Number(p.id)).map((m) => ms(m.at));
     const end = mergedAt.length ? Math.min(...mergedAt) : p.ended_at == null ? null : ms(p.ended_at);
     return end === null ? [] : [end - ms(p.joined_at)];
-  }) : [];
+  });
   const sliceCount = Number(db.prepare("SELECT COUNT(*) AS n FROM slices WHERE run = ?").get(id).n);
   const addedMidRun = messages.filter((m) => m.kind === "event" && orchestrators.has(Number(m.author)) && /^added \S+: /.test(String(m.body))).length;
   const holdersByPath = /* @__PURE__ */ new Map();
@@ -689,7 +690,7 @@ function computeRun(db, r, now, silentAfterMs) {
   let agreedBeforeMerge = 0;
   for (const { path: path5, holders: everyHolder } of holdersByPath.values()) {
     const sharers = sharersOf(path5);
-    const holders = everyHolder.filter((h) => sharers.has(h));
+    const holders = sharesRecorded ? everyHolder.filter((h) => sharers.has(h)) : everyHolder;
     if (holders.length < 2) continue;
     const tellTimes = [];
     let told = true;
@@ -740,13 +741,14 @@ function computeRun(db, r, now, silentAfterMs) {
     known += files.length;
     inShared += files.filter((f) => claimLog.some((c) => Number(c.participant) !== Number(m.participant) && foldPath(String(c.path)) === foldPath(f))).length;
   }
-  const mergedSlices = new Set(merges.map((m) => Number(m.participant)).filter((pid) => !orchestrators.has(pid))).size;
+  const mergedSlices = recorded ? new Set(merges.map((m) => Number(m.participant)).filter((pid) => !orchestrators.has(pid))).size : sliceMembers.filter((p) => Number(p.merged ?? 0) === 1).length;
   return {
     ...base,
     plan: {
-      slices: { merged: recorded ? mergedSlices : null, of: sliceCount, addedMidRun, timesMs },
+      slices: { merged: mergedSlices, of: sliceCount, addedMidRun, timesMs, estimated: !recorded },
       lock: { waitsMs: lockWaitsMs, racesLost },
-      shared: sharesRecorded ? { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge, perFile } : { files: null, everyHolderTold: null, agreed: null, agreedBeforeMerge: null, perFile: [] },
+      // before the shares record no merge time says which agreement came first (D44)
+      shared: { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge: sharesRecorded ? agreedBeforeMerge : null, perFile, estimated: !sharesRecorded },
       flags: messages.filter(isBoardFlag).length,
       conflicts: recorded ? { known, inShared, unknownMerges } : { known: null, inShared: null, unknownMerges: null }
     }
@@ -846,7 +848,12 @@ function withMemberFigures(run2) {
     endorsed: m.endorsed ?? (debated ? marked(m, "endorsed") : null),
     objections: m.objections ?? (debated ? marked(m, "objected") : null)
   }));
-  return { ...run2, members };
+  const plan = run2.plan && {
+    ...run2.plan,
+    slices: { ...run2.plan.slices, estimated: run2.plan.slices.estimated ?? false },
+    shared: { ...run2.plan.shared, estimated: run2.plan.shared.estimated ?? false }
+  };
+  return { ...run2, members, ...plan ? { plan } : {} };
 }
 var KEPT = "(pruned_at IS NULL OR id IN (SELECT run FROM run_stats))";
 function summarize(db, run2, silentAfterMs) {
@@ -859,13 +866,14 @@ function totalsOf(runs) {
   const recorded = runs.filter((r) => r.recorded);
   const recordedPlans = recorded.flatMap((r) => r.plan ? [r.plan] : []);
   const silentOf = (r) => r.members.filter((m) => m.intervals.some((i) => i.what === "silent")).length;
-  const times = recordedPlans.flatMap((p) => p.slices.timesMs);
+  const times = plans.flatMap((p) => p.slices.timesMs);
   const waits = recordedPlans.flatMap((p) => p.lock.waitsMs);
   const bins = [...WAIT_BINS_MS, Infinity].map((upper, i) => waits.filter((w) => w >= (WAIT_BINS_MS[i - 1] ?? 0) && w < upper).length);
   const shared = (pick) => sumKnown(plans.map((p) => pick(p.shared)));
   const files = shared((s) => s.files);
   const agreed = shared((s) => s.agreed);
   const series = (figure) => runs.map((r) => r.recorded ? figure(r) : null);
+  const everyRun = (figure) => runs.map(figure);
   return {
     runs: runs.length,
     byKind: { plan: runs.filter((r) => r.kind === "plan").length, brainstorm: runs.filter((r) => r.kind === "brainstorm").length },
@@ -876,7 +884,8 @@ function totalsOf(runs) {
       merged: sumKnown(plans.map((p) => p.slices.merged)),
       of: sumKnown(plans.map((p) => p.slices.of)),
       p50Ms: percentile(times, 0.5),
-      p90Ms: percentile(times, 0.9)
+      p90Ms: percentile(times, 0.9),
+      estimatedRuns: plans.filter((p) => p.slices.estimated).length
     },
     // merges: the lock turns granted, each one merge's wait
     lockWait: { merges: recordedPlans.length ? waits.length : null, p50Ms: percentile(waits, 0.5), p90Ms: percentile(waits, 0.9), bins: recordedPlans.length ? bins : [] },
@@ -885,7 +894,8 @@ function totalsOf(runs) {
       everyHolderTold: shared((s) => s.everyHolderTold),
       agreed,
       agreedBeforeMerge: shared((s) => s.agreedBeforeMerge),
-      withoutAgreement: files === null || agreed === null ? null : files - agreed
+      withoutAgreement: files === null || agreed === null ? null : files - agreed,
+      estimatedRuns: plans.filter((p) => p.shared.estimated).length
     },
     flags: sumKnown(plans.map((p) => p.flags)),
     runsWithoutFlag: plans.length ? plans.filter((p) => p.flags === 0).length : null,
@@ -896,12 +906,12 @@ function totalsOf(runs) {
     },
     brainstorm: brainstormTotalsOf(runs),
     series: {
-      slicesMerged: series((r) => r.plan?.slices.merged ?? null),
-      sliceTimeP50: series((r) => r.plan ? percentile(r.plan.slices.timesMs, 0.5) : null),
+      slicesMerged: everyRun((r) => r.plan?.slices.merged ?? null),
+      sliceTimeP50: everyRun((r) => r.plan ? percentile(r.plan.slices.timesMs, 0.5) : null),
       lockWaitP50: series((r) => r.plan ? percentile(r.plan.lock.waitsMs, 0.5) : null),
-      sharedAgreed: series((r) => r.plan?.shared.agreed ?? null),
+      sharedAgreed: everyRun((r) => r.plan?.shared.agreed ?? null),
       // flags come from the board's messages, kept for a run before the records too (D43)
-      flags: runs.map((r) => r.plan?.flags ?? null),
+      flags: everyRun((r) => r.plan?.flags ?? null),
       conflicts: series((r) => r.plan?.conflicts.known ?? null),
       silentMembers: series(silentOf)
     }
