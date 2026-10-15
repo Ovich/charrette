@@ -28,8 +28,9 @@ major and the minor move only on the person's word.
 
 ## The build output is versioned on purpose
 
-`skills/companions/aiview/dist/` (the UI, ~5 MB) and `skills/companions/aiview/dist-cli/cli.mjs` (the CLI and
-server, ~44 KB, bundled by esbuild with no runtime dependencies) are committed.
+`skills/companions/aiview/dist/` (the UI, ~5 MB, the collection's one page, documents and
+the swarm board) and `skills/companions/aiview/dist-cli/cli.mjs` (the CLI and the one server,
+swarm's BoardReader bundled in, by esbuild with no runtime dependencies) are committed.
 
 They have to be. An update installs into a *new, empty* cache directory; nothing carries
 over from the previous version. Anything not in git is therefore rebuilt by every user
@@ -43,8 +44,8 @@ the old viewer.** Run the build before tagging, every time, and commit what it p
 ## The sequence
 
 ```bash
-cd skills/companions/aiview && npm install && npm run build && npm test && cd ../../..   # refresh dist/ + dist-cli/
-cd skills/companions/swarm && npm install && npm run build && npm test && npm run test:app && cd ../../..   # the board: dist/ + dist-cli/
+cd skills/companions/aiview && npm install && npm run build && npm test && npm run test:app && cd ../../..   # the one page and server: dist/ + dist-cli/
+cd skills/companions/swarm && npm install && npm run build && npm test && cd ../../..   # the board's CLI: dist-cli/ only
 node --test skills/review/pr-review/scripts/scope.test.mjs            # the review scope script
 node --test skills/project/write-conventions/scripts/rules.test.mjs # the conventions rules script
 node --test "skills/workbench/create-workbench/scripts/*.test.mjs" # the workbench page, writer and loader
@@ -86,9 +87,9 @@ Users with background marketplace refresh still need the second command and the 
 
 ## Notes
 
-- swarm ships as aiview does: `skills/companions/swarm/dist/` (the page) and `skills/companions/swarm/dist-cli/cli.mjs`
-  (the CLI and the server) are committed, and a release that changes swarm's source without its
-  build ships the old board.
+- swarm builds its CLI only: `skills/companions/swarm/dist-cli/cli.mjs` is committed; it has no
+  page and no server. The board's page is aiview's, so a release that changes swarm's board
+  reader or the board's page rebuilds aiview too, or ships the old board.
 - `aiview mermaid-check` is its own bundle, `dist-cli/mermaid-check.mjs`, about 3.5 MB,
   built by `npm run build` with the CLI. It is versioned like the CLI bundle, for the
   same reason.

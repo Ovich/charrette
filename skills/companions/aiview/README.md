@@ -1,14 +1,18 @@
 # aiview
 
 Local document viewer with a central index. Renders Markdown (GFM + mermaid), HTML
-mockups (sandboxed iframe with viewport presets) and PDFs (native browser viewer) at
-`http://localhost:4321`, live-reloads on save, and keeps an index of every document it
-has been given (path, project, title, kind, tags, group, start time) so earlier work is
-one click away.
+mockups (sandboxed iframe with viewport presets), PDFs (native browser viewer) and the
+project's swarm board (drawn from swarm's store) at `http://localhost:4321`, live-reloads
+on save, and keeps an index of every document it has been given (path, project, title,
+kind, tags, group, start time) so earlier work is one click away. It is the one page and
+the one server of the collection: swarm has none of its own.
 
 One npm package: a React + TypeScript + Tailwind + shadcn-style UI (`app/`, built to
-`dist/`), a small plain-Node server (5 API routes + static, `src/server/`), and a CLI
-(`src/cli/`), all sharing `src/core/` (typed sqlite index, path rules, file watcher).
+`dist/`), a small plain-Node server (the documents' API routes, the board's
+`/api/board` and static, `src/server/`), and a CLI (`src/cli/`), all sharing `src/core/`
+(typed sqlite index, path rules, file watcher). The board is read from `swarm.sqlite`
+only through swarm's BoardReader (`swarm/src/board/snapshot.ts`), bundled into
+`dist-cli/` at build; aiview never writes it.
 
 ## Requirements
 

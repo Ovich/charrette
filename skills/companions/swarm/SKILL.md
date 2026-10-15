@@ -72,10 +72,11 @@ first. A long call holds the listener's news until it ends; only the orchestrato
 
 ## The page
 
-The person watches in aiview only; swarm has no page of its own. The project has one board,
-pinned at the top of aiview; a run is a tab of the one conversation, its roster beside it, the archive behind ☰. `open` prints the
-run's aiview URL. Without aiview, `open` prints the URL of the run's view and says to open it.
-`serve --detach` starts the server aiview frames alone; `status` says where it runs.
+The person watches in aiview, which draws the board from the store; swarm has no page and no
+server. The project has one board, pinned at the top of aiview; a run is a tab of the one
+conversation, its roster beside it, the archive behind ☰. `open` prints the run's aiview URL.
+Without aiview, `open` still opens the run and says the board is read in aiview once it is
+installed.
 
 ## Your side
 

@@ -33,6 +33,12 @@ to what the person was reading before the agent pointed, as the agent's `show --
 does; a tab the person has since moved is left where it is. The address bar
 holds the pointer (`#doc=12&show=Strip,Menu&variant=step-2`), so the link can be kept.
 
+**The board.** The project's `swarm` document, pinned first in the sidebar, is the swarm
+board drawn by aiview itself from swarm's store, for the repositories its `{ repos }`
+names: one tab per run of the one conversation, the roster beside it, the archive behind
+☰. It follows aiview's theme and updates live as agents write; there is no second server
+to start.
+
 **Bindings.** An html mockup that pulls components from siblings (`data-bind`) is
 composed at serve time; the file on disk never changes. Opened as a plain file it shows
 a notice, not the page. Saving a source reloads every open host.

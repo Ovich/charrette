@@ -15,9 +15,12 @@ sit beside it, situational ones under `references/`. `project/` holds what a pro
 has once and keeps, `verify/` its verification skill and the validation with the person, `workbench/` the pages worked on
 with the person during development and the project skills that feed them; the loop's phases group the rest,
 `architecture/`, `ui/`, `plan/`, `execute/`, `review/`; `interview/` and `whiteboard-defense/` sit at the root;
-`companions/` holds the two tools, aiview (`skills/companions/aiview/`, the documents) and swarm (`skills/companions/swarm/`, the board a
-swarm-mode plan runs on): each a CLI, a server and a UI, shipped as versioned bundles so an
-install never builds. The plugin sees a group only through the `skills`
+`companions/` holds the two tools, shipped as versioned bundles so an install never builds:
+aiview (`skills/companions/aiview/`), a CLI, the one server and the one UI, drawing the
+documents and the board; and swarm (`skills/companions/swarm/`, the board a swarm-mode plan
+runs on), a CLI and a store, with no page or server of its own. aiview reads swarm's store
+only through the BoardReader, `skills/companions/swarm/src/board/snapshot.ts`, bundled into
+aiview's `dist-cli/`; never `board.ts` or SQL, and swarm never imports aiview. The plugin sees a group only through the `skills`
 list in `.claude-plugin/plugin.json`: the default scan reads one level under `skills/`,
 so a group left off the list ships none of its skills, and `claude plugin validate`
 passes all the same. What runs for a user is the plugin cache, not this checkout; a
