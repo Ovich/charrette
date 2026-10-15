@@ -373,11 +373,13 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       since_seq INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (repo, path, participant)
     );
-    -- every claim made, kept past its release: who held a path during a run (D63)
+    -- every claim made, kept past its release: who held a path during a run (D63), and whether as an
+    -- interface: widened to 'interface' when the claim is made or widened so, never narrowed (D42)
     CREATE TABLE IF NOT EXISTS claim_log (
       repo TEXT NOT NULL,
       path TEXT NOT NULL,
       participant INTEGER NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'inside',
       PRIMARY KEY (repo, path, participant)
     );
     -- a claim granted beside a live holder of the path, kept past both claims' release: who held a path
@@ -469,6 +471,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
   };
   upkeep("participants", "worktree", "worktree TEXT");
+  // a claim's kind kept past its release, so a closed run read live still knows its interfaces (D42)
+  upkeep("claim_log", "kind", "kind TEXT NOT NULL DEFAULT 'inside'");
   upkeep("participants", "last_call", "last_call TEXT");
   upkeep("participants", "calls", "calls INTEGER NOT NULL DEFAULT 0");
   upkeep("participants", "waiting", "waiting INTEGER NOT NULL DEFAULT 0");

@@ -84,7 +84,10 @@ export function claimsOf(deps: ClaimsDeps): Claims {
            ON CONFLICT (repo, path, participant) DO UPDATE SET kind = excluded.kind WHERE claims.kind = 'inside' AND excluded.kind = 'interface'`,
         )
         .run(p.repo, rel, p.id, kind, lastSeq());
-      db.prepare("INSERT OR IGNORE INTO claim_log (repo, path, participant) VALUES (?, ?, ?)").run(p.repo, rel, p.id);
+      db.prepare(
+        `INSERT INTO claim_log (repo, path, participant, kind) VALUES (?, ?, ?, ?)
+         ON CONFLICT (repo, path, participant) DO UPDATE SET kind = 'interface' WHERE excluded.kind = 'interface'`,
+      ).run(p.repo, rel, p.id, kind);
       if (Number(r.changes) === 0) return false;
       bump(p.repo);
       return true;

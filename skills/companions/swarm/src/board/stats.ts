@@ -230,7 +230,7 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
   const nameOf = (p: Row): string => `${r.plan}/${p.slice}`;
   const messages = db.prepare(`SELECT * FROM messages WHERE run = ? OR (run IS NULL AND author IN (${marks})) ORDER BY seq`).all(id, ...ids) as Row[];
   const merges = recorded ? (db.prepare("SELECT * FROM merges WHERE run = ? ORDER BY rowid").all(id) as Row[]) : [];
-  const claimLog = db.prepare(`SELECT path, participant FROM claim_log WHERE participant IN (${marks}) ORDER BY rowid`).all(...ids) as Row[];
+  const claimLog = db.prepare(`SELECT path, participant, kind FROM claim_log WHERE participant IN (${marks}) ORDER BY rowid`).all(...ids) as Row[];
   // shares: a claim granted beside another member of the run still holding the path (D39)
   const shares = db
     .prepare(`SELECT path, participant, other FROM shares WHERE participant IN (${marks}) AND other IN (${marks})`)
@@ -388,8 +388,8 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
     return body.includes(foldPath(path)) || body.includes(foldPath(path.split("/").pop()!));
   };
   const said = messages.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
-  // the claims still held; closeRun summarizes before it releases them
-  const interfaceClaims = db.prepare(`SELECT path, participant FROM claims WHERE kind = 'interface' AND participant IN (${marks})`).all(...ids) as Row[];
+  // the claims made as an interface, kept past their release (D42)
+  const interfaceClaims = claimLog.filter((c) => c.kind === "interface");
   const perFile: SharedFile[] = [];
   // the funnel is nested (D38): each step counts only the files that passed the step before
   let everyHolderTold = 0;
