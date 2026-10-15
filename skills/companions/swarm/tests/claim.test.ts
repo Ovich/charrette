@@ -353,7 +353,8 @@ test("the merged event names the branch from merge-lock --onto and stores whom i
   try {
     const merged = board.snapshot(board.repos()[0].repo).events.find((e) => e.event === "merged")!;
     assert.match(merged.body, /^merged abc123 into main: rebase your branch onto it\.\n/);
-    assert.deepEqual(merged.meta, { rebase: ["review-tool/S3"], tell: ["review-tool/S3"] });
+    // no rebase since the grant: conflicts known and empty, so nobody is told (D5)
+    assert.deepEqual(merged.meta, { rebase: ["review-tool/S3"], tell: [] });
   } finally {
     board.close();
   }

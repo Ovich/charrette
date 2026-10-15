@@ -50,7 +50,8 @@ test("the tab row: All, then each open run with its code, title and slices done/
   show([APP], null);
   const names = tabs().getAllByRole("button").map((b) => b.textContent);
   expect(names[1]).toBe("All");
-  expect(names.slice(2)).toEqual(["RTSessions with refresh tokens2/7", "ALAudit log0/3", "NMNaming the kinds0/1"]);
+  // the run tabs, then the Analytics pill drawn beside the merge lock at the row's end (SL4)
+  expect(names.slice(2)).toEqual(["RTSessions with refresh tokens2/7", "ALAudit log0/3", "NMNaming the kinds0/1", "Analytics"]);
   for (const r of CLOSED) expect(tabs().queryByText(r.title)).toBeNull();
   expect(pressed()?.textContent).toBe("All");
 });
