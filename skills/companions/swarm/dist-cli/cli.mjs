@@ -479,6 +479,8 @@ var SHARES_SINCE = "shares-since";
 var ORCHESTRATOR = "orchestrator";
 var SKEPTIC = "skeptic";
 var QUESTION = /^D\d+$/;
+var FLAG_BODY = /flag:\s*\S+\s+wrote\s+\S+\s+outside its claim/;
+var isBoardFlag = (m) => Number(m.by_board ?? 0) === 1 && (m.event === "flag" || m.event == null && FLAG_BODY.test(String(m.body)));
 var SOURCE = /[\w./\\-]+\.\w+:\d+|#\d+|https?:\/\/\S+/;
 var WAIT_BINS_MS = [1, 2, 5, 10].map((m) => m * MINUTE_MS);
 function periodStart(since) {
@@ -597,9 +599,9 @@ function computeRun(db, r, now, silentAfterMs) {
     if (lost) racesLost.push({ member: nameOf(p), lost, waitedMs });
     const own = messages.filter((m) => Number(m.author) === pid);
     const posts = own.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
-    const flagged = own.filter((m) => m.event === "flag");
+    const flagged = own.filter(isBoardFlag);
     for (const m of own) {
-      if (m.kind !== "agreement" && m.event !== "flag") continue;
+      if (m.kind !== "agreement" && !isBoardFlag(m)) continue;
       memberMarks.push({
         at: String(m.at),
         what: m.kind === "agreement" ? "agreement" : "flag",
@@ -745,7 +747,7 @@ function computeRun(db, r, now, silentAfterMs) {
       slices: { merged: recorded ? mergedSlices : null, of: sliceCount, addedMidRun, timesMs },
       lock: { waitsMs: lockWaitsMs, racesLost },
       shared: sharesRecorded ? { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge, perFile } : { files: null, everyHolderTold: null, agreed: null, agreedBeforeMerge: null, perFile: [] },
-      flags: messages.filter((m) => m.event === "flag").length,
+      flags: messages.filter(isBoardFlag).length,
       conflicts: recorded ? { known, inShared, unknownMerges } : { known: null, inShared: null, unknownMerges: null }
     }
   };
@@ -898,7 +900,8 @@ function totalsOf(runs) {
       sliceTimeP50: series((r) => r.plan ? percentile(r.plan.slices.timesMs, 0.5) : null),
       lockWaitP50: series((r) => r.plan ? percentile(r.plan.lock.waitsMs, 0.5) : null),
       sharedAgreed: series((r) => r.plan?.shared.agreed ?? null),
-      flags: series((r) => r.plan?.flags ?? null),
+      // flags come from the board's messages, kept for a run before the records too (D43)
+      flags: runs.map((r) => r.plan?.flags ?? null),
       conflicts: series((r) => r.plan?.conflicts.known ?? null),
       silentMembers: series(silentOf)
     }
