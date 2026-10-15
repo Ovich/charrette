@@ -136,11 +136,13 @@ test("`totals.brainstorm` over the scope's brainstorm runs, null where not compu
   planRun(board, "app", ["S1"]);
   const plans = board.stats({ repo: REPO, kinds: ["plan"] }).totals.brainstorm;
   assert.deepEqual(plans, {
+    notRecorded: null,
     questionsSettled: null,
     questions: null,
     exchangesMedian: null,
     objectedThenAgreed: null,
     sourcedShare: null,
+    claimsWithSource: { n: null, of: null },
     silentSeats: null,
   });
   // run one: D1 settled with no exchange before its outcome, D2 after 1, D3 open
@@ -165,6 +167,7 @@ test("`totals.brainstorm` over the scope's brainstorm runs, null where not compu
   clockTo(3);
   const t = board.stats({ repo: REPO, kinds: ["brainstorm"] }).totals.brainstorm;
   assert.deepEqual(t, {
+    notRecorded: 0,
     questionsSettled: 3,
     questions: 4,
     // [0, 1, 4]: the outcome's own agreement is no exchange (D46)
@@ -172,6 +175,8 @@ test("`totals.brainstorm` over the scope's brainstorm runs, null where not compu
     objectedThenAgreed: 1,
     // claims up to the outcome: run one's 2 posts (1 sourced), run two's 3 (1 sourced)
     sourcedShare: 2 / 5,
+    // the share's own figures, so the page writes "2 of 5" without counting (D35)
+    claimsWithSource: { n: 2, of: 5 },
     silentSeats: 0,
   });
 });

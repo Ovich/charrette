@@ -47,7 +47,7 @@ function assertReadFromEvents(board: Board, run: RunId, [a, b, c]: string[]): vo
   assert.ok(r.members.every((m) => m.estimated && m.waitingMs === null));
   const p = r.plan!;
   assert.deepEqual([...p.slices.timesMs].sort((x, y) => x - y), [5 * MIN, 9 * MIN, 12 * MIN]);
-  assert.equal(p.slices.estimated, true);
+  assert.equal(p.slices.timesEstimated, true);
   // x.ts agreed at 3, before its merge at 5; z.ts agreed at 10, after its merge at 9
   assert.deepEqual([p.shared.files, p.shared.agreed, p.shared.agreedBeforeMerge, p.shared.estimated], [2, 2, 1, true]);
   // what the events do not carry stays null (D34)

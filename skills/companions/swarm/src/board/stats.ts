@@ -39,9 +39,9 @@ export type MemberStats = {
 /** `estimated` (D44): the run closed before the records, its figures read from what the store kept for every run
  *  (`participants`, `claim_log`) and approximate, never passed off as recorded (D23); false on a recorded run. */
 export type PlanRunStats = {
-  /** Estimated: `merged` the members whose row says merged (exact); `timesMs` each member's join to its first `merged`
-   *  event, else to its end (D45). */
-  slices: { merged: number | null; of: number | null; addedMidRun: number | null; timesMs: number[]; estimated: boolean };
+  /** Before the records, `merged` is the members whose row says merged, exact; `timesMs` each member's join to its first
+   *  `merged` event, else to its end (D45), and `timesEstimated` true: only the times are estimated, never the count. */
+  slices: { merged: number | null; of: number | null; addedMidRun: number | null; timesMs: number[]; timesEstimated: boolean };
   lock: { waitsMs: number[]; racesLost: { member: string; lost: number | null; waitedMs: number | null }[] };
   /** Estimated (before `shares-since`): a path two or more members claimed while both were members of the run, their
    *  membership spans overlapping (D46); `agreedBeforeMerge`
@@ -103,19 +103,24 @@ export type Totals = {
   notRecorded: number | null;
   members: number | null;
   silentMembers: number | null;
-  /** `estimatedRuns`: the plan runs whose figure here is estimated (D44), counted so the page never counts (D35). */
-  slices: { merged: number | null; of: number | null; p50Ms: number | null; p90Ms: number | null; estimatedRuns: number };
+  /** `timesEstimatedRuns`: the plan runs whose slice times are estimated (D44), counted so the page never counts (D35);
+   *  `merged` is exact for every run. */
+  slices: { merged: number | null; of: number | null; p50Ms: number | null; p90Ms: number | null; timesEstimatedRuns: number };
   lockWait: { merges: number | null; p50Ms: number | null; p90Ms: number | null; bins: number[] /* < 1m, 1–2m, 2–5m, 5–10m, 10m + */ };
   shared: { files: number | null; everyHolderTold: number | null; agreed: number | null; agreedBeforeMerge: number | null; withoutAgreement: number | null; estimatedRuns: number };
   flags: number | null;
   runsWithoutFlag: number | null;
   conflicts: { known: number | null; inShared: number | null; unknownMerges: number | null };
   brainstorm: {
+    /** The scope's brainstorm runs before the records, whose silent seats are unknown; null with no brainstorm run. */
+    notRecorded: number | null;
     questionsSettled: number | null;
     questions: number | null;
     exchangesMedian: number | null;
     objectedThenAgreed: number | null;
     sourcedShare: number | null /* 0–1 */;
+    /** The share's numerator and denominator, summed over the debated runs (D35). */
+    claimsWithSource: { n: number | null; of: number | null };
     silentSeats: number | null;
   };
   /** One point per run, as `runs`; null: not recorded, a gap (D32); an estimated figure is a point (D44). */
@@ -542,7 +547,7 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
   return {
     ...base,
     plan: {
-      slices: { merged: mergedSlices, of: sliceCount, addedMidRun, timesMs, estimated: !recorded },
+      slices: { merged: mergedSlices, of: sliceCount, addedMidRun, timesMs, timesEstimated: !recorded },
       lock: { waitsMs: lockWaitsMs, racesLost },
       shared: { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge, perFile, estimated: !sharesRecorded },
       flags: boardFlags.length,
@@ -675,7 +680,7 @@ function withMemberFigures(run: RunStats): RunStats {
   }));
   const plan = run.plan && {
     ...run.plan,
-    slices: { ...run.plan.slices, estimated: run.plan.slices.estimated ?? false },
+    slices: slicesOfSummary(run.plan.slices),
     shared: {
       ...run.plan.shared,
       estimated: run.plan.shared.estimated ?? false,
@@ -684,6 +689,13 @@ function withMemberFigures(run: RunStats): RunStats {
     },
   };
   return { ...run, members, ...(plan ? { plan } : {}) };
+}
+
+/** A summary's slices as today's: `timesEstimated` read from the `estimated` it was named before (it meant the times,
+ *  the count being exact), false when a summary from before the estimates (D44) carries neither. */
+function slicesOfSummary(slices: PlanRunStats["slices"] & { estimated?: boolean }): PlanRunStats["slices"] {
+  const { estimated, ...rest } = slices;
+  return { ...rest, timesEstimated: slices.timesEstimated ?? estimated ?? false };
 }
 
 /** A run kept: not pruned, or pruned with its summary kept (D21). */
@@ -723,7 +735,7 @@ function totalsOf(runs: RunStats[]): Totals {
       of: sumKnown(plans.map((p) => p.slices.of)),
       p50Ms: percentile(times, 0.5),
       p90Ms: percentile(times, 0.9),
-      estimatedRuns: plans.filter((p) => p.slices.estimated).length,
+      timesEstimatedRuns: plans.filter((p) => p.slices.timesEstimated).length,
     },
     // merges: the lock turns granted, each one merge's wait
     lockWait: { merges: recordedPlans.length ? waits.length : null, p50Ms: percentile(waits, 0.5), p90Ms: percentile(waits, 0.9), bins: recordedPlans.length ? bins : [] },
@@ -768,12 +780,15 @@ function brainstormTotalsOf(runs: RunStats[]): Totals["brainstorm"] {
   const of = sumKnown(debated.map((d) => d.debate.claimsWithSource.of));
   // the seats (the orchestrator is none) with a silent interval, over the runs whose intervals are recorded
   const silentSeatsOf = (r: RunStats): number => r.members.filter((m) => m.slice !== ORCHESTRATOR && m.intervals.some((i) => i.what === "silent")).length;
+  const brainstorms = runs.filter((r) => r.kind === "brainstorm");
   return {
+    notRecorded: brainstorms.length ? brainstorms.filter((r) => !r.recorded).length : null,
     questionsSettled: debated.length ? settled.length : null,
     questions: debated.length ? questions.length : null,
     exchangesMedian: percentile(settled.flatMap((q) => (q.exchanges === null ? [] : [q.exchanges])), 0.5),
     objectedThenAgreed: debated.length ? debated.reduce((k, d) => k + d.debate.questions.filter((q) => objectedOf(d.run, q)).length, 0) : null,
     sourcedShare: n === null || !of ? null : n / of,
+    claimsWithSource: { n, of },
     silentSeats: sumKnown(debated.filter((d) => d.run.recorded).map((d) => silentSeatsOf(d.run))),
   };
 }
