@@ -21,7 +21,8 @@ const isSpan = (k: LegendKey): k is Interval["what"] => k in SPAN_WORD;
 const isMark = (k: LegendKey): k is Mark["what"] => k in MARK_WORD;
 
 function legendWord(key: LegendKey, silentAfterMs: number): string {
-  if (key === "silent") return `silent: no command for ${formatDuration(silentAfterMs)}`;
+  // the rule's own words, as the mockup gives them: whole minutes read "N min"
+  if (key === "silent") return `silent: no command for ${silentAfterMs % 60_000 === 0 ? `${silentAfterMs / 60_000} min` : formatDuration(silentAfterMs)}`;
   if (key === "post") return "post";
   return isSpan(key) ? SPAN_WORD[key] : MARK_WORD[key];
 }
