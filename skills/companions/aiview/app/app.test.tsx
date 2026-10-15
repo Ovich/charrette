@@ -438,31 +438,102 @@ describe("MockupFrame modes", () => {
 describe("swarm document", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  test("the viewer frames the URL a swarm document names, full height, theme only", async () => {
-    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(""))));
-    const { SwarmDocumentView } = await import("./App.tsx");
-    render(<SwarmDocumentView content={JSON.stringify({ run: "7", url: "http://127.0.0.1:4777/run/7" })} />);
-    const frame = await screen.findByTitle("swarm board");
-    expect(frame.getAttribute("src")).toMatch(/^http:\/\/127\.0\.0\.1:4777\/run\/7/);
-    expect(frame.className).toContain("h-[calc(100vh-10rem)]");
-    expect(document.querySelector('[data-component="SwarmThemeToggle"]')).toBeTruthy();
-    expect(document.querySelector('[data-component="MockupViewportToggle"]')).toBeNull();
-    expect(document.querySelector('[data-component="MockupModeToggle"]')).toBeNull();
-  });
+  // aiview's own routes stood in for: /api/board answers an empty board of the repository asked
+  const REPO = "C:/repos/one/.git";
+  const standInBoard = () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      const repo = new URL(url, "http://aiview").searchParams.get("repo") ?? REPO;
+      const snapshot = { repo, name: "one", runs: [], lock: null, roster: [], events: [], queues: {}, files: [], flags: [] };
+      return { ok: true, status: 200, json: async () => ({ repos: [{ repo, name: "one", runs: [] }], snapshot }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const streams: string[] = [];
+    vi.stubGlobal(
+      "EventSource",
+      class {
+        onopen = null;
+        onerror = null;
+        onmessage = null;
+        constructor(url: string) {
+          streams.push(url);
+        }
+        close(): void {}
+      },
+    );
+    return { fetchMock, streams };
+  };
 
-  test("an unreachable URL shows the line with the command", async () => {
-    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("refused"))));
-    const { SwarmFrame } = await import("./components/viewers/SwarmFrame.tsx");
-    render(<SwarmFrame url="http://127.0.0.1:1/run/7" />);
-    expect(await screen.findByText("swarm serve --detach")).toBeTruthy();
+  test("a swarm document renders the board natively, from aiview's own routes; nothing framed", async () => {
+    const { fetchMock, streams } = standInBoard();
+    const { SwarmDocumentView } = await import("./App.tsx");
+    render(<SwarmDocumentView content={JSON.stringify({ repos: [REPO, "C:/repos/two/.git"] })} />);
+    expect(await screen.findByText("No run on one yet.")).toBeTruthy();
+    expect(document.querySelector('[data-component="BoardView"]')!.getAttribute("data-state")).toBe("no run yet");
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/board?repo=${encodeURIComponent(REPO)}`);
+    expect(streams).toEqual(["/events"]);
     expect(document.querySelector("iframe")).toBeNull();
   });
 
-  test("the theme is asked of the page by query, system leaves the URL as written", async () => {
-    const { themedSwarmUrl, swarmUrlOf } = await import("./components/viewers/SwarmFrame.tsx");
-    expect(themedSwarmUrl("http://h/run/7", "dark")).toBe("http://h/run/7?theme=dark");
-    expect(themedSwarmUrl("http://h/run/7", "system")).toBe("http://h/run/7");
-    expect(swarmUrlOf("not json")).toBeNull();
+  test("a pre-merge { url } document gives the board the repositories of its ?repo= (D6)", async () => {
+    const { fetchMock } = standInBoard();
+    const { SwarmDocumentView } = await import("./App.tsx");
+    const url = `http://127.0.0.1:4322/?repo=${encodeURIComponent(REPO)}&repo=${encodeURIComponent("C:/repos/two/.git")}`;
+    render(<SwarmDocumentView content={JSON.stringify({ url })} />);
+    expect(await screen.findByText("No run on one yet.")).toBeTruthy();
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/board?repo=${encodeURIComponent(REPO)}`);
+  });
+
+  test("a document naming no repository says so, and asks nothing", async () => {
+    const { fetchMock } = standInBoard();
+    const { SwarmDocumentView } = await import("./App.tsx");
+    render(<SwarmDocumentView content={JSON.stringify({ run: "7" })} />);
+    expect(screen.getByText("This board names no repository.")).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test("boardReposOf reads repos", async () => {
+    const { boardReposOf } = await import("./components/viewers/board/BoardView.tsx");
+    expect(boardReposOf(JSON.stringify({ repos: ["/a/.git", "/b/.git"] }))).toEqual(["/a/.git", "/b/.git"]);
+  });
+
+  test("boardReposOf reads a pre-merge url", async () => {
+    const { boardReposOf } = await import("./components/viewers/board/BoardView.tsx");
+    expect(boardReposOf(JSON.stringify({ url: "http://127.0.0.1:4322/?repo=%2Fa%2F.git&repo=%2Fb%2F.git&run=7" }))).toEqual(["/a/.git", "/b/.git"]);
+  });
+
+  test("boardReposOf null for neither", async () => {
+    const { boardReposOf } = await import("./components/viewers/board/BoardView.tsx");
+    expect(boardReposOf(JSON.stringify({ run: "7" }))).toBeNull();
+    expect(boardReposOf(JSON.stringify({ repos: [], url: "http://h/run/7" }))).toBeNull();
+    expect(boardReposOf("not json")).toBeNull();
+  });
+
+  // jsdom resolves no stylesheet: the seam is board.css's source, read from disk
+  const boardCss = () => readFileSync(`${import.meta.dirname}/components/viewers/board/board.css`, "utf8");
+
+  test("the board takes aiview's theme: no toggle of its own, no ?theme=, no token of aiview's redefined (D12)", async () => {
+    standInBoard();
+    const { SwarmDocumentView } = await import("./App.tsx");
+    render(<SwarmDocumentView content={JSON.stringify({ repos: [REPO] })} />);
+    await screen.findByText("No run on one yet.");
+    expect(document.querySelector('[data-component$="ThemeToggle"]')).toBeNull();
+    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+    const css = boardCss();
+    expect(css).not.toMatch(/data-theme|:root/);
+    const aiviewTokens = [...readFileSync(`${import.meta.dirname}/styles.css`, "utf8").matchAll(/^\s*(--[\w-]+)\s*:/gm)].map((m) => m[1]);
+    for (const token of new Set(aiviewTokens)) expect(css, token).not.toMatch(new RegExp(`(?:^|[{;\\s])${token}\\s*:`));
+  });
+
+  test("the board's styles reach only the board: every rule sits under .board", () => {
+    // comments and keyframe steps out; what is left before each `{` is a selector or an at-rule
+    const css = boardCss()
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/@keyframes[^{]*\{(?:[^{}]*\{[^}]*\})*[^}]*\}/g, "");
+    const preludes = [...css.matchAll(/([^{};]+)\{/g)].map((m) => m[1].trim()).filter((p) => !p.startsWith("@"));
+    expect(preludes.length).toBeGreaterThan(50);
+    for (const prelude of preludes)
+      for (const selector of prelude.split(",")) expect(selector.trim(), prelude).toMatch(/^\.board(?:$|[\s.:#[])/);
+    expect(css).not.toMatch(/@keyframes (?!board-)/);
   });
 
   test("the swarm chip has its own placed colour", () => {

@@ -1,0 +1,223 @@
+/* The board viewer (plan D12): aiview's tokens and aiview's theme (the OS's), none copied;
+   every rule below sits under .board, the viewer's root, so .card, .item, .who and the like
+   touch nothing else in aiview. The page drawn is mockup #643's, as swarm's page drew it. */
+
+/* The board's own tokens, which aiview has no use for: red means act now, amber waits */
+.board { --danger: #dc2626; --danger-glow: #ef444466; --amber: #b45309; }
+@media (prefers-color-scheme: dark) { .board { --danger: #f87171; --danger-glow: #f8717180; --amber: #fbbf24; } }
+
+/* ── The page, as the mockup 2026-10-07-swarm-board draws it ─────────────────────── */
+
+.board .mono, .board .code, .board .file, .board .card .meta {
+  font-family: ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace;
+}
+.board button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.board p { margin: 0; }
+
+/* PlanCode: two letters, the KindChip recipe on a hairline */
+.board .code { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 5px; padding: 0 4px; font-weight: 600; font-size: 9.5px; line-height: 1.5; color: var(--muted-foreground); background: var(--background); }
+
+/* RunnerTag: the KindChip recipe, light tone, a hue per runner */
+.board .who { --h: 250; --s: 60; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; border: 1px solid; border-radius: 5px; padding: 0 5px;
+  font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; line-height: 1.6;
+  background: light-dark(hsl(var(--h) calc(var(--s) * 1%) 94%), hsl(var(--h) calc(var(--s) * .6%) 17%));
+  color: light-dark(hsl(var(--h) calc(var(--s) * 1.1%) 31%), hsl(var(--h) calc(var(--s) * 1.15%) 78%));
+  border-color: light-dark(hsl(var(--h) calc(var(--s) * .8%) 82%), hsl(var(--h) calc(var(--s) * .55%) 28%)); }
+.board .who .pc { opacity: .65; font-weight: 500; }
+
+/* RunnerName: the funny name, then the tag (D43) */
+.board .rname { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; min-width: 0; }
+.board .rname .nick { font-size: 11.5px; font-weight: 500; color: var(--foreground); overflow: hidden; text-overflow: ellipsis; }
+.board .rname .dot { color: var(--faint-foreground); }
+
+.board .lock { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 999px; padding: 1px 9px 1px 7px; white-space: nowrap; }
+.board .lock svg { width: 11px; height: 11px; }
+.board .lock.held { color: var(--foreground); border-color: color-mix(in srgb, var(--accent) 35%, transparent); background: var(--accent-soft); }
+@media (max-width: 720px) { .board .lock span.t { display: none; } }
+
+.board .content { padding: 22px 28px 20px; }
+@media (max-width: 720px) { .board .content { padding: 16px; } }
+.board .label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--faint-foreground); margin: 0 0 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.board .label .n { background: var(--surface-2); color: var(--muted-foreground); border-radius: 999px; padding: 0 7px; letter-spacing: 0; font-weight: 500; }
+.board .label .hint { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; }
+.board .label .hint button { color: var(--accent); }
+
+/* Roster: the one bold thing */
+.board .card { position: relative; display: block; text-align: left; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); padding: 10px 12px 10px 15px; box-shadow: var(--shadow-sm); overflow: hidden; width: 100%; transition: box-shadow .15s, opacity .15s; }
+.board .card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: light-dark(hsl(var(--h) calc(var(--s) * 1%) 58%), hsl(var(--h) calc(var(--s) * .7%) 56%)); }
+.board .card.orch::before { background: var(--faint-foreground); }
+.board .card:hover { box-shadow: 0 0 0 1px var(--border), var(--shadow-sm); }
+.board .card[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); }
+.board .card .top { display: flex; align-items: center; gap: 6px; }
+.board .state { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted-foreground); }
+.board .state i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.board .state.working i { animation: board-pulse 1.6s ease-in-out infinite; }
+.board .state.waiting i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--muted-foreground); }
+.board .state.merging i { background: var(--foreground); }
+.board .state.watching i { background: var(--faint-foreground); }
+.board .state.done i, .board .state.ended i { background: var(--border); }
+.board .state.stale { color: var(--faint-foreground); }
+.board .state.stale i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint-foreground); animation: none; }
+@keyframes board-pulse { 50% { opacity: .35; } }
+.board .card .slice { display: block; font-size: 12.5px; font-weight: 600; line-height: 1.35; }
+.board .card .doing { display: block; font-size: 12px; color: var(--muted-foreground); line-height: 1.4; margin-top: 3px; min-height: 2.8em; }
+.board .files { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.board .file { font-size: 10.5px; line-height: 1.6; background: var(--surface-2); border-radius: 4px; padding: 0 5px; color: var(--muted-foreground); }
+.board .file.iface { color: var(--foreground); box-shadow: inset 0 -1.5px 0 var(--accent); }
+.board .file .shared { font-family: var(--font-sans); color: var(--faint-foreground); }
+.board .card.done, .board .card.ended { box-shadow: none; background: var(--surface); }
+.board .card.done .slice, .board .card.ended .slice { color: var(--muted-foreground); }
+.board .card.waiting { background: var(--surface); }
+@keyframes board-rise { from { transform: translateY(4px); opacity: 0; } }
+
+.board .panel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); overflow: hidden; min-width: 0; }
+/* The run page fills the view: the roster at its height, the thread taking the rest and scrolling inside */
+.board .mention { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.board .tag { font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; color: var(--muted-foreground); background: var(--background); }
+.board .tag.strong { color: var(--foreground); border-color: var(--muted-foreground); }
+.board .none { padding: 26px 14px; text-align: center; color: var(--muted-foreground); font-size: 13px; }
+.board .none button { color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .board *, .board *::before { animation: none !important; transition: none !important; }
+}
+
+/* SL7: the board page, the RepoList rail beside a column: tabs, agent strip, conversation (flex 1), claims row */
+/* in aiview the board fills the document area, at the height of the frame it replaced */
+.board { height: calc(100vh - 10rem); display: flex; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); overflow: hidden; }
+.board > .content { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.board .rail { flex: none; width: 210px; border-right: 1px solid var(--border); background: var(--surface); padding: 16px 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.board .rail .label { margin: 12px 6px 4px; }
+.board .rail .label:first-child { margin-top: 0; }
+.board .rail-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border-radius: 6px; padding: 4px 8px; font-size: 12.5px; color: var(--muted-foreground); }
+.board .rail-row:hover { background: var(--surface-2); }
+.board .rail-row[aria-current="true"] { background: var(--accent-soft); color: var(--foreground); font-weight: 500; }
+.board .rail-row .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board .rail-row .n { font-size: 10.5px; color: var(--faint-foreground); }
+.board .notice { font-size: 12px; color: var(--muted-foreground); margin: 0 0 10px; }
+
+/* SL1 (posts): markdown in posts; a one-paragraph post flows inline as plain text did */
+.board .post-md p, .board .post-md li, .board .post-md td, .board .post-md th { white-space: pre-line; }
+.board .post-md p { margin: 0; }
+.board .post-md > * + * { margin-top: 6px; }
+.board .post-md ul, .board .post-md ol { margin-bottom: 4px; padding-left: 20px; }
+.board .post-md ul { list-style: disc; }
+.board .post-md ol { list-style: decimal; }
+.board .post-md h1, .board .post-md h2, .board .post-md h3, .board .post-md h4, .board .post-md h5, .board .post-md h6 { font-weight: 600; font-size: 14px; }
+.board .post-md blockquote { padding-left: 10px; border-left: 3px solid var(--border); color: var(--muted-foreground); }
+.board .post-md a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.board .post-md pre { padding: 8px; font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow-x: auto; white-space: pre; }
+.board .post-md table { border-collapse: collapse; font-size: 12.5px; display: block; overflow-x: auto; }
+.board .post-md th, .board .post-md td { border: 1px solid var(--border); padding: 3px 8px; text-align: left; vertical-align: top; }
+.board .post-md th { background: var(--surface-2); font-weight: 600; }
+
+/* SL5: the tab row (RunTabs, the merge lock at its end) and the archive drawer (mockup #643) */
+.board .runs { flex: none; position: sticky; top: 0; z-index: 20; display: flex; align-items: stretch; gap: 2px; padding: 0 0 0 12px; border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; background: var(--background); }
+.board .run { display: flex; align-items: center; gap: 7px; padding: 10px 12px 9px; font-size: 13px; color: var(--muted-foreground); white-space: nowrap; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.board .run:hover { color: var(--foreground); }
+.board .run[aria-pressed="true"] { color: var(--foreground); border-bottom-color: var(--foreground); }
+.board .run.closed { opacity: .5; }
+.board .run .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; background: var(--faint-foreground); }
+.board .run .dot.live { background: var(--ok); }
+.board .run .dot.quiet { background: #d97706; }
+.board .run .code { font: 600 11px var(--mono, ui-monospace, monospace); }
+.board .run .of { font-size: 11px; color: var(--faint-foreground); }
+.board .run .x { margin-left: 2px; color: var(--faint-foreground); padding: 0 2px; }
+.board .run .x:hover { color: var(--foreground); }
+.board .runs .lockwrap { position: sticky; right: 0; margin-left: auto; display: flex; align-items: center; padding: 0 12px 0 24px; background: linear-gradient(to right, transparent, var(--background) 20px); }
+.board .menu { display: flex; align-items: center; padding: 0 10px 0 2px; color: var(--muted-foreground); }
+.board .menu:hover, .board .menu[aria-expanded="true"] { color: var(--foreground); }
+.board .menu svg { width: 16px; height: 16px; }
+.board .drawer { position: fixed; inset: 0 auto 0 0; width: 380px; max-width: 90vw; z-index: 30; background: var(--background); border-right: 1px solid var(--border); box-shadow: 8px 0 24px rgba(0,0,0,.08); overflow: auto; }
+.board .archive { padding: 12px; }
+.board .archive .ahead { display: flex; align-items: baseline; gap: 8px; font-size: 14px; font-weight: 600; margin: 2px 4px 10px; }
+.board .archive .ahead span { font-size: 12px; font-weight: 400; color: var(--faint-foreground); }
+.board .archive .aclose { margin-left: auto; font-size: 18px; line-height: 1; color: var(--muted-foreground); }
+.board .archive input { width: 100%; font: inherit; font-size: 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; margin-bottom: 4px; background: var(--background); color: var(--foreground); }
+.board .archive .arow { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 2px 8px; width: 100%; text-align: left; padding: 7px 8px; border-radius: var(--radius-sm); }
+.board .archive .arow:hover { background: var(--surface-2); }
+.board .archive .arow .code { font: 600 11px var(--mono, ui-monospace, monospace); padding-top: 2px; }
+.board .archive .arow .at { font-size: 13px; font-weight: 500; min-width: 0; }
+.board .archive .arow .ak { font-size: 11px; color: var(--faint-foreground); font-weight: 400; margin-left: 6px; }
+.board .archive .arow .am { grid-column: 2; font-size: 11.5px; color: var(--muted-foreground); }
+.board .archive .arow .ad { grid-row: 1; grid-column: 3; font: 11px var(--mono, ui-monospace, monospace); color: var(--faint-foreground); white-space: nowrap; }
+.board .archive .aempty { padding: 8px; font-size: 12px; color: var(--faint-foreground); }
+/* SL6: the one conversation (D8, D9), as mockup #643 draws it. Red only means act now. */
+
+.board .convo { flex: 1; display: flex; flex-direction: column; min-height: 240px; min-width: 0; }
+.board .stream { list-style: none; margin: 0; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 24px 24px; }
+.board .archived-line { font-size: 12px; color: var(--muted-foreground); padding: 0 0 10px 12px; }
+.board .item { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 12px; padding: 6px 0 6px 10px; border-left: 2px solid transparent; }
+.board .item + .item.cont { padding-top: 0; }
+.board .item .time, .board .event .time { font: 11px ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace; color: var(--faint-foreground); padding-top: 2px; }
+/* the time centred on the head's line, the 18px of a member's chip, not 2px above it */
+.board .item .time { padding-top: 0; line-height: 18px; }
+.board .item .head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 12.5px; }
+.board .item .what { font-size: 12px; }
+.board .item .text { grid-column: 2; font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.board .item .text code { font-size: 12px; background: var(--surface-2); border-radius: 4px; padding: 1px 4px; }
+.board .item .text .post-md pre code { background: none; padding: 0; }
+.board .item .text .seq-ref { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.board .item.cont .head, .board .item.cont .time { display: none; }
+.board .item.act { border-left: 2px solid var(--danger); }
+.board .item.act .what { color: var(--danger); font-weight: 600; }
+.board .item.flag.open { background: color-mix(in srgb, var(--danger) 5%, transparent); }
+.board .item.wait { border-left: 2px dashed var(--amber); }
+.board .item.wait .what { color: var(--amber); }
+.board .item.decided .what { color: var(--ok); }
+.board .item.new, .board .event.new { animation: board-rise .35s ease-out; }
+.board .event { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 12px; padding: 2px 0 2px 12px; font-size: 12px; color: var(--faint-foreground); }
+.board .event .head { display: flex; align-items: center; min-height: 18px; }
+.board .event .time { padding-top: 0; line-height: 18px; }
+.board .event .text { grid-column: 2; line-height: 1.5; overflow-wrap: anywhere; }
+.board .tip { cursor: help; text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; }
+.board #tipbox { position: fixed; z-index: 50; max-width: 300px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--foreground); color: var(--background); font-size: 12px; line-height: 1.45; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); pointer-events: none; }
+.board #tipbox[hidden] { display: none; }
+@media (max-width: 860px) {
+  .board .stream { padding: 10px 14px; }
+  .board .item, .board .event { grid-template-columns: 1fr; }
+  .board .item .time, .board .event .time { display: none; }
+  .board .item .text, .board .event .text { grid-column: 1; }
+}
+
+/* SL7: the agent strip (D7, D20) and the claims row; the page a column: tabs, strip, conversation, claims */
+/* the cards wrap onto as many rows as they need, never a horizontal scroll */
+/* two rows at most, the rest scrolled to: rows of one height so the cap is exact */
+.board .agent-strip { --row: 77px; flex: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); grid-auto-rows: var(--row); gap: 10px; padding: 12px 2px; max-height: calc(2 * var(--row) + 10px + 24px); overflow-y: auto; }
+.board .agent-strip .card { min-width: 0; }
+.board .agent-strip.following .card[aria-pressed="false"] { opacity: .45; }
+.board .agent-strip .card.ended, .board .agent-strip .card.done { opacity: .55; }
+.board .agent-strip .doing { min-height: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.board .state.quiet { color: var(--amber); }
+.board .state.quiet i { background: var(--amber); }
+.board .claims-row { flex: none; border-top: 1px solid var(--border); padding: 6px 0 0; }
+.board .claims-row[data-expanded="true"] { max-height: 30vh; overflow-y: auto; }
+.board .claims-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted-foreground); padding: 4px 0; }
+.board .claims-toggle .n { font-weight: 400; color: var(--faint-foreground); }
+.board .claims-list { list-style: none; margin: 0; padding: 0 0 6px 18px; display: flex; flex-direction: column; gap: 3px; }
+.board .claims-list li { display: flex; align-items: baseline; gap: 10px; font-size: 12px; }
+.board .claims-list .path { font-family: var(--font-mono, monospace); flex: none; width: 360px; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board .claims-list .holders { display: inline-flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.board .claims-list .shared { color: var(--faint-foreground); }
+/* a run's code in the tab row and the archive: coloured text, no box (the generic .code draws one) */
+.board .run .code, .board .archive .arow .code { border: 0; border-radius: 0; padding: 0; background: none; }
+
+/* SL11: ConversationFilters, quiet chips above the conversation, and the FileMenu under File ▾ (mockup #643) */
+.board .filters { display: flex; gap: 6px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.board .fchip { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; padding: 2px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); }
+.board .fchip:hover { color: var(--foreground); }
+.board .fchip[aria-pressed="true"] { color: var(--foreground); border-color: var(--foreground); background: var(--surface-2); }
+.board .fchip .n { font-size: 11px; color: var(--faint-foreground); }
+.board .fchip code { font-size: 11.5px; }
+.board .fchip .fx { margin-left: 2px; color: var(--faint-foreground); }
+.board .fchip .fx:hover { color: var(--foreground); }
+.board .fwrap { position: relative; }
+.board .fmenu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 25; width: min(360px, calc(100vw - 32px)); max-height: 50vh; overflow: auto; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 6px; }
+.board .fmenu .fhead { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; }
+.board .fmenu input { flex: 1; min-width: 0; font: inherit; font-size: 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 9px; background: var(--background); color: var(--foreground); }
+.board .fmenu .fclose { font-size: 18px; line-height: 1; padding: 0 4px; color: var(--muted-foreground); }
+.board .frow { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; padding: 5px 8px; border-radius: var(--radius-sm); }
+.board .frow:hover { background: var(--surface-2); }
+.board .frow code { font-size: 12px; flex: 1; overflow-wrap: anywhere; }
+.board .frow .n { font-size: 11px; color: var(--faint-foreground); }
+.board .fempty { padding: 6px 8px; font-size: 12px; color: var(--faint-foreground); }

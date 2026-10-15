@@ -9,13 +9,13 @@ import { MarkdownView } from "./components/viewers/MarkdownView.tsx";
 import { PendingCards } from "./components/docs/PendingCards.tsx";
 import { MockupFrame } from "./components/viewers/MockupFrame.tsx";
 import { PdfFrame } from "./components/viewers/PdfFrame.tsx";
-import { SwarmFrame, swarmUrlOf } from "./components/viewers/SwarmFrame.tsx";
+import { BoardView, boardReposOf } from "./components/viewers/board/BoardView.tsx";
 
-/** A swarm document framed from the URL its file names, or why it cannot be. */
+/** A swarm document: the board of the repositories its file names, drawn here, or why it cannot be. */
 export function SwarmDocumentView({ content }: { content: string }) {
-  const url = swarmUrlOf(content);
-  if (url === null) return <p className="text-muted-foreground">This swarm document names no page URL.</p>;
-  return <SwarmFrame url={url} />;
+  const repos = boardReposOf(content);
+  if (repos === null) return <p className="text-muted-foreground">This board names no repository.</p>;
+  return <BoardView key={repos.join("\n")} repos={repos} run={null} />;
 }
 
 /** The hash is the pointer: the document, and what the agent is pointing at in it. */
