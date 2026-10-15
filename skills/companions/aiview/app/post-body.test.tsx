@@ -1,8 +1,8 @@
-// A post's body (SL5): fenced mermaid blocks drawn as diagrams, `#<seq>` links. jsdom cannot lay
-// mermaid out: it is mocked, its render resolving an svg or rejecting.
+// A post's body: aiview's markdown, diagrams and code, with mentions and `#<seq>` links on top. jsdom
+// cannot lay mermaid out: it is mocked, its render resolving an svg or rejecting.
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { readdirSync, statSync } from "node:fs";
+import { cleanup, render, screen } from "@testing-library/react";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { segments, seqRefs } from "./lib/board/post.ts";
 
@@ -23,6 +23,8 @@ vi.mock("mermaid", () => {
 import { PostBody } from "./components/viewers/board/PostBody.tsx";
 
 afterEach(cleanup);
+// MermaidView picks its theme from the OS scheme; jsdom has no matchMedia.
+vi.stubGlobal("matchMedia", () => ({ matches: false }));
 
 const FENCE = "```";
 
@@ -61,31 +63,32 @@ describe("seqRefs", () => {
   });
 });
 
+// SL4: a post renders through aiview's own markdown (MermaidView, CodeView), the board's decorations on top.
 describe("PostBody", () => {
-  test("a body with a block shows the text and a drawn diagram; the toggle reveals the source", async () => {
+  test("a mermaid fence renders as a diagram", async () => {
     mermaidMock.render = async () => ({ svg: '<svg data-testid="drawn"></svg>' });
     const { container } = render(<PostBody body={`see below\n${FENCE}mermaid\nflowchart LR\n A-->B\n${FENCE}`} shown={new Set()} />);
     expect(screen.getByText("see below")).toBeTruthy();
     await screen.findByTestId("drawn");
-    const diagram = container.querySelector('[data-component="PostDiagram"]')!;
-    expect(diagram.getAttribute("data-state")).toBe("drawn");
-    expect(diagram.querySelector("pre")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "source" }));
-    expect(diagram.querySelector("pre")!.textContent).toBe("flowchart LR\n A-->B");
+    expect(container.querySelector('[data-component="MermaidView"]')).toBeTruthy();
+    expect(container.querySelector("pre code.language-mermaid")).toBeNull();
   });
 
-  test("a rejected render shows mermaid failed and the source", async () => {
+  test("a mermaid fence that fails shows mermaid failed and the source", async () => {
     mermaidMock.render = async () => {
       throw new Error("Parse error on line 1");
     };
     const { container } = render(<PostBody body={`${FENCE}mermaid\nnot a diagram\n${FENCE}`} shown={new Set()} />);
     await screen.findByText("mermaid failed: Parse error on line 1");
-    const diagram = container.querySelector('[data-component="PostDiagram"]')!;
-    expect(diagram.getAttribute("data-state")).toBe("failed");
-    expect(diagram.querySelector("pre")!.textContent).toBe("not a diagram");
+    expect(container.querySelector('[data-component="MermaidView"] pre')!.textContent).toBe("not a diagram\n");
   });
 
-  test("#42 links when 42 is shown, plain text when not", () => {
+  test("a code fence renders as code", () => {
+    const { container } = render(<PostBody body={`${FENCE}ts\nconst a = 1;\n${FENCE}`} shown={new Set()} />);
+    expect(container.querySelector('[data-component="CodeView"]')!.textContent).toBe("const a = 1;\n");
+  });
+
+  test("#seq links to a shown post, plain text when not shown", () => {
     render(<PostBody body="settled in #42" shown={new Set([42])} />);
     const link = screen.getByRole("link", { name: "#42" });
     expect(link.getAttribute("href")).toBe("#seq-42");
@@ -115,30 +118,28 @@ describe("PostBody markdown", () => {
     expect(table.querySelector("tbody tr td")!.textContent).toBe("word, word. word");
   });
 
-  test("a list, inline code, a js fence, bold and a link each render as their element", () => {
+  test("a list, inline code, a js fence (as code), bold and a link each render as their element", () => {
     const body = ["- one", "- two", "", "run `npm ci` **now**, see [docs](https://example.com)", "", `${FENCE}js`, "const a = 1;", FENCE].join("\n");
     const { container } = render(<PostBody body={body} shown={new Set()} />);
     expect(container.querySelectorAll("ul > li")).toHaveLength(2);
     expect(container.querySelector("p code")!.textContent).toBe("npm ci");
     expect(container.querySelector("strong")!.textContent).toBe("now");
     expect(screen.getByRole("link", { name: "docs" }).getAttribute("href")).toBe("https://example.com");
-    const fence = container.querySelector("pre > code")!;
-    expect(fence.className).toContain("language-js");
-    expect(fence.textContent).toBe("const a = 1;\n");
+    expect(container.querySelector('[data-component="CodeView"]')!.textContent).toBe("const a = 1;\n");
   });
 
-  test("a mermaid fence inside markdown is drawn by PostDiagram, the text around as markdown", async () => {
+  test("a mermaid fence inside markdown is drawn by MermaidView, the text around as markdown", async () => {
     mermaidMock.render = async () => ({ svg: '<svg data-testid="drawn-md"></svg>' });
     const body = ["**before**", "", `${FENCE}mermaid`, "flowchart LR", " A-->B", FENCE, "", "- after"].join("\n");
     const { container } = render(<PostBody body={body} shown={new Set()} />);
     await screen.findByTestId("drawn-md");
-    expect(container.querySelector('[data-component="PostDiagram"]')!.getAttribute("data-state")).toBe("drawn");
+    expect(container.querySelector('[data-component="MermaidView"]')).toBeTruthy();
     expect(container.querySelector("strong")!.textContent).toBe("before");
     expect(container.querySelector("li")!.textContent).toBe("after");
     expect(container.querySelector("pre code.language-mermaid")).toBeNull();
   });
 
-  test("mentions and #seq highlight in a table cell and a list item, stay literal in code", () => {
+  test("mentions highlighted outside code only: a table cell and a list item, never inline code or a fence", () => {
     const body = [
       "| who | ref |",
       "|---|---|",
@@ -164,7 +165,7 @@ describe("PostBody markdown", () => {
     expect(container.querySelector("pre")!.textContent).toBe("@swarm-kinds/SL2 #43\n");
   });
 
-  test("raw HTML is shown as text, never rendered", () => {
+  test("raw html is text, never rendered", () => {
     const body = 'look <img src=x onerror="alert(1)"> here\n\n<script>alert(2)</script>';
     const { container } = render(<PostBody body={body} shown={new Set()} />);
     expect(container.querySelector("img")).toBeNull();
@@ -172,6 +173,16 @@ describe("PostBody markdown", () => {
     expect(container.textContent).toContain('<img src=x onerror="alert(1)">');
     expect(container.textContent).toContain("<script>alert(2)</script>");
   });
+});
+
+// The board draws diagrams only through aiview's MermaidView: nothing under its folders imports mermaid.
+test("nothing of the board imports mermaid itself", () => {
+  const roots = [join(__dirname, "components/viewers/board"), join(__dirname, "lib/board")];
+  const files = roots.flatMap((dir) => readdirSync(dir).filter((f) => /\.tsx?$/.test(f)).map((f) => join(dir, f)));
+  expect(files.length).toBeGreaterThan(0);
+  const importing = files.filter((f) => /from\s+["']mermaid["']|import\(\s*["']mermaid["']\s*\)/.test(readFileSync(f, "utf8")));
+  expect(importing).toEqual([]);
+  expect(safeExists(join(__dirname, "components/viewers/board/PostDiagram.tsx"))).toBe(false);
 });
 
 // Kept last in the file and isolated by module: mermaid is imported only once a block needs it.
