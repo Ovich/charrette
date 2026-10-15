@@ -1,13 +1,13 @@
 import type { SharedFile } from "../../../../../swarm/src/board/snapshot.ts";
-import { ESTIMATED_TIP, formatDuration, NOT_RECORDED } from "../../../lib/board/analytics.ts";
+import { ESTIMATED_TIP, formatDuration } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";
 
 /** What a file's merge met: a conflict, none, or unknown (git older than 2.38, board D13); a run before
- *  the records has none recorded (D32). */
+ *  the records says nothing, its tile and column already reading not recorded once (D45). */
 function ConflictNote({ conflict, recorded }: { conflict: boolean | null; recorded: boolean }) {
   if (conflict === true) return <span className="bad"> · conflict at merge</span>;
-  if (conflict === false) return null;
-  return <span className="faint"> · {recorded ? "conflict unknown (git older than 2.38)" : `conflict ${NOT_RECORDED}`}</span>;
+  if (conflict === false || !recorded) return null;
+  return <span className="faint"> · conflict unknown (git older than 2.38)</span>;
 }
 
 /** The files two members held in this run (mockup #677 SharedFilesList): their holders, and whether the

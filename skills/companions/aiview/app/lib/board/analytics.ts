@@ -66,6 +66,21 @@ export function readRunAnalytics(hash: string): RunId | null {
   return fields.get("view") === "analytics" && Number.isInteger(run) && run > 0 ? run : null;
 }
 
+/** The run the hash names, `run=13`, on its Analytics or not; null when it names none. */
+export function readRunInHash(hash: string): RunId | null {
+  const run = Number(new Map(fieldsOf(hash)).get("run"));
+  return Number.isInteger(run) && run > 0 ? run : null;
+}
+
+/** The hash's board fields, the run's and the across view's, as one key: a hashchange that leaves it equal moved
+ *  nothing on the board (the document or its pointer moved). */
+export function boardFieldsOf(hash: string): string {
+  return fieldsOf(hash)
+    .filter(([key]) => RUN_VIEW_KEYS.has(key) || ACROSS_KEYS.has(key))
+    .map(([key, value]) => `${key}=${value ?? ""}`)
+    .join("&");
+}
+
 /** The hash with a run's Analytics written in (null: taken out). */
 export function hashWithRunAnalytics(hash: string, run: RunId | null): string {
   return hashWith(hash, RUN_VIEW_KEYS, run === null ? [] : [`run=${run}`, "view=analytics"]);
@@ -96,6 +111,9 @@ export const NOT_RECORDED = "not recorded";
 
 /** The tip of a figure estimated for a run before the records (D44), drawn as an inferred one (D23, D33). */
 export const ESTIMATED_TIP = "Estimated: this run closed before analytics recorded it; read from its claims and members.";
+
+/** The tip of a member's spans and time estimated from the board's events for a run before the records (D45). */
+export const ESTIMATED_EVENTS_TIP = "Estimated: this run closed before analytics recorded it; read from its board events.";
 
 /** A duration as the board writes it: "40s", "1m 50s" under ten minutes, "18m", "2h 42m". */
 export function formatDuration(ms: number): string {

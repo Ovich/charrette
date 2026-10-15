@@ -76,7 +76,7 @@ function Tiles({ stats }: { stats: Stats }) {
         spark={t.series.conflicts}
         notRecorded={notRecorded}
       />
-      <KpiTile label="Silent members" value={line(t.silentMembers, String)} unit={`past ${formatDuration(stats.silentAfterMs)}`} spark={t.series.silentMembers} notRecorded={notRecorded} />
+      <KpiTile label="Silent members" value={line(t.silentMembers, String)} unit={`past ${formatDuration(stats.silentAfterMs)}`} spark={t.series.silentMembers} notRecorded={notRecorded} newRecord />
     </div>
   );
 }

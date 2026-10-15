@@ -69,7 +69,7 @@ function PlanTiles({ stats, run }: { stats: Stats; run: RunStats }) {
         tone="bad"
         newRecord
       />
-      <KpiTile label="Silent members" value={line(t.silentMembers, String)} delta={silentLine(run.members, t.silentMembers)} />
+      <KpiTile label="Silent members" value={line(t.silentMembers, String)} delta={silentLine(run.members, t.silentMembers)} newRecord />
     </div>
   );
 }
@@ -93,6 +93,7 @@ export function PlanRunAnalytics({ stats, run, onOpenPost }: { stats: Stats; run
         from={run.openedAt}
         to={to}
         recorded={run.recorded}
+        estimated={run.members.some((m) => m.estimated)}
         silentAfterMs={stats.silentAfterMs}
         focus={focus}
         onFocus={setFocus}

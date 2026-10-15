@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { RunSummary, Stats } from "../../swarm/src/board/snapshot.ts";
 import { CLOSED, LIVE, RUNS } from "./board-fixtures.ts";
-import { BRAINSTORM_RUN, LP_S4, OPEN_RUN, PLAN_RUN, UNRECORDED_RUN, bodyOf } from "./stats-fixtures.ts";
+import { BRAINSTORM_RUN, EVENTS_READ_RUN, LP_S4, OPEN_RUN, PLAN_RUN, UNRECORDED_RUN, bodyOf } from "./stats-fixtures.ts";
 import { source, standIn } from "./stats-stand-in.ts";
 
 vi.mock("./hooks/useBoard.ts", async () => ({ useBoard: (await import("./stats-stand-in.ts")).useBoardStandIn }));
@@ -21,6 +21,8 @@ afterEach(() => {
 const LP_SUMMARY = CLOSED[0];
 const TT_SUMMARY = CLOSED[1];
 const OLD_SUMMARY: RunSummary = { ...LP_SUMMARY, run: 8, plan: "old-login", group: "old-login", code: "OL", title: "The old login" };
+const EVENTS_SUMMARY: RunSummary = { ...LP_SUMMARY, run: 9, plan: "old-signup", group: "old-signup", code: "OS", title: "The old signup" };
+const EVENTS_TIP = "Estimated: this run closed before analytics recorded it; read from its board events.";
 
 /** One run's tab on Analytics, alone. */
 const showRun = (summary: RunSummary, stats: Stats) => {
@@ -101,7 +103,7 @@ test("inferred spans are drawn apart, dashed, and the legend names silent: no co
   expect(lane("theme-tokens/skeptic").querySelectorAll(".post")).toHaveLength(0);
 });
 
-test("a run with recorded: false: the Not recorded line in place of the lanes, — in Time, not recorded for lock wait and conflicts (D32, D33, SL5)", () => {
+test("a run with recorded: false and no spans read: the Not recorded line in place of the lanes, — in Time, not recorded for lock wait and conflicts, no conflict text on a shared file (D32, D33, D45, SL5, SL10)", () => {
   showRun(OLD_SUMMARY, UNRECORDED_RUN);
   const timeline = part("RunTimeline")!;
   expect(within(timeline).getByText("Not recorded: this run closed before analytics recorded member activity.")).toBeTruthy();
@@ -116,7 +118,8 @@ test("a run with recorded: false: the Not recorded line in place of the lanes, �
   const list = part("SharedFilesList")!;
   expect(list.dataset.state).toBe("estimated");
   expect(list.querySelector(".label .hint")!.textContent).toBe("estimated");
-  expect(rowOf(list, "src/old-login.ts").querySelectorAll("td")[2].textContent).toBe("none · conflict not recorded");
+  // its conflicts null: the tile already says not recorded, the row says nothing of them (D45)
+  expect(rowOf(list, "src/old-login.ts").querySelectorAll("td")[2].textContent).toBe("none");
 });
 
 test("an open run's line says open (D32, D33, SL5)", () => {
@@ -176,4 +179,52 @@ test("a mark with a seq opens Conversation on that post (SL5)", () => {
   expect(screen.getByRole("region", { name: "The conversation" })).toBeTruthy();
   expect(scrolled).toEqual([`seq-${agreement.seq}`]);
   expect(document.getElementById(`seq-${agreement.seq}`)).toBeTruthy();
+});
+
+test("a run before the records read from its board events: its lanes drawn estimated, dashed with the estimate's tip, each member's Time drawn as an estimate; Silent members a new record (D45, SL10)", () => {
+  showRun(EVENTS_SUMMARY, EVENTS_READ_RUN);
+  const timeline = part("RunTimeline")!;
+  expect(timeline.dataset.state).toBe("estimated");
+  expect(timeline.classList.contains("inferred")).toBe(true);
+  expect(timeline.dataset.tip).toBe(EVENTS_TIP);
+  expect(within(timeline).queryByText(/^Not recorded/)).toBeNull();
+  expect(timeline.querySelector(".label .hint")!.textContent).toBe("estimated");
+  // a working span each, inferred; S1's merge a mark in its lane and in the lock band
+  expect(lane("old-signup/S1").querySelectorAll(".seg.s-working.inferred")).toHaveLength(1);
+  expect(lane("old-signup/S1").querySelectorAll(".seg.s-merging")).toHaveLength(1);
+  expect(lane("old-signup/S2").querySelectorAll(".seg.s-working.inferred")).toHaveLength(1);
+  expect(timeline.querySelectorAll(".lockband .seg.s-merging")).toHaveLength(1);
+  // Time: the member's join to its end, drawn as an estimate
+  const time = (nick: string) => rowOf(part("MembersTable")!, nick).querySelectorAll("td")[1] as HTMLElement;
+  expect(time("Quiet Llama").textContent).toBe(" 25m");
+  expect(time("Shy Otter").textContent).toBe(" 45m");
+  expect(time("Quiet Llama").classList.contains("inferred")).toBe(true);
+  expect(time("Quiet Llama").dataset.tip).toBe(EVENTS_TIP);
+  expect(tile("Length").textContent).toContain("first merge at 20m");
+  expect(tile("Silent members").querySelector(".newrec")!.textContent).toBe("new record");
+});
+
+test("a hash change of run= switches the run's tab and its Analytics without a reload; one that leaves the board's fields equal moves nothing (D31, D45, SL10)", () => {
+  standIn([LIVE], null, [OPEN_RUN, PLAN_RUN]);
+  history.replaceState(null, "", "#run=1&view=analytics");
+  render(<BoardView repos={[LIVE.repo]} run={null} />);
+  const tabs = () => within(screen.getByRole("navigation", { name: "Runs" }));
+  expect(tabs().getByText("Sessions with refresh tokens").closest("button")!.getAttribute("aria-pressed")).toBe("true");
+  expect(source.asks.at(-1)).toEqual({ run: 1 });
+  history.replaceState(null, "", "#run=4&view=analytics");
+  fireEvent(window, new HashChangeEvent("hashchange"));
+  // run 4 is closed: its archived tab pressed, on its Analytics
+  const archived = screen.getByText("The login page", { selector: ".t" }).closest('[data-component="ArchivedTab"]') as HTMLElement;
+  expect(archived.getAttribute("aria-pressed")).toBe("true");
+  expect(source.asks.at(-1)).toEqual({ run: 4 });
+  expect(view()).toBeTruthy();
+  // the document's own fields change: the board stays where it is
+  history.replaceState(null, "", "#doc=7&run=4&view=analytics");
+  fireEvent(window, new HashChangeEvent("hashchange"));
+  expect(archived.getAttribute("aria-pressed")).toBe("true");
+  // run= alone: the run's conversation
+  history.replaceState(null, "", "#run=2");
+  fireEvent(window, new HashChangeEvent("hashchange"));
+  expect(tabs().getByText("Audit log").closest("button")!.getAttribute("aria-pressed")).toBe("true");
+  expect(document.querySelector('[data-component="RunAnalytics"]')).toBeNull();
 });

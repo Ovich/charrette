@@ -48,7 +48,9 @@ export function SharingFunnel({ shared, conflictsInShared }: { shared: Totals["s
         );
       })}
       <div className="foot">
-        A shared file is one a second member claimed while another held it; each step counts the files that made it that far.
+        {estimated
+          ? "Estimated: a shared file is one two members claimed in the run, at once or not. Each step counts the files that made it that far."
+          : "A shared file is one a second member claimed while another held it; each step counts the files that made it that far."}
         {/* the conflict line only when both its figures are recorded (D43) */}
         {conflictsInShared !== null && shared.files !== null ? (
           <>

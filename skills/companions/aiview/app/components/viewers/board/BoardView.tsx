@@ -2,10 +2,21 @@
 // names several, the tab row (☰ archive, All, the open runs, the merge lock at its end), the picked
 // run's switch between its conversation (the agent strip, the conversation, the claims row) and its
 // Analytics, and the across-runs view. aiview's theme; board.css reaches only `.board`.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBoard } from "../../../hooks/useBoard.ts";
 import { agents, archive, claimRows, conversation, narrow, nicksOf, openingRun, runHue, runTabs, type Narrow, type Pick, type RunId } from "../../../lib/board/view.ts";
-import { DEFAULT_SCOPE, hashWithAcross, hashWithRunAnalytics, readAcross, readRunAnalytics, summaryLine, type AcrossScope, type RunView } from "../../../lib/board/analytics.ts";
+import {
+  boardFieldsOf,
+  DEFAULT_SCOPE,
+  hashWithAcross,
+  hashWithRunAnalytics,
+  readAcross,
+  readRunAnalytics,
+  readRunInHash,
+  summaryLine,
+  type AcrossScope,
+  type RunView,
+} from "../../../lib/board/analytics.ts";
 import { AcrossRunsView } from "./AcrossRunsView.tsx";
 import { ConversationFilters } from "./ConversationFilters.tsx";
 import { NicksContext } from "./chips.tsx";
@@ -48,7 +59,7 @@ const NONE = new Set<never>();
 const ALL: Pick = { run: null, follow: null };
 const UNNARROWED: Narrow = { kind: "all", file: null };
 
-/** The hash, replaced and never pushed: it keeps the document and its pointer, and hashchange stays App's. */
+/** The hash, replaced and never pushed: it keeps the document and its pointer, and fires no hashchange. */
 const replaceHash = (hash: string): void => history.replaceState(history.state, "", `#${hash}`);
 
 export function BoardView({ repos, run: asked }: { repos: string[]; run: number | null }) {
@@ -69,6 +80,29 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
   const [runView, setRunView] = useState<RunView>(run !== null && run === analyticsInUrl ? "analytics" : "conversation");
   // a timeline mark clicked: the post to bring into view once the conversation shows
   const [postToShow, setPostToShow] = useState<number | null>(null);
+  // the board fields the hash held when the board last wrote or followed it: a hashchange that changes them is a link
+  // or the back button, followed without a reload
+  const hashSeen = useRef(boardFieldsOf(location.hash));
+  const writeHash = (hash: string): void => {
+    replaceHash(hash);
+    hashSeen.current = boardFieldsOf(hash);
+  };
+  useEffect(() => {
+    const follow = (): void => {
+      const fields = boardFieldsOf(location.hash);
+      if (fields === hashSeen.current) return;
+      hashSeen.current = fields;
+      const scope = readAcross(location.hash);
+      setAcross(scope);
+      setMenuOpen(false);
+      if (scope) return;
+      setRunView(readRunAnalytics(location.hash) !== null ? "analytics" : "conversation");
+      setOpened(true);
+      setPick({ run: readRunInHash(location.hash), follow: null });
+    };
+    window.addEventListener("hashchange", follow);
+    return () => window.removeEventListener("hashchange", follow);
+  }, []);
   const board = useBoard(query);
   const snapshot = board.snapshot;
   const focus = pick.follow;
@@ -106,11 +140,11 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
   const showAcross = (scope: AcrossScope | null): void => {
     setAcross(scope);
     // the across view takes a run's Analytics out of the URL: a reload reopens the across view
-    replaceHash(hashWithRunAnalytics(hashWithAcross(location.hash, scope), null));
+    writeHash(hashWithRunAnalytics(hashWithAcross(location.hash, scope), null));
   };
   const showRunView = (r: RunId | null, view: RunView): void => {
     setRunView(view);
-    replaceHash(hashWithRunAnalytics(location.hash, view === "analytics" ? r : null));
+    writeHash(hashWithRunAnalytics(location.hash, view === "analytics" ? r : null));
   };
 
   const pickRun = (r: RunId | null): void => {

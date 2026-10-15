@@ -62,7 +62,7 @@ test("the funnel's conflict line reads only when both its figures are recorded, 
   for (const [missing, stats] of notRecorded) {
     cleanup();
     openAcross(stats);
-    expect(foot(), missing).toContain("each step counts the files that made it that far.");
+    expect(foot(), missing).toMatch(/[Ee]ach step counts the files that made it that far\./);
     expect(foot(), missing).not.toContain("At merge");
     expect(foot(), missing).not.toContain("conflict");
   }
@@ -175,4 +175,14 @@ test("a runs-table cell whose two figures are null reads not recorded once; an e
   expect(settledOf(old.title).title).toMatch(/^Estimated: /);
   expect(settledOf(old.title).textContent).toContain("0 of 1");
   expect(settledOf(recorded.title).classList.contains("inferred")).toBe(false);
+});
+
+test("the funnel's footnote over an estimated scope says what an estimated shared file is; a recorded scope keeps the held-at-once rule (D44, D45, SL10)", () => {
+  openAcross();
+  const foot = () => across().querySelector('[data-component="SharingFunnel"] .foot')!.textContent!;
+  expect(foot()).toContain("Estimated: a shared file is one two members claimed in the run, at once or not.");
+  expect(foot()).not.toContain("claimed while another held it");
+  cleanup();
+  openAcross({ ...ACROSS, totals: { ...ACROSS.totals, shared: { ...ACROSS.totals.shared, estimatedRuns: 0 } } });
+  expect(foot()).toContain("A shared file is one a second member claimed while another held it");
 });
