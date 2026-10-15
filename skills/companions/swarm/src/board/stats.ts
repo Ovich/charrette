@@ -29,7 +29,8 @@ export type MemberStats = {
   waitingMs: number | null;
   /** Its agreements posted (D40). */
   agreementsMade: number | null;
-  /** A brainstorm run's: its endorsements and its objections (inferred, D23); null on a plan run, which computes neither (D40). */
+  /** A brainstorm run's: its endorsements of agreements on a `D<n>`, any seat's (D46), and its objections (inferred, D23); null on
+   *  a plan run, which computes neither (D40). */
   endorsed: number | null;
   objections: number | null;
   /** True: its intervals and time read from the board's events, the calls not kept (D45); false on a recorded run. */
@@ -42,7 +43,8 @@ export type PlanRunStats = {
    *  event, else to its end (D45). */
   slices: { merged: number | null; of: number | null; addedMidRun: number | null; timesMs: number[]; estimated: boolean };
   lock: { waitsMs: number[]; racesLost: { member: string; lost: number | null; waitedMs: number | null }[] };
-  /** Estimated (before `shares-since`): a path two or more members claimed, held at once or not; `agreedBeforeMerge`
+  /** Estimated (before `shares-since`): a path two or more members claimed while both were members of the run, their
+   *  membership spans overlapping (D46); `agreedBeforeMerge`
    *  against the first `merged` event of a holder that carried the path (D45). */
   shared: { files: number | null; everyHolderTold: number | null; agreed: number | null; agreedBeforeMerge: number | null; perFile: SharedFile[]; estimated: boolean };
   flags: number | null;
@@ -53,7 +55,10 @@ export type PlanRunStats = {
 export type SharedFile = {
   path: string;
   holders: string[];
+  /** Every later holder told every earlier one (D41): the funnel counts its agreement only then (D38, D46). */
+  told: boolean;
   agreement: number | null /* seq */;
+  /** From the first tell to the agreement; below 0 when the agreement came before the tell (D46). */
   agreedAfterMs: number | null;
   conflict: boolean | null;
   /** A holder declared it an interface at join, or claimed it as one (D37); null on a summary from before. */
@@ -61,18 +66,19 @@ export type SharedFile = {
 };
 /** A question `D<n>`, from the `about` of the posts and agreements (D4). `outcome`: the first agreement on it the skeptic
  *  endorsed, at that agreement's time and seq; none, null (D30; no escalation until D26). `exchanges`: the seats' `msg`,
- *  `urgent` and `agreement` posts about it up to its outcome's agreement included, events not (D33). */
+ *  `urgent` and `agreement` posts about it strictly before its outcome's agreement, events not (D33, D46). */
 export type QuestionStats = { id: string /* D<n> */; firstPost: string; outcome: { at: string; seq: number; kind: "agreed" } | null; exchanges: number | null };
 export type BrainstormRunStats = {
   /** Ordered by first post. */
   questions: QuestionStats[];
-  /** The agreements about a `D<n>`; `endorsed`: the skeptic's endorsements of them. */
+  /** The agreements about a `D<n>`; `endorsed`: the skeptic's endorsements of them (D30); each seat's own, `MemberStats.endorsed` (D46). */
   agreements: number | null;
   endorsed: number | null;
   /** Inferred (D23). A claim: a member's `msg` or `urgent` post about a `D<n>`, up to its outcome. It carries a source when
    *  its body holds `file:line` (`<name>.<ext>:<digits>`), `#<digits>` or an `http://` / `https://` URL; a source named in
    *  words reads unsourced, and counts in its author's `unsourced`. An objection (a mark `objected`): the skeptic's
-   *  `msg` or `urgent` post about a `D<n>` after an agreement on it by another member that the skeptic never endorsed. */
+   *  `msg` or `urgent` post about a `D<n>` when the latest agreement on it, by another member, was not yet endorsed by the
+   *  skeptic at the post's time (D46). */
   claimsWithSource: { n: number | null; of: number | null; inferred: true };
 };
 export type RunStats = {
@@ -141,13 +147,25 @@ const ORCHESTRATOR = "orchestrator";
 const SKEPTIC = "skeptic";
 /** A brainstorm question's `about` (D4). */
 const QUESTION = /^D\d+$/;
-// a flag as the board wrote it before the `event` column (D43): its body, posted by the board (by_board 1)
-const FLAG_BODY = /flag:\s*\S+\s+wrote\s+\S+\s+outside its claim/;
+// a flag as the board wrote it before the `event` column (D43): its body, posted by the board (by_board 1); its path and holder
+const FLAG_BODY = /flag:\s*\S+\s+wrote\s+(\S+)\s+outside its claim(?:;\s*(\S+)\s+holds it)?/;
 /** A flag the board posted, from its message (D43): the `flag` event, or a board-written row from before
  *  the event name with the flag's body. Never the `flags` table, which the release of a claim empties,
  *  and never a member's own post quoting a flag. */
 const isBoardFlag = (m: Row): boolean =>
   Number(m.by_board ?? 0) === 1 && (m.event === "flag" || (m.event == null && FLAG_BODY.test(String(m.body))));
+/** The board's flags without their repeats: one per writer, path and holder in a run (D43, D46); the first kept. */
+function distinctFlags(messages: Row[]): Row[] {
+  const seen = new Set<string>();
+  return messages.filter((m) => {
+    if (!isBoardFlag(m)) return false;
+    const [, path = m.about ?? "", holder = ""] = String(m.body).match(FLAG_BODY) ?? [];
+    const key = JSON.stringify([Number(m.author), foldPath(String(path)), holder]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 /** A post is sourced when it carries file:line, #id or a URL (D23). */
 const SOURCE = /[\w./\\-]+\.\w+:\d+|#\d+|https?:\/\/\S+/;
 /** The lock wait histogram's upper bounds, the last bin open-ended: < 1m, 1–2m, 2–5m, 5–10m, 10m + (D28). */
@@ -298,6 +316,8 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
         .all(repo) as Row[])
     : [];
   const lockWaitsMs: number[] = [];
+  // a flag repeated for one writer, path and holder counts once (D46)
+  const boardFlags = distinctFlags(messages);
   const racesLost: PlanRunStats["lock"]["racesLost"] = [];
 
   const members: MemberStats[] = people.map((p) => {
@@ -342,9 +362,8 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
 
     const own = messages.filter((m) => Number(m.author) === pid);
     const posts = own.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
-    const flagged = own.filter(isBoardFlag);
-    for (const m of own) {
-      if (m.kind !== "agreement" && !isBoardFlag(m)) continue;
+    const flagged = boardFlags.filter((m) => Number(m.author) === pid);
+    for (const m of [...own.filter((x) => x.kind === "agreement"), ...flagged]) {
       memberMarks.push({
         at: String(m.at),
         what: m.kind === "agreement" ? "agreement" : "flag",
@@ -418,7 +437,7 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
   const addedMidRun = messages.filter((m) => m.kind === "event" && orchestrators.has(Number(m.author)) && /^added \S+: /.test(String(m.body))).length;
 
   // shared files: a path two members of the run held at the same time (D39), its holders in the order they took it;
-  // before the shares record, a path two members claimed, at once or not (D44)
+  // before the shares record, a path two members claimed while both were members, standing in for at once (D44, D46)
   const holdersByPath = new Map<string, { path: string; holders: number[] }>();
   for (const c of claimLog) {
     const key = foldPath(String(c.path));
@@ -430,6 +449,18 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
   const sharersOf = (path: string): Set<number> =>
     new Set(shares.filter((sh) => foldPath(String(sh.path)) === foldPath(path)).flatMap((sh) => [Number(sh.participant), Number(sh.other)]));
   const byId = new Map(people.map((p) => [Number(p.id), p]));
+  // a member's span in the run: its join to its end, else to the run's close
+  const membershipOf = (pid: number): { from: number; to: number } => {
+    const p = byId.get(pid)!;
+    return { from: ms(p.joined_at), to: p.ended_at == null ? runOver : ms(p.ended_at) };
+  };
+  const membersTogether = (a: number, b: number): boolean => {
+    const x = membershipOf(a);
+    const y = membershipOf(b);
+    return x.from < y.to && y.from < x.to;
+  };
+  // before the shares record: the claimers whose membership overlapped another claimer's (D46)
+  const claimersTogether = (claimers: number[]): number[] => claimers.filter((h) => claimers.some((o) => o !== h && membersTogether(h, o)));
   const namesPath = (m: Row, path: string): boolean => {
     if (aboutNames(m.about, path)) return true;
     const body = foldPath(String(m.body));
@@ -445,7 +476,7 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
   let agreedBeforeMerge = 0;
   for (const { path, holders: everyHolder } of holdersByPath.values()) {
     const sharers = sharersOf(path);
-    const holders = sharesRecorded ? everyHolder.filter((h) => sharers.has(h)) : everyHolder;
+    const holders = sharesRecorded ? everyHolder.filter((h) => sharers.has(h)) : claimersTogether(everyHolder);
     if (holders.length < 2) continue;
     // each later holder posted about the path mentioning every earlier one (D41); the file is shared from the first such post
     const tellTimes: number[] = [];
@@ -483,8 +514,10 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
       path,
       holders: holders.map((h) => nameOf(byId.get(h)!)),
       interface: declaredInterface || claimedInterface,
+      told,
       agreement: agreement ? Number(agreement.seq) : null,
-      agreedAfterMs: agreement && sharedAt !== null ? Math.max(0, ms(agreement.at) - sharedAt) : null,
+      // below 0: agreed before the tell (D46)
+      agreedAfterMs: agreement && sharedAt !== null ? ms(agreement.at) - sharedAt : null,
       conflict,
     });
   }
@@ -512,7 +545,7 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
       slices: { merged: mergedSlices, of: sliceCount, addedMidRun, timesMs, estimated: !recorded },
       lock: { waitsMs: lockWaitsMs, racesLost },
       shared: { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge, perFile, estimated: !sharesRecorded },
-      flags: messages.filter(isBoardFlag).length,
+      flags: boardFlags.length,
       conflicts: recorded ? { known, inShared, unknownMerges } : { known: null, inShared: null, unknownMerges: null },
     },
   };
@@ -530,8 +563,8 @@ function skepticOf(db: DatabaseSync, run: RunId, seats: Row[]): Set<number> {
   return subscribed ? seated(String(subscribed.id)) : new Set();
 }
 
-/** A brainstorm run's debate, from its messages in seq order (D4, D23, D29, D30, D33): its block, the skeptic's marks
- *  `endorsed` and `objected` by participant id, and each member's claims without a source by participant id. */
+/** A brainstorm run's debate, from its messages in seq order (D4, D23, D29, D30, D33, D46): its block, each seat's marks
+ *  `endorsed` and the skeptic's `objected` by participant id, and each member's claims without a source by participant id. */
 function debateOf(
   db: DatabaseSync,
   run: RunId,
@@ -548,17 +581,22 @@ function debateOf(
   const spoken = (m: Row): boolean => Number(m.by_board ?? 0) === 0 && (m.kind === "msg" || m.kind === "urgent" || m.kind === "agreement");
   const bySeq = new Map(messages.map((m) => [Number(m.seq), m]));
 
-  // the skeptic's endorsements of agreements on a question; a question's outcome is its first agreement endorsed
-  const endorsedSeqs = new Set<number>();
+  // every seat's endorsements of agreements on a question (D46); the skeptic's, by the seq it endorsed at (D30): a
+  // question's outcome is its first agreement the skeptic endorsed
   const endorsements: { endorsement: Row; question: string }[] = [];
+  const skepticEndorsedAt = new Map<number, number>();
   for (const m of messages) {
-    if (m.kind !== "endorsement" || !skeptic.has(Number(m.author)) || m.endorses == null) continue;
+    if (m.kind !== "endorsement" || m.endorses == null) continue;
     const agreement = bySeq.get(Number(m.endorses));
     const question = agreement && agreement.kind === "agreement" ? questionOf(agreement) : null;
     if (question === null) continue;
     endorsements.push({ endorsement: m, question });
-    endorsedSeqs.add(Number(m.endorses));
+    if (skeptic.has(Number(m.author)) && !skepticEndorsedAt.has(Number(m.endorses))) skepticEndorsedAt.set(Number(m.endorses), Number(m.seq));
   }
+  const endorsedSeqs = new Set(skepticEndorsedAt.keys());
+  const skepticEndorsements = endorsements.filter(({ endorsement }) => skeptic.has(Number(endorsement.author)));
+  /** The skeptic had endorsed the agreement `agreementSeq` before the post at `seq`. */
+  const endorsedBefore = (agreementSeq: number, seq: number): boolean => (skepticEndorsedAt.get(agreementSeq) ?? Infinity) < seq;
   const outcomeOf = new Map<string, Row>();
   for (const m of messages) {
     const q = questionOf(m);
@@ -580,21 +618,23 @@ function debateOf(
     const question = questions.get(q) ?? { id: q, firstPost: String(m.at), outcome: null, exchanges: 0 };
     questions.set(q, question);
     const outcome = outcomeOf.get(q);
-    const upToOutcome = !outcome || Number(m.seq) <= Number(outcome.seq);
-    if (upToOutcome && seatIds.has(author)) question.exchanges = (question.exchanges ?? 0) + 1;
+    // the outcome's own agreement is no exchange (D46)
+    const beforeOutcome = !outcome || Number(m.seq) < Number(outcome.seq);
+    if (beforeOutcome && seatIds.has(author)) question.exchanges = (question.exchanges ?? 0) + 1;
     if (m.kind === "agreement") {
       agreements++;
       lastAgreementOn.set(q, m);
       continue;
     }
-    if (upToOutcome) {
+    if (beforeOutcome) {
       claims++;
       if (SOURCE.test(String(m.body))) sourced++;
       else unsourcedOf.set(author, (unsourcedOf.get(author) ?? 0) + 1);
     }
-    // an objection, inferred: the skeptic speaks on a question after another's agreement it never endorsed (D23)
+    // an objection, inferred: the skeptic speaks on a question while another's latest agreement on it is not yet endorsed
+    // by the skeptic (D23, D46)
     const last = lastAgreementOn.get(q);
-    if (skeptic.has(author) && last && Number(last.author) !== author && !endorsedSeqs.has(Number(last.seq))) {
+    if (skeptic.has(author) && last && Number(last.author) !== author && !endorsedBefore(Number(last.seq), Number(m.seq))) {
       mark(author, { at: String(m.at), what: "objected", seq: Number(m.seq), path: q, note: `objects to #${last.seq}: ${firstLine(String(m.body))}` });
     }
   }
@@ -609,7 +649,7 @@ function debateOf(
     brainstorm: {
       questions: [...questions.values()].sort((a, b) => ms(a.firstPost) - ms(b.firstPost)),
       agreements,
-      endorsed: endorsements.length,
+      endorsed: skepticEndorsements.length,
       claimsWithSource: { n: sourced, of: claims, inferred: true },
     },
     marksOf,
@@ -636,7 +676,12 @@ function withMemberFigures(run: RunStats): RunStats {
   const plan = run.plan && {
     ...run.plan,
     slices: { ...run.plan.slices, estimated: run.plan.slices.estimated ?? false },
-    shared: { ...run.plan.shared, estimated: run.plan.shared.estimated ?? false },
+    shared: {
+      ...run.plan.shared,
+      estimated: run.plan.shared.estimated ?? false,
+      // a summary from before `told` (D46) reads each file told, as its list read it
+      perFile: run.plan.shared.perFile.map((f) => ({ ...f, told: f.told ?? true })),
+    },
   };
   return { ...run, members, ...(plan ? { plan } : {}) };
 }

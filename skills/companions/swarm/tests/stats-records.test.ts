@@ -264,7 +264,8 @@ test("a plan run before the records: slices merged from the members' rows, each 
 test("before shares-since a path claimed by two members is shared, estimated, its agreement before any merge counted; a path one member claimed is not (D44, D45, SL9, SL10)", async () => {
   const { board } = s;
   const { run, m: [a, b] } = planRun(board, "app", ["S1", "S2"]);
-  // held one after the other: a recorded run would not share it, an old one counts it
+  // held one after the other while both were members: a recorded run would not share it, an old one counts it, their
+  // memberships overlapping (D46)
   clockTo(1), board.checkEdit(a, "src/x.ts");
   clockTo(2), board.end(a);
   clockTo(3), board.checkEdit(b, "src/x.ts");
