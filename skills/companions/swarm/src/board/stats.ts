@@ -2,7 +2,8 @@
 // board.ts only, as claims.ts. Reads the store, never git or the CLI. Every figure is nullable
 // (D34): null means not recorded or not computed yet, never 0; a list may be empty. A run with a
 // run_stats row is read whole from it (D20); an open run, or a closed one with none, is computed from
-// the raw rows (D21, D22). The brainstorm block is not computed yet: absent, its totals null.
+// the raw rows (D21, D22). A brainstorm run's debate comes from its messages alone, so a run before the
+// records still carries it (D4, D33).
 import type { DatabaseSync } from "node:sqlite";
 import type { RunId } from "./board.ts";
 import { type Kind, profileOf } from "./kinds.ts";
@@ -43,11 +44,20 @@ export type SharedFile = {
   /** A holder declared it an interface at join, or claimed it as one (D37); null on a summary from before. */
   interface: boolean | null;
 };
+/** A question `D<n>`, from the `about` of the posts and agreements (D4). `outcome`: the first agreement on it the skeptic
+ *  endorsed, at that agreement's time and seq; none, null (D30; no escalation until D26). `exchanges`: the seats' `msg`,
+ *  `urgent` and `agreement` posts about it up to its outcome's agreement included, events not (D33). */
 export type QuestionStats = { id: string /* D<n> */; firstPost: string; outcome: { at: string; seq: number; kind: "agreed" } | null; exchanges: number | null };
 export type BrainstormRunStats = {
+  /** Ordered by first post. */
   questions: QuestionStats[];
+  /** The agreements about a `D<n>`; `endorsed`: the skeptic's endorsements of them. */
   agreements: number | null;
   endorsed: number | null;
+  /** Inferred (D23). A claim: a member's `msg` or `urgent` post about a `D<n>`, up to its outcome. It carries a source when
+   *  its body holds `file:line` (`<name>.<ext>:<digits>`), `#<digits>` or an `http://` / `https://` URL; a source named in
+   *  words reads unsourced, and counts in its author's `unsourced`. An objection (a mark `objected`): the skeptic's
+   *  `msg` or `urgent` post about a `D<n>` after an agreement on it by another member that the skeptic never endorsed. */
   claimsWithSource: { n: number | null; of: number | null; inferred: true };
 };
 export type RunStats = {
@@ -109,6 +119,10 @@ const foldPath = (p: string): string => (CASELESS ? p.toLowerCase() : p);
 /** The settings row the board writes when the analytics records begin (D33). */
 const RECORDS_SINCE = "records-since";
 const ORCHESTRATOR = "orchestrator";
+/** The seat id of a brainstorm's skeptic (D30). */
+const SKEPTIC = "skeptic";
+/** A brainstorm question's `about` (D4). */
+const QUESTION = /^D\d+$/;
 /** A post is sourced when it carries file:line, #id or a URL (D23). */
 const SOURCE = /[\w./\\-]+\.\w+:\d+|#\d+|https?:\/\/\S+/;
 /** The lock wait histogram's upper bounds, the last bin open-ended: < 1m, 1–2m, 2–5m, 5–10m, 10m + (D28). */
@@ -311,7 +325,16 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
     racesLost: recorded ? racesLost.reduce((n, x) => n + (x.lost ?? 0), 0) : null,
     members,
   };
-  // a brainstorm run's own block is not computed yet: listed with its members only
+  if (kind === "brainstorm") {
+    const { brainstorm, marksOf, unsourcedOf } = debateOf(db, id, people.filter((p) => !orchestrators.has(Number(p.id))), messages);
+    members.forEach((m, i) => {
+      const pid = Number(people[i].id);
+      m.marks = [...m.marks, ...(marksOf.get(pid) ?? [])].sort((a, b) => ms(a.at) - ms(b.at));
+      // a brainstorm member's unsourced: its claims without a source (D23, D29)
+      m.unsourced = unsourcedOf.get(pid) ?? 0;
+    });
+    return { ...base, brainstorm };
+  }
   if (kind !== "plan") return base;
 
   // a slice's time: its join to its first merge, else to its end (board D9)
@@ -410,6 +433,105 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
   };
 }
 
+/** The skeptic's participant ids (D30): the seat with id `skeptic`, else the first seat whose row subscribes to `agreement`. */
+function skepticOf(db: DatabaseSync, run: RunId, seats: Row[]): Set<number> {
+  const seated = (slice: string): Set<number> => new Set(seats.filter((p) => String(p.slice) === slice).map((p) => Number(p.id)));
+  const named = seated(SKEPTIC);
+  if (named.size) return named;
+  const rows = db.prepare("SELECT id, on_events FROM slices WHERE run = ? AND on_events IS NOT NULL ORDER BY ord").all(run) as Row[];
+  const subscribesToAgreement = (row: Row): boolean =>
+    (JSON.parse(String(row.on_events)) as string[]).flatMap((e) => e.split(",")).some((e) => e.trim().replace(/^(any|main):/, "") === "agreement");
+  const subscribed = rows.find(subscribesToAgreement);
+  return subscribed ? seated(String(subscribed.id)) : new Set();
+}
+
+/** A brainstorm run's debate, from its messages in seq order (D4, D23, D29, D30, D33): its block, the skeptic's marks
+ *  `endorsed` and `objected` by participant id, and each member's claims without a source by participant id. */
+function debateOf(
+  db: DatabaseSync,
+  run: RunId,
+  seats: Row[],
+  messages: Row[],
+): { brainstorm: BrainstormRunStats; marksOf: Map<number, Mark[]>; unsourcedOf: Map<number, number> } {
+  const skeptic = skepticOf(db, run, seats);
+  const seatIds = new Set(seats.map((p) => Number(p.id)));
+  const questionOf = (m: Row): string | null => {
+    const about = m.about == null ? "" : String(m.about).trim();
+    return QUESTION.test(about) ? about : null;
+  };
+  // what a member says itself: a post or an agreement, never an event or the board's own line
+  const spoken = (m: Row): boolean => Number(m.by_board ?? 0) === 0 && (m.kind === "msg" || m.kind === "urgent" || m.kind === "agreement");
+  const bySeq = new Map(messages.map((m) => [Number(m.seq), m]));
+
+  // the skeptic's endorsements of agreements on a question; a question's outcome is its first agreement endorsed
+  const endorsedSeqs = new Set<number>();
+  const endorsements: { endorsement: Row; question: string }[] = [];
+  for (const m of messages) {
+    if (m.kind !== "endorsement" || !skeptic.has(Number(m.author)) || m.endorses == null) continue;
+    const agreement = bySeq.get(Number(m.endorses));
+    const question = agreement && agreement.kind === "agreement" ? questionOf(agreement) : null;
+    if (question === null) continue;
+    endorsements.push({ endorsement: m, question });
+    endorsedSeqs.add(Number(m.endorses));
+  }
+  const outcomeOf = new Map<string, Row>();
+  for (const m of messages) {
+    const q = questionOf(m);
+    if (q !== null && m.kind === "agreement" && endorsedSeqs.has(Number(m.seq)) && !outcomeOf.has(q)) outcomeOf.set(q, m);
+  }
+
+  const questions = new Map<string, QuestionStats>();
+  const marksOf = new Map<number, Mark[]>();
+  const unsourcedOf = new Map<number, number>();
+  const mark = (pid: number, x: Mark): void => void marksOf.set(pid, [...(marksOf.get(pid) ?? []), x]);
+  const lastAgreementOn = new Map<string, Row>();
+  let agreements = 0;
+  let sourced = 0;
+  let claims = 0;
+  for (const m of messages) {
+    const q = questionOf(m);
+    if (q === null || !spoken(m)) continue;
+    const author = Number(m.author);
+    const question = questions.get(q) ?? { id: q, firstPost: String(m.at), outcome: null, exchanges: 0 };
+    questions.set(q, question);
+    const outcome = outcomeOf.get(q);
+    const upToOutcome = !outcome || Number(m.seq) <= Number(outcome.seq);
+    if (upToOutcome && seatIds.has(author)) question.exchanges = (question.exchanges ?? 0) + 1;
+    if (m.kind === "agreement") {
+      agreements++;
+      lastAgreementOn.set(q, m);
+      continue;
+    }
+    if (upToOutcome) {
+      claims++;
+      if (SOURCE.test(String(m.body))) sourced++;
+      else unsourcedOf.set(author, (unsourcedOf.get(author) ?? 0) + 1);
+    }
+    // an objection, inferred: the skeptic speaks on a question after another's agreement it never endorsed (D23)
+    const last = lastAgreementOn.get(q);
+    if (skeptic.has(author) && last && Number(last.author) !== author && !endorsedSeqs.has(Number(last.seq))) {
+      mark(author, { at: String(m.at), what: "objected", seq: Number(m.seq), path: q, note: `objects to #${last.seq}: ${firstLine(String(m.body))}` });
+    }
+  }
+  for (const { endorsement, question } of endorsements) {
+    mark(Number(endorsement.author), { at: String(endorsement.at), what: "endorsed", seq: Number(endorsement.seq), path: question, note: `endorses #${endorsement.endorses}` });
+  }
+  for (const [q, outcome] of outcomeOf) {
+    const question = questions.get(q);
+    if (question) question.outcome = { at: String(outcome.at), seq: Number(outcome.seq), kind: "agreed" };
+  }
+  return {
+    brainstorm: {
+      questions: [...questions.values()].sort((a, b) => ms(a.firstPost) - ms(b.firstPost)),
+      agreements,
+      endorsed: endorsements.length,
+      claimsWithSource: { n: sourced, of: claims, inferred: true },
+    },
+    marksOf,
+    unsourcedOf,
+  };
+}
+
 /** A run kept: not pruned, or pruned with its summary kept (D21). */
 const KEPT = "(pruned_at IS NULL OR id IN (SELECT run FROM run_stats))";
 
@@ -462,8 +584,7 @@ function totalsOf(runs: RunStats[]): Totals {
       inShared: sumKnown(plans.map((p) => p.conflicts.inShared)),
       unknownMerges: sumKnown(plans.map((p) => p.conflicts.unknownMerges)),
     },
-    // the brainstorm figures are not computed yet (D34)
-    brainstorm: { questionsSettled: null, questions: null, exchangesMedian: null, objectedThenAgreed: null, sourcedShare: null, silentSeats: null },
+    brainstorm: brainstormTotalsOf(runs),
     series: {
       slicesMerged: series((r) => r.plan?.slices.merged ?? null),
       sliceTimeP50: series((r) => (r.plan ? percentile(r.plan.slices.timesMs, 0.5) : null)),
@@ -473,6 +594,28 @@ function totalsOf(runs: RunStats[]): Totals {
       conflicts: series((r) => r.plan?.conflicts.known ?? null),
       silentMembers: series(silentOf),
     },
+  };
+}
+
+/** The brainstorm figures over the scope's brainstorm runs with a debate block; null where none is (D34). */
+function brainstormTotalsOf(runs: RunStats[]): Totals["brainstorm"] {
+  const debated = runs.flatMap((r) => (r.brainstorm ? [{ run: r, debate: r.brainstorm }] : []));
+  const questions = debated.flatMap((d) => d.debate.questions);
+  const settled = questions.filter((q) => q.outcome !== null);
+  // a question objected then agreed: the skeptic objected on it before the agreement that settled it
+  const objectedOf = (r: RunStats, q: QuestionStats): boolean =>
+    q.outcome !== null && r.members.some((m) => m.marks.some((x) => x.what === "objected" && x.path === q.id && x.seq !== undefined && x.seq < q.outcome!.seq));
+  const n = sumKnown(debated.map((d) => d.debate.claimsWithSource.n));
+  const of = sumKnown(debated.map((d) => d.debate.claimsWithSource.of));
+  // the seats (the orchestrator is none) with a silent interval, over the runs whose intervals are recorded
+  const silentSeatsOf = (r: RunStats): number => r.members.filter((m) => m.slice !== ORCHESTRATOR && m.intervals.some((i) => i.what === "silent")).length;
+  return {
+    questionsSettled: debated.length ? settled.length : null,
+    questions: debated.length ? questions.length : null,
+    exchangesMedian: percentile(settled.flatMap((q) => (q.exchanges === null ? [] : [q.exchanges])), 0.5),
+    objectedThenAgreed: debated.length ? debated.reduce((k, d) => k + d.debate.questions.filter((q) => objectedOf(d.run, q)).length, 0) : null,
+    sourcedShare: n === null || !of ? null : n / of,
+    silentSeats: sumKnown(debated.filter((d) => d.run.recorded).map((d) => silentSeatsOf(d.run))),
   };
 }
 
