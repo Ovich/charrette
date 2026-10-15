@@ -277,7 +277,7 @@ test("the first edit of a held file is held, naming the holder and the post that
   assert.match(refusal, /review-tool\/S3/);
   assert.match(refusal, /the page/);
   assert.match(refusal, /`swarm post "@review-tool\/S3 …" --about src\/a\.ts`/);
-  assert.match(refusal, /its holder answers with an agreement on who changes what \(`swarm agree … --about src\/a\.ts`\), and that agreement goes\. Then claim again\.$/);
+  assert.match(refusal, /its holder answers with an agreement on who changes what \(`swarm agree … --about src\/a\.ts`\), and that agreement goes\. Claim again once posted; do not wait for the agreement\.$/);
 });
 
 test("a post about the path mentioning the holder opens it; both then hold it", () => {
@@ -307,6 +307,19 @@ test("a post about the path mentioning no holder does not open it", () => {
   board.post(s5, "@S1 I add isExpired() at the end", { about: "src/a.ts" }); // S1 does not hold it
   board.post(s5, "@S3 about something else", { about: "src/b.ts" });
   assert.equal(board.checkEdit(s5, "src/a.ts").allowed, false);
+});
+
+test("a path held by two opens only once every holder is mentioned, in one post or several", () => {
+  const { run, s5 } = claimed();
+  board.post(s5, "@S3 a helper at the end", { about: "src/a.ts" });
+  board.checkEdit(s5, "src/a.ts");
+  const s1 = board.join({ run: run.id, slice: "S1", doing: "board", files: [], worktree: wt("s1") }).runner;
+  board.post(s1, "@S3 one line in a.ts", { about: "src/a.ts" });
+  const v = board.checkEdit(s1, "src/a.ts");
+  assert.equal(v.allowed, false);
+  assert.match((v as { refusal: string }).refusal, /`swarm post "@review-tool\/S3 @review-tool\/S5 …"/);
+  board.post(s1, "@S5 one line in a.ts", { about: "src/a.ts" });
+  assert.equal(board.checkEdit(s1, "src/a.ts").allowed, true);
 });
 
 test("the notice is given once per runner and path", () => {
@@ -343,7 +356,7 @@ test("merged mentions every other holder of a shared path", () => {
   const { run, s3, s5 } = claimed();
   const s1 = board.join({ run: run.id, slice: "S1", doing: "board", files: [], worktree: wt("s1") }).runner;
   for (const p of [s1, s5]) {
-    board.post(p, "@S3 my part of a.ts", { about: "src/a.ts" });
+    board.post(p, "@S3 @S1 my part of a.ts", { about: "src/a.ts" });
     assert.equal(board.checkEdit(p, "src/a.ts").allowed, true);
   }
   for (const p of [s1, s3, s5]) board.deliver(p);

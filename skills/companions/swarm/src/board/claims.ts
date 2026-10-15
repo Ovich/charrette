@@ -91,8 +91,8 @@ export function claimsOf(deps: ClaimsDeps): Claims {
       if (held.length) return { held, taken: false };
       return { held, taken: hold(p, rel, kind) };
     });
-  /** Whether `p` has posted about `rel` mentioning one of `holders` since that holder claimed it (D41):
-   *  the message's `about` is the path (or its tail), or its body names the path or its file name. */
+  /** Whether `p` has posted about `rel` mentioning every one of `holders` since that holder claimed it (D41),
+   *  in one post or several: the message's `about` is the path (or its tail), or its body names the path or its file name. */
   const hasPostedAbout = (p: Participant, rel: string, holders: ClaimRow[]): boolean => {
     const since = Math.min(...holders.map((h) => h.since));
     const rows = db.prepare("SELECT seq, body, about, mentions FROM messages WHERE repo = ? AND author = ? AND seq > ? AND kind != 'event' AND by_board = 0").all(p.repo, p.id, since) as Row[];
@@ -104,13 +104,10 @@ export function claimsOf(deps: ClaimsDeps): Claims {
       const body = fold(String(r.body));
       return body.includes(f) || body.includes(fold(base));
     };
-    return rows.some((r) => {
-      if (!names(r)) return false;
-      const mentions = JSON.parse(String(r.mentions)) as string[];
-      return holders.some((h) => {
-        const o = participantById(h.participant);
-        return Number(r.seq) > h.since && (mentions.includes(o.name) || mentions.includes(`${o.plan}/*`));
-      });
+    const told = rows.filter(names).map((r) => ({ seq: Number(r.seq), mentions: JSON.parse(String(r.mentions)) as string[] }));
+    return holders.every((h) => {
+      const o = participantById(h.participant);
+      return told.some((r) => r.seq > h.since && (r.mentions.includes(o.name) || r.mentions.includes(`${o.plan}/*`)));
     });
   };
   /** The other holders `me` is told of, once per runner and path (D40). */
@@ -230,7 +227,7 @@ export function claimsOf(deps: ClaimsDeps): Claims {
               refusal:
                 `${rel} is also held by ${who}. You may share it, but first tell ${people.length > 1 ? "them" : "its holder"} what you change in it: ` +
                 `\`swarm post "${at} …" --about ${rel}\`; ${people.length > 1 ? "they answer" : "its holder answers"} with an agreement on who changes what ` +
-                `(\`swarm agree … --about ${rel}\`), and that agreement goes. Then claim again.`,
+                `(\`swarm agree … --about ${rel}\`), and that agreement goes. Claim again once posted; do not wait for the agreement.`,
             };
           }
         }

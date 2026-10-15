@@ -23,12 +23,7 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
 3. **Before each edit, `$S claim <path>`**, and before a command that writes a file (a
    generator, a formatter, a move). `--interface` for a file other slices import. Paths are
    repository-relative (from the current folder when the file exists there); `--new` for a file
-   you are creating. The answer names the path claimed.
-   - Exit 0: edit it. If the answer says `also held by <runner>`, post what you change there:
-     `$S post "@<runner> I change <what> in <where>" --about <path>`.
-   - Exit 3: another runner holds it. Post the message the answer gives, mentioning the holders:
-     the post settles the claim (`claimed <path>, shared with …`); claiming again is optional
-     (*Sharing a file*).
+   you are creating. Read its answer and do what it says (*Claiming a file*).
 4. **The listener ended** (the harness tells you): read its output. The first line is the
    command that re-arms it; the message follows. Act on the message, answer on the thread if it
    asks (`$S post "@<them> …" --about <path>`; a message ending on `swarm agree …` is answered
@@ -81,29 +76,18 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
 
 ## Claiming a file
 
-**`$S claim <path>` before you edit a file, then read its answer:**
-
-| Answer | Exit | What to do |
-|---|---|---|
-| `claimed <path>` | 0 | edit it |
-| `<path> is also held by …`, with the post to make | 3 | post it, then claim again |
-| `claimed <path>, also held by …` | 0 | edit it; its holder works in it too: say what you change |
+**`$S claim <path>` before you edit a file, then do what its answer says.** Exit 0: the file is
+yours to edit, alone or shared. Exit 3: another runner holds it, and the answer gives the post
+to make before claiming again. Claims are the project's, across every run on it.
 
 Nothing stops an edit made without a claim; `end` claims or flags it on the thread, late.
-Claims are the project's, across every run on it: a holder in another run is told by
-mention, and the post the answer gives then names it `@<CODE>·<id>`.
 
 ## Sharing a file
 
-1. **Your first claim of a file another runner holds is held** (exit 3). Post what you change
-   there, `$S post "@<holder> I add <what> to <where in the file>" --about <path>`, then claim
-   again. The holder answers with an agreement.
-2. **The holder answers with an agreement, every time:** a post about a file you hold, from a
-   runner that did not hold it, reaches you ending on the line to run,
-   `$S agree "<who changes what in <path>>" --about <path>`: who touches which part, in what
-   order. A plain post never settles a shared file; one agreement per file does.
-3. **The agreement goes** for you both. To change it, the holder agrees again.
-4. **From then on your claims pass**; you are told once of each other holder.
+**A shared file is settled by one agreement, made by its holder.** A post about a file you
+hold, from a runner that did not hold it, reaches you ending on the `agree` line to run: run
+it, saying who changes which part, in what order. The agreement goes for you both, and
+corrects work already started; to change it, agree again.
 
 **A flag** is a file you wrote without claiming it while another runner holds it, found by
 `merge-lock` or `end` and posted on the thread to you both. Claim before you edit and there is none.

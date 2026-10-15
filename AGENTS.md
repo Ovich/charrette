@@ -49,6 +49,8 @@ file the person was looking for. Refresh the cache with
 
 9. **MUST put a protocol used by more than one kind of work in a skill named for no kind, never in the first kind that needed it.** A plan-named owner reads as plan-only, and the next kind copies it instead.
 
+10. **MUST let a CLI verb's answer carry the next step it asks for, and have the skill say only to read that answer and why.** A step written in both drifts, and the agent follows whichever it read last. The swarm skill's `references/runner.md` names the verbs and their exits; the commands to run next are in their output.
+
 ## aiview
 
 5. **MUST bundle a new runtime dependency into `dist-cli/` through `skills/companions/aiview/build.mjs`, never require `node_modules` at runtime.** An installed plugin has no `node_modules`; a bare import fails only for users. `parse5` and `mermaid` are bundled this way, the checker as its own bundle.

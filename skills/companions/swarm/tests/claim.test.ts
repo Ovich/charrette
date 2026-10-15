@@ -101,7 +101,7 @@ test("claim on a shared path before a post holds it: the holder, its note, the p
     answer(r.stdout),
     `src/a.ts is also held by review-tool/S3 (${nick}: the page). You may share it, but first tell its holder what you change in it: ` +
       '`swarm post "@review-tool/S3 …" --about src/a.ts`; its holder answers with an agreement on who changes what ' +
-      "(`swarm agree … --about src/a.ts`), and that agreement goes. Then claim again.\n",
+      "(`swarm agree … --about src/a.ts`), and that agreement goes. Claim again once posted; do not wait for the agreement.\n",
   );
   // held again until the post is made
   assert.equal(swarm(wtB, "claim", "src/a.ts").status, 3);
