@@ -13,7 +13,7 @@ import { nameHandle, unmatchedMentions } from "../board/mentions.ts";
 import { registerBoardDocument } from "./aiview-document.ts";
 import { unclaimedLines } from "./unclaimed.ts";
 import { git } from "./git.ts";
-import { conflictsOf } from "./conflicts.ts";
+import { conflictsOf, headReflogLength } from "./conflicts.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
@@ -547,7 +547,9 @@ async function main(board: Board): Promise<void> {
       // what the branch wrote without a claim, committed or not, before the lock; a flag informs, never blocks
       const reconciled = p.worktree ? branchChangedIn(p.worktree, onto) : [];
       const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
-      const r = board.lockMerge(p, onto);
+      // where the worktree's HEAD reflog stands: merged replays only a rebase past it (D36)
+      const reflogMark = p.worktree ? (headReflogLength(p.worktree) ?? undefined) : undefined;
+      const r = board.lockMerge(p, onto, reflogMark);
       emit({ runner: p.name, ...r, reconciled, flags }, () => {
         printReconciled(reconciled, flags);
         console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait --mentions for its merged event`);
@@ -558,9 +560,9 @@ async function main(board: Board): Promise<void> {
       const p = caller(board);
       const sha = args.positional[0] ?? fail("merged: which sha?");
       const files = args.list("--files");
-      // what the rebase since the lock's grant met, read before the lock goes (D3, D25); no worktree or no lock: unknown (D33)
+      // what a rebase since the lock's grant met, read before the lock goes (D3, D25, D36); no worktree, no lock or no mark: unknown (D33)
       const lock = board.heldMergeLock(p);
-      const conflicts = p.worktree && lock ? conflictsOf(p.worktree, lock.onto ?? "", lock.grantedAt) : undefined;
+      const conflicts = p.worktree && lock && lock.reflogMark !== null ? conflictsOf(p.worktree, lock.onto ?? "", lock.reflogMark) : undefined;
       const sharers = board.merged(p, sha, files.map((f) => path.resolve(f)), conflicts);
       // the post after a resolved conflict, prompted by the command just run (D63)
       const tell = sharers.map(

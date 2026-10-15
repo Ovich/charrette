@@ -2,10 +2,10 @@
 // branch was rebased after the merge lock was granted. Read-only, in the member's worktree: the
 // reflog gives the head before the rebase and the commit it started onto, and one
 // `merge-tree --write-tree` replays them. Never throws; what git cannot answer is an unknown.
+import type { Conflicts } from "../board/board.ts";
 import { git, gitAnswer } from "./git.ts";
 
-/** Known (`files`, repository-relative, maybe none) or unknown, and why (board D13). */
-export type Conflicts = { files: string[] } | { unknown: "old-git" | "no-reflog" };
+export type { Conflicts } from "../board/board.ts";
 
 /** `merge-tree --write-tree` came with git 2.38. */
 const MERGE_TREE_SINCE: [number, number] = [2, 38];
@@ -20,34 +20,40 @@ function gitHasMergeTree(worktree: string): boolean {
   return major > MERGE_TREE_SINCE[0] || (major === MERGE_TREE_SINCE[0] && minor >= MERGE_TREE_SINCE[1]);
 }
 
-type ReflogEntry = { commit: string; atSeconds: number; subject: string };
+type ReflogEntry = { commit: string; subject: string };
 
 /** HEAD's reflog in the worktree, newest first; null when it cannot be read. */
 function headReflog(worktree: string): ReflogEntry[] | null {
-  const r = gitAnswer(worktree, "reflog", "show", "--date=unix", "--format=%H%x09%gd%x09%gs", "HEAD");
+  const r = gitAnswer(worktree, "reflog", "show", "--format=%H%x09%gs", "HEAD");
   if (r.status !== 0) return null;
-  const entries: ReflogEntry[] = [];
-  for (const line of r.stdout.split(/\r?\n/)) {
-    if (!line) continue;
-    const [commit, selector, ...subject] = line.split("\t");
-    const at = selector?.match(/\{(\d+)\}/);
-    if (!commit || !at) return null;
-    entries.push({ commit, atSeconds: Number(at[1]), subject: subject.join("\t") });
-  }
-  return entries;
+  return r.stdout
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const [commit, ...subject] = line.split("\t");
+      return { commit, subject: subject.join("\t") };
+    });
 }
 
-/** The conflicts of the last rebase in `worktree` since `grantedAt` (ISO, the lock's grant), replayed
- *  against the commit that rebase started onto (D33); `onto`, the lock's branch, stands in only when
- *  that entry names no commit. No rebase since the grant: no conflict (D3). */
-export function conflictsOf(worktree: string, onto: string, grantedAt: string): Conflicts {
+/** How many entries HEAD's reflog holds in the worktree: the mark `merge-lock` keeps with a grant (D36); null when unreadable. */
+export function headReflogLength(worktree: string): number | null {
+  try {
+    return headReflog(worktree)?.length ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The conflicts of the last rebase in `worktree` past `reflogMark` (the reflog's length at the lock's grant, D36),
+ *  replayed against the commit that rebase started onto (D33); `onto`, the lock's branch, stands in only when
+ *  that entry names no commit. No rebase past the mark: no conflict (D3). */
+export function conflictsOf(worktree: string, onto: string, reflogMark: number): Conflicts {
   try {
     if (!gitHasMergeTree(worktree)) return { unknown: "old-git" };
-    const grantedSeconds = Math.floor(Date.parse(grantedAt) / 1000);
     const reflog = headReflog(worktree);
-    if (!reflog || Number.isNaN(grantedSeconds)) return { unknown: "no-reflog" };
-    // newest first: the first start found since the grant is the last rebase
-    const start = reflog.findIndex((e) => e.atSeconds >= grantedSeconds && REBASE_START.test(e.subject));
+    if (!reflog || reflog.length < reflogMark) return { unknown: "no-reflog" };
+    // newest first: the entries past the mark lead the list, and the first start among them is the last rebase
+    const start = reflog.slice(0, reflog.length - reflogMark).findIndex((e) => REBASE_START.test(e.subject));
     if (start < 0) return { files: [] };
     // the entry before the start (older, next in the list) is where HEAD stood: the branch before the rebase
     const before = reflog[start + 1];

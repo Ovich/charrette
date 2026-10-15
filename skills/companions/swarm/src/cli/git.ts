@@ -6,7 +6,8 @@ import { spawnSync } from "node:child_process";
 export type GitAnswer = { status: number | null; stdout: string };
 
 export const gitAnswer = (cwd: string, ...argv: string[]): GitAnswer => {
-  const r = spawnSync("git", argv, { cwd, encoding: "utf8" });
+  // a worktree's whole reflog is read (D36): room past the 1 MB default
+  const r = spawnSync("git", argv, { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   return { status: r.error ? null : r.status, stdout: r.stdout ?? "" };
 };
 

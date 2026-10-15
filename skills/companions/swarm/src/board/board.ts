@@ -9,7 +9,6 @@ import { SQLITE_PATH } from "./home.ts";
 import { nameHandle, parseMentions, planCode } from "./mentions.ts";
 import { claimsOf, type HeldMergeLock } from "./claims.ts";
 import { statsOf, type Stats, type StatsScope } from "./stats.ts";
-import type { Conflicts } from "../cli/conflicts.ts";
 import { type Kind, profileOf } from "./kinds.ts";
 import { type EventName, type Subscription, EVENTS, formatSubscriptions, mentions as mentionsMe, parseSubscriptions as parseOn, wakes } from "./events.ts";
 import { funnyName } from "./names.ts";
@@ -18,7 +17,9 @@ export type RunId = number;
 export type { Kind } from "./kinds.ts";
 export type { EventName, Subscription } from "./events.ts";
 export type { HeldMergeLock } from "./claims.ts";
-export type { Conflicts } from "../cli/conflicts.ts";
+/** What a merge's rebase met, as the board records it: the conflicted files (repository-relative,
+ *  maybe none), or unknown and why (board D13). The CLI's conflicts.ts answers in it. */
+export type Conflicts = { files: string[] } | { unknown: "old-git" | "no-reflog" };
 export type { Stats, StatsScope, Totals, RunStats, MemberStats, PlanRunStats, SharedFile, FileAcrossRuns, Interval, Mark, QuestionStats, BrainstormRunStats } from "./stats.ts";
 /** A seat of a run (D22). `link`: the slice document's URL, opaque to the board (D44). */
 export type SeatSpec = { id: string; title: string; role?: string; blockers: string[]; link?: string | null; on?: string[] };
@@ -238,13 +239,14 @@ export interface Board {
   /** Paths written outside the claim: a free one is claimed, a held one flagged on the thread. */
   reconcileWrites(p: Participant, changed: string[]): Flag[];
   release(p: Participant, path: string): void;
-  lockMerge(p: Participant, onto?: string): { granted: true } | { granted: false; holder: string };
+  /** `reflogMark`: the length of the caller's HEAD reflog at the call, kept with a new grant so `merged` replays only a later rebase (D36). */
+  lockMerge(p: Participant, onto?: string, reflogMark?: number): { granted: true } | { granted: false; holder: string };
   /** Releases the lock; tells whoever holds or declared one of `files` to rebase onto `sha`,
    *  every plan on the repository when one of them is an interface (D26). Returns, for each
    *  merged path, every other runner that holds it, or held it during `p`'s run (D63); once `conflicts` are known,
    *  of a conflicted path only (D5). Records the merge with its conflicts, absent recorded as unknown (D25). */
   merged(p: Participant, sha: string, files: string[], conflicts?: Conflicts): Sharer[];
-  /** The merge lock `p` holds, its grant time and branch, for the CLI to replay the rebase since (D33); null when it holds none. */
+  /** The merge lock `p` holds, its grant time, branch and reflog mark, for the CLI to replay the rebase since (D33, D36); null when it holds none. */
   heldMergeLock(p: Participant): HeldMergeLock | null;
   /** The figures of the scope's runs (D33, D34): one read, no write; a figure not recorded or not computed yet is null, never 0. */
   stats(scope: StatsScope): Stats;
@@ -451,6 +453,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   upkeep("messages", "meta", "meta TEXT");
   // the branch a merge lands in, named by merge-lock --onto (D9)
   upkeep("merge_locks", "onto", "onto TEXT");
+  // the holder's HEAD reflog length at the grant: merged replays only a rebase past it (D36)
+  upkeep("merge_locks", "reflog_mark", "reflog_mark INTEGER");
   upkeep("slices", "link", "link TEXT");
   // what kind of work a run is (D25); a run from before is a plan run
   upkeep("runs", "kind", "kind TEXT NOT NULL DEFAULT 'plan'");
@@ -1183,8 +1187,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       claims.release(gated(live(p), "release"), file);
     },
 
-    lockMerge(p, onto) {
-      return claims.lockMerge(gated(live(p), "merge-lock"), onto);
+    lockMerge(p, onto, reflogMark) {
+      return claims.lockMerge(gated(live(p), "merge-lock"), onto, reflogMark);
     },
 
     merged(p, sha, files, conflicts) {

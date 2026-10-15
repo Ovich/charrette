@@ -2,10 +2,9 @@
 // second module that sees SQL. The Board's verbs of the same names delegate here after the
 // kind gate; behaviour and wording are the board's, moved, not rewritten.
 import type { DatabaseSync } from "node:sqlite";
-import type { Declared, EditAllowed, MergedMeta, EditHeld, Flag, Message, MessageKind, Participant, Sharer } from "./board.ts";
+import type { Conflicts, Declared, EditAllowed, MergedMeta, EditHeld, Flag, Message, MessageKind, Participant, Sharer } from "./board.ts";
 import { type EventName, EVENTS } from "./events.ts";
 import { profileOf } from "./kinds.ts";
-import type { Conflicts } from "../cli/conflicts.ts";
 
 export interface ClaimsDeps {
   db: DatabaseSync;
@@ -27,7 +26,7 @@ export interface Claims {
   reconcileWrites(p: Participant, changed: string[]): Flag[];
   release(p: Participant, file: string): void;
   /** `onto`: the branch the merge lands in, recorded with the lock for the merged event (D9). */
-  lockMerge(p: Participant, onto?: string): { granted: true } | { granted: false; holder: string };
+  lockMerge(p: Participant, onto?: string, reflogMark?: number): { granted: true } | { granted: false; holder: string };
   /** After a refused claim, `m` (by `p`, about the path, mentioning every holder, in it or before it) makes `p` a sharer, as the second claim would (D7). */
   claimByPost(p: Participant, m: Message): PostClaim | null;
   /** The merge lock `p` holds: when it was granted and the branch it lands in (D33); null when `p` holds none. */
@@ -51,8 +50,9 @@ export interface Claims {
 
 /** What a post settled: the claimed path and its other holders' names. */
 export type PostClaim = { path: string; sharedWith: string[] };
-/** `grantedAt` ISO; `onto` null for a lock taken without a branch. */
-export type HeldMergeLock = { grantedAt: string; onto: string | null };
+/** `grantedAt` ISO; `onto` null for a lock taken without a branch; `reflogMark` the holder's HEAD reflog
+ *  length at the grant, null when none was given (D36). */
+export type HeldMergeLock = { grantedAt: string; onto: string | null; reflogMark: number | null };
 
 type Row = Record<string, unknown>;
 type ClaimRow = { participant: number; kind: string; since: number };
@@ -291,7 +291,7 @@ export function claimsOf(deps: ClaimsDeps): Claims {
       });
     },
 
-    lockMerge(me, onto) {
+    lockMerge(me, onto, reflogMark) {
       return transaction(() => {
         const r = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo) as Row | undefined;
         if (r && Number(r.participant) !== me.id && isLive(Number(r.participant))) {
@@ -304,15 +304,18 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         }
         // a new holder: the waiters on the one before are not this one's (D65)
         db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(me.repo);
-        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at, onto) VALUES (?, ?, ?, ?)").run(me.repo, me.id, now(), onto ?? null);
+        // the mark is the grant's: a holder asking again keeps it, as it keeps the grant's time (D36)
+        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at, onto, reflog_mark) VALUES (?, ?, ?, ?, ?)").run(me.repo, me.id, now(), onto ?? null, reflogMark ?? null);
         bump(me.repo);
         return { granted: true as const };
       });
     },
 
     heldMergeLock(me) {
-      const r = db.prepare("SELECT at, onto FROM merge_locks WHERE repo = ? AND participant = ?").get(me.repo, me.id) as Row | undefined;
-      return r ? { grantedAt: String(r.at), onto: r.onto == null ? null : String(r.onto) } : null;
+      const r = db.prepare("SELECT at, onto, reflog_mark FROM merge_locks WHERE repo = ? AND participant = ?").get(me.repo, me.id) as Row | undefined;
+      return r
+        ? { grantedAt: String(r.at), onto: r.onto == null ? null : String(r.onto), reflogMark: r.reflog_mark == null ? null : Number(r.reflog_mark) }
+        : null;
     },
 
     merged(me, sha, files, conflicts) {
