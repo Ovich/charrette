@@ -1,0 +1,56 @@
+import type { SharedFile } from "../../../../../swarm/src/board/snapshot.ts";
+import { formatDuration, NOT_RECORDED } from "../../../lib/board/analytics.ts";
+import { RunnerTag } from "./chips.tsx";
+
+/** What a file's merge met: a conflict, none, or unknown (git older than 2.38, board D13); a run before
+ *  the records has none recorded (D32). */
+function ConflictNote({ conflict, recorded }: { conflict: boolean | null; recorded: boolean }) {
+  if (conflict === true) return <span className="bad"> · conflict at merge</span>;
+  if (conflict === false) return null;
+  return <span className="faint"> · {recorded ? "conflict unknown (git older than 2.38)" : `conflict ${NOT_RECORDED}`}</span>;
+}
+
+/** The files two members held in this run (mockup #677 SharedFilesList): their holders, and whether the
+ *  holders agreed and how long after, or none. */
+export function SharedFilesList({ perFile, recorded }: { perFile: SharedFile[]; recorded: boolean }) {
+  return (
+    <div className="apanel" data-component="SharedFilesList" data-state={perFile.length ? "files" : "none"}>
+      <div className="label">Shared files in this run</div>
+      {perFile.length === 0 ? (
+        <p className="faint">No file was shared in this run.</p>
+      ) : (
+        <div className="tablewrap">
+          <table className="t shared">
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Holders</th>
+                <th>Agreement</th>
+              </tr>
+            </thead>
+            <tbody>
+              {perFile.map((f) => (
+                <tr key={f.path}>
+                  <td className="apath" title={f.path}>
+                    {f.path}
+                  </td>
+                  <td>
+                    <span className="holders">
+                      {f.holders.map((h) => (
+                        <RunnerTag key={h} name={h} />
+                      ))}
+                    </span>
+                  </td>
+                  <td>
+                    {f.agreement === null ? <span className="warn">none</span> : f.agreedAfterMs === null ? "agreed" : `agreed ${formatDuration(f.agreedAfterMs)} after`}
+                    <ConflictNote conflict={f.conflict} recorded={recorded} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

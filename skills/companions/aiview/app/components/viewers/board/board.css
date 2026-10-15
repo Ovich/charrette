@@ -328,3 +328,83 @@
 .board .aempty { padding: 48px 16px; text-align: center; color: var(--muted-foreground); font-size: 13px; }
 .board .aempty .lead { margin: 0 0 6px; color: var(--foreground); font-weight: 500; }
 .board .aempty code { font-family: ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace; background: var(--surface-2); border-radius: 4px; padding: 1px 5px; color: var(--foreground); }
+
+/* SL5: one run's Analytics in its tab (mockup #677, variants run, brun and conv) */
+.board .runhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted-foreground); padding: 10px 0 4px; flex: none; }
+.board .runhead .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.board .runhead .seg button { padding: 4px 11px; font-size: 12.5px; color: var(--muted-foreground); }
+.board .runhead .seg button + button { border-left: 1px solid var(--border); }
+.board .runhead .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.board .runhead .ghost { margin-left: auto; font-size: 12px; color: var(--accent); }
+.board .analytics .kpis.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .board .analytics .kpis.six { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .board .analytics .kpis.six { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* an inferred figure (plan D23): dashed, its rule in its tip */
+.board .kpi.inferred { border-style: dashed; cursor: help; }
+
+.board .chart .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.board .chart .head .label { margin: 0; }
+.board [data-component="RunTimeline"] .legend { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-left: auto; }
+.board [data-component="RunTimeline"] .legend button { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
+.board [data-component="RunTimeline"] .legend button[aria-pressed="false"] { opacity: .4; text-decoration: line-through; }
+.board [data-component="RunTimeline"] .sw { width: 10px; height: 8px; border-radius: 2px; display: inline-block; box-sizing: border-box; }
+.board [data-component="RunTimeline"] .sw-mark, .board [data-component="RunTimeline"] .sw-post { font-weight: 700; }
+.board [data-component="RunTimeline"] .sw-post { color: var(--muted-foreground); }
+.board [data-component="RunTimeline"] > .nr { font-size: 12.5px; padding: 18px 0; text-align: center; }
+.board .chart .scroll { overflow-x: auto; }
+.board .chart .tl { min-width: 760px; position: relative; }
+.board .chart .row { display: grid; grid-template-columns: 190px 1fr; align-items: center; height: 26px; }
+.board [data-component="RunTimeline"] .row[data-lane] { cursor: pointer; }
+.board [data-component="RunTimeline"] .row.lockband { height: 22px; border-bottom: 1px dashed var(--border); margin-bottom: 4px; }
+.board [data-component="RunTimeline"] .row.dim { opacity: .3; }
+.board [data-component="RunTimeline"] .row.hl { background: var(--accent-soft); border-radius: 6px; }
+.board .chart .name { display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; padding-left: 4px; }
+.board .chart .name .t { font-size: 11px; color: var(--muted-foreground); }
+.board [data-component="RunTimeline"] .name .nick { font-size: 11.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board .chart .lane { position: relative; height: 100%; }
+.board .chart .seg { position: absolute; top: 8px; height: 10px; border-radius: 3px; box-sizing: border-box; }
+.board [data-component="RunTimeline"] .lockband .seg { top: 5px; height: 12px; opacity: .8; }
+.board .chart .seg:hover, .board .chart .mk:hover { outline: 2px solid var(--accent); outline-offset: 1px; z-index: 2; }
+.board .s-working, .board .s-agreed { background: color-mix(in srgb, var(--accent) 55%, transparent); }
+.board .s-waiting, .board .s-open { background: repeating-linear-gradient(135deg, var(--amber) 0 3px, color-mix(in srgb, var(--amber) 25%, transparent) 3px 6px); }
+.board .s-merging { background: var(--foreground); }
+.board .s-silent { background: transparent; border: 1.5px dashed var(--faint-foreground); }
+/* an inferred span (board D9, plan D33): reduced opacity, a dashed edge; exact spans stay solid */
+.board .s-working.inferred { opacity: .6; border: 1px dashed var(--accent); }
+.board .s-silent.inferred { opacity: .8; }
+.board [data-component="RunTimeline"] .rule { position: absolute; left: 0; right: 0; top: 12px; height: 1px; background: var(--border); }
+.board [data-component="RunTimeline"] .post { position: absolute; top: 7px; width: 2px; height: 11px; border-radius: 1px; background: var(--muted-foreground); transform: translateX(-1px); }
+.board [data-component="RunTimeline"] .mk { position: absolute; top: 5px; width: 16px; height: 16px; transform: translateX(-8px); display: grid; place-items: center; font-size: 10px; font-weight: 700; line-height: 1; border-radius: 4px; background: var(--background); }
+.board [data-component="RunTimeline"] .mk[role="button"] { cursor: pointer; }
+.board .m-agreement { color: var(--accent); }
+.board [data-component="RunTimeline"] .mk.m-agreement { border: 1.5px solid var(--accent); transform: translateX(-8px) rotate(45deg) scale(.7); }
+.board .m-flag, .board .m-conflict { color: var(--danger); }
+.board .m-race { color: var(--amber); }
+.board .m-endorsed { color: var(--accent); }
+.board .m-objected { color: var(--amber); }
+.board [data-component="RunTimeline"] .mk.inferred { opacity: .75; outline: 1px dashed var(--amber); outline-offset: -1px; }
+.board .chart .axis { display: grid; grid-template-columns: 190px 1fr; margin-top: 4px; }
+.board .chart .ticks { position: relative; height: 16px; border-top: 1px solid var(--border); }
+.board .chart .ticks span { position: absolute; top: 2px; transform: translateX(-50%); font: 10.5px ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace; color: var(--faint-foreground); }
+.board [data-component="RunTimeline"] .grid-line { position: absolute; top: 0; bottom: 20px; width: 1px; background: var(--border); opacity: .6; pointer-events: none; }
+
+.board [data-component="QuestionsChart"] .row, .board [data-component="QuestionsChart"] .axis { grid-template-columns: 90px 1fr 140px; }
+.board [data-component="QuestionsChart"] .qid { font: 11px ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted-foreground); }
+.board [data-component="QuestionsChart"] .dots { position: absolute; top: 9px; display: inline-flex; gap: 2px; }
+.board [data-component="QuestionsChart"] .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted-foreground); }
+.board [data-component="QuestionsChart"] .outcome { font-size: 11.5px; padding-left: 8px; white-space: nowrap; }
+.board [data-component="QuestionsChart"] .outcome .agreed { color: var(--accent); }
+
+/* members and shared files side by side only where both tables fit; else one under the other */
+@media (max-width: 1599px) { .board .grid2.rundetail { grid-template-columns: 1fr; } }
+.board .analytics table.t.members { min-width: 520px; }
+.board .analytics table.t.shared { min-width: 460px; }
+.board .analytics table.t.seats { min-width: 560px; }
+.board [data-component="MembersTable"] tbody tr { cursor: pointer; }
+.board [data-component="MembersTable"] tbody tr.hl { background: var(--accent-soft); }
+.board [data-component="MembersTable"] .nick, .board [data-component="SeatsTable"] .nick { font-size: 11.5px; font-weight: 500; }
+.board [data-component="MembersTable"] .stack { display: inline-flex; gap: 1px; vertical-align: middle; }
+.board [data-component="MembersTable"] .stack i { display: inline-block; height: 8px; border-radius: 2px; box-sizing: border-box; }
+.board [data-component="SharedFilesList"] .holders { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.board [data-component="SharedFilesList"] .apath { word-break: break-all; min-width: 160px; }
+.board [data-component="SharedFilesList"] td:last-child { min-width: 170px; }

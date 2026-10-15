@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { KINDS, PERIODS, toggleKind, type AcrossScope, type Period } from "../../../lib/board/analytics.ts";
+import { KINDS, PERIODS, plural, toggleKind, type AcrossScope, type Period } from "../../../lib/board/analytics.ts";
 
 const GIT_TIP = "merged found no git 2.38 or later for these merges: their conflicts are unknown, not zero. Update git where the members run.";
 
@@ -48,7 +48,7 @@ export function AnalyticsToolbar({
       <span className="right">
         {unknownMerges !== null && unknownMerges > 0 && (
           <span className="warnchip" data-part="git-chip" title={GIT_TIP}>
-            ⚠ git 2.38+ needed · {unknownMerges} merges with conflicts unknown
+            ⚠ git 2.38+ needed · {plural(unknownMerges, "merge")} with conflicts unknown
           </span>
         )}
         <button className="ghost" onClick={copy} disabled={body === null}>

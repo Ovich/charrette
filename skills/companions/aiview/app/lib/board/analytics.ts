@@ -1,7 +1,7 @@
-// The across-runs view's scope as the page's URL keeps it (D31), the `/api/stats` route it asks, and
-// how a figure reads. Formats and selects, never aggregates (D34, D35): a figure the JSON does not
+// The analytics views as the page's URL keeps them (D31): the across-runs view's scope, a run tab's
+// Analytics; the `/api/stats` route each asks, and how a figure and a run's line read. Formats and selects, never aggregates (D34, D35): a figure the JSON does not
 // carry is not drawn here. Pure: no DOM, no fetch.
-import type { Kind } from "../../../../swarm/src/board/snapshot.ts";
+import type { Kind, RunStats, RunSummary, Totals } from "../../../../swarm/src/board/snapshot.ts";
 import type { RunId } from "./view.ts";
 
 /** "all": every run kept, `since` left out (D33). */
@@ -39,15 +39,36 @@ export function readAcross(hash: string): AcrossScope | null {
 }
 
 const ACROSS_KEYS = new Set(["across", "period", "kinds"]);
+const RUN_VIEW_KEYS = new Set(["run", "view"]);
 
-/** The hash with the across view written in (null: taken out), every other field kept: the
- *  document and the pointer stay where they are. Without the leading `#`. */
-export function hashWithAcross(hash: string, scope: AcrossScope | null): string {
+/** The hash with `keys` taken out and `added` put at its end, every other field kept: the document
+ *  and the pointer stay where they are. Without the leading `#`. */
+function hashWith(hash: string, keys: ReadonlySet<string>, added: string[]): string {
   const kept = fieldsOf(hash)
-    .filter(([key]) => !ACROSS_KEYS.has(key))
+    .filter(([key]) => !keys.has(key))
     .map(([key, value]) => (value === null ? key : `${key}=${encodeURIComponent(value)}`));
-  if (scope) kept.push("across=1", `period=${scope.period}`, `kinds=${scope.kinds.join(",")}`);
-  return kept.join("&");
+  return [...kept, ...added].join("&");
+}
+
+/** The hash with the across view written in (null: taken out). */
+export function hashWithAcross(hash: string, scope: AcrossScope | null): string {
+  return hashWith(hash, ACROSS_KEYS, scope ? ["across=1", `period=${scope.period}`, `kinds=${scope.kinds.join(",")}`] : []);
+}
+
+/** A run tab's two views (D31): it opens on the conversation; Analytics is kept in the URL. */
+export type RunView = "conversation" | "analytics";
+
+/** The run whose Analytics the hash opens, `run=13&view=analytics`, or null: a run tab opens on
+ *  its conversation, so only Analytics is written (D31). */
+export function readRunAnalytics(hash: string): RunId | null {
+  const fields = new Map(fieldsOf(hash));
+  const run = Number(fields.get("run"));
+  return fields.get("view") === "analytics" && Number.isInteger(run) && run > 0 ? run : null;
+}
+
+/** The hash with a run's Analytics written in (null: taken out). */
+export function hashWithRunAnalytics(hash: string, run: RunId | null): string {
+  return hashWith(hash, RUN_VIEW_KEYS, run === null ? [] : [`run=${run}`, "view=analytics"]);
 }
 
 /** What a view asks `/api/stats` for: the across view's scope, or one run (its tab's Analytics). */
@@ -95,3 +116,30 @@ export function share(part: number | null, whole: number | null): string | null 
 
 /** A difference of two figures of one object (D35); null when either is unknown. */
 export const less = (from: number | null, minus: number | null): number | null => (from === null || minus === null ? null : from - minus);
+
+/** A count with its noun agreeing in number, "1 run", "2 runs" (plan D38). */
+export const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
+
+/** A share 0–1 the JSON carries, written "89%" (D35). */
+export const percent = (fraction: number): string => `${Math.round(fraction * 100)}%`;
+
+const openOrClosed = (open: boolean): string => (open ? "open" : "closed");
+
+/** A run tab's line under Analytics, from its figures: `plan · run 13 · closed · 9 of 9 slices · 2h 42m`,
+ *  `brainstorm · run 11 · closed · 4 of 5 questions settled · 41m`; "open" while the run is (D33). */
+export function runLine(run: RunStats, totals: Totals): string {
+  const parts = [run.kind, `run ${run.run}`, openOrClosed(run.closedAt === null)];
+  const slices = run.plan?.slices;
+  if (slices && slices.of !== null) parts.push(slices.merged === null ? plural(slices.of, "slice") : `${slices.merged} of ${plural(slices.of, "slice")}`);
+  const { questionsSettled, questions } = totals.brainstorm;
+  if (run.brainstorm && questions !== null) parts.push(`${questionsSettled ?? figure(null)} of ${plural(questions, "question")} settled`);
+  if (run.lengthMs !== null) parts.push(formatDuration(run.lengthMs));
+  return parts.join(" · ");
+}
+
+/** The same line under Conversation, where no figure is asked (D31): what the board's summary carries. */
+export function summaryLine(run: RunSummary): string {
+  const parts = [run.kind, `run ${run.run}`, openOrClosed(run.open)];
+  if (run.of > 0) parts.push(`${run.done} of ${plural(run.of, "slice")}`);
+  return parts.join(" · ");
+}

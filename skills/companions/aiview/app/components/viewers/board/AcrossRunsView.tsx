@@ -4,7 +4,7 @@
 import type { Stats } from "../../../../../swarm/src/board/snapshot.ts";
 import type { RunId } from "../../../lib/board/view.ts";
 import { useStats } from "../../../hooks/useStats.ts";
-import { figure, formatDuration, share, type AcrossScope } from "../../../lib/board/analytics.ts";
+import { figure, formatDuration, plural, share, type AcrossScope } from "../../../lib/board/analytics.ts";
 import { AnalyticsToolbar } from "./AnalyticsToolbar.tsx";
 import { HotFiles } from "./HotFiles.tsx";
 import { KpiTile } from "./KpiTile.tsx";
@@ -25,7 +25,7 @@ function Tiles({ stats }: { stats: Stats }) {
         label="Slices merged"
         value={line(t.slices.merged, String)}
         unit={line(t.slices.of, (n) => `of ${n}`)}
-        delta={line(t.byKind.plan, (n) => `${n} plan runs`)}
+        delta={line(t.byKind.plan, (n) => plural(n, "plan run"))}
         spark={t.series.slicesMerged}
         notRecorded={notRecorded}
       />
@@ -53,7 +53,7 @@ function Tiles({ stats }: { stats: Stats }) {
         label="Flags"
         value={line(t.flags, String)}
         unit="edits outside a claim"
-        delta={line(t.runsWithoutFlag, (n) => `${n} runs clean`)}
+        delta={line(t.runsWithoutFlag, (n) => `${plural(n, "run")} clean`)}
         tone="bad"
         spark={t.series.flags}
         notRecorded={notRecorded}
@@ -89,7 +89,7 @@ export function AcrossRunsView({
   const { stats, body, error } = useStats(repo, scope);
   if (error) return <p className="notice">{error}</p>;
   const empty = stats !== null && stats.runs.length === 0;
-  const note = stats === null ? "" : empty ? "no closed run" : `${figure(stats.totals.runs)} runs · ${figure(stats.totals.members)} members · ${repoName}`;
+  const note = stats === null ? "" : empty ? "no closed run" : `${line(stats.totals.runs, (n) => plural(n, "run")) ?? figure(null)} · ${line(stats.totals.members, (n) => plural(n, "member")) ?? figure(null)} · ${repoName}`;
   return (
     <section className="analytics" data-component="AcrossRunsView" data-state={stats === null ? "loading" : empty ? "empty" : "across"}>
       <AnalyticsToolbar scope={scope} note={note} unknownMerges={stats?.totals.conflicts.unknownMerges ?? null} body={body} onScope={onScope} />

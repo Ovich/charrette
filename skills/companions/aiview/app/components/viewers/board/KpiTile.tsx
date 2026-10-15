@@ -1,4 +1,4 @@
-import { NOT_RECORDED } from "../../../lib/board/analytics.ts";
+import { NOT_RECORDED, plural } from "../../../lib/board/analytics.ts";
 
 export type Tone = "warn" | "bad";
 
@@ -34,7 +34,9 @@ function Sparkline({ points, tone }: { points: (number | null)[]; tone?: Tone })
 }
 
 /** One figure of the scope with its sparkline over runs (mockup #677). `value` null reads "not recorded";
- *  `notRecorded` runs in the scope add "N runs not recorded" (D33). Pressed filtering is later (handoff). */
+ *  `notRecorded` runs in the scope add "N runs not recorded" (D33). One run's tile has no sparkline.
+ *  `inferred`: the rule a figure is inferred by (plan D23), the tile drawn as inferred with the rule as its
+ *  tip. Pressed filtering is later (handoff). */
 export function KpiTile({
   label,
   value,
@@ -42,8 +44,9 @@ export function KpiTile({
   delta,
   tone,
   newRecord,
-  spark,
-  notRecorded,
+  spark = [],
+  notRecorded = null,
+  inferred,
 }: {
   label: string;
   value: string | null;
@@ -51,12 +54,13 @@ export function KpiTile({
   delta?: string | null;
   tone?: Tone;
   newRecord?: boolean;
-  spark: (number | null)[];
-  notRecorded: number | null;
+  spark?: (number | null)[];
+  notRecorded?: number | null;
+  inferred?: string;
 }) {
   const state = value === null ? "not recorded" : notRecorded ? "some not recorded" : "filled";
   return (
-    <div className="kpi" data-component="KpiTile" data-state={state}>
+    <div className={inferred ? "kpi inferred" : "kpi"} data-component="KpiTile" data-state={state} data-tip={inferred}>
       <span className="k">
         {label}
         {newRecord && <span className="newrec">new record</span>}
@@ -70,7 +74,7 @@ export function KpiTile({
         </span>
       )}
       {value !== null && delta && <span className={tone ? `d ${tone}` : "d"}>{delta}</span>}
-      {notRecorded ? <span className="d nr">{notRecorded} runs not recorded</span> : null}
+      {notRecorded ? <span className="d nr">{plural(notRecorded, "run")} not recorded</span> : null}
       <Sparkline points={spark} tone={tone} />
     </div>
   );

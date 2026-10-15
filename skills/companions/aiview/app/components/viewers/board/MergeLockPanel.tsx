@@ -1,5 +1,5 @@
 import type { RunStats, Totals } from "../../../../../swarm/src/board/snapshot.ts";
-import { figure, formatDuration } from "../../../lib/board/analytics.ts";
+import { figure, formatDuration, plural } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";
 
 const BINS = ["< 1m", "1–2m", "2–5m", "5–10m", "10m +"];
@@ -20,14 +20,14 @@ export function MergeLockPanel({ lockWait, runs }: { lockWait: Totals["lockWait"
         <span className="hint">
           {lockWait.merges === null
             ? figure(null)
-            : `${lockWait.merges} merges · p50 ${figure(lockWait.p50Ms, formatDuration)} · p90 ${figure(lockWait.p90Ms, formatDuration)}`}
+            : `${plural(lockWait.merges, "merge")} · p50 ${figure(lockWait.p50Ms, formatDuration)} · p90 ${figure(lockWait.p90Ms, formatDuration)}`}
         </span>
       </div>
       {lockWait.bins.length ? (
         <>
           <div className="hist">
             {lockWait.bins.map((n, i) => (
-              <div key={BINS[i]} className={i >= SLOW_FROM ? "col slow" : "col"} title={`${n} merges`}>
+              <div key={BINS[i]} className={i >= SLOW_FROM ? "col slow" : "col"} title={plural(n, "merge")}>
                 <span>{n}</span>
                 <i style={{ height: `${(n / tallest) * 85}%` }} />
               </div>
