@@ -103,7 +103,15 @@ export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRo
       ...(kinds.length ? { kinds } : {}),
       ...(q.get("closedOnly") === "1" ? { closedOnly: true } : {}),
     };
-    json(res, board.stats(scope));
+    let stats: ReturnType<BoardReader["stats"]>;
+    try {
+      stats = board.stats(scope);
+    } catch (err) {
+      // a run unknown to the named repository is a 404, as an unknown repository is
+      if (scope.run !== undefined && (err as Error).message === `no run ${scope.run}`) return json(res, { error: (err as Error).message }, 404);
+      throw err;
+    }
+    json(res, stats);
   };
 
   const ROUTES = new Map<string, (board: BoardReader, url: URL, res: http.ServerResponse) => void>([
