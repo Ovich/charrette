@@ -132,6 +132,13 @@ const ORCHESTRATOR = "orchestrator";
 const SKEPTIC = "skeptic";
 /** A brainstorm question's `about` (D4). */
 const QUESTION = /^D\d+$/;
+// a flag as the board wrote it before the `event` column (D43): its body, posted by the board (by_board 1)
+const FLAG_BODY = /flag:\s*\S+\s+wrote\s+\S+\s+outside its claim/;
+/** A flag the board posted, from its message (D43): the `flag` event, or a board-written row from before
+ *  the event name with the flag's body. Never the `flags` table, which the release of a claim empties,
+ *  and never a member's own post quoting a flag. */
+const isBoardFlag = (m: Row): boolean =>
+  Number(m.by_board ?? 0) === 1 && (m.event === "flag" || (m.event == null && FLAG_BODY.test(String(m.body))));
 /** A post is sourced when it carries file:line, #id or a URL (D23). */
 const SOURCE = /[\w./\\-]+\.\w+:\d+|#\d+|https?:\/\/\S+/;
 /** The lock wait histogram's upper bounds, the last bin open-ended: < 1m, 1–2m, 2–5m, 5–10m, 10m + (D28). */
@@ -295,9 +302,9 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
 
     const own = messages.filter((m) => Number(m.author) === pid);
     const posts = own.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
-    const flagged = own.filter((m) => m.event === "flag");
+    const flagged = own.filter(isBoardFlag);
     for (const m of own) {
-      if (m.kind !== "agreement" && m.event !== "flag") continue;
+      if (m.kind !== "agreement" && !isBoardFlag(m)) continue;
       memberMarks.push({
         at: String(m.at),
         what: m.kind === "agreement" ? "agreement" : "flag",
@@ -462,7 +469,7 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
       shared: sharesRecorded
         ? { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge, perFile }
         : { files: null, everyHolderTold: null, agreed: null, agreedBeforeMerge: null, perFile: [] },
-      flags: messages.filter((m) => m.event === "flag").length,
+      flags: messages.filter(isBoardFlag).length,
       conflicts: recorded ? { known, inShared, unknownMerges } : { known: null, inShared: null, unknownMerges: null },
     },
   };
@@ -641,7 +648,8 @@ function totalsOf(runs: RunStats[]): Totals {
       sliceTimeP50: series((r) => (r.plan ? percentile(r.plan.slices.timesMs, 0.5) : null)),
       lockWaitP50: series((r) => (r.plan ? percentile(r.plan.lock.waitsMs, 0.5) : null)),
       sharedAgreed: series((r) => r.plan?.shared.agreed ?? null),
-      flags: series((r) => r.plan?.flags ?? null),
+      // flags come from the board's messages, kept for a run before the records too (D43)
+      flags: runs.map((r) => r.plan?.flags ?? null),
       conflicts: series((r) => r.plan?.conflicts.known ?? null),
       silentMembers: series(silentOf),
     },

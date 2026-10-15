@@ -183,10 +183,11 @@ test("`totals` carries the scope's counts and a series point per run, a run with
   assert.equal(out.totals.notRecorded, 1);
   for (const [name, points] of Object.entries(out.totals.series)) {
     assert.equal(points.length, 3, name);
-    assert.equal(points[0], null, `${name}: the unrecorded run is a gap`);
+    // flags are read from the board's messages, kept for a run before the records (D43)
+    if (name !== "flags") assert.equal(points[0], null, `${name}: the unrecorded run is a gap`);
   }
   assert.deepEqual(out.totals.series.slicesMerged.slice(0, 2), [null, 1]);
-  assert.deepEqual(out.totals.series.flags.slice(0, 2), [null, 0]);
+  assert.deepEqual(out.totals.series.flags, [0, 0, null]);
 });
 
 test("`files[].perRun` lists each run's holders and conflict, oldest first, `declaredInterface` counted from interface claims (D33, D37, SL2)", () => {

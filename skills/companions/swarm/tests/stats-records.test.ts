@@ -175,3 +175,62 @@ test("a file claimed, not declared, as an interface reads interface: true from t
   await dropSummary(s.file, run);
   assert.deepEqual(interfaceOf(), [true], "computed live after close");
 });
+
+test("a closed run's flags are the board's flag messages, read after release: the `flag` event, a board-written row from before the event name, never a member's post quoting one (D43, S6.2)", async () => {
+  const { board } = s;
+  /** A plan run where `b` writes a path `a` holds, flagged by the board, and `a` quotes a flag's wording in a post. */
+  const flaggedRun = (group: string): { run: RunId; a: string; b: string; flagSeq: number } => {
+    const { run, m: [a, b] } = planRun(board, group, ["S1", "S2"]);
+    board.checkEdit(a, "src/y.ts");
+    const [flag] = board.reconcileWrites(b, ["src/y.ts"]);
+    board.post(a, `@${b.name} the page reads 'flag: <runner> wrote <path> outside its claim; <holder> holds it'`, { about: "src/view.ts" });
+    board.closeRun(run);
+    return { run, a: a.name, b: b.name, flagSeq: flag.seq };
+  };
+  const flagsOf = (run: RunId) => {
+    const out = board.stats({ repo: REPO, run });
+    const r = out.runs[0];
+    return {
+      recorded: r.recorded,
+      plan: r.plan!.flags,
+      members: r.members.filter((m) => m.slice !== "orchestrator").map((m) => [m.member, m.flags, m.marks.filter((x) => x.what === "flag").length]),
+      total: out.totals.flags,
+      without: out.totals.runsWithoutFlag,
+      series: out.totals.series.flags,
+    };
+  };
+
+  // a recorded run, its summary dropped: computed live once close has released the claims and emptied the flags table
+  clockTo(1);
+  const live = flaggedRun("live");
+  await dropSummary(s.file, live.run);
+  assert.deepEqual(flagsOf(live.run), {
+    recorded: true,
+    plan: 1,
+    members: [
+      [live.a, 0, 0],
+      [live.b, 1, 1],
+    ],
+    total: 1,
+    without: 0,
+    series: [1],
+  });
+
+  // a run before the records, its flag a plain board-written message, as the board wrote one before the event name
+  clockTo(20);
+  const old = flaggedRun("old");
+  await setup(s.file, (db) => void db.prepare("UPDATE messages SET kind = 'msg', event = NULL, run = NULL WHERE seq = ?").run(old.flagSeq));
+  await recordsBeginAt(s.file, at(30));
+  await dropSummary(s.file, old.run);
+  assert.deepEqual(flagsOf(old.run), {
+    recorded: false,
+    plan: 1,
+    members: [
+      [old.a, 0, 0],
+      [old.b, 1, 1],
+    ],
+    total: 1,
+    without: 0,
+    series: [1],
+  });
+});
