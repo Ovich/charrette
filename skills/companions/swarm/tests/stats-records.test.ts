@@ -161,3 +161,17 @@ test("`close` exits 0 with its usual output when the summary fails, and the run 
   assert.notEqual(read.closedAt, null);
   assert.equal(read.plan!.conflicts.known, 1);
 });
+
+test("a file claimed, not declared, as an interface reads interface: true from the stored summary and computed live after close (D37, D42)", async () => {
+  const { board } = s;
+  const { run, m: [a, b] } = planRun(board, "api", ["S1", "S2"]);
+  clockTo(1), board.checkEdit(a, "src/api.ts", { interface: true });
+  clockTo(2), share(board, b, a, "src/api.ts");
+  clockTo(3), board.checkEdit(b, "src/api.ts");
+  clockTo(10), board.closeRun(run);
+  const interfaceOf = (): (boolean | null)[] =>
+    board.stats({ repo: REPO, run }).runs[0].plan!.shared.perFile.filter((f) => f.path === "src/api.ts").map((f) => f.interface);
+  assert.deepEqual(interfaceOf(), [true], "from the stored summary");
+  await dropSummary(s.file, run);
+  assert.deepEqual(interfaceOf(), [true], "computed live after close");
+});
