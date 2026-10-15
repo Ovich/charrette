@@ -1,6 +1,7 @@
-// The project's board as an aiview document (plan D17, D30, D39): `swarm.swarm.json` { url } in
-// aiview's project folder, one per project, no group; its URL names every repository of the
-// project that opened a run. aiview is called as a command, never imported (swarm plan D16, D17).
+// The project's board as an aiview document (plan D17, D30, D39; companions-merge D6):
+// `swarm.swarm.json` { repos } in aiview's project folder, one per project, no group; it names
+// every repository of the project that opened a run. aiview is called as a command, never
+// imported (swarm plan D16, D17).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -26,15 +27,33 @@ const callAiview = (launcher: string, cwd: string, argv: string[]): AiviewResult
 /** The fixed name of the project's board document. */
 export const BOARD_DOCUMENT_FILE = "swarm.swarm.json";
 
-/** The board page's URL for these repositories: `?repo=<key>` once per repository, in order. */
-export const boardUrlFor = (pageUrl: string, repos: string[]): string => {
-  const url = new URL(pageUrl);
-  url.search = "";
-  for (const repo of repos) url.searchParams.append("repo", repo);
-  return url.toString();
+/** The repositories the board document names after an open from `repo`: the file's `repos`
+ *  (or, in a pre-merge `{ url }` file, its `?repo=` values) plus `repo`, in order, once each.
+ *  `current` is the file's text, null when there is none. */
+export const boardReposFor = (current: string | null, repo: string): string[] => {
+  const repos = reposInDocument(current);
+  return repos.includes(repo) ? repos : [...repos, repo];
 };
 
-const reposInUrl = (url: string): string[] => {
+/** The repositories a board document's text names; [] when it names none or cannot be read. */
+function reposInDocument(text: string | null): string[] {
+  if (text === null) return [];
+  let parsed: { repos?: unknown; url?: unknown };
+  try {
+    parsed = JSON.parse(text) as { repos?: unknown; url?: unknown };
+  } catch {
+    return [];
+  }
+  const named = Array.isArray(parsed.repos)
+    ? parsed.repos.filter((r): r is string => typeof r === "string")
+    : typeof parsed.url === "string"
+      ? reposInPreMergeUrl(parsed.url)
+      : [];
+  return [...new Set(named)];
+}
+
+/** A pre-merge document's `{ url }`: its `?repo=` values. */
+const reposInPreMergeUrl = (url: string): string[] => {
   try {
     return new URL(url).searchParams.getAll("repo");
   } catch {
@@ -42,13 +61,16 @@ const reposInUrl = (url: string): string[] => {
   }
 };
 
+/** The document's text for these repositories. */
+const boardDocumentText = (repos: string[]): string => JSON.stringify({ repos }, null, 2) + "\n";
+
 export type BoardDocument =
   | { registered: true; url: string; file: string; retired: string[] } // retired: the files of the per-run documents removed
   | { registered: false; reason: string }; // "aiview not found", "no aiview project for <cwd>", an aiview error
 
 /** Writes or extends the project's swarm document, registers it with no group, retires every
  *  other swarm document of the project. Idempotent: a second call with the same repository changes nothing. */
-export function registerBoardDocument(input: { toolRoot: string; cwd: string; repo: string; pageUrl: string }): BoardDocument {
+export function registerBoardDocument(input: { toolRoot: string; cwd: string; repo: string }): BoardDocument {
   const launcher = aiviewLauncher(input.toolRoot);
   if (!launcher) return { registered: false, reason: "aiview not found" };
   const aiview = (argv: string[]) => callAiview(launcher, input.cwd, argv);
@@ -60,11 +82,12 @@ export function registerBoardDocument(input: { toolRoot: string; cwd: string; re
   const where = aiview(["path", BOARD_DOCUMENT_FILE, "--project", project]);
   if (!where.ok) return { registered: false, reason: where.error };
   const file = (where.out as { path: string }).path;
-  const existing = readBoardUrl(file);
-  const repos = existing === null ? [] : reposInUrl(existing);
-  if (existing === null || !repos.includes(input.repo)) {
+  const existing = readDocumentText(file);
+  // the same text, the file untouched; a pre-merge { url } file is rewritten as { repos }
+  const text = boardDocumentText(boardReposFor(existing, input.repo));
+  if (text !== existing) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ url: boardUrlFor(input.pageUrl, [...repos, input.repo]) }, null, 2) + "\n");
+    fs.writeFileSync(file, text);
   }
   const opened = aiview(existing === null ? ["open", file, "--kind", "swarm"] : ["open", file]);
   if (!opened.ok) return { registered: false, reason: opened.error };
@@ -73,11 +96,10 @@ export function registerBoardDocument(input: { toolRoot: string; cwd: string; re
   return { registered: true, url: (opened.out as { url: string }).url, file, retired: retired.files };
 }
 
-/** The board URL the document holds, or null when there is no readable document. */
-function readBoardUrl(file: string): string | null {
+/** The document's text, or null when there is none. */
+function readDocumentText(file: string): string | null {
   try {
-    const url = (JSON.parse(fs.readFileSync(file, "utf8")) as { url?: unknown }).url;
-    return typeof url === "string" ? url : null;
+    return fs.readFileSync(file, "utf8");
   } catch {
     return null;
   }

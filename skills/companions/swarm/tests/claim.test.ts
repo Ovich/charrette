@@ -8,7 +8,6 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openBoard } from "../src/board/board.ts";
-import { freePort, stopServer } from "./support/page-server.ts";
 
 const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "cli", "index.ts");
 
@@ -16,10 +15,8 @@ let home: string;
 let repo: string;
 let wtA: string;
 let wtB: string;
-let port: number;
 
-// SWARM_PORT: `open` starts the page's server; each test on a port of its own.
-const env = () => ({ ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home, SWARM_PORT: String(port) });
+const env = () => ({ ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home });
 const swarm = (cwd: string, ...argv: string[]) => spawnSync(process.execPath, [CLI, ...argv], { cwd, encoding: "utf8", env: env() });
 const cli = (cwd: string, ...argv: string[]): string => {
   const r = swarm(cwd, ...argv);
@@ -60,8 +57,7 @@ const running = (): string => {
   return s3.nick;
 };
 
-beforeEach(async () => {
-  port = await freePort();
+beforeEach(() => {
   home = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-claim-"));
   repo = path.join(home, "repo");
   fs.mkdirSync(path.join(repo, "src"), { recursive: true });
@@ -77,7 +73,6 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-  stopServer(home);
   for (let i = 0; ; i++) {
     try {
       fs.rmSync(home, { recursive: true, force: true });

@@ -1,17 +1,16 @@
 // CLI dispatch — the agent-facing surface of the board. Human output is short lines an
 // agent reads; --json prints the same data as one object; errors go to stderr, exit 1.
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { openBoard, type Board, type Declared, type Delivery, type Flag, type Kind, type Message, type Participant, type RosterEntry, type SliceSpec, type SliceState } from "../board/board.ts";
 import { profileOf } from "../board/kinds.ts";
 import { EVENTS, eventOf, formatSubscriptions, parseSubscriptions, type Subscription } from "../board/events.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
-import { portFrom, PORT_FILE, readServerStatus } from "../server/state.ts";
 import { parseArgs } from "./args.ts";
 import { fullText, seqLine } from "./format.ts";
 import { nameHandle, unmatchedMentions } from "../board/mentions.ts";
-import { boardUrlFor, registerBoardDocument } from "./aiview-document.ts";
+import { registerBoardDocument } from "./aiview-document.ts";
 import { unclaimedLines } from "./unclaimed.ts";
 
 const args = parseArgs(process.argv.slice(2));
@@ -39,8 +38,7 @@ const USAGE = [
   "          # --mentions: only a mention of you, an urgent post or an event you subscribed to ends it; the rest stays for deliver",
   "  roster  [--repo <path>]",
   "  end     [--as <member>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
-  "  serve   [--port <p>] [--detach]                 # the run pages aiview frames, on :4322 (SWARM_PORT)",
-  "  status                                                          # data home, the page's server, open runs",
+  "  status                                                          # data home, open runs",
   "  config  retention [<days>]                                      # prints, or sets then prints, how many days closed runs and main's talk are kept",
   `events: ${Object.keys(EVENTS).join(", ")}; any:<event> for one posted in any run`,
   "a member is <group>/<seat>, the orchestrator <group>/orchestrator; without --as, the runner joined from this worktree",
@@ -121,38 +119,6 @@ const printReconciled = (reconciled: string[], flags: Flag[]): void => {
   for (const f of flags) console.log(`#${f.seq} flagged: you wrote ${f.path} outside your claim; ${f.holder} holds it. Settle it with @${f.holder} on the thread.`);
 };
 
-/** Starts the page's server detached and waits for its port file (aiview's shape, copied).
- *  The port it listens on, or null when it did not come up. */
-function spawnDetachedServer(port: number): number | null {
-  try {
-    fs.rmSync(PORT_FILE, { force: true });
-  } catch {}
-  // re-invoke the current entry: swarm.mjs in real use, the TS source under test
-  const child = spawn(process.execPath, [process.argv[1], "serve", "--port", String(port)], {
-    detached: true,
-    stdio: "ignore",
-    cwd: DATA_ROOT,
-  });
-  child.unref();
-  const t0 = Date.now();
-  for (;;) {
-    const st = readServerStatus();
-    if (st.running && st.port !== null) return st.port;
-    if (Date.now() - t0 > 10_000) return null;
-    // a synchronous CLI: a short blocking poll
-    spawnSync(process.execPath, ["-e", "setTimeout(()=>{},120)"]);
-  }
-}
-
-/** The running page server's port, starting one when none runs; null when it would not start. */
-function ensureServer(): number | null {
-  const st = readServerStatus();
-  if (st.running && st.port !== null) return st.port;
-  fs.mkdirSync(DATA_ROOT, { recursive: true });
-  return spawnDetachedServer(portFrom(args.flag("--port")));
-}
-
-const pageUrl = (port: number): string => `http://localhost:${port}/`;
 /** The tool's folder (swarm.mjs's), the aiview skill beside it. */
 const toolRoot = (): string => process.env.SWARM_ROOT ?? path.dirname(path.resolve(process.argv[1]));
 
@@ -302,7 +268,7 @@ function boardUpkeep(board: Board): void {
     console.error(`swarm: upkeep failed: ${(e as Error).message}`);
   }
 }
-const UPKEEP_EVERY_MS = 60 * 60 * 1000;
+
 /** `open`'s kind and group: `--plan <slug>` is `--kind plan --group <slug>` (D22). */
 function openKindAndGroup(): { kind: Kind; group: string } {
   const raw = args.flag("--kind") ?? "plan";
@@ -375,19 +341,15 @@ async function main(board: Board): Promise<void> {
       const plan = group;
       const seatsFile = args.flag("--seats") ?? args.flag("--slices") ?? fail(`open: --seats <file.json> is required (or --slices)\n${USAGE}`);
       const run = board.openRun({ repo: repoOf(process.cwd()), kind, group, title: need("--title"), link: args.flag("--link") ?? null, seats: readSlices(seatsFile) });
-      // the person watches the run on the page: start it when none runs (US1, US6)
-      const port = ensureServer();
-      const page = port === null ? null : pageUrl(port);
-      if (page === null) {
-        console.error(`swarm: the page did not start (port ${portFrom(args.flag("--port"))} may be in use; swarm serve --detach --port <n>). The run is open.`);
+      // the person watches the project's board in aiview, pinned first (plan D17, D30, D39)
+      const doc = registerBoardDocument({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run.repo });
+      if (!doc.registered) {
+        // the run is open all the same; swarm has no page of its own (companions-merge D13)
+        console.error(`swarm: ${doc.reason}: the run is open; its board is read in aiview once aiview is installed and knows this project`);
         emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url: null }, String(run.id));
         break;
       }
-      // the person watches the project's board in aiview, pinned first (plan D17, D30, D39)
-      const doc = registerBoardDocument({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run.repo, pageUrl: page });
-      if (!doc.registered) console.error(`swarm: ${doc.reason}: open the URL`);
-      const url = doc.registered ? doc.url : boardUrlFor(page, [run.repo]);
-      emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url }, `${run.id}\n${url}`);
+      emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url: doc.url }, `${run.id}\n${doc.url}`);
       break;
     }
     case "slice": {
@@ -615,16 +577,12 @@ async function main(board: Board): Promise<void> {
     }
     case "status": {
       const runs = board.runs();
-      const server = readServerStatus();
       // each member's worktree, null for a seat or an orchestrator (D64)
       const membersOf = (r: (typeof runs)[number]) => board.roster(r.repo).filter((m) => m.run === r.id).map((m) => ({ name: m.name, nick: m.nick, worktree: m.worktree }));
       const open = runs.map((r) => ({ run: r.id, kind: r.kind, group: r.plan, title: r.title, members: membersOf(r) }));
-      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, runs: runs.length, open }, () => {
+      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, runs: runs.length, open }, () => {
         console.log(`home    ${DATA_ROOT}`);
         console.log(`sqlite  ${SQLITE_PATH}`);
-        console.log(
-          server.running ? `page    running  pid ${server.pid}  ${pageUrl(server.port as number)}` : `page    not running${server.stale ? " (stale pid file)" : ""}: swarm serve --detach`,
-        );
         if (!runs.length) console.log("no open run");
         for (const r of runs) {
           console.log(`run ${r.id}  ${r.kind}  ${r.plan}  ${r.title}  ${r.repo}`);
@@ -647,24 +605,10 @@ if (args.verb === "--help") {
   console.log(args.positional[0] === "code" ? CODE_USAGE : USAGE);
   process.exit(0);
 }
-if (args.verb === "serve" && args.has("--detach")) {
-  const st = readServerStatus();
-  const port = st.running && st.port !== null ? st.port : (fs.mkdirSync(DATA_ROOT, { recursive: true }), spawnDetachedServer(portFrom(args.flag("--port"))));
-  if (port === null) {
-    console.error(`swarm: the server did not come up within 10 s (port ${portFrom(args.flag("--port"))} may be in use; retry with --port <n>)`);
-    process.exitCode = 1;
-  } else {
-    const server = readServerStatus();
-    emit({ server, url: pageUrl(port), already: st.running }, st.running ? `swarm's page already running on ${pageUrl(port)} (pid ${server.pid})` : `swarm's page up on ${pageUrl(port)}`);
-  }
-} else if (args.verb === "serve") {
-  // the server holds its Board for its whole life
-  const { startServer } = await import("../server/index.ts");
-  const board = await openBoard();
-  boardUpkeep(board);
-  // hourly while the server runs (D45); never what keeps the process alive
-  setInterval(() => boardUpkeep(board), UPKEEP_EVERY_MS).unref();
-  startServer(board, { port: portFrom(args.flag("--port")) });
+if (args.verb === "serve") {
+  // swarm has no page and no server: aiview reads the board (companions-merge D4)
+  console.error(`swarm: unknown verb serve: swarm has no page; the board is read in aiview\n${USAGE}`);
+  process.exit(2);
 } else {
   const board = await openBoard();
   try {

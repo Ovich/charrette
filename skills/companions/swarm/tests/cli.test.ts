@@ -6,18 +6,15 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openBoard } from "../src/board/board.ts";
-import { freePort, stopServer } from "./support/page-server.ts";
 
 const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "cli", "index.ts");
 
 let toolRoot: string;
 let repo: string;
-let port: number;
 
 // SWARM_ROOT = where the code would be; CHARRETTE_HOME = where the data goes.
 // The suite points both at one temp dir so a run leaves nothing in the real home.
-// SWARM_PORT: `open` starts the page's server; each test on a port of its own.
-const env = () => ({ ...process.env, SWARM_ROOT: toolRoot, CHARRETTE_HOME: toolRoot, SWARM_PORT: String(port) });
+const env = () => ({ ...process.env, SWARM_ROOT: toolRoot, CHARRETTE_HOME: toolRoot });
 
 const runIn = (cwd: string, ...argv: string[]) => spawnSync(process.execPath, [CLI, ...argv], { cwd, encoding: "utf8", env: env() });
 const run = (...argv: string[]) => runIn(repo, ...argv);
@@ -37,11 +34,10 @@ const openRun = (plan = "review-tool", cwd = repo): number => {
   fs.writeFileSync(slices, SLICES);
   const r = runIn(cwd, "open", "--plan", plan, "--title", "A plan", "--slices", slices);
   assert.equal(r.status, 0, r.stderr);
-  return Number(r.stdout.split("\n")[0].trim()); // the run id, then the page's URL
+  return Number(r.stdout.split("\n")[0].trim()); // the run id, then the board's URL when aiview registered it
 };
 
-beforeEach(async () => {
-  port = await freePort();
+beforeEach(() => {
   toolRoot = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-cli-"));
   repo = path.join(toolRoot, "repo");
   fs.mkdirSync(repo);
@@ -56,7 +52,6 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-  stopServer(toolRoot);
   // Windows may briefly hold handles of a just-ended child; a leaked temp dir
   // must not fail the suite.
   for (let i = 0; ; i++) {
@@ -128,7 +123,8 @@ else process.exit(1);
 
 const aiviewCalls = (log: string): string[][] => fs.readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
 const boardFile = () => path.join(toolRoot, "docs", "swarm.swarm.json");
-const boardRepos = (): string[] => new URL((JSON.parse(fs.readFileSync(boardFile(), "utf8")) as { url: string }).url).searchParams.getAll("repo");
+const boardDocument = (): unknown => JSON.parse(fs.readFileSync(boardFile(), "utf8"));
+const boardRepos = (): string[] => (boardDocument() as { repos: string[] }).repos;
 const indexed = (index: string) => JSON.parse(fs.readFileSync(index, "utf8")) as { file_path: string; kind: string }[];
 
 const openWith = (aiview: string, cwd = repo) => {
@@ -141,15 +137,13 @@ const openWith = (aiview: string, cwd = repo) => {
   });
 };
 
-test("the first open writes the project's board document with ?repo= and registers it with no group (D17, D30)", () => {
+test("open writes repos and registers the board: the project's board document { repos }, registered with no group (D17, D30, D6)", () => {
   const { launcher, log } = fakeAiview();
   const r = openWith(launcher);
   assert.equal(r.status, 0, r.stderr);
   const out = JSON.parse(r.stdout) as { url: string; repo: string };
   assert.equal(out.url, "http://localhost:4321/#doc=7");
-  const url = new URL((JSON.parse(fs.readFileSync(boardFile(), "utf8")) as { url: string }).url);
-  assert.equal(`${url.origin}${url.pathname}`, `http://localhost:${port}/`);
-  assert.deepEqual(boardRepos(), [out.repo]);
+  assert.deepEqual(boardDocument(), { repos: [out.repo] });
   const calls = aiviewCalls(log);
   assert.deepEqual(calls.find((c) => c[0] === "path"), ["path", "swarm.swarm.json", "--project", "p", "--json"]);
   assert.deepEqual(calls.find((c) => c[0] === "open"), ["open", boardFile(), "--kind", "swarm", "--json"]);
@@ -169,7 +163,7 @@ test("a second open in the same repository writes nothing new and prints the sam
   assert.equal(indexed(index).length, 1);
 });
 
-test("an open in a second repository of the project adds its repo to the board's URL; still one document (D39)", () => {
+test("a second repository is added to repos once; still one document (D39, D6)", () => {
   const { launcher, index } = fakeAiview();
   const first = JSON.parse(openWith(launcher).stdout) as { url: string; repo: string };
   const other = path.join(toolRoot, "other");
@@ -182,7 +176,30 @@ test("an open in a second repository of the project adds its repo to the board's
   assert.notEqual(second.repo, first.repo);
   assert.equal(second.url, first.url);
   assert.deepEqual(boardRepos(), [first.repo, second.repo]);
+  // once: a further open from either repository names neither again
+  assert.equal(openWith(launcher, other).status, 0);
+  assert.equal(openWith(launcher).status, 0);
+  assert.deepEqual(boardRepos(), [first.repo, second.repo]);
   assert.equal(indexed(index).length, 1);
+});
+
+test("a pre-merge url file is rewritten as repos, its ?repo= values kept first (D6)", () => {
+  const { launcher, log } = fakeAiview();
+  const earlier = path.join(toolRoot, "earlier-repo");
+  fs.mkdirSync(path.join(toolRoot, "docs"), { recursive: true });
+  const old = new URL("http://localhost:4322/");
+  old.searchParams.append("repo", earlier);
+  fs.writeFileSync(boardFile(), JSON.stringify({ url: old.toString() }, null, 2) + "\n");
+  const r = openWith(launcher);
+  assert.equal(r.status, 0, r.stderr);
+  const out = JSON.parse(r.stdout) as { repo: string };
+  assert.deepEqual(boardDocument(), { repos: [earlier, out.repo] });
+  // an existing file is registered again without a kind, as before
+  assert.deepEqual(aiviewCalls(log).find((c) => c[0] === "open"), ["open", boardFile(), "--json"]);
+  // a pre-merge file already naming this repository is rewritten all the same
+  fs.writeFileSync(boardFile(), JSON.stringify({ url: `http://localhost:4322/?repo=${encodeURIComponent(out.repo)}` }) + "\n");
+  assert.equal(openWith(launcher).status, 0);
+  assert.deepEqual(boardDocument(), { repos: [out.repo] });
 });
 
 test("open retires the per-run swarm documents of earlier runs from the index", () => {
@@ -196,13 +213,25 @@ test("open retires the per-run swarm documents of earlier runs from the index", 
   assert.deepEqual(indexed(index).map((d) => d.file_path).sort(), [plan, boardFile()].sort());
 });
 
-test("open without aiview prints the board's URL and says why", () => {
+test("open without aiview opens the run and exits 0, printing no URL and saying the board is read in aiview once installed (D13)", async () => {
   const r = openWith(path.join(toolRoot, "none.mjs"));
   assert.equal(r.status, 0, r.stderr);
-  const out = JSON.parse(r.stdout) as { url: string; repo: string };
-  assert.equal(new URL(out.url).origin, `http://localhost:${port}`);
-  assert.deepEqual(new URL(out.url).searchParams.getAll("repo"), [out.repo]);
-  assert.match(r.stderr, /aiview not found: open the URL/);
+  const out = JSON.parse(r.stdout) as { run: number; url: string | null };
+  assert.equal(out.url, null);
+  assert.match(r.stderr, /aiview not found: the run is open; its board is read in aiview once aiview is installed/);
+  assert.doesNotMatch(r.stderr + r.stdout, /https?:\/\//);
+  const slices = path.join(toolRoot, "s.json");
+  const text = runIn(repo, "open", "--plan", "other", "--title", "T", "--slices", slices);
+  assert.equal(text.status, 0, text.stderr);
+  assert.match(text.stdout, /^\d+\n$/, "the run id alone");
+  const board = await openBoard(path.join(toolRoot, "swarm.sqlite"));
+  try {
+    assert.deepEqual(board.runs().map((x) => x.id).sort(), [out.run, Number(text.stdout.trim())].sort());
+  } finally {
+    board.close();
+  }
+  assert.equal(fs.existsSync(path.join(toolRoot, "swarm.pid")), false, "no server started");
+  assert.equal(fs.existsSync(path.join(toolRoot, "swarm.port")), false, "no server started");
 });
 
 test("the roster shows a runner's funny name beside it; open keeps the links (D43, D44)", async () => {
@@ -516,55 +545,32 @@ test("the launcher has no hook verb: usage, exit 1, and the usage never names a 
   }
 });
 
-// ── the page's server (Slice 3) ──────────────────────────────────────────────────
+// ── no page, no server (companions-merge D4) ─────────────────────────────────────
 
-const status = () => JSON.parse(run("status", "--json").stdout);
-
-test("serve --detach starts the server, status reports it, a second reports the one running", () => {
-  assert.deepEqual(status().server, { running: false, pid: null, port: null, stale: false });
-  const first = run("serve", "--detach", "--json");
-  assert.equal(first.status, 0, first.stderr);
-  const up = JSON.parse(first.stdout);
-  assert.equal(up.server.running, true);
-  assert.equal(up.server.port, port);
-  assert.equal(up.url, `http://localhost:${port}/`);
-  assert.equal(fs.readFileSync(path.join(toolRoot, "swarm.port"), "utf8"), String(port));
-  assert.equal(Number(fs.readFileSync(path.join(toolRoot, "swarm.pid"), "utf8")), up.server.pid);
-
-  const st = status();
-  assert.equal(st.server.running, true);
-  assert.equal(st.server.pid, up.server.pid);
-  assert.equal(st.runs, 0);
-
-  const second = run("serve", "--detach");
-  assert.equal(second.status, 0, second.stderr);
-  assert.match(second.stdout, new RegExp(`already running on http://localhost:${port}/ \\(pid ${up.server.pid}\\)`));
-  assert.equal(status().server.pid, up.server.pid, "no second server");
+test("serve is an unknown verb: exit 2, and --help lists no serve", () => {
+  for (const argv of [["serve"], ["serve", "--detach"], ["serve", "--detach", "--port", "4322", "--json"]]) {
+    const r = run(...argv);
+    assert.equal(r.status, 2, argv.join(" "));
+    assert.match(r.stderr, /unknown verb serve/);
+    assert.equal(r.stdout, "");
+  }
+  assert.equal(fs.existsSync(path.join(toolRoot, "swarm.pid")), false, "no server started");
+  for (const help of [run("--help"), run("--help", "code")]) assert.doesNotMatch(help.stdout, /\bserve\b/);
 });
 
-test("serve --detach --port takes the port asked for", async () => {
-  const other = await freePort();
-  const r = run("serve", "--detach", "--port", String(other), "--json");
-  assert.equal(r.status, 0, r.stderr);
-  assert.equal(JSON.parse(r.stdout).server.port, other);
-});
-
-test("open starts the server when none runs and prints the page's URL", async () => {
-  const slices = path.join(toolRoot, "s.json");
-  fs.writeFileSync(slices, SLICES);
-  const r = run("open", "--plan", "review-tool", "--title", "T", "--slices", slices);
-  assert.equal(r.status, 0, r.stderr);
-  const [id, url] = r.stdout.trim().split("\n");
-  assert.ok(Number(id) > 0);
-  assert.equal(new URL(url).origin + new URL(url).pathname, `http://localhost:${port}/`);
-  assert.equal(new URL(url).searchParams.getAll("repo").length, 1);
-  assert.equal(status().server.running, true);
-  const body = (await (await fetch(`http://127.0.0.1:${port}/api/run?id=${id}`)).json()) as { snapshot: { runs: { run: number }[] } };
-  assert.ok(body.snapshot.runs.some((x) => x.run === Number(id)));
-  // a second run reuses the server
-  const again = run("open", "--plan", "swarm", "--title", "T", "--slices", slices, "--json");
-  const second = JSON.parse(again.stdout);
-  assert.deepEqual(new URL(second.url).searchParams.getAll("repo"), [second.repo]);
+test("status has no server: the data home, the store and the open runs", () => {
+  const empty = run("status", "--json");
+  assert.equal(empty.status, 0, empty.stderr);
+  assert.deepEqual(Object.keys(JSON.parse(empty.stdout)).sort(), ["home", "open", "runs", "sqlite"]);
+  const id = openRun();
+  const s = JSON.parse(run("status", "--json").stdout);
+  assert.deepEqual(Object.keys(s).sort(), ["home", "open", "runs", "sqlite"]);
+  assert.equal(s.home, toolRoot);
+  assert.equal(s.runs, 1);
+  const text = run("status").stdout;
+  assert.match(text, new RegExp(`^run ${id} `, "m"));
+  assert.doesNotMatch(text, /^page /m);
+  assert.doesNotMatch(text, /serve|localhost/);
 });
 
 // The retention setting (D32): read, set, refuse; prune uses what was set.

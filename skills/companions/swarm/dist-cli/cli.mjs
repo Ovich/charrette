@@ -1,239 +1,17 @@
-var __defProp = Object.defineProperty;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __esm = (fn, res, err) => function __init() {
-  if (err) throw err[0];
-  try {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-  } catch (e) {
-    throw err = [e], e;
-  }
-};
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
+// src/cli/index.ts
+import { spawnSync as spawnSync2 } from "node:child_process";
+import fs3 from "node:fs";
+import path4 from "node:path";
+
+// src/board/board.ts
+import fs from "node:fs";
+import path2 from "node:path";
 
 // src/board/home.ts
 import os from "node:os";
 import path from "node:path";
-var DATA_ROOT, SQLITE_PATH;
-var init_home = __esm({
-  "src/board/home.ts"() {
-    "use strict";
-    DATA_ROOT = process.env.CHARRETTE_HOME ? path.resolve(process.env.CHARRETTE_HOME) : path.join(os.homedir(), "charrette_appdata");
-    SQLITE_PATH = path.join(DATA_ROOT, "swarm.sqlite");
-  }
-});
-
-// src/server/state.ts
-import fs2 from "node:fs";
-import path3 from "node:path";
-function writeServerFiles(port) {
-  fs2.mkdirSync(DATA_ROOT, { recursive: true });
-  fs2.writeFileSync(PID_FILE, String(process.pid));
-  fs2.writeFileSync(PORT_FILE, String(port));
-}
-function clearServerFiles() {
-  if (readInt(PID_FILE) !== process.pid) return;
-  try {
-    fs2.rmSync(PID_FILE, { force: true });
-    fs2.rmSync(PORT_FILE, { force: true });
-  } catch {
-  }
-}
-function readServerStatus() {
-  const pid = readInt(PID_FILE);
-  const port = readInt(PORT_FILE);
-  if (pid === null || port === null) return { running: false, pid: null, port: null, stale: pid !== null || port !== null };
-  if (!alive(pid)) return { running: false, pid, port, stale: true };
-  return { running: true, pid, port, stale: false };
-}
-var PID_FILE, PORT_FILE, DEFAULT_PORT, readInt, alive, portFrom;
-var init_state = __esm({
-  "src/server/state.ts"() {
-    "use strict";
-    init_home();
-    PID_FILE = path3.join(DATA_ROOT, "swarm.pid");
-    PORT_FILE = path3.join(DATA_ROOT, "swarm.port");
-    DEFAULT_PORT = 4322;
-    readInt = (f) => {
-      try {
-        const n = Number(fs2.readFileSync(f, "utf8").trim());
-        return Number.isInteger(n) && n > 0 ? n : null;
-      } catch {
-        return null;
-      }
-    };
-    alive = (pid) => {
-      try {
-        process.kill(pid, 0);
-        return true;
-      } catch {
-        return false;
-      }
-    };
-    portFrom = (flag) => Number(flag ?? process.env.SWARM_PORT ?? DEFAULT_PORT);
-  }
-});
-
-// src/server/sse.ts
-function createSseHub(heartbeatMs = HEARTBEAT_MS) {
-  const clients = /* @__PURE__ */ new Set();
-  const drop = (res) => {
-    if (clients.delete(res)) res.destroy();
-  };
-  const send = (res, event) => {
-    if (res.writableEnded || res.destroyed) return drop(res);
-    try {
-      res.write(`data: ${JSON.stringify(event)}
-
-`, (err) => {
-        if (err) drop(res);
-      });
-    } catch {
-      drop(res);
-    }
-  };
-  const beat = setInterval(() => {
-    for (const res of [...clients]) send(res, { type: "ping" });
-  }, heartbeatMs);
-  beat.unref?.();
-  return {
-    add(res) {
-      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });
-      clients.add(res);
-      res.on("close", () => clients.delete(res));
-      res.on("error", () => drop(res));
-      send(res, { type: "hello" });
-    },
-    // the set is copied: a failed write drops its client from it
-    broadcast(event) {
-      for (const res of [...clients]) send(res, event);
-    },
-    size: () => clients.size,
-    close() {
-      clearInterval(beat);
-      for (const res of [...clients]) drop(res);
-    }
-  };
-}
-var HEARTBEAT_MS;
-var init_sse = __esm({
-  "src/server/sse.ts"() {
-    "use strict";
-    HEARTBEAT_MS = 15e3;
-  }
-});
-
-// src/server/index.ts
-var server_exports = {};
-__export(server_exports, {
-  startServer: () => startServer
-});
-import fs4 from "node:fs";
-import http from "node:http";
-import path5 from "node:path";
-function startServer(board, options) {
-  const { port, toolRoot: toolRoot2 = defaultToolRoot(), writeState = true, heartbeatMs } = options;
-  const sse = createSseHub(heartbeatMs);
-  const off = board.onChange((repo) => sse.broadcast({ type: "changed", repo }));
-  const send = (res, status, body, type) => {
-    res.writeHead(status, { "content-type": type, "cache-control": "no-store" });
-    res.end(body);
-  };
-  const json = (res, obj, status = 200) => send(res, status, JSON.stringify(obj), MIME[".json"]);
-  const distDir = path5.join(toolRoot2, "dist");
-  const serveStatic = (res, p) => {
-    const index = path5.join(distDir, "index.html");
-    if (!fs4.existsSync(index)) return send(res, 404, `swarm's page is not built. Run: npm install && npm run build  (in ${toolRoot2})`, "text/plain; charset=utf-8");
-    const f = path5.resolve(distDir, "." + decodeURIComponent(p).replaceAll("..", ""));
-    if (f.startsWith(distDir) && fs4.existsSync(f) && fs4.statSync(f).isFile()) return send(res, 200, fs4.readFileSync(f), MIME[path5.extname(f).toLowerCase()] ?? "application/octet-stream");
-    return send(res, 200, fs4.readFileSync(index), MIME[".html"]);
-  };
-  const server = http.createServer((req, res) => {
-    if (req.method !== "GET" && req.method !== "HEAD") {
-      res.setHeader("allow", "GET, HEAD");
-      return json(res, { error: `${req.method} is not accepted: the page only reads` }, 405);
-    }
-    const url = new URL(req.url ?? "/", "http://x");
-    const p = url.pathname;
-    try {
-      if (p === "/events") return sse.add(res);
-      if (p === "/api/board" || p === "/api/run") {
-        const run2 = url.searchParams.get(p === "/api/run" ? "id" : "run");
-        const key = url.searchParams.get("repo");
-        const repos = board.repos();
-        let repo;
-        if (run2 !== null) {
-          repo = repos.find((r) => r.runs.some((x) => x.run === Number(run2)))?.repo;
-          if (!repo) return json(res, { error: `no run ${run2}` }, 404);
-        } else if (key !== null) {
-          repo = repos.find((r) => r.repo === key)?.repo;
-          if (!repo) return json(res, { error: `no repository ${key}` }, 404);
-        } else {
-          repo = repos[0]?.repo;
-          if (!repo) return json(res, { error: "no repository on the board" }, 404);
-        }
-        return json(res, { repos, snapshot: board.snapshot(repo) });
-      }
-      if (p.startsWith("/api/")) return json(res, { error: `no route ${p}` }, 404);
-      return serveStatic(res, p);
-    } catch (e) {
-      return json(res, { error: e.message }, 500);
-    }
-  });
-  server.on("close", () => {
-    off();
-    sse.close();
-  });
-  server.on("error", (err) => {
-    console.error(err.code === "EADDRINUSE" ? `swarm: port ${port} is already in use. Retry with --port <n> or set SWARM_PORT.` : `swarm: server error: ${err.message}`);
-    process.exit(1);
-  });
-  server.listen(port, "127.0.0.1", () => {
-    const actual = server.address().port;
-    if (writeState) {
-      writeServerFiles(actual);
-      process.on("exit", clearServerFiles);
-      for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => process.exit(0));
-    }
-    const url = `http://localhost:${actual}/`;
-    console.log(`swarm  the page
-  url   ${url}`);
-  });
-  return server;
-}
-var MIME, defaultToolRoot;
-var init_server = __esm({
-  "src/server/index.ts"() {
-    "use strict";
-    init_sse();
-    init_state();
-    MIME = {
-      ".html": "text/html; charset=utf-8",
-      ".js": "text/javascript; charset=utf-8",
-      ".mjs": "text/javascript; charset=utf-8",
-      ".css": "text/css; charset=utf-8",
-      ".json": "application/json; charset=utf-8",
-      ".map": "application/json; charset=utf-8",
-      ".svg": "image/svg+xml",
-      ".png": "image/png",
-      ".ico": "image/x-icon",
-      ".woff2": "font/woff2"
-    };
-    defaultToolRoot = () => process.env.SWARM_ROOT ?? path5.dirname(path5.resolve(process.argv[1] ?? "."));
-  }
-});
-
-// src/cli/index.ts
-import { spawn, spawnSync as spawnSync2 } from "node:child_process";
-import fs5 from "node:fs";
-import path6 from "node:path";
-
-// src/board/board.ts
-init_home();
-import fs from "node:fs";
-import path2 from "node:path";
+var DATA_ROOT = process.env.CHARRETTE_HOME ? path.resolve(process.env.CHARRETTE_HOME) : path.join(os.homedir(), "charrette_appdata");
+var SQLITE_PATH = path.join(DATA_ROOT, "swarm.sqlite");
 
 // src/board/mentions.ts
 function planCode(plan) {
@@ -1500,7 +1278,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
           if (f && !f.holders.includes(name) && !everClaimed.get(repo, f.path, Number(r.id))) f.holders.push(name);
         }
       }
-      const sharedBy = (path7, id) => live2.some((c) => String(c.path) === path7 && Number(c.participant) !== id);
+      const sharedBy = (path5, id) => live2.some((c) => String(c.path) === path5 && Number(c.participant) !== id);
       const roster = people.map((r) => {
         const id = Number(r.id);
         const slice = String(r.slice);
@@ -1636,10 +1414,6 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
   return board;
 }
 
-// src/cli/index.ts
-init_home();
-init_state();
-
 // src/cli/args.ts
 var VALUE_FLAGS = /* @__PURE__ */ new Set([
   "--plan",
@@ -1708,11 +1482,11 @@ ${m.answer}` : ""}`;
 
 // src/cli/aiview-document.ts
 import { spawnSync } from "node:child_process";
-import fs3 from "node:fs";
-import path4 from "node:path";
+import fs2 from "node:fs";
+import path3 from "node:path";
 function aiviewLauncher(toolRoot2) {
-  const file = process.env.SWARM_AIVIEW ?? path4.join(toolRoot2, "..", "aiview", "aiview.mjs");
-  return fs3.existsSync(file) ? file : null;
+  const file = process.env.SWARM_AIVIEW ?? path3.join(toolRoot2, "..", "aiview", "aiview.mjs");
+  return fs2.existsSync(file) ? file : null;
 }
 var callAiview = (launcher, cwd, argv) => {
   const r = spawnSync(process.execPath, [launcher, ...argv, "--json"], { cwd, encoding: "utf8" });
@@ -1724,19 +1498,29 @@ var callAiview = (launcher, cwd, argv) => {
   }
 };
 var BOARD_DOCUMENT_FILE = "swarm.swarm.json";
-var boardUrlFor = (pageUrl2, repos) => {
-  const url = new URL(pageUrl2);
-  url.search = "";
-  for (const repo of repos) url.searchParams.append("repo", repo);
-  return url.toString();
+var boardReposFor = (current, repo) => {
+  const repos = reposInDocument(current);
+  return repos.includes(repo) ? repos : [...repos, repo];
 };
-var reposInUrl = (url) => {
+function reposInDocument(text) {
+  if (text === null) return [];
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  const named = Array.isArray(parsed.repos) ? parsed.repos.filter((r) => typeof r === "string") : typeof parsed.url === "string" ? reposInPreMergeUrl(parsed.url) : [];
+  return [...new Set(named)];
+}
+var reposInPreMergeUrl = (url) => {
   try {
     return new URL(url).searchParams.getAll("repo");
   } catch {
     return [];
   }
 };
+var boardDocumentText = (repos) => JSON.stringify({ repos }, null, 2) + "\n";
 function registerBoardDocument(input) {
   const launcher = aiviewLauncher(input.toolRoot);
   if (!launcher) return { registered: false, reason: "aiview not found" };
@@ -1748,11 +1532,11 @@ function registerBoardDocument(input) {
   const where = aiview(["path", BOARD_DOCUMENT_FILE, "--project", project]);
   if (!where.ok) return { registered: false, reason: where.error };
   const file = where.out.path;
-  const existing = readBoardUrl(file);
-  const repos = existing === null ? [] : reposInUrl(existing);
-  if (existing === null || !repos.includes(input.repo)) {
-    fs3.mkdirSync(path4.dirname(file), { recursive: true });
-    fs3.writeFileSync(file, JSON.stringify({ url: boardUrlFor(input.pageUrl, [...repos, input.repo]) }, null, 2) + "\n");
+  const existing = readDocumentText(file);
+  const text = boardDocumentText(boardReposFor(existing, input.repo));
+  if (text !== existing) {
+    fs2.mkdirSync(path3.dirname(file), { recursive: true });
+    fs2.writeFileSync(file, text);
   }
   const opened = aiview(existing === null ? ["open", file, "--kind", "swarm"] : ["open", file]);
   if (!opened.ok) return { registered: false, reason: opened.error };
@@ -1760,10 +1544,9 @@ function registerBoardDocument(input) {
   if (!retired.ok) return { registered: false, reason: retired.error };
   return { registered: true, url: opened.out.url, file, retired: retired.files };
 }
-function readBoardUrl(file) {
+function readDocumentText(file) {
   try {
-    const url = JSON.parse(fs3.readFileSync(file, "utf8")).url;
-    return typeof url === "string" ? url : null;
+    return fs2.readFileSync(file, "utf8");
   } catch {
     return null;
   }
@@ -1771,7 +1554,7 @@ function readBoardUrl(file) {
 function retireOtherSwarmDocuments(aiview, project, board) {
   const listed = aiview(["list", "--kind", "swarm", "--project", project]);
   if (!listed.ok) return listed;
-  const others = listed.out.filter((d) => path4.resolve(d.abs_path ?? d.file_path) !== path4.resolve(board));
+  const others = listed.out.filter((d) => path3.resolve(d.abs_path ?? d.file_path) !== path3.resolve(board));
   if (!others.length) return { ok: true, files: [] };
   const removed = aiview(["remove", ...others.map((d) => `#${d.id}`)]);
   if (!removed.ok) return removed;
@@ -1823,8 +1606,7 @@ var USAGE = [
   "          # --mentions: only a mention of you, an urgent post or an event you subscribed to ends it; the rest stays for deliver",
   "  roster  [--repo <path>]",
   "  end     [--as <member>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
-  "  serve   [--port <p>] [--detach]                 # the run pages aiview frames, on :4322 (SWARM_PORT)",
-  "  status                                                          # data home, the page's server, open runs",
+  "  status                                                          # data home, open runs",
   "  config  retention [<days>]                                      # prints, or sets then prints, how many days closed runs and main's talk are kept",
   `events: ${Object.keys(EVENTS).join(", ")}; any:<event> for one posted in any run`,
   "a member is <group>/<seat>, the orchestrator <group>/orchestrator; without --as, the runner joined from this worktree"
@@ -1854,16 +1636,16 @@ var git = (cwd, ...argv) => {
 function repoOf(dir) {
   const common = git(dir, "rev-parse", "--git-common-dir");
   if (!common) fail(`not in a git repository: ${dir}`);
-  const abs = path6.resolve(dir, common);
+  const abs = path4.resolve(dir, common);
   try {
-    return fs5.realpathSync.native(abs);
+    return fs3.realpathSync.native(abs);
   } catch {
     return abs;
   }
 }
 function worktreeOf(dir) {
   const top = git(dir, "rev-parse", "--show-toplevel");
-  return top ? path6.resolve(top) : null;
+  return top ? path4.resolve(top) : null;
 }
 function changedIn(worktree) {
   const r = spawnSync2("git", ["status", "--porcelain", "-z", "--untracked-files=all"], { cwd: worktree, encoding: "utf8" });
@@ -1889,33 +1671,7 @@ var printReconciled = (reconciled, flags) => {
   for (const line of unclaimedLines(reconciled)) console.log(line);
   for (const f of flags) console.log(`#${f.seq} flagged: you wrote ${f.path} outside your claim; ${f.holder} holds it. Settle it with @${f.holder} on the thread.`);
 };
-function spawnDetachedServer(port) {
-  try {
-    fs5.rmSync(PORT_FILE, { force: true });
-  } catch {
-  }
-  const child = spawn(process.execPath, [process.argv[1], "serve", "--port", String(port)], {
-    detached: true,
-    stdio: "ignore",
-    cwd: DATA_ROOT
-  });
-  child.unref();
-  const t0 = Date.now();
-  for (; ; ) {
-    const st = readServerStatus();
-    if (st.running && st.port !== null) return st.port;
-    if (Date.now() - t0 > 1e4) return null;
-    spawnSync2(process.execPath, ["-e", "setTimeout(()=>{},120)"]);
-  }
-}
-function ensureServer() {
-  const st = readServerStatus();
-  if (st.running && st.port !== null) return st.port;
-  fs5.mkdirSync(DATA_ROOT, { recursive: true });
-  return spawnDetachedServer(portFrom(args.flag("--port")));
-}
-var pageUrl = (port) => `http://localhost:${port}/`;
-var toolRoot = () => process.env.SWARM_ROOT ?? path6.dirname(path6.resolve(process.argv[1]));
+var toolRoot = () => process.env.SWARM_ROOT ?? path4.dirname(path4.resolve(process.argv[1]));
 var need = (flag) => args.flag(flag) ?? fail(`${flag} is required
 ${USAGE}`);
 var runArg = () => {
@@ -1975,19 +1731,19 @@ var emitHeard = (p, json, human) => {
   });
 };
 function resolveClaimPath(file) {
-  if (path6.isAbsolute(file)) return file;
-  const here = path6.resolve(file);
-  if (fs5.existsSync(here)) return here;
+  if (path4.isAbsolute(file)) return file;
+  const here = path4.resolve(file);
+  if (fs3.existsSync(here)) return here;
   const root = worktreeOf(process.cwd());
-  const fromRoot = root ? path6.resolve(root, file) : null;
-  if (fromRoot && fs5.existsSync(fromRoot)) return fromRoot;
+  const fromRoot = root ? path4.resolve(root, file) : null;
+  if (fromRoot && fs3.existsSync(fromRoot)) return fromRoot;
   if (args.has("--new")) return here;
   return fail(`no such file: ${here}${fromRoot && fromRoot !== here ? ` nor ${fromRoot}` : ""}; pass --new if you are creating it`);
 }
 function repoRelative(abs) {
   const root = worktreeOf(process.cwd());
-  const rel = root ? path6.relative(root, abs) : abs;
-  return rel.split(path6.sep).join("/");
+  const rel = root ? path4.relative(root, abs) : abs;
+  return rel.split(path4.sep).join("/");
 }
 function aboutArg() {
   const about = args.flag("--about");
@@ -2002,7 +1758,7 @@ function parseFile(spec) {
 function readSlices(file) {
   let raw;
   try {
-    raw = JSON.parse(fs5.readFileSync(path6.resolve(file), "utf8"));
+    raw = JSON.parse(fs3.readFileSync(path4.resolve(file), "utf8"));
   } catch (e) {
     return fail(`cannot read slices from ${file}: ${e.message}`);
   }
@@ -2028,7 +1784,6 @@ function boardUpkeep(board) {
     console.error(`swarm: upkeep failed: ${e.message}`);
   }
 }
-var UPKEEP_EVERY_MS = 60 * 60 * 1e3;
 function openKindAndGroup() {
   const raw = args.flag("--kind") ?? "plan";
   let kind;
@@ -2093,18 +1848,14 @@ ${USAGE}`);
       const seatsFile = args.flag("--seats") ?? args.flag("--slices") ?? fail(`open: --seats <file.json> is required (or --slices)
 ${USAGE}`);
       const run2 = board.openRun({ repo: repoOf(process.cwd()), kind, group, title: need("--title"), link: args.flag("--link") ?? null, seats: readSlices(seatsFile) });
-      const port = ensureServer();
-      const page = port === null ? null : pageUrl(port);
-      if (page === null) {
-        console.error(`swarm: the page did not start (port ${portFrom(args.flag("--port"))} may be in use; swarm serve --detach --port <n>). The run is open.`);
+      const doc = registerBoardDocument({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run2.repo });
+      if (!doc.registered) {
+        console.error(`swarm: ${doc.reason}: the run is open; its board is read in aiview once aiview is installed and knows this project`);
         emit({ run: run2.id, repo: run2.repo, kind: run2.kind, group: run2.group, plan: run2.plan, url: null }, String(run2.id));
         break;
       }
-      const doc = registerBoardDocument({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run2.repo, pageUrl: page });
-      if (!doc.registered) console.error(`swarm: ${doc.reason}: open the URL`);
-      const url = doc.registered ? doc.url : boardUrlFor(page, [run2.repo]);
-      emit({ run: run2.id, repo: run2.repo, kind: run2.kind, group: run2.group, plan: run2.plan, url }, `${run2.id}
-${url}`);
+      emit({ run: run2.id, repo: run2.repo, kind: run2.kind, group: run2.group, plan: run2.plan, url: doc.url }, `${run2.id}
+${doc.url}`);
       break;
     }
     case "slice": {
@@ -2252,7 +2003,7 @@ ${USAGE}`);
       break;
     }
     case "roster": {
-      const repo = repoOf(path6.resolve(args.flag("--repo") ?? process.cwd()));
+      const repo = repoOf(path4.resolve(args.flag("--repo") ?? process.cwd()));
       const roster = board.roster(repo);
       emit({ repo, roster }, () => {
         for (const r of roster) console.log(rosterLine(r));
@@ -2297,7 +2048,7 @@ ${USAGE}`);
       const p = caller(board);
       const sha = args.positional[0] ?? fail("merged: which sha?");
       const files = args.list("--files");
-      const sharers = board.merged(p, sha, files.map((f) => path6.resolve(f)));
+      const sharers = board.merged(p, sha, files.map((f) => path4.resolve(f)));
       const tell = sharers.map(
         (o) => `if you resolved a conflict in ${o.path}, tell them: swarm post "@${o.runner} I resolved ${o.path}: <how>" --about ${o.path}`
       );
@@ -2320,15 +2071,11 @@ ${USAGE}`);
     }
     case "status": {
       const runs = board.runs();
-      const server = readServerStatus();
       const membersOf = (r) => board.roster(r.repo).filter((m) => m.run === r.id).map((m) => ({ name: m.name, nick: m.nick, worktree: m.worktree }));
       const open = runs.map((r) => ({ run: r.id, kind: r.kind, group: r.plan, title: r.title, members: membersOf(r) }));
-      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, server, runs: runs.length, open }, () => {
+      emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, runs: runs.length, open }, () => {
         console.log(`home    ${DATA_ROOT}`);
         console.log(`sqlite  ${SQLITE_PATH}`);
-        console.log(
-          server.running ? `page    running  pid ${server.pid}  ${pageUrl(server.port)}` : `page    not running${server.stale ? " (stale pid file)" : ""}: swarm serve --detach`
-        );
         if (!runs.length) console.log("no open run");
         for (const r of runs) {
           console.log(`run ${r.id}  ${r.kind}  ${r.plan}  ${r.title}  ${r.repo}`);
@@ -2349,22 +2096,10 @@ if (args.verb === "--help") {
   console.log(args.positional[0] === "code" ? CODE_USAGE : USAGE);
   process.exit(0);
 }
-if (args.verb === "serve" && args.has("--detach")) {
-  const st = readServerStatus();
-  const port = st.running && st.port !== null ? st.port : (fs5.mkdirSync(DATA_ROOT, { recursive: true }), spawnDetachedServer(portFrom(args.flag("--port"))));
-  if (port === null) {
-    console.error(`swarm: the server did not come up within 10 s (port ${portFrom(args.flag("--port"))} may be in use; retry with --port <n>)`);
-    process.exitCode = 1;
-  } else {
-    const server = readServerStatus();
-    emit({ server, url: pageUrl(port), already: st.running }, st.running ? `swarm's page already running on ${pageUrl(port)} (pid ${server.pid})` : `swarm's page up on ${pageUrl(port)}`);
-  }
-} else if (args.verb === "serve") {
-  const { startServer: startServer2 } = await Promise.resolve().then(() => (init_server(), server_exports));
-  const board = await openBoard();
-  boardUpkeep(board);
-  setInterval(() => boardUpkeep(board), UPKEEP_EVERY_MS).unref();
-  startServer2(board, { port: portFrom(args.flag("--port")) });
+if (args.verb === "serve") {
+  console.error(`swarm: unknown verb serve: swarm has no page; the board is read in aiview
+${USAGE}`);
+  process.exit(2);
 } else {
   const board = await openBoard();
   try {
