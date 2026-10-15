@@ -1,4 +1,4 @@
-import { NOT_RECORDED, plural } from "../../../lib/board/analytics.ts";
+import { ESTIMATED_TIP, NOT_RECORDED, plural } from "../../../lib/board/analytics.ts";
 
 export type Tone = "warn" | "bad";
 
@@ -36,7 +36,8 @@ function Sparkline({ points, tone }: { points: (number | null)[]; tone?: Tone })
 /** One figure of the scope with its sparkline over runs (mockup #677). `value` null reads "not recorded";
  *  `notRecorded` runs in the scope add "N runs not recorded" (D33). One run's tile has no sparkline.
  *  `inferred`: the rule a figure is inferred by (plan D23), the tile drawn as inferred with the rule as its
- *  tip. Pressed filtering is later (handoff). */
+ *  tip. `estimatedRuns`: the runs whose figure is estimated (D44), the tile drawn as inferred with the estimate's
+ *  tip and "N runs estimated". Pressed filtering is later (handoff). */
 export function KpiTile({
   label,
   value,
@@ -46,6 +47,7 @@ export function KpiTile({
   newRecord,
   spark = [],
   notRecorded = null,
+  estimatedRuns = null,
   inferred,
 }: {
   label: string;
@@ -56,11 +58,14 @@ export function KpiTile({
   newRecord?: boolean;
   spark?: (number | null)[];
   notRecorded?: number | null;
+  estimatedRuns?: number | null;
   inferred?: string;
 }) {
-  const state = value === null ? "not recorded" : notRecorded ? "some not recorded" : "filled";
+  const estimated = value !== null && !!estimatedRuns;
+  const state = value === null ? "not recorded" : estimated ? "estimated" : notRecorded ? "some not recorded" : "filled";
+  const tip = inferred ?? (estimated ? ESTIMATED_TIP : undefined);
   return (
-    <div className={inferred ? "kpi inferred" : "kpi"} data-component="KpiTile" data-state={state} data-tip={inferred}>
+    <div className={tip ? "kpi inferred" : "kpi"} data-component="KpiTile" data-state={state} data-tip={tip}>
       <span className="k">
         {label}
         {newRecord && <span className="newrec">new record</span>}
@@ -75,6 +80,7 @@ export function KpiTile({
       )}
       {value !== null && delta && <span className={tone ? `d ${tone}` : "d"}>{delta}</span>}
       {notRecorded ? <span className="d nr">{plural(notRecorded, "run")} not recorded</span> : null}
+      {estimated ? <span className="d nr">{plural(estimatedRuns, "run")} estimated</span> : null}
       <Sparkline points={spark} tone={tone} />
     </div>
   );

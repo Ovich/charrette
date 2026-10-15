@@ -18,6 +18,8 @@ const duration = (n: number | null): string | null => line(n, formatDuration);
 
 function Tiles({ stats }: { stats: Stats }) {
   const t = stats.totals;
+  // slices and shared files are estimated for a run before the records (D44), flags known for every run (D43):
+  // only the figures nothing kept say "not recorded"
   const notRecorded = t.notRecorded;
   return (
     <div className="kpis">
@@ -27,9 +29,16 @@ function Tiles({ stats }: { stats: Stats }) {
         unit={line(t.slices.of, (n) => `of ${n}`)}
         delta={line(t.byKind.plan, (n) => plural(n, "plan run"))}
         spark={t.series.slicesMerged}
-        notRecorded={notRecorded}
+        estimatedRuns={t.slices.estimatedRuns}
       />
-      <KpiTile label="Slice time" value={duration(t.slices.p50Ms)} unit="median" delta={line(t.slices.p90Ms, (n) => `p90 ${formatDuration(n)}`)} spark={t.series.sliceTimeP50} notRecorded={notRecorded} />
+      <KpiTile
+        label="Slice time"
+        value={duration(t.slices.p50Ms)}
+        unit="median"
+        delta={line(t.slices.p90Ms, (n) => `p90 ${formatDuration(n)}`)}
+        spark={t.series.sliceTimeP50}
+        estimatedRuns={t.slices.estimatedRuns}
+      />
       <KpiTile
         label="Lock wait"
         value={duration(t.lockWait.p50Ms)}
@@ -47,7 +56,7 @@ function Tiles({ stats }: { stats: Stats }) {
         delta={line(t.shared.withoutAgreement, (n) => `${n} with no agreement`)}
         tone="warn"
         spark={t.series.sharedAgreed}
-        notRecorded={notRecorded}
+        estimatedRuns={t.shared.estimatedRuns}
       />
       <KpiTile
         label="Flags"
@@ -56,7 +65,6 @@ function Tiles({ stats }: { stats: Stats }) {
         delta={line(t.runsWithoutFlag, (n) => `${plural(n, "run")} clean`)}
         tone="bad"
         spark={t.series.flags}
-        notRecorded={notRecorded}
       />
       <KpiTile
         label="Rebase conflicts"

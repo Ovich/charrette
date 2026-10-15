@@ -1,5 +1,5 @@
 import type { SharedFile } from "../../../../../swarm/src/board/snapshot.ts";
-import { formatDuration, NOT_RECORDED } from "../../../lib/board/analytics.ts";
+import { ESTIMATED_TIP, formatDuration, NOT_RECORDED } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";
 
 /** What a file's merge met: a conflict, none, or unknown (git older than 2.38, board D13); a run before
@@ -11,11 +11,24 @@ function ConflictNote({ conflict, recorded }: { conflict: boolean | null; record
 }
 
 /** The files two members held in this run (mockup #677 SharedFilesList): their holders, and whether the
- *  holders agreed and how long after, or none. */
-export function SharedFilesList({ perFile, recorded }: { perFile: SharedFile[]; recorded: boolean }) {
+ *  holders agreed and how long after, or none. `estimated`: a run before the shares record, its files the
+ *  paths two members claimed, drawn as inferred (D44). */
+export function SharedFilesList({ perFile, recorded, estimated }: { perFile: SharedFile[]; recorded: boolean; estimated: boolean }) {
   return (
-    <div className="apanel" data-component="SharedFilesList" data-state={perFile.length ? "files" : "none"}>
-      <div className="label">Shared files in this run</div>
+    <div
+      className={estimated ? "apanel inferred" : "apanel"}
+      data-component="SharedFilesList"
+      data-state={perFile.length ? (estimated ? "estimated" : "files") : "none"}
+      data-tip={estimated ? ESTIMATED_TIP : undefined}
+    >
+      <div className="label">
+        Shared files in this run
+        {estimated ? (
+          <span className="hint" title={ESTIMATED_TIP}>
+            estimated
+          </span>
+        ) : null}
+      </div>
       {perFile.length === 0 ? (
         <p className="faint">No file was shared in this run.</p>
       ) : (

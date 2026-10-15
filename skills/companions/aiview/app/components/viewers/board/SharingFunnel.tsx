@@ -1,8 +1,9 @@
 import type { Totals } from "../../../../../swarm/src/board/snapshot.ts";
-import { figure, less } from "../../../lib/board/analytics.ts";
+import { ESTIMATED_TIP, figure, less, plural } from "../../../lib/board/analytics.ts";
 
 /** Does the claim protocol hold? The scope's shared files through the four steps (D33), each drop the
- *  difference of two steps of `totals.shared` (D35), its reason beside it. */
+ *  difference of two steps of `totals.shared` (D35), its reason beside it. Over runs some estimated (D44), drawn
+ *  as inferred with "N runs estimated". */
 export function SharingFunnel({ shared, conflictsInShared }: { shared: Totals["shared"]; conflictsInShared: number | null }) {
   const steps: { label: string; tip: string; n: number | null; drop?: string }[] = [
     { label: "Shared", tip: "a second member claimed it", n: shared.files },
@@ -12,8 +13,14 @@ export function SharingFunnel({ shared, conflictsInShared }: { shared: Totals["s
   ];
   const whole = shared.files;
   const width = (n: number | null): number => (n === null || !whole ? 0 : (n / whole) * 100);
+  const estimated = shared.estimatedRuns > 0;
   return (
-    <div className="apanel" data-component="SharingFunnel">
+    <div
+      className={estimated ? "apanel inferred" : "apanel"}
+      data-component="SharingFunnel"
+      data-state={estimated ? "estimated" : "recorded"}
+      data-tip={estimated ? ESTIMATED_TIP : undefined}
+    >
       <div className="label">
         Shared files <span className="hint">does the claim protocol hold?</span>
       </div>
@@ -52,6 +59,7 @@ export function SharingFunnel({ shared, conflictsInShared }: { shared: Totals["s
             met a conflict.
           </>
         ) : null}
+        {estimated ? <span className="nr"> {plural(shared.estimatedRuns, "run")} estimated.</span> : null}
       </div>
     </div>
   );

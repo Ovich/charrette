@@ -68,15 +68,16 @@ test("the funnel's conflict line reads only when both its figures are recorded, 
   }
 });
 
-test("a null figure reads not recorded, never 0; a tile over runs some unrecorded says N runs not recorded; the sparkline has a gap at the unrecorded run (US1, D32, D33)", () => {
+test("a null figure reads not recorded, never 0; a tile over runs some unrecorded says N runs not recorded; the sparkline has a gap at the unrecorded run (US1, D32, D33, D44)", () => {
   openAcross();
   expect(valueOf("Silent members")).toBe("not recorded");
   expect(tile("Silent members").querySelector(".v")!.textContent).not.toMatch(/0/);
-  for (const label of ["Slices merged", "Slice time", "Lock wait", "Shared files settled", "Flags", "Rebase conflicts", "Silent members"]) {
+  // only what no run kept: slices and shared files are estimated (D44), flags known for every run (D43)
+  for (const label of ["Lock wait", "Rebase conflicts", "Silent members"]) {
     expect(within(tile(label)).getByText("1 run not recorded")).toBeTruthy();
   }
   // [2, null, 4, 5]: three points, the line broken at the null, one line through the last two
-  const spark = tile("Slices merged").querySelector("svg")!;
+  const spark = tile("Lock wait").querySelector("svg")!;
   expect(spark.querySelectorAll("circle")).toHaveLength(3);
   const lines = spark.querySelectorAll("polyline");
   expect(lines).toHaveLength(1);
@@ -143,4 +144,35 @@ test("a runs-table row opens its run's tab on Analytics (D33, SL5)", () => {
   expect(view.getByRole("button", { name: "Analytics" }).getAttribute("aria-pressed")).toBe("true");
   expect(source.asks.at(-1)).toEqual({ run: 4 });
   expect(location.hash).toContain("run=4&view=analytics");
+});
+
+test("an estimated figure: the Slices merged, Slice time and Shared files settled tiles and the funnel drawn as inferred with the estimate's tip and N runs estimated; the Flags tile has no not-recorded line (D43, D44, SL9)", () => {
+  openAcross();
+  const tip = "Estimated: this run closed before analytics recorded it; read from its claims and members.";
+  for (const label of ["Slices merged", "Slice time", "Shared files settled"]) {
+    expect(tile(label).dataset.state, label).toBe("estimated");
+    expect(tile(label).classList.contains("inferred"), label).toBe(true);
+    expect(tile(label).dataset.tip, label).toBe(tip);
+    expect(within(tile(label)).getByText("1 run estimated")).toBeTruthy();
+    expect(tile(label).textContent, label).not.toContain("not recorded");
+  }
+  expect(tile("Flags").textContent).not.toContain("not recorded");
+  expect(tile("Flags").classList.contains("inferred")).toBe(false);
+  const funnel = across().querySelector('[data-component="SharingFunnel"]') as HTMLElement;
+  expect(funnel.classList.contains("inferred")).toBe(true);
+  expect(funnel.dataset.tip).toBe(tip);
+  expect(funnel.querySelector(".foot")!.textContent).toContain("1 run estimated.");
+});
+
+test("a runs-table cell whose two figures are null reads not recorded once; an estimated one carries the estimate's tip (D34, D44, SL9)", () => {
+  const [recorded, old] = ACROSS.runs;
+  const unknown = { ...recorded, run: 21, title: "Nothing kept", plan: { ...recorded.plan!, shared: { ...recorded.plan!.shared, files: null, agreed: null, perFile: [] } } };
+  openAcross({ ...ACROSS, runs: [...ACROSS.runs, unknown] });
+  const table = across().querySelector('[data-component="RunsTable"]') as HTMLElement;
+  const settledOf = (title: string): HTMLElement => within(table).getByText(title).closest("tr")!.querySelectorAll("td")[4] as HTMLElement;
+  expect(settledOf("Nothing kept").textContent!.trim()).toBe("not recorded");
+  expect(settledOf(old.title).classList.contains("inferred")).toBe(true);
+  expect(settledOf(old.title).title).toMatch(/^Estimated: /);
+  expect(settledOf(old.title).textContent).toContain("0 of 1");
+  expect(settledOf(recorded.title).classList.contains("inferred")).toBe(false);
 });
