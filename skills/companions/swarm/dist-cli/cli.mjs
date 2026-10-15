@@ -536,7 +536,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
   const db = new DatabaseSync(dbPath);
   db.exec(`
     PRAGMA journal_mode = DELETE;
-    -- The CLI and the server write concurrently; without a busy timeout a
+    -- Several CLI processes write, and aiview reads, concurrently; without a busy timeout a
     -- concurrent verb fails outright with SQLITE_BUSY.
     PRAGMA busy_timeout = 5000;
     CREATE TABLE IF NOT EXISTS runs (
