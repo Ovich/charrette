@@ -12,6 +12,7 @@ import { fullText, seqLine } from "./format.ts";
 import { nameHandle, unmatchedMentions } from "../board/mentions.ts";
 import { registerBoardDocument } from "./aiview-document.ts";
 import { unclaimedLines } from "./unclaimed.ts";
+import { git } from "./git.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
@@ -65,11 +66,6 @@ const emit = (json: unknown, human: string | (() => void)): void => {
   else if (typeof human === "string") {
     if (human) console.log(human);
   } else human();
-};
-
-const git = (cwd: string, ...argv: string[]): string | null => {
-  const r = spawnSync("git", argv, { cwd, encoding: "utf8" });
-  return r.status === 0 ? r.stdout.trim() : null;
 };
 
 /** The repository (D29): its common git dir, so every worktree of one repository is one. */
