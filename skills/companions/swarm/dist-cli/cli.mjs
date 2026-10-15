@@ -479,8 +479,19 @@ var SHARES_SINCE = "shares-since";
 var ORCHESTRATOR = "orchestrator";
 var SKEPTIC = "skeptic";
 var QUESTION = /^D\d+$/;
-var FLAG_BODY = /flag:\s*\S+\s+wrote\s+\S+\s+outside its claim/;
+var FLAG_BODY = /flag:\s*\S+\s+wrote\s+(\S+)\s+outside its claim(?:;\s*(\S+)\s+holds it)?/;
 var isBoardFlag = (m) => Number(m.by_board ?? 0) === 1 && (m.event === "flag" || m.event == null && FLAG_BODY.test(String(m.body)));
+function distinctFlags(messages) {
+  const seen = /* @__PURE__ */ new Set();
+  return messages.filter((m) => {
+    if (!isBoardFlag(m)) return false;
+    const [, path5 = m.about ?? "", holder = ""] = String(m.body).match(FLAG_BODY) ?? [];
+    const key = JSON.stringify([Number(m.author), foldPath(String(path5)), holder]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 var SOURCE = /[\w./\\-]+\.\w+:\d+|#\d+|https?:\/\/\S+/;
 var WAIT_BINS_MS = [1, 2, 5, 10].map((m) => m * MINUTE_MS);
 function periodStart(since) {
@@ -533,6 +544,21 @@ function timeline(joined, over, calls, turns, silentAfterMs) {
   }
   return out;
 }
+function estimatedTimeline(joined, over, mergedAt) {
+  if (!(over > joined)) return [];
+  const merges = mergedAt.filter((t) => t > joined && t <= over).sort((a, b) => a - b);
+  const working = { from: iso(joined), to: iso(merges[0] ?? over), what: "working", inferred: true };
+  return [working, ...merges.map((t) => ({ from: iso(t), to: iso(t), what: "merging", inferred: true }))];
+}
+var MERGED_BODY = /^merged \S+/;
+var FILES_LINE = /^files: (.*)$/m;
+function mergesFromEvents(messages) {
+  return messages.filter((m) => m.kind === "event" && (m.event === "merged" || m.event == null && MERGED_BODY.test(String(m.body)))).map((m) => {
+    const line = String(m.body).match(FILES_LINE)?.[1].trim();
+    const files = line === void 0 ? null : line === "-" ? [] : line.split(", ").map((f) => f.trim()).filter(Boolean);
+    return { participant: Number(m.author), at: ms(m.at), files, conflicts: null };
+  });
+}
 function computeRun(db, r, now, silentAfterMs) {
   const id = Number(r.id);
   const repo = String(r.repo);
@@ -554,13 +580,15 @@ function computeRun(db, r, now, silentAfterMs) {
   const shares = db.prepare(`SELECT path, participant, other FROM shares WHERE participant IN (${marks}) AND other IN (${marks})`).all(...ids, ...ids);
   const orchestrators = new Set(people.filter((p) => String(p.slice) === ORCHESTRATOR).map((p) => Number(p.id)));
   const conflictedOf = (m) => m.conflicts == null ? null : JSON.parse(String(m.conflicts));
-  const filesOf = (m) => JSON.parse(String(m.files));
+  const mergesRead = recorded ? merges.map((m) => ({ participant: Number(m.participant), at: ms(m.at), files: JSON.parse(String(m.files)), conflicts: conflictedOf(m) })) : mergesFromEvents(messages);
+  const mergeTimesOf = (pid) => mergesRead.filter((m) => m.participant === pid).map((m) => m.at);
   const grants = recorded ? db.prepare(
     `SELECT t.participant, t.asked_at, t.granted_at, p.slice, r.plan FROM lock_requests t
              LEFT JOIN participants p ON p.id = t.participant LEFT JOIN runs r ON r.id = p.run
            WHERE t.repo = ? AND t.granted_at IS NOT NULL ORDER BY t.granted_at`
   ).all(repo) : [];
   const lockWaitsMs = [];
+  const boardFlags = distinctFlags(messages);
   const racesLost = [];
   const members = people.map((p) => {
     const pid = Number(p.id);
@@ -599,9 +627,8 @@ function computeRun(db, r, now, silentAfterMs) {
     if (lost) racesLost.push({ member: nameOf(p), lost, waitedMs });
     const own = messages.filter((m) => Number(m.author) === pid);
     const posts = own.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
-    const flagged = own.filter(isBoardFlag);
-    for (const m of own) {
-      if (m.kind !== "agreement" && !isBoardFlag(m)) continue;
+    const flagged = boardFlags.filter((m) => Number(m.author) === pid);
+    for (const m of [...own.filter((x) => x.kind === "agreement"), ...flagged]) {
       memberMarks.push({
         at: String(m.at),
         what: m.kind === "agreement" ? "agreement" : "flag",
@@ -610,8 +637,8 @@ function computeRun(db, r, now, silentAfterMs) {
         note: firstLine(String(m.body))
       });
     }
-    for (const m of merges.filter((x) => Number(x.participant) === pid)) {
-      for (const f of conflictedOf(m) ?? []) memberMarks.push({ at: String(m.at), what: "conflict", path: f, note: `the rebase met a conflict in ${f}` });
+    for (const m of mergesRead.filter((x) => x.participant === pid)) {
+      for (const f of m.conflicts ?? []) memberMarks.push({ at: iso(m.at), what: "conflict", path: f, note: `the rebase met a conflict in ${f}` });
     }
     memberMarks.sort((a, b) => ms(a.at) - ms(b.at));
     return {
@@ -620,7 +647,7 @@ function computeRun(db, r, now, silentAfterMs) {
       slice: String(p.slice),
       joined: String(p.joined_at),
       ended: p.ended_at == null ? null : String(p.ended_at),
-      intervals: recorded ? timeline(joined, over, calls.map((c) => ms(c.at)), turns, silentAfterMs) : [],
+      intervals: recorded ? timeline(joined, over, calls.map((c) => ms(c.at)), turns, silentAfterMs) : estimatedTimeline(joined, over, mergeTimesOf(pid)),
       marks: memberMarks,
       posts: posts.length,
       postTimes: posts.map((m) => String(m.at)),
@@ -631,10 +658,11 @@ function computeRun(db, r, now, silentAfterMs) {
       waitingMs: null,
       agreementsMade: null,
       endorsed: null,
-      objections: null
+      objections: null,
+      estimated: !recorded
     };
   });
-  const firstMerge = merges.length ? Math.min(...merges.map((m) => ms(m.at))) : null;
+  const firstMerge = mergesRead.length ? Math.min(...mergesRead.map((m) => m.at)) : null;
   const length = runOver - ms(openedAt);
   const base = {
     run: id,
@@ -645,7 +673,7 @@ function computeRun(db, r, now, silentAfterMs) {
     closedAt,
     lengthMs: Number.isNaN(length) ? null : length,
     recorded,
-    firstMergeAtMs: recorded && firstMerge !== null ? firstMerge - ms(openedAt) : null,
+    firstMergeAtMs: firstMerge === null ? null : firstMerge - ms(openedAt),
     racesLost: recorded ? racesLost.reduce((n, x) => n + (x.lost ?? 0), 0) : null,
     members
   };
@@ -661,8 +689,7 @@ function computeRun(db, r, now, silentAfterMs) {
   if (kind !== "plan") return base;
   const sliceMembers = people.filter((p) => !orchestrators.has(Number(p.id)));
   const timesMs = sliceMembers.flatMap((p) => {
-    if (!recorded) return Number(p.merged ?? 0) === 1 && p.ended_at != null ? [ms(p.ended_at) - ms(p.joined_at)] : [];
-    const mergedAt = merges.filter((m) => Number(m.participant) === Number(p.id)).map((m) => ms(m.at));
+    const mergedAt = mergeTimesOf(Number(p.id));
     const end = mergedAt.length ? Math.min(...mergedAt) : p.ended_at == null ? null : ms(p.ended_at);
     return end === null ? [] : [end - ms(p.joined_at)];
   });
@@ -677,6 +704,16 @@ function computeRun(db, r, now, silentAfterMs) {
   }
   const sharersOf = (path5) => new Set(shares.filter((sh) => foldPath(String(sh.path)) === foldPath(path5)).flatMap((sh) => [Number(sh.participant), Number(sh.other)]));
   const byId = new Map(people.map((p) => [Number(p.id), p]));
+  const membershipOf = (pid) => {
+    const p = byId.get(pid);
+    return { from: ms(p.joined_at), to: p.ended_at == null ? runOver : ms(p.ended_at) };
+  };
+  const membersTogether = (a, b) => {
+    const x = membershipOf(a);
+    const y = membershipOf(b);
+    return x.from < y.to && y.from < x.to;
+  };
+  const claimersTogether = (claimers) => claimers.filter((h) => claimers.some((o) => o !== h && membersTogether(h, o)));
   const namesPath = (m, path5) => {
     if (aboutNames(m.about, path5)) return true;
     const body = foldPath(String(m.body));
@@ -690,7 +727,7 @@ function computeRun(db, r, now, silentAfterMs) {
   let agreedBeforeMerge = 0;
   for (const { path: path5, holders: everyHolder } of holdersByPath.values()) {
     const sharers = sharersOf(path5);
-    const holders = sharesRecorded ? everyHolder.filter((h) => sharers.has(h)) : everyHolder;
+    const holders = sharesRecorded ? everyHolder.filter((h) => sharers.has(h)) : claimersTogether(everyHolder);
     if (holders.length < 2) continue;
     const tellTimes = [];
     let told = true;
@@ -705,8 +742,8 @@ function computeRun(db, r, now, silentAfterMs) {
     }
     const sharedAt = tellTimes.length ? Math.min(...tellTimes) : null;
     const agreement = messages.find((m) => m.kind === "agreement" && aboutNames(m.about, path5));
-    const mergedWith = merges.filter((m) => filesOf(m).some((f) => foldPath(f) === foldPath(path5)));
-    const firstMergeOfPath = mergedWith.length ? Math.min(...mergedWith.map((m) => ms(m.at))) : null;
+    const mergedWith = mergesRead.filter((m) => m.files ? m.files.some((f) => foldPath(f) === foldPath(path5)) : holders.includes(m.participant));
+    const firstMergeOfPath = mergedWith.length ? Math.min(...mergedWith.map((m) => m.at)) : null;
     if (told) {
       everyHolderTold++;
       if (agreement) {
@@ -714,7 +751,7 @@ function computeRun(db, r, now, silentAfterMs) {
         if (firstMergeOfPath === null || ms(agreement.at) < firstMergeOfPath) agreedBeforeMerge++;
       }
     }
-    const met = mergedWith.map(conflictedOf);
+    const met = mergedWith.map((m) => m.conflicts);
     const conflict = !recorded ? null : met.some((c) => c?.some((f) => foldPath(f) === foldPath(path5))) ? true : met.some((c) => c === null) ? null : false;
     const declaredInterface = holders.some(
       (h) => JSON.parse(String(byId.get(h).files ?? "[]")).some((d) => d.interface === true && aboutNames(d.path, path5))
@@ -724,8 +761,10 @@ function computeRun(db, r, now, silentAfterMs) {
       path: path5,
       holders: holders.map((h) => nameOf(byId.get(h))),
       interface: declaredInterface || claimedInterface,
+      told,
       agreement: agreement ? Number(agreement.seq) : null,
-      agreedAfterMs: agreement && sharedAt !== null ? Math.max(0, ms(agreement.at) - sharedAt) : null,
+      // below 0: agreed before the tell (D46)
+      agreedAfterMs: agreement && sharedAt !== null ? ms(agreement.at) - sharedAt : null,
       conflict
     });
   }
@@ -745,11 +784,10 @@ function computeRun(db, r, now, silentAfterMs) {
   return {
     ...base,
     plan: {
-      slices: { merged: mergedSlices, of: sliceCount, addedMidRun, timesMs, estimated: !recorded },
+      slices: { merged: mergedSlices, of: sliceCount, addedMidRun, timesMs, timesEstimated: !recorded },
       lock: { waitsMs: lockWaitsMs, racesLost },
-      // before the shares record no merge time says which agreement came first (D44)
-      shared: { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge: sharesRecorded ? agreedBeforeMerge : null, perFile, estimated: !sharesRecorded },
-      flags: messages.filter(isBoardFlag).length,
+      shared: { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge, perFile, estimated: !sharesRecorded },
+      flags: boardFlags.length,
       conflicts: recorded ? { known, inShared, unknownMerges } : { known: null, inShared: null, unknownMerges: null }
     }
   };
@@ -772,16 +810,19 @@ function debateOf(db, run2, seats, messages) {
   };
   const spoken = (m) => Number(m.by_board ?? 0) === 0 && (m.kind === "msg" || m.kind === "urgent" || m.kind === "agreement");
   const bySeq = new Map(messages.map((m) => [Number(m.seq), m]));
-  const endorsedSeqs = /* @__PURE__ */ new Set();
   const endorsements = [];
+  const skepticEndorsedAt = /* @__PURE__ */ new Map();
   for (const m of messages) {
-    if (m.kind !== "endorsement" || !skeptic.has(Number(m.author)) || m.endorses == null) continue;
+    if (m.kind !== "endorsement" || m.endorses == null) continue;
     const agreement = bySeq.get(Number(m.endorses));
     const question = agreement && agreement.kind === "agreement" ? questionOf(agreement) : null;
     if (question === null) continue;
     endorsements.push({ endorsement: m, question });
-    endorsedSeqs.add(Number(m.endorses));
+    if (skeptic.has(Number(m.author)) && !skepticEndorsedAt.has(Number(m.endorses))) skepticEndorsedAt.set(Number(m.endorses), Number(m.seq));
   }
+  const endorsedSeqs = new Set(skepticEndorsedAt.keys());
+  const skepticEndorsements = endorsements.filter(({ endorsement }) => skeptic.has(Number(endorsement.author)));
+  const endorsedBefore = (agreementSeq, seq) => (skepticEndorsedAt.get(agreementSeq) ?? Infinity) < seq;
   const outcomeOf = /* @__PURE__ */ new Map();
   for (const m of messages) {
     const q = questionOf(m);
@@ -802,20 +843,20 @@ function debateOf(db, run2, seats, messages) {
     const question = questions.get(q) ?? { id: q, firstPost: String(m.at), outcome: null, exchanges: 0 };
     questions.set(q, question);
     const outcome = outcomeOf.get(q);
-    const upToOutcome = !outcome || Number(m.seq) <= Number(outcome.seq);
-    if (upToOutcome && seatIds.has(author)) question.exchanges = (question.exchanges ?? 0) + 1;
+    const beforeOutcome = !outcome || Number(m.seq) < Number(outcome.seq);
+    if (beforeOutcome && seatIds.has(author)) question.exchanges = (question.exchanges ?? 0) + 1;
     if (m.kind === "agreement") {
       agreements++;
       lastAgreementOn.set(q, m);
       continue;
     }
-    if (upToOutcome) {
+    if (beforeOutcome) {
       claims++;
       if (SOURCE.test(String(m.body))) sourced++;
       else unsourcedOf.set(author, (unsourcedOf.get(author) ?? 0) + 1);
     }
     const last = lastAgreementOn.get(q);
-    if (skeptic.has(author) && last && Number(last.author) !== author && !endorsedSeqs.has(Number(last.seq))) {
+    if (skeptic.has(author) && last && Number(last.author) !== author && !endorsedBefore(Number(last.seq), Number(m.seq))) {
       mark(author, { at: String(m.at), what: "objected", seq: Number(m.seq), path: q, note: `objects to #${last.seq}: ${firstLine(String(m.body))}` });
     }
   }
@@ -830,7 +871,7 @@ function debateOf(db, run2, seats, messages) {
     brainstorm: {
       questions: [...questions.values()].sort((a, b) => ms(a.firstPost) - ms(b.firstPost)),
       agreements,
-      endorsed: endorsements.length,
+      endorsed: skepticEndorsements.length,
       claimsWithSource: { n: sourced, of: claims, inferred: true }
     },
     marksOf,
@@ -846,14 +887,25 @@ function withMemberFigures(run2) {
     waitingMs: m.waitingMs ?? (run2.recorded ? m.intervals.filter((i) => i.what === "waiting").reduce((n, i) => n + lengthOf(i), 0) : null),
     agreementsMade: m.agreementsMade ?? marked(m, "agreement"),
     endorsed: m.endorsed ?? (debated ? marked(m, "endorsed") : null),
-    objections: m.objections ?? (debated ? marked(m, "objected") : null)
+    objections: m.objections ?? (debated ? marked(m, "objected") : null),
+    // a summary from before the events were read (D45) reads its member as not estimated
+    estimated: m.estimated ?? false
   }));
   const plan = run2.plan && {
     ...run2.plan,
-    slices: { ...run2.plan.slices, estimated: run2.plan.slices.estimated ?? false },
-    shared: { ...run2.plan.shared, estimated: run2.plan.shared.estimated ?? false }
+    slices: slicesOfSummary(run2.plan.slices),
+    shared: {
+      ...run2.plan.shared,
+      estimated: run2.plan.shared.estimated ?? false,
+      // a summary from before `told` (D46) reads each file told, as its list read it
+      perFile: run2.plan.shared.perFile.map((f) => ({ ...f, told: f.told ?? true }))
+    }
   };
   return { ...run2, members, ...plan ? { plan } : {} };
+}
+function slicesOfSummary(slices) {
+  const { estimated, ...rest } = slices;
+  return { ...rest, timesEstimated: slices.timesEstimated ?? estimated ?? false };
 }
 var KEPT = "(pruned_at IS NULL OR id IN (SELECT run FROM run_stats))";
 function summarize(db, run2, silentAfterMs) {
@@ -885,7 +937,7 @@ function totalsOf(runs) {
       of: sumKnown(plans.map((p) => p.slices.of)),
       p50Ms: percentile(times, 0.5),
       p90Ms: percentile(times, 0.9),
-      estimatedRuns: plans.filter((p) => p.slices.estimated).length
+      timesEstimatedRuns: plans.filter((p) => p.slices.timesEstimated).length
     },
     // merges: the lock turns granted, each one merge's wait
     lockWait: { merges: recordedPlans.length ? waits.length : null, p50Ms: percentile(waits, 0.5), p90Ms: percentile(waits, 0.9), bins: recordedPlans.length ? bins : [] },
@@ -925,12 +977,15 @@ function brainstormTotalsOf(runs) {
   const n = sumKnown(debated.map((d) => d.debate.claimsWithSource.n));
   const of = sumKnown(debated.map((d) => d.debate.claimsWithSource.of));
   const silentSeatsOf = (r) => r.members.filter((m) => m.slice !== ORCHESTRATOR && m.intervals.some((i) => i.what === "silent")).length;
+  const brainstorms = runs.filter((r) => r.kind === "brainstorm");
   return {
+    notRecorded: brainstorms.length ? brainstorms.filter((r) => !r.recorded).length : null,
     questionsSettled: debated.length ? settled.length : null,
     questions: debated.length ? questions.length : null,
     exchangesMedian: percentile(settled.flatMap((q) => q.exchanges === null ? [] : [q.exchanges]), 0.5),
     objectedThenAgreed: debated.length ? debated.reduce((k, d) => k + d.debate.questions.filter((q) => objectedOf(d.run, q)).length, 0) : null,
     sourcedShare: n === null || !of ? null : n / of,
+    claimsWithSource: { n, of },
     silentSeats: sumKnown(debated.filter((d) => d.run.recorded).map((d) => silentSeatsOf(d.run)))
   };
 }
