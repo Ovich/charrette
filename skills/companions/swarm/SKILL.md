@@ -1,6 +1,6 @@
 ---
 name: swarm
-description: "Use when agents run together on the project's swarm board: a plan in swarm mode or an auto brainstorm, as its orchestrator, a slice runner or a seat whose brief names a run, or when a run on the board has to be opened, read, interrupted or closed. Produces nothing but the run's state on the board. Not for a classic run, and not for documents (aiview)."
+description: "Use when agents run together on the project's swarm board: a plan in swarm mode or an auto brainstorm, as its orchestrator, a slice runner or a seat whose brief names a run, or when a run on the board has to be opened, read, interrupted or closed, or how the runs went has to be read from outside them. Produces nothing but the run's state on the board, or its figures. Not for a classic run, and not for documents (aiview)."
 ---
 
 # swarm: the board
@@ -85,3 +85,7 @@ installed.
 - **The orchestrator of a run** (a plan whose mandate says `mode: swarm`, or an auto
   brainstorm): read `references/orchestrator.md` before opening it, and the `orchestrate` skill
   for dispatch.
+- **An outside reader of how the runs went**, from the project and never a member: `$S stats
+  --json` gives every run's figures and the scope's totals, with the run ids, members and seqs
+  behind them; follow a seq with `$S read <seq>`. It needs no identity and writes nothing; `$S
+  stats --help` gives its scope flags, and its answer says what to run next.
