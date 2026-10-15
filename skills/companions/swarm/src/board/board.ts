@@ -7,7 +7,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { SQLITE_PATH } from "./home.ts";
 import { nameHandle, parseMentions, planCode } from "./mentions.ts";
-import { claimsOf } from "./claims.ts";
+import { claimsOf, type HeldMergeLock } from "./claims.ts";
+import { statsOf, type Stats, type StatsScope } from "./stats.ts";
+import type { Conflicts } from "../cli/conflicts.ts";
 import { type Kind, profileOf } from "./kinds.ts";
 import { type EventName, type Subscription, EVENTS, formatSubscriptions, mentions as mentionsMe, parseSubscriptions as parseOn, wakes } from "./events.ts";
 import { funnyName } from "./names.ts";
@@ -15,6 +17,9 @@ import { funnyName } from "./names.ts";
 export type RunId = number;
 export type { Kind } from "./kinds.ts";
 export type { EventName, Subscription } from "./events.ts";
+export type { HeldMergeLock } from "./claims.ts";
+export type { Conflicts } from "../cli/conflicts.ts";
+export type { Stats, StatsScope, Totals, RunStats, MemberStats, PlanRunStats, SharedFile, FileAcrossRuns, Interval, Mark, QuestionStats, BrainstormRunStats } from "./stats.ts";
 /** A seat of a run (D22). `link`: the slice document's URL, opaque to the board (D44). */
 export type SeatSpec = { id: string; title: string; role?: string; blockers: string[]; link?: string | null; on?: string[] };
 /** Kept: the plan's own word (D41). */
@@ -128,7 +133,8 @@ export type SnapshotRunner = {
   /** Its last call to the board, else when it joined (D20: quiet n min). */
   lastCall: string;
 };
-/** What a merged event told, as data (D11): `rebase` holds or declared a changed file, `tell` is whom to tell of a resolved conflict. */
+/** What a merged event told, as data (D11): `rebase` holds or declared a changed file, `tell` is whom to tell of a resolved conflict,
+ *  of a conflicted path only once the conflicts are known (D5). */
 export type MergedMeta = { rebase: string[]; tell: string[] };
 /** `event`, `mentions`, `meta`: absent on rows written before D11. */
 export type SnapshotEvent = {
@@ -225,7 +231,7 @@ export interface Board {
 
   /** A claim before an edit of `path` (absolute, or repository-relative), `swarm claim` (D58).
    *  Free: claimed, silently. Held by others (D40, D41): `p`'s first claim is held until `p` has
-   *  posted about the path mentioning a holder; then `p` holds it too, the other holders named
+   *  posted about the path mentioning every holder; then `p` holds it too, the other holders named
    *  once. `interface`: claimed as an interface, an `inside` claim of `p` widened. */
   checkEdit(p: Participant, path: string, opts?: { interface?: boolean }): EditAllowed | EditHeld;
   // checkEdit, reconcileWrites, release, lockMerge, merged: refused when the caller's kind has no claims
@@ -235,8 +241,13 @@ export interface Board {
   lockMerge(p: Participant, onto?: string): { granted: true } | { granted: false; holder: string };
   /** Releases the lock; tells whoever holds or declared one of `files` to rebase onto `sha`,
    *  every plan on the repository when one of them is an interface (D26). Returns, for each
-   *  merged path, every other runner that holds it, or held it during `p`'s run (D63). */
-  merged(p: Participant, sha: string, files: string[]): Sharer[];
+   *  merged path, every other runner that holds it, or held it during `p`'s run (D63); once `conflicts` are known,
+   *  of a conflicted path only (D5). Records the merge with its conflicts, absent recorded as unknown (D25). */
+  merged(p: Participant, sha: string, files: string[], conflicts?: Conflicts): Sharer[];
+  /** The merge lock `p` holds, its grant time and branch, for the CLI to replay the rebase since (D33); null when it holds none. */
+  heldMergeLock(p: Participant): HeldMergeLock | null;
+  /** The figures of the scope's runs (D33, D34): one read, no write; a figure not recorded or not computed yet is null, never 0. */
+  stats(scope: StatsScope): Stats;
 
   // the page (D39)
   /** Every repository with an open run or a closed run within the retention (D46); a run kept only as a pruned author never. */
@@ -403,6 +414,16 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       repo TEXT PRIMARY KEY,
       version INTEGER NOT NULL
     );
+    -- one row per merge, written by merged, deleted with its run by prune (D25): files and conflicts JSON, conflicts NULL for unknown
+    CREATE TABLE IF NOT EXISTS merges (
+      participant INTEGER NOT NULL,
+      run INTEGER NOT NULL,
+      sha TEXT NOT NULL,
+      at TEXT NOT NULL,
+      files TEXT NOT NULL,
+      conflicts TEXT
+    );
+    CREATE INDEX IF NOT EXISTS merges_run ON merges (run);
     -- board settings (D32): retention-days; the board's own last-upkeep (D16)
     CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
     -- the identities and hook_seen tables, left in stores from before D58, are no longer read or written
@@ -878,6 +899,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
             if (!db.prepare("SELECT 1 FROM messages WHERE author = ? LIMIT 1").get(id)) db.prepare("DELETE FROM participants WHERE id = ?").run(id);
           }
           db.prepare("DELETE FROM slices WHERE run = ?").run(run);
+          db.prepare("DELETE FROM merges WHERE run = ?").run(run);
           // the row stays, stamped: its id is never handed to a new run (D61)
           db.prepare("UPDATE runs SET pruned_at = ? WHERE id = ?").run(at.toISOString(), run);
         }
@@ -1165,8 +1187,16 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       return claims.lockMerge(gated(live(p), "merge-lock"), onto);
     },
 
-    merged(p, sha, files) {
-      return claims.merged(gated(live(p), "merged"), sha, files);
+    merged(p, sha, files, conflicts) {
+      return claims.merged(gated(live(p), "merged"), sha, files, conflicts);
+    },
+
+    heldMergeLock(p) {
+      return claims.heldMergeLock(p);
+    },
+
+    stats(scope) {
+      return statsOf(db, scope, STALE_MS);
     },
 
     repos() {

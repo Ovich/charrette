@@ -5,6 +5,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Declared, EditAllowed, MergedMeta, EditHeld, Flag, Message, MessageKind, Participant, Sharer } from "./board.ts";
 import { type EventName, EVENTS } from "./events.ts";
 import { profileOf } from "./kinds.ts";
+import type { Conflicts } from "../cli/conflicts.ts";
 
 export interface ClaimsDeps {
   db: DatabaseSync;
@@ -27,9 +28,12 @@ export interface Claims {
   release(p: Participant, file: string): void;
   /** `onto`: the branch the merge lands in, recorded with the lock for the merged event (D9). */
   lockMerge(p: Participant, onto?: string): { granted: true } | { granted: false; holder: string };
-  /** After a refused claim, `m` (by `p`, about the path, mentioning a holder) makes `p` a sharer, as the second claim would (D7). */
+  /** After a refused claim, `m` (by `p`, about the path, mentioning every holder, in it or before it) makes `p` a sharer, as the second claim would (D7). */
   claimByPost(p: Participant, m: Message): PostClaim | null;
-  merged(p: Participant, sha: string, files: string[]): Sharer[];
+  /** The merge lock `p` holds: when it was granted and the branch it lands in (D33); null when `p` holds none. */
+  heldMergeLock(p: Participant): HeldMergeLock | null;
+  /** `conflicts` absent: unknown. Writes the merge's row; known conflicts narrow the sharers to the conflicted paths (D5, D25). */
+  merged(p: Participant, sha: string, files: string[], conflicts?: Conflicts): Sharer[];
   /** join's declared files, claimed where free */
   claimDeclared(p: Participant, files: Declared[]): void;
   /** end, closeRun, slice done */
@@ -47,6 +51,8 @@ export interface Claims {
 
 /** What a post settled: the claimed path and its other holders' names. */
 export type PostClaim = { path: string; sharedWith: string[] };
+/** `grantedAt` ISO; `onto` null for a lock taken without a branch. */
+export type HeldMergeLock = { grantedAt: string; onto: string | null };
 
 type Row = Record<string, unknown>;
 type ClaimRow = { participant: number; kind: string; since: number };
@@ -304,8 +310,15 @@ export function claimsOf(deps: ClaimsDeps): Claims {
       });
     },
 
-    merged(me, sha, files) {
+    heldMergeLock(me) {
+      const r = db.prepare("SELECT at, onto FROM merge_locks WHERE repo = ? AND participant = ?").get(me.repo, me.id) as Row | undefined;
+      return r ? { grantedAt: String(r.at), onto: r.onto == null ? null : String(r.onto) } : null;
+    },
+
+    merged(me, sha, files, conflicts) {
       const rels = [...new Set(files.map((f) => relPath(me.repo, f)).filter((x): x is string => x !== null))];
+      // known: the conflicted paths, as the claims key them; null: unknown, every shared path told as before (D5)
+      const conflicted = conflicts && "files" in conflicts ? new Set(conflicts.files.map((f) => fold(slashes(f)))) : null;
       const wanted = new Set(rels);
       const told = new Set<string>();
       const iface = new Set<string>();
@@ -353,8 +366,10 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         if (iface.size) lines.push(`@swarm interface changed: ${[...iface].join(", ")}.`);
         if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);
         lines.push(`files: ${rels.join(", ") || "-"}`);
-        // whom to tell of a resolved conflict (D63): a holder from any run, or one of this run that held it
+        // whom to tell of a resolved conflict (D63): a holder from any run, or one of this run that held it;
+        // once the conflicts are known, of a conflicted path only (D5)
         for (const rel of rels) {
+          if (conflicted && !conflicted.has(fold(rel))) continue;
           const ids = new Set(holdersOf(me.repo, rel).map((c) => c.participant));
           const held = db
             .prepare("SELECT l.participant FROM claim_log l JOIN participants p ON p.id = l.participant WHERE l.repo = ? AND l.path = ? AND p.run = ? ORDER BY l.rowid")
@@ -365,6 +380,15 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         }
         const meta: MergedMeta = { rebase: [...told], tell: [...new Set(sharers.map((o) => o.runner))] };
         insertMessage(me, lines.join("\n"), null, "event", [...new Set([...told, ...waiters, ...all])], { event: EVENTS.merged.name, meta });
+        // the merge, for the stats: its files and conflicts, null for unknown (D25)
+        db.prepare("INSERT INTO merges (participant, run, sha, at, files, conflicts) VALUES (?, ?, ?, ?, ?, ?)").run(
+          me.id,
+          me.run,
+          sha,
+          now(),
+          JSON.stringify(rels),
+          conflicts && "files" in conflicts ? JSON.stringify(conflicts.files.map(slashes)) : null,
+        );
       });
       return sharers;
     },
