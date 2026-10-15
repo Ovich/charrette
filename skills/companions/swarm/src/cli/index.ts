@@ -13,6 +13,7 @@ import { nameHandle, unmatchedMentions } from "../board/mentions.ts";
 import { registerBoardDocument } from "./aiview-document.ts";
 import { unclaimedLines } from "./unclaimed.ts";
 import { git } from "./git.ts";
+import { conflictsOf } from "./conflicts.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
@@ -54,6 +55,12 @@ const CODE_USAGE = [
   "  release [--as <runner>] <path>                                  # gives up a claim",
   "  merge-lock --onto <branch> [--as <runner>]                      # one merge at a time per repository; claims or flags what your branch wrote unclaimed",
   "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase and who was refused the lock, names whom to tell of a resolved conflict",
+].join("\n");
+
+/** `stats` is for an outside reader, never a member: not in USAGE, its own help (D33). */
+const STATS_USAGE = [
+  "usage: swarm stats [--run <id>] [--json]",
+  "  the figures of this repository's runs, oldest first; a figure not recorded or not computed yet is null, never 0",
 ].join("\n");
 
 class CliError extends Error {}
@@ -551,7 +558,10 @@ async function main(board: Board): Promise<void> {
       const p = caller(board);
       const sha = args.positional[0] ?? fail("merged: which sha?");
       const files = args.list("--files");
-      const sharers = board.merged(p, sha, files.map((f) => path.resolve(f)));
+      // what the rebase since the lock's grant met, read before the lock goes (D3, D25); no worktree or no lock: unknown (D33)
+      const lock = board.heldMergeLock(p);
+      const conflicts = p.worktree && lock ? conflictsOf(p.worktree, lock.onto ?? "", lock.grantedAt) : undefined;
+      const sharers = board.merged(p, sha, files.map((f) => path.resolve(f)), conflicts);
       // the post after a resolved conflict, prompted by the command just run (D63)
       const tell = sharers.map(
         (o) => `if you resolved a conflict in ${o.path}, tell them: swarm post "@${o.runner} I resolved ${o.path}: <how>" --about ${o.path}`,
@@ -572,6 +582,14 @@ async function main(board: Board): Promise<void> {
         printReconciled(reconciled, flags);
         console.log(`${p.name} ended`);
       });
+      break;
+    }
+    case "stats": {
+      const raw = args.flag("--run");
+      const run = raw === undefined ? undefined : Number(raw);
+      if (run !== undefined && !Number.isInteger(run)) fail(`--run takes a run id, got ${raw}`);
+      const stats = board.stats({ repo: repoOf(process.cwd()), ...(run !== undefined ? { run } : {}) });
+      emit(stats, JSON.stringify(stats, null, 2));
       break;
     }
     case "status": {
@@ -598,6 +616,10 @@ async function main(board: Board): Promise<void> {
 if (!args.verb) {
   console.error(USAGE);
   process.exit(1);
+}
+if (args.verb === "stats" && args.has("--help")) {
+  console.log(STATS_USAGE);
+  process.exit(0);
 }
 if (args.verb === "--help") {
   // the core verbs; `--help code` the claim and merge verbs (D22)
