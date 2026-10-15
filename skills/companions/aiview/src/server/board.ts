@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import type http from "node:http";
 import path from "node:path";
-import { openBoardReader, type BoardReader } from "../../../swarm/src/board/snapshot.ts";
+import { openBoardReader, type BoardReader, type Kind, type StatsScope } from "../../../swarm/src/board/snapshot.ts";
 import type { BoardChangedEventPayload } from "../core/api.ts";
 import { DATA_ROOT } from "../core/home.ts";
 import type { SseHub } from "./sse.ts";
@@ -83,16 +83,43 @@ export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRo
     json(res, { repos: board.repos(), snapshot: board.snapshot(named.repo) });
   };
 
+  /** The figures of a scope, `BoardReader.stats()` as it answers; the scope maps the CLI's flags one to one
+   *  (D34): `since=all` is `--all` (no since, every run kept), `closedOnly=1` is `--closed`, `kind` is `--kind`. */
+  const answerStats = (board: BoardReader, url: URL, res: http.ServerResponse): void => {
+    const named = repoNamed(board, url);
+    if ("missing" in named) return json(res, { error: named.missing }, 404);
+    const q = url.searchParams;
+    const run = q.get("run");
+    const since = q.get("since");
+    const kinds = (q.get("kind") ?? "").split(",").filter(Boolean) as Kind[];
+    // the keys in the CLI's order, so the two bodies are the same text
+    const scope: StatsScope = {
+      repo: named.repo,
+      ...(run !== null ? { run: Number(run) } : {}),
+      ...(since !== null && since !== "all" ? { since } : {}),
+      ...(kinds.length ? { kinds } : {}),
+      ...(q.get("closedOnly") === "1" ? { closedOnly: true } : {}),
+    };
+    json(res, board.stats(scope));
+  };
+
+  const ROUTES = new Map<string, (board: BoardReader, url: URL, res: http.ServerResponse) => void>([
+    ["/api/board", answerBoard],
+    ["/api/run", answerBoard],
+    ["/api/stats", answerStats],
+  ]);
+
   return {
     handle(req, res, url) {
-      if (url.pathname !== "/api/board" && url.pathname !== "/api/run") return false;
+      const answer = ROUTES.get(url.pathname);
+      if (!answer) return false;
       if (req.method !== "GET" && req.method !== "HEAD") return false; // aiview's own 404 answers it
       if (!reader && !fs.existsSync(dbPath)) {
         json(res, { error: "no run on the board yet" }, 404);
         return true;
       }
       openReader()
-        .then((board) => answerBoard(board, url, res))
+        .then((board) => answer(board, url, res))
         .catch((err: unknown) => json(res, { error: (err as Error).message }, 500));
       return true;
     },
