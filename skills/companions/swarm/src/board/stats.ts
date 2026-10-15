@@ -367,7 +367,9 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
   // the claims still held; closeRun summarizes before it releases them
   const interfaceClaims = db.prepare(`SELECT path, participant FROM claims WHERE kind = 'interface' AND participant IN (${marks})`).all(...ids) as Row[];
   const perFile: SharedFile[] = [];
+  // the funnel is nested (D38): each step counts only the files that passed the step before
   let everyHolderTold = 0;
+  let agreed = 0;
   let agreedBeforeMerge = 0;
   for (const { path, holders } of holdersByPath.values()) {
     if (holders.length < 2) continue;
@@ -385,11 +387,16 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
       if (!holders.slice(0, i).every(mentioned)) told = false;
     }
     const sharedAt = tellTimes.length ? Math.min(...tellTimes) : null;
-    if (told) everyHolderTold++;
     const agreement = messages.find((m) => m.kind === "agreement" && aboutNames(m.about, path));
     const mergedWith = merges.filter((m) => filesOf(m).some((f) => foldPath(f) === foldPath(path)));
     const firstMergeOfPath = mergedWith.length ? Math.min(...mergedWith.map((m) => ms(m.at))) : null;
-    if (agreement && (firstMergeOfPath === null || ms(agreement.at) < firstMergeOfPath)) agreedBeforeMerge++;
+    if (told) {
+      everyHolderTold++;
+      if (agreement) {
+        agreed++;
+        if (firstMergeOfPath === null || ms(agreement.at) < firstMergeOfPath) agreedBeforeMerge++;
+      }
+    }
     const met = mergedWith.map(conflictedOf);
     const conflict = !recorded ? null : met.some((c) => c?.some((f) => foldPath(f) === foldPath(path))) ? true : met.some((c) => c === null) ? null : false;
     // an interface: declared so at join (repository-relative), or claimed so (D37)
@@ -426,7 +433,7 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
     plan: {
       slices: { merged: recorded ? mergedSlices : null, of: sliceCount, addedMidRun, timesMs },
       lock: { waitsMs: lockWaitsMs, racesLost },
-      shared: { files: perFile.length, everyHolderTold, agreed: perFile.filter((f) => f.agreement !== null).length, agreedBeforeMerge, perFile },
+      shared: { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge, perFile },
       flags: messages.filter((m) => m.event === "flag").length,
       conflicts: recorded ? { known, inShared, unknownMerges } : { known: null, inShared: null, unknownMerges: null },
     },
