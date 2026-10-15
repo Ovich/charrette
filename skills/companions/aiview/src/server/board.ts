@@ -86,9 +86,12 @@ export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRo
   /** The figures of a scope, `BoardReader.stats()` as it answers; the scope maps the CLI's flags one to one
    *  (D34): `since=all` is `--all` (no since, every run kept), `closedOnly=1` is `--closed`, `kind` is `--kind`. */
   const answerStats = (board: BoardReader, url: URL, res: http.ServerResponse): void => {
-    const named = repoNamed(board, url);
-    if ("missing" in named) return json(res, { error: named.missing }, 404);
     const q = url.searchParams;
+    const key = q.get("repo");
+    // a named repository is read as `swarm stats --repo` reads it, its run whatever its age, pruned with its summary
+    // kept or not in the board's list (plan D40); a run named alone is found among the runs the board lists
+    const named = key !== null ? (board.repos().some((r) => r.repo === key) ? { repo: key } : { missing: `no repository ${key}` }) : repoNamed(board, url);
+    if ("missing" in named) return json(res, { error: named.missing }, 404);
     const run = q.get("run");
     const since = q.get("since");
     const kinds = (q.get("kind") ?? "").split(",").filter(Boolean) as Kind[];
