@@ -200,13 +200,10 @@ function claimsOf(deps) {
       const body = fold(String(r.body));
       return body.includes(f) || body.includes(fold(base));
     };
-    return rows.some((r) => {
-      if (!names(r)) return false;
-      const mentions2 = JSON.parse(String(r.mentions));
-      return holders.some((h) => {
-        const o = participantById(h.participant);
-        return Number(r.seq) > h.since && (mentions2.includes(o.name) || mentions2.includes(`${o.plan}/*`));
-      });
+    const told = rows.filter(names).map((r) => ({ seq: Number(r.seq), mentions: JSON.parse(String(r.mentions)) }));
+    return holders.every((h) => {
+      const o = participantById(h.participant);
+      return told.some((r) => r.seq > h.since && (r.mentions.includes(o.name) || r.mentions.includes(`${o.plan}/*`)));
     });
   };
   const noticeOf = (me, rel, people) => {
@@ -308,7 +305,7 @@ function claimsOf(deps) {
             const at = people.map((o) => `@${o.name}`).join(" ");
             return {
               allowed: false,
-              refusal: `${rel} is also held by ${who}. You may share it, but first tell ${people.length > 1 ? "them" : "its holder"} what you change in it: \`swarm post "${at} \u2026" --about ${rel}\`; ${people.length > 1 ? "they answer" : "its holder answers"} with an agreement on who changes what (\`swarm agree \u2026 --about ${rel}\`), and that agreement goes. Then claim again.`
+              refusal: `${rel} is also held by ${who}. You may share it, but first tell ${people.length > 1 ? "them" : "its holder"} what you change in it: \`swarm post "${at} \u2026" --about ${rel}\`; ${people.length > 1 ? "they answer" : "its holder answers"} with an agreement on who changes what (\`swarm agree \u2026 --about ${rel}\`), and that agreement goes. Claim again once posted; do not wait for the agreement.`
             };
           }
         }
