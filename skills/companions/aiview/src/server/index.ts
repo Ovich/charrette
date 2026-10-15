@@ -100,8 +100,9 @@ export function startServer(
     status: number,
     body: string | Buffer,
     type = "application/json; charset=utf-8",
+    cacheControl = "no-store",
   ) => {
-    res.writeHead(status, { "content-type": type, "cache-control": "no-store" });
+    res.writeHead(status, { "content-type": type, "cache-control": cacheControl });
     res.end(body);
   };
   const json = (res: http.ServerResponse, obj: unknown, status = 200) => send(res, status, JSON.stringify(obj));
@@ -114,10 +115,16 @@ export function startServer(
     if (!useDist)
       return send(res, 404, `aiview UI not built. Run: npm install && npm run build  (in ${toolRoot})`, "text/plain");
     const f = path.resolve(distDir, "." + p.replaceAll("..", ""));
-    if (f.startsWith(distDir) && fs.existsSync(f) && fs.statSync(f).isFile())
-      return send(res, 200, fs.readFileSync(f), MIME[path.extname(f).toLowerCase()] ?? "application/octet-stream");
-    // SPA fallback
-    return send(res, 200, fs.readFileSync(path.join(distDir, "index.html")), "text/html; charset=utf-8");
+    const indexHtml = path.join(distDir, "index.html");
+    if (f !== indexHtml && f.startsWith(distDir) && fs.existsSync(f) && fs.statSync(f).isFile()) {
+      // Vite names every file under assets/ by its content hash: a new build is a new URL.
+      const hashed = f.startsWith(path.join(distDir, "assets") + path.sep);
+      const mime = MIME[path.extname(f).toLowerCase()] ?? "application/octet-stream";
+      return send(res, 200, fs.readFileSync(f), mime, hashed ? "public, max-age=31536000, immutable" : "no-cache");
+    }
+    // index.html and the SPA fallback: revalidated on every load, so a plugin update's
+    // new hashed bundle is picked up by the next load, never an old cached page.
+    return send(res, 200, fs.readFileSync(indexHtml), "text/html; charset=utf-8", "no-cache");
   };
 
   const server = http.createServer((req, res) => {

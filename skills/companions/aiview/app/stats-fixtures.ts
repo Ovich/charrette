@@ -49,13 +49,13 @@ const totals = (over: Partial<Totals> = {}, points: (number | null)[] = []): Tot
   notRecorded: 0,
   members: 2,
   silentMembers: 0,
-  slices: { merged: 1, of: 1, p50Ms: 5 * MIN, p90Ms: 5 * MIN, estimatedRuns: 0 },
+  slices: { merged: 1, of: 1, p50Ms: 5 * MIN, p90Ms: 5 * MIN, timesEstimatedRuns: 0 },
   lockWait: { merges: 1, p50Ms: MIN, p90Ms: MIN, bins: [0, 1, 0, 0, 0] },
   shared: { files: 0, everyHolderTold: 0, agreed: 0, agreedBeforeMerge: 0, withoutAgreement: 0, estimatedRuns: 0 },
   flags: 0,
   runsWithoutFlag: 1,
   conflicts: { known: 0, inShared: 0, unknownMerges: 0 },
-  brainstorm: { questionsSettled: null, questions: null, exchangesMedian: null, objectedThenAgreed: null, sourcedShare: null, silentSeats: null },
+  brainstorm: { notRecorded: null, questionsSettled: null, questions: null, exchangesMedian: null, objectedThenAgreed: null, sourcedShare: null, claimsWithSource: { n: null, of: null }, silentSeats: null },
   series: series(points),
   ...over,
 });
@@ -95,7 +95,7 @@ const LP_RUN: RunStats = {
     LP_S4,
   ],
   plan: {
-    slices: { merged: 1, of: 4, addedMidRun: 0, timesMs: [18 * MIN], estimated: false },
+    slices: { merged: 1, of: 4, addedMidRun: 0, timesMs: [18 * MIN], timesEstimated: false },
     lock: { waitsMs: [MIN], racesLost: [] },
     shared: {
       files: 2,
@@ -117,7 +117,7 @@ export const PLAN_RUN: Stats = {
   runs: [LP_RUN],
   totals: totals({
     members: 2,
-    slices: { merged: 1, of: 4, p50Ms: 18 * MIN, p90Ms: 18 * MIN, estimatedRuns: 0 },
+    slices: { merged: 1, of: 4, p50Ms: 18 * MIN, p90Ms: 18 * MIN, timesEstimatedRuns: 0 },
     shared: { files: 2, everyHolderTold: 2, agreed: 1, agreedBeforeMerge: 1, withoutAgreement: 1, estimatedRuns: 0 },
     flags: 1,
     conflicts: { known: 1, inShared: 1, unknownMerges: 0 },
@@ -182,13 +182,13 @@ export const BRAINSTORM_RUN: Stats = {
   totals: totals({
     byKind: { plan: 0, brainstorm: 1 },
     members: 3,
-    slices: { merged: null, of: null, p50Ms: null, p90Ms: null, estimatedRuns: 0 },
+    slices: { merged: null, of: null, p50Ms: null, p90Ms: null, timesEstimatedRuns: 0 },
     lockWait: { merges: null, p50Ms: null, p90Ms: null, bins: [] },
     shared: { files: null, everyHolderTold: null, agreed: null, agreedBeforeMerge: null, withoutAgreement: null, estimatedRuns: 0 },
     flags: null,
     runsWithoutFlag: null,
     conflicts: { known: null, inShared: null, unknownMerges: null },
-    brainstorm: { questionsSettled: 1, questions: 2, exchangesMedian: 4, objectedThenAgreed: 1, sourcedShare: 5 / 8, silentSeats: 0 },
+    brainstorm: { notRecorded: 0, questionsSettled: 1, questions: 2, exchangesMedian: 4, objectedThenAgreed: 1, sourcedShare: 5 / 8, claimsWithSource: { n: 5, of: 8 }, silentSeats: 0 },
   }, [null]),
   files: [],
   silentAfterMs: SILENT_AFTER_MS,
@@ -210,7 +210,7 @@ const OLD_RUN: RunStats = {
   members: [member("old-login/S1", "Quiet Llama", "09:00", { ended: at("10:00"), posts: 6, waitingMs: null })],
   // its slices and shared files estimated from its members' rows and claims (D44)
   plan: {
-    slices: { merged: 1, of: 2, addedMidRun: 0, timesMs: [55 * MIN], estimated: true },
+    slices: { merged: 1, of: 2, addedMidRun: 0, timesMs: [55 * MIN], timesEstimated: true },
     lock: { waitsMs: [], racesLost: [] },
     shared: {
       files: 1,
@@ -231,7 +231,7 @@ export const UNRECORDED_RUN: Stats = {
     notRecorded: 1,
     members: 1,
     silentMembers: null,
-    slices: { merged: 1, of: 2, p50Ms: 55 * MIN, p90Ms: 55 * MIN, estimatedRuns: 1 },
+    slices: { merged: 1, of: 2, p50Ms: 55 * MIN, p90Ms: 55 * MIN, timesEstimatedRuns: 1 },
     lockWait: { merges: null, p50Ms: null, p90Ms: null, bins: [] },
     shared: { files: 1, everyHolderTold: 1, agreed: 0, agreedBeforeMerge: null, withoutAgreement: 1, estimatedRuns: 1 },
     conflicts: { known: null, inShared: null, unknownMerges: null },
@@ -266,7 +266,7 @@ const EVENTS_RUN: RunStats = {
       intervals: [{ from: at("09:05"), to: at("09:50"), what: "working", inferred: true }],
     }),
   ],
-  plan: { ...OLD_RUN.plan!, slices: { merged: 1, of: 2, addedMidRun: 0, timesMs: [20 * MIN, 45 * MIN], estimated: true }, shared: { ...OLD_RUN.plan!.shared, agreedBeforeMerge: 0 } },
+  plan: { ...OLD_RUN.plan!, slices: { merged: 1, of: 2, addedMidRun: 0, timesMs: [20 * MIN, 45 * MIN], timesEstimated: true }, shared: { ...OLD_RUN.plan!.shared, agreedBeforeMerge: 0 } },
 };
 export const EVENTS_READ_RUN: Stats = { ...UNRECORDED_RUN, scope: { repo: APP, run: 9 }, runs: [EVENTS_RUN] };
 
@@ -292,7 +292,7 @@ export const ACROSS: Stats = {
       notRecorded: 1,
       members: 37,
       silentMembers: null,
-      slices: { merged: 29, of: 33, p50Ms: 17 * MIN, p90Ms: 41 * MIN, estimatedRuns: 1 },
+      slices: { merged: 29, of: 33, p50Ms: 17 * MIN, p90Ms: 41 * MIN, timesEstimatedRuns: 1 },
       lockWait: { merges: 23, p50Ms: 4 * MIN + 10_000, p90Ms: 9 * MIN, bins: [6, 5, 7, 3, 2] },
       shared: { files: 9, everyHolderTold: 8, agreed: 6, agreedBeforeMerge: 4, withoutAgreement: 3, estimatedRuns: 1 },
       flags: 7,

@@ -117,7 +117,7 @@ test("a run before the records reads `recorded: false`, its lock-wait and confli
   }
   const p = r.plan!;
   // read from the members' rows and the claims, estimated (D44)
-  assert.deepEqual([p.slices.merged, p.slices.estimated, p.shared.estimated], [2, true, true]);
+  assert.deepEqual([p.slices.merged, p.slices.timesEstimated, p.shared.estimated], [2, true, true]);
   assert.equal(p.slices.timesMs.length, 2);
   assert.deepEqual(p.lock.waitsMs, []);
   assert.deepEqual(p.conflicts, { known: null, inShared: null, unknownMerges: null });
@@ -130,7 +130,7 @@ test("a run before the records reads `recorded: false`, its lock-wait and confli
   assert.deepEqual([byName.get(a.name)!.agreementsMade, byName.get(b.name)!.flags], [1, 1]);
   const t = out.totals;
   assert.deepEqual([t.notRecorded, t.lockWait.merges, t.lockWait.p50Ms, t.conflicts.known, t.silentMembers], [1, null, null, null, null]);
-  assert.deepEqual([t.slices.merged, t.slices.estimatedRuns, t.shared.estimatedRuns], [2, 1, 1]);
+  assert.deepEqual([t.slices.merged, t.slices.timesEstimatedRuns, t.shared.estimatedRuns], [2, 1, 1]);
   assert.equal(t.flags, 1);
 });
 
@@ -254,7 +254,7 @@ test("a plan run before the records: slices merged from the members' rows, each 
   const r = board.stats({ repo: REPO, run }).runs[0];
   const p = r.plan!;
   assert.equal(r.recorded, false);
-  assert.deepEqual([p.slices.merged, p.slices.of, p.slices.estimated], [2, 3, true]);
+  assert.deepEqual([p.slices.merged, p.slices.of, p.slices.timesEstimated], [2, 3, true]);
   // the merges at 2 and 7 minutes, read from the board's events; c, never merged, to its end at 10 (D45)
   assert.deepEqual([...p.slices.timesMs].sort((x, y) => x - y), [2 * 60_000, 7 * 60_000, 10 * 60_000]);
   assert.deepEqual(p.lock.waitsMs, []);
@@ -289,7 +289,44 @@ test("a recorded run reads both estimate flags false (D44, SL9)", () => {
   const plan = fullPlanRun(board);
   const out = board.stats({ repo: REPO, run: plan.run });
   const p = out.runs[0].plan!;
-  assert.deepEqual([p.slices.estimated, p.shared.estimated], [false, false]);
+  assert.deepEqual([p.slices.timesEstimated, p.shared.estimated], [false, false]);
   assert.ok(out.runs[0].members.every((m) => m.estimated === false));
-  assert.deepEqual([out.totals.slices.estimatedRuns, out.totals.shared.estimatedRuns], [0, 0]);
+  assert.deepEqual([out.totals.slices.timesEstimatedRuns, out.totals.shared.estimatedRuns], [0, 0]);
+});
+
+test("a stored summary from before `timesEstimated`: its `estimated` read as the times', none read false; the count never estimated (D44, round 2)", async () => {
+  const { board } = s;
+  const legacy = fullPlanRun(board, "legacy");
+  const older = fullPlanRun(board, "older");
+  const rewrite = (run: RunId, slices: (x: Record<string, unknown>) => void) =>
+    setup(s.file, (db) => {
+      const body = JSON.parse(String((db.prepare("SELECT body FROM run_stats WHERE run = ?").get(run) as { body: string }).body));
+      slices(body.plan.slices);
+      db.prepare("UPDATE run_stats SET body = ? WHERE run = ?").run(JSON.stringify(body), run);
+    });
+  await rewrite(legacy.run, (x) => {
+    delete x.timesEstimated;
+    x.estimated = true;
+  });
+  await rewrite(older.run, (x) => void delete x.timesEstimated);
+  const out = board.stats({ repo: REPO });
+  const slicesOf = (run: RunId) => out.runs.find((r) => r.run === run)!.plan!.slices;
+  assert.equal(slicesOf(legacy.run).timesEstimated, true);
+  assert.equal("estimated" in slicesOf(legacy.run), false);
+  assert.equal(slicesOf(older.run).timesEstimated, false);
+  assert.deepEqual([out.totals.slices.merged, out.totals.slices.timesEstimatedRuns], [4, 1]);
+});
+
+test("`totals.brainstorm.notRecorded` counts the brainstorm runs before the records only, never the plan runs (round 2)", async () => {
+  const { board } = s;
+  const plans = [fullPlanRun(board, "p1"), fullPlanRun(board, "p2")];
+  const old = fullBrainstormRun(board);
+  await recordsBeginAt(s.file, at(60));
+  for (const p of plans) await dropSummary(s.file, p.run);
+  await dropSummary(s.file, old);
+  clockTo(61);
+  const out = board.stats({ repo: REPO });
+  assert.deepEqual([out.totals.notRecorded, out.totals.brainstorm.notRecorded], [3, 1]);
+  // a scope with no brainstorm run has none to count
+  assert.equal(board.stats({ repo: REPO, kinds: ["plan"] }).totals.brainstorm.notRecorded, null);
 });

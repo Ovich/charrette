@@ -5,16 +5,27 @@ import { runHue, type RunId } from "../../../lib/board/view.ts";
 
 /** One run's row: what each column shows, and the value it sorts by (null last). */
 type Cell = { show: ReactNode; sortBy: number | string | null; className?: string; tip?: string };
-type Column = { heading: string; numeric: boolean; cell: (run: RunStats, i: number) => Cell };
+type Column = { heading: string; numeric: boolean; planOnly?: true; cell: (run: RunStats, i: number) => Cell };
 
 const notPlan = (): Cell => ({ show: "—", sortBy: null, className: "faint" });
 const count = (n: number | null | undefined, tone: string): Cell => ({ show: figure(n), sortBy: n ?? null, className: n ? tone : n === 0 ? "faint" : "nr" });
 
 /** The scope's runs, one row each, oldest first until a heading is clicked; a row opens its run's tab
- *  (D33). Lock wait p50 and Stale per run from `totals.series` (one point per run, as `runs`). */
-export function RunsTable({ runs, series, onOpen }: { runs: RunStats[]; series: Totals["series"]; onOpen: (run: RunId) => void }) {
+ *  (D33). Lock wait p50 and Stale per run from `totals.series` (one point per run, as `runs`). A brainstorm row reads
+ *  — in every plan column; `planColumns` false (plan not chosen) leaves those columns out. */
+export function RunsTable({
+  runs,
+  series,
+  planColumns = true,
+  onOpen,
+}: {
+  runs: RunStats[];
+  series: Totals["series"];
+  planColumns?: boolean;
+  onOpen: (run: RunId) => void;
+}) {
   const [sort, setSort] = useState<{ column: number; descending: boolean } | null>(null);
-  const columns: Column[] = [
+  const allColumns: Column[] = [
     {
       heading: "Run",
       numeric: false,
@@ -35,13 +46,15 @@ export function RunsTable({ runs, series, onOpen }: { runs: RunStats[]; series: 
     {
       heading: "Lock wait p50",
       numeric: true,
+      planOnly: true,
       cell: (r, i) => (r.plan ? { show: figure(series.lockWaitP50[i], formatDuration), sortBy: series.lockWaitP50[i], className: series.lockWaitP50[i] === null ? "nr" : undefined } : notPlan()),
     },
     {
       heading: "Shared files settled",
       numeric: false,
+      planOnly: true,
       cell: (r) => {
-        if (!r.plan) return { show: <span className="sub">no claims in a brainstorm</span>, sortBy: null };
+        if (!r.plan) return notPlan();
         const { perFile, agreed, files, estimated } = r.plan.shared;
         return {
           sortBy: agreed,
@@ -62,10 +75,11 @@ export function RunsTable({ runs, series, onOpen }: { runs: RunStats[]; series: 
         };
       },
     },
-    { heading: "Flags", numeric: true, cell: (r) => (r.plan ? count(r.plan.flags, "bad") : notPlan()) },
+    { heading: "Flags", numeric: true, planOnly: true, cell: (r) => (r.plan ? count(r.plan.flags, "bad") : notPlan()) },
     {
       heading: "Conflicts",
       numeric: true,
+      planOnly: true,
       cell: (r) => {
         if (!r.plan) return notPlan();
         const { known, unknownMerges } = r.plan.conflicts;
@@ -75,6 +89,7 @@ export function RunsTable({ runs, series, onOpen }: { runs: RunStats[]; series: 
     },
     { heading: "Stale", numeric: true, cell: (r, i) => count(series.silentMembers[i], "") },
   ];
+  const columns = planColumns ? allColumns : allColumns.filter((c) => !c.planOnly);
 
   const rows = runs.map((r, i) => ({ run: r, cells: columns.map((c) => c.cell(r, i)) }));
   if (sort) {

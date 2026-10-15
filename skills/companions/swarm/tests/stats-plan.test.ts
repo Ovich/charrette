@@ -190,7 +190,7 @@ test("`totals` carries the scope's counts and a series point per run, a run with
   // the early run merged nothing: 0, estimated, never a gap
   assert.deepEqual(out.totals.series.slicesMerged.slice(0, 2), [0, 1]);
   assert.deepEqual(out.totals.series.sharedAgreed.slice(0, 2), [0, 0]);
-  assert.deepEqual([out.totals.slices.estimatedRuns, out.totals.shared.estimatedRuns], [1, 1]);
+  assert.deepEqual([out.totals.slices.timesEstimatedRuns, out.totals.shared.estimatedRuns], [1, 1]);
   assert.deepEqual(out.totals.series.flags, [0, 0, null]);
 });
 

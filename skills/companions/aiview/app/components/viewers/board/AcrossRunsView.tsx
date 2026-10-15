@@ -1,7 +1,8 @@
 // The across-runs view (board D10, mockup #677 `across` and `empty`): the closed runs of the scope as
 // `GET /api/stats` answers them. Every tile, the funnel and the lock panel read `Stats.totals`, each
 // sparkline `totals.series` (D28); the view formats and selects, never aggregates (D34, D35). The plan tiles show
-// when plan is among the kinds chosen, the brainstorm tiles when brainstorm is (D46).
+// when plan is among the kinds chosen, the brainstorm tiles when brainstorm is (D46); the funnel, the lock panel, the
+// hot files and the runs table's plan columns only with plan.
 import type { Stats } from "../../../../../swarm/src/board/snapshot.ts";
 import type { RunId } from "../../../lib/board/view.ts";
 import { useStats } from "../../../hooks/useStats.ts";
@@ -19,8 +20,8 @@ const duration = (n: number | null): string | null => line(n, formatDuration);
 
 function PlanTiles({ stats }: { stats: Stats }) {
   const t = stats.totals;
-  // slices and shared files are estimated for a run before the records (D44), flags known for every run (D43):
-  // only the figures nothing kept say "not recorded"
+  // slice times and shared files are estimated for a run before the records (D44), the merged count exact from the
+  // members' rows, flags known for every run (D43): only the figures nothing kept say "not recorded"
   const notRecorded = t.notRecorded;
   return (
     <div className="kpis">
@@ -30,7 +31,6 @@ function PlanTiles({ stats }: { stats: Stats }) {
         unit={line(t.slices.of, (n) => `of ${n}`)}
         delta={line(t.byKind.plan, (n) => plural(n, "plan run"))}
         spark={t.series.slicesMerged}
-        estimatedRuns={t.slices.estimatedRuns}
       />
       <KpiTile
         label="Slice time"
@@ -38,7 +38,7 @@ function PlanTiles({ stats }: { stats: Stats }) {
         unit="median"
         delta={line(t.slices.p90Ms, (n) => `p90 ${formatDuration(n)}`)}
         spark={t.series.sliceTimeP50}
-        estimatedRuns={t.slices.estimatedRuns}
+        estimatedRuns={t.slices.timesEstimatedRuns}
       />
       <KpiTile
         label="Lock wait"
@@ -95,8 +95,15 @@ function BrainstormTiles({ stats }: { stats: Stats }) {
       />
       <KpiTile label="Exchanges to agree" value={line(b.exchangesMedian, String)} unit="median" />
       <KpiTile label="Objected, then agreed again" value={line(b.objectedThenAgreed, String)} unit="questions" />
-      <KpiTile label="Claims with a source" value={line(b.sourcedShare, percent)} tone="warn" inferred={SOURCED_RULE} />
-      <KpiTile label="Silent seats" value={line(b.silentSeats, String)} unit={`past ${formatDuration(stats.silentAfterMs)}`} notRecorded={stats.totals.notRecorded} newRecord />
+      <KpiTile
+        label="Claims with a source"
+        value={line(b.sourcedShare, percent)}
+        unit={b.claimsWithSource.n !== null && b.claimsWithSource.of !== null ? `${b.claimsWithSource.n} of ${b.claimsWithSource.of}` : null}
+        tone="warn"
+        inferred={SOURCED_RULE}
+      />
+      {/* the brainstorm runs not recorded, never the scope's plan runs */}
+      <KpiTile label="Silent seats" value={line(b.silentSeats, String)} unit={`past ${formatDuration(stats.silentAfterMs)}`} notRecorded={b.notRecorded} newRecord />
     </div>
   );
 }
@@ -117,6 +124,8 @@ export function AcrossRunsView({
   const { stats, body, error } = useStats(repo, scope);
   if (error) return <p className="notice">{error}</p>;
   const empty = stats !== null && stats.runs.length === 0;
+  // claims, the merge lock and shared files are a plan's: with plan not chosen, their panels and columns go
+  const withPlan = scope.kinds.includes("plan");
   const note = stats === null ? "" : empty ? "no closed run" : `${line(stats.totals.runs, (n) => plural(n, "run")) ?? figure(null)} · ${line(stats.totals.members, (n) => plural(n, "member")) ?? figure(null)} · ${repoName}`;
   return (
     <section className="analytics" data-component="AcrossRunsView" data-state={stats === null ? "loading" : empty ? "empty" : "across"}>
@@ -130,17 +139,20 @@ export function AcrossRunsView({
         </div>
       ) : (
         <>
-          {scope.kinds.includes("plan") ? <PlanTiles stats={stats} /> : null}
+          {withPlan ? <PlanTiles stats={stats} /> : null}
           {scope.kinds.includes("brainstorm") ? <BrainstormTiles stats={stats} /> : null}
           <div className="sparknote">
             Sparklines read oldest run to newest. <span className="newrec">new record</span> marks a figure the board does not keep today; it starts with the run after this ships.
           </div>
-          <div className="grid2">
-            <SharingFunnel shared={stats.totals.shared} conflictsInShared={stats.totals.conflicts.inShared} />
-            <MergeLockPanel lockWait={stats.totals.lockWait} runs={stats.runs} />
-          </div>
-          <RunsTable runs={stats.runs} series={stats.totals.series} onOpen={onOpenRun} />
-          <HotFiles files={stats.files} runs={stats.runs} runCount={stats.totals.runs} />
+          {withPlan ? (
+            <div className="grid2">
+              <SharingFunnel shared={stats.totals.shared} conflictsInShared={stats.totals.conflicts.inShared} />
+              <MergeLockPanel lockWait={stats.totals.lockWait} runs={stats.runs} />
+            </div>
+          ) : null}
+          {/* keyed by its columns, so a sort never points at a column the other set lacks */}
+          <RunsTable key={withPlan ? "with-plan" : "brainstorm-only"} runs={stats.runs} series={stats.totals.series} planColumns={withPlan} onOpen={onOpenRun} />
+          {withPlan ? <HotFiles files={stats.files} runs={stats.runs} runCount={stats.totals.runs} /> : null}
         </>
       )}
     </section>
