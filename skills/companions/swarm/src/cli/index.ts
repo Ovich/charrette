@@ -3,7 +3,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { openBoard, type Board, type Declared, type Delivery, type Flag, type Kind, type Message, type Participant, type RosterEntry, type SliceSpec, type SliceState } from "../board/board.ts";
+import { openBoard, type Board, type Declared, type Delivery, type Flag, type Kind, type Message, type Participant, type RosterEntry, type RunStats, type SliceSpec, type SliceState } from "../board/board.ts";
 import { profileOf } from "../board/kinds.ts";
 import { EVENTS, eventOf, formatSubscriptions, parseSubscriptions, type Subscription } from "../board/events.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
@@ -59,9 +59,33 @@ const CODE_USAGE = [
 
 /** `stats` is for an outside reader, never a member: not in USAGE, its own help (D33). */
 const STATS_USAGE = [
-  "usage: swarm stats [--run <id>] [--json]",
-  "  the figures of this repository's runs, oldest first; a figure not recorded or not computed yet is null, never 0",
+  "usage: swarm stats [--repo <path>] [--run <id>] [--since 30d|<ISO> | --all] [--closed] [--kind plan|brainstorm[,…]] [--json]",
+  "  the figures of a repository's runs, oldest first, with the scope's totals; a figure not recorded or not computed yet is null, never 0",
+  "  --since: runs open, or closed since then, default 30d; --all: every run kept; --closed: closed runs only",
+  "  without --json: one line per run; --json carries every figure, with the run ids, members and seqs to follow with swarm read <seq>",
 ].join("\n");
+
+/** A length as an agent reads it: `2h 05m`, `12m`, `40s`; `—` when not known. */
+const lengthText = (ms: number | null): string => {
+  if (ms === null) return "—";
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+  return minutes >= 1 ? `${minutes}m` : `${Math.round(ms / 1000)}s`;
+};
+/** `stats`' line for a run (D34, D35): `<code> <title> · <kind> · <length> · <open|closed> · conflicts <n|unknown>`. */
+const statsLine = (r: RunStats): string => {
+  const c = r.plan?.conflicts;
+  // no merge: —; not recorded: unknown; some merges unknown: <n> + <m> unknown
+  const conflicts =
+    !c || (r.recorded && r.firstMergeAtMs === null)
+      ? "—"
+      : c.known === null
+        ? "unknown"
+        : c.unknownMerges
+          ? `${c.known} + ${c.unknownMerges} unknown`
+          : String(c.known);
+  return `${r.code} ${r.title} · ${r.kind} · ${lengthText(r.lengthMs)} · ${r.closedAt === null ? "open" : "closed"} · conflicts ${conflicts}`;
+};
 
 class CliError extends Error {}
 const fail = (msg: string): never => {
@@ -587,11 +611,31 @@ async function main(board: Board): Promise<void> {
       break;
     }
     case "stats": {
+      // an outside reader's verb: no member identity, no write of its own (board D6)
       const raw = args.flag("--run");
       const run = raw === undefined ? undefined : Number(raw);
       if (run !== undefined && !Number.isInteger(run)) fail(`--run takes a run id, got ${raw}`);
-      const stats = board.stats({ repo: repoOf(process.cwd()), ...(run !== undefined ? { run } : {}) });
-      emit(stats, JSON.stringify(stats, null, 2));
+      const all = args.has("--all");
+      if (all && args.has("--since")) fail("stats: --since or --all, not both");
+      const kinds = args.list("--kind").map((k) => {
+        try {
+          return profileOf(k).kind;
+        } catch (e) {
+          return fail(`stats: ${(e as Error).message}`);
+        }
+      });
+      const stats = board.stats({
+        repo: repoOf(path.resolve(args.flag("--repo") ?? process.cwd())),
+        ...(run !== undefined ? { run } : {}),
+        ...(all ? {} : { since: args.flag("--since") ?? "30d" }),
+        ...(kinds.length ? { kinds } : {}),
+        ...(args.has("--closed") ? { closedOnly: true } : {}),
+      });
+      emit(stats, () => {
+        if (!stats.runs.length) console.log("no run in this scope");
+        for (const r of stats.runs) console.log(statsLine(r));
+        console.log("swarm stats --json for every figure");
+      });
       break;
     }
     case "status": {

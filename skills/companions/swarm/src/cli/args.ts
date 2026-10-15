@@ -22,6 +22,7 @@ const VALUE_FLAGS = new Set([
   "--blockers",
   "--role",
   "--link",
+  "--since",
 ]);
 /** Flags taking every value up to the next flag: `--files a b c`, or `--files "a,b,c"`. */
 const LIST_FLAGS = new Set(["--files"]);
