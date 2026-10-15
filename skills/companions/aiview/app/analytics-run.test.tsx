@@ -111,8 +111,9 @@ test("a run with recorded: false and no spans read: the Not recorded line in pla
   expect(rowOf(part("MembersTable")!, "Quiet Llama").querySelectorAll("td")[1].textContent).toBe("—");
   expect(tile("Lock wait").querySelector(".v")!.textContent).toBe("not recorded");
   expect(tile("Rebase conflicts").querySelector(".v")!.textContent).toBe("not recorded");
-  // its slices and shared files estimated (D44): drawn as inferred, the list marked so
-  expect(tile("Slices merged").dataset.state).toBe("estimated");
+  // its shared files estimated (D44): drawn as inferred, the list marked so; its merged count exact from the members'
+  // rows, never drawn estimated (round 2)
+  expect(tile("Slices merged").dataset.state).toBe("filled");
   expect(tile("Shared files settled").dataset.state).toBe("estimated");
   expect(tile("Flags").dataset.state).toBe("filled");
   const list = part("SharedFilesList")!;

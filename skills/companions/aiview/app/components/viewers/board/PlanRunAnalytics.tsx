@@ -48,7 +48,6 @@ function PlanTiles({ stats, run }: { stats: Stats; run: RunStats }) {
         value={line(t.slices.merged, String)}
         unit={line(t.slices.of, (n) => `of ${n}`)}
         delta={plan.slices.addedMidRun ? `+${plan.slices.addedMidRun} drawn mid-run` : null}
-        estimatedRuns={t.slices.estimatedRuns}
       />
       <KpiTile label="Length" value={line(run.lengthMs, runLength)} delta={line(run.firstMergeAtMs, (n) => `first merge at ${formatDuration(n)}`)} />
       <KpiTile label="Lock wait" value={line(t.lockWait.p50Ms, formatDuration)} unit="p50" delta={lockLine || null} tone="warn" newRecord />

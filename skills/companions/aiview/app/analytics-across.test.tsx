@@ -146,10 +146,14 @@ test("a runs-table row opens its run's tab on Analytics (D33, SL5)", () => {
   expect(location.hash).toContain("run=4&view=analytics");
 });
 
-test("an estimated figure: the Slices merged, Slice time and Shared files settled tiles and the funnel drawn as inferred with the estimate's tip and N runs estimated; the Flags tile has no not-recorded line (D43, D44, SL9)", () => {
+test("an estimated figure: the Slice time and Shared files settled tiles and the funnel drawn as inferred with the estimate's tip and N runs estimated; Slices merged, exact, and Flags are not (D43, D44, SL9, round 2)", () => {
   openAcross();
   const tip = "Estimated: this run closed before analytics recorded it; read from its claims and members.";
-  for (const label of ["Slices merged", "Slice time", "Shared files settled"]) {
+  // the merged count is read from the members' rows, exact for every run: only its times were estimated
+  expect(tile("Slices merged").dataset.state).toBe("filled");
+  expect(tile("Slices merged").classList.contains("inferred")).toBe(false);
+  expect(tile("Slices merged").textContent).not.toContain("estimated");
+  for (const label of ["Slice time", "Shared files settled"]) {
     expect(tile(label).dataset.state, label).toBe("estimated");
     expect(tile(label).classList.contains("inferred"), label).toBe(true);
     expect(tile(label).dataset.tip, label).toBe(tip);
@@ -197,7 +201,11 @@ test("the funnel's first drop reads not every holder told (D38, D46, SL11)", () 
 /** The across view over brainstorm runs too: its debate figures filled. */
 const DEBATED: Stats = {
   ...ACROSS,
-  totals: { ...ACROSS.totals, brainstorm: { questionsSettled: 7, questions: 8, exchangesMedian: 5, objectedThenAgreed: 2, sourcedShare: 0.75, silentSeats: null } },
+  // 2 brainstorm runs not recorded, where the scope has 1 run not recorded in all: the tile reads its own (round 2)
+  totals: {
+    ...ACROSS.totals,
+    brainstorm: { notRecorded: 2, questionsSettled: 7, questions: 8, exchangesMedian: 5, objectedThenAgreed: 2, sourcedShare: 0.75, claimsWithSource: { n: 18, of: 24 }, silentSeats: null },
+  },
 };
 const PLAN_TILES = ["Slices merged", "Slice time", "Lock wait", "Shared files settled", "Flags", "Rebase conflicts", "Silent members"];
 const BRAINSTORM_TILES = ["Questions settled", "Exchanges to agree", "Objected, then agreed again", "Claims with a source", "Silent seats"];
@@ -209,10 +217,29 @@ test("brainstorm chosen: a row of brainstorm tiles from totals.brainstorm; the p
   fireEvent.click(within(across()).getByRole("button", { name: "plan" }));
   expect(tileLabels()).toEqual(BRAINSTORM_TILES);
   const row = across().querySelector('[data-component="BrainstormTiles"]') as HTMLElement;
-  expect([...row.querySelectorAll(".v")].map((v) => v.textContent)).toEqual(["7of 8", "5median", "2questions", "75%", "not recorded"]);
+  expect([...row.querySelectorAll(".v")].map((v) => v.textContent)).toEqual(["7of 8", "5median", "2questions", "75%18 of 24", "not recorded"]);
   expect(tile("Claims with a source").classList.contains("inferred")).toBe(true);
+  // Silent seats counts the brainstorm runs not recorded, never the plan runs' (round 2)
+  expect(within(tile("Silent seats")).getByText("2 runs not recorded")).toBeTruthy();
+  expect(tile("Silent seats").textContent).not.toContain("1 run not recorded");
   // plan alone: no brainstorm row
   fireEvent.click(within(across()).getByRole("button", { name: "plan" }));
   fireEvent.click(within(across()).getByRole("button", { name: "brainstorm" }));
   expect(tileLabels()).toEqual(PLAN_TILES);
+});
+
+test("brainstorm alone: no shared-files funnel, merge lock or hot files, and the runs table without its plan columns; with plan, a brainstorm row reads — in each (round 2)", () => {
+  const hot = { path: "src/session.ts", runs: [4, 9], holders: 3, agreements: 1, conflicts: 0, declaredInterface: 0, perRun: [{ run: 4, holders: 2, conflict: false }, { run: 9, holders: 2, conflict: false }] };
+  openAcross({ ...DEBATED, files: [hot] });
+  const panel = (name: string) => across().querySelector(`[data-component="${name}"]`);
+  const headings = () => [...across().querySelectorAll('[data-component="RunsTable"] th')].map((th) => th.textContent);
+  for (const name of ["SharingFunnel", "MergeLockPanel", "HotFiles"]) expect(panel(name), name).toBeTruthy();
+  expect(headings()).toEqual(["Run", "Members", "Length", "Lock wait p50", "Shared files settled", "Flags", "Conflicts", "Stale"]);
+  // the brainstorm row: — in every plan column, never a sentence in one of them
+  const table = panel("RunsTable") as HTMLElement;
+  const cells = [...within(table).getByText("Theme tokens").closest("tr")!.querySelectorAll("td")].map((td) => td.textContent);
+  expect(cells.slice(3, 7)).toEqual(["—", "—", "—", "—"]);
+  fireEvent.click(within(across()).getByRole("button", { name: "plan" }));
+  for (const name of ["SharingFunnel", "MergeLockPanel", "HotFiles"]) expect(panel(name), name).toBeNull();
+  expect(headings()).toEqual(["Run", "Members", "Length", "Stale"]);
 });
