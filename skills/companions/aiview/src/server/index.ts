@@ -321,7 +321,7 @@ export function startServer(
   server.listen(port, "127.0.0.1", () => {
     const actualPort = (server.address() as { port: number }).port;
     if (writeState) {
-      writeServerFiles(actualPort);
+      writeServerFiles(actualPort, version);
       process.on("exit", clearServerFiles);
     }
     const url = `http://localhost:${actualPort}/${startDoc ? `#doc=${startDoc.id}` : ""}`;

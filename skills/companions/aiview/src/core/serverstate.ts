@@ -1,16 +1,21 @@
-// Pidfile + portfile next to the sqlite in the data home: how `open` and `status`
-// find a running server. One data home = one server, shared by every project.
+// Pidfile, portfile and versionfile next to the sqlite in the data home: how `open` and
+// `status` find a running server, and whether it is the installed one. One data home =
+// one server, shared by every project.
 import fs from "node:fs";
 import path from "node:path";
 import { DATA_ROOT, ensureHome } from "./home.ts";
 
 export const PID_FILE = path.join(DATA_ROOT, "aiview.pid");
 export const PORT_FILE = path.join(DATA_ROOT, "aiview.port");
+export const VERSION_FILE = path.join(DATA_ROOT, "aiview.version");
 
 export interface ServerStatus {
   running: boolean;
   pid: number | null;
   port: number | null;
+  /** The collection version the running server started from; null when it recorded none
+   *  (a server from before versions were recorded, or no manifest to read). */
+  version: string | null;
   /** Files exist but the process is dead — safe to overwrite. */
   stale: boolean;
 }
@@ -33,8 +38,20 @@ const alive = (pid: number): boolean => {
   }
 };
 
-export function writeServerFiles(port: number): void {
+const readText = (f: string): string | null => {
+  try {
+    const t = fs.readFileSync(f, "utf8").trim();
+    return t === "" ? null : t;
+  } catch {
+    return null;
+  }
+};
+
+/** The version is written first: a reader that finds this pid and port finds its version too. */
+export function writeServerFiles(port: number, version: string | null): void {
   ensureHome();
+  if (version === null) fs.rmSync(VERSION_FILE, { force: true });
+  else fs.writeFileSync(VERSION_FILE, version);
   fs.writeFileSync(PID_FILE, String(process.pid));
   fs.writeFileSync(PORT_FILE, String(port));
 }
@@ -45,6 +62,7 @@ export function clearServerFiles(): void {
     try {
       fs.rmSync(PID_FILE, { force: true });
       fs.rmSync(PORT_FILE, { force: true });
+      fs.rmSync(VERSION_FILE, { force: true });
     } catch {}
   }
 }
@@ -52,7 +70,9 @@ export function clearServerFiles(): void {
 export function readServerStatus(): ServerStatus {
   const pid = readInt(PID_FILE);
   const port = readInt(PORT_FILE);
-  if (pid === null || port === null) return { running: false, pid: null, port: null, stale: pid !== null || port !== null };
-  if (!alive(pid)) return { running: false, pid, port, stale: true };
-  return { running: true, pid, port, stale: false };
+  if (pid === null || port === null)
+    return { running: false, pid: null, port: null, version: null, stale: pid !== null || port !== null };
+  const version = readText(VERSION_FILE);
+  if (!alive(pid)) return { running: false, pid, port, version, stale: true };
+  return { running: true, pid, port, version, stale: false };
 }

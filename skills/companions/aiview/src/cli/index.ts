@@ -22,6 +22,7 @@ import type { ShowResponse } from "../core/api.ts";
 import { projectForCwd } from "../core/projects.ts";
 import { adoptLegacyIndex, DATA_ROOT, docsDirFor, DOCS_ROOT, ensureHome } from "../core/home.ts";
 import { readServerStatus, PORT_FILE, type ServerStatus } from "../core/serverstate.ts";
+import { collectionVersion } from "../core/collectionversion.ts";
 import { parseArgs } from "./args.ts";
 import { disciplineWarnings } from "../mermaid/discipline.ts";
 import { check as trackerCheck, findTracker, sync as trackerSync } from "../core/tracker.ts";
@@ -161,8 +162,52 @@ function spawnDetachedServer(port: number): number {
       process.exit(1);
     }
     // synchronous CLI: a short busy-wait poll is fine here
-    spawnSync(process.execPath, ["-e", "setTimeout(()=>{},120)"]);
+    pause(120);
   }
+}
+
+/** Busy-wait a little: the CLI is synchronous and has no event loop to sleep on. */
+const pause = (ms: number): void => {
+  spawnSync(process.execPath, ["-e", `setTimeout(()=>{},${ms})`]);
+};
+
+const isAlive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Stop the server at this pid and wait until it is gone; its files may stay behind (on
+ *  Windows the kill skips its exit hook), and read as stale once the pid is dead. */
+function stopServerProcess(pid: number): void {
+  try {
+    process.kill(pid);
+  } catch {}
+  const t0 = Date.now();
+  while (isAlive(pid)) {
+    if (Date.now() - t0 > 5_000) {
+      console.error(`aiview: the running server (pid ${pid}) is an older version and did not stop within 5s; stop it and retry`);
+      process.exit(1);
+    }
+    pause(100);
+  }
+}
+
+/** The port of a server running the installed collection: the running one when its
+ *  version is the installed one, else a fresh one. A running server of another version,
+ *  or with none recorded, is stopped and replaced on its own port. With no installed
+ *  version to compare against, any running server is reused. */
+function portOfInstalledServer(): number {
+  const requested = Number(args.flag("--port") ?? process.env.AIVIEW_PORT ?? 4321);
+  const st: ServerStatus = readServerStatus();
+  if (!st.running || st.port === null || st.pid === null) return spawnDetachedServer(requested);
+  const installed = collectionVersion(TOOL_ROOT);
+  if (installed === null || st.version === installed) return st.port;
+  stopServerProcess(st.pid);
+  return spawnDetachedServer(st.port);
 }
 
 function resolveRef(ref: string): Document | undefined {
@@ -196,7 +241,7 @@ function cmdStatus(): void {
     console.log(`tool       ${TOOL_ROOT}`);
     console.log(`documents  ${documents}`);
     console.log(
-      `server     ${server.running ? `up (pid ${server.pid}, port ${server.port})` : server.stale ? "down (stale pidfile)" : "down"}`,
+      `server     ${server.running ? `up (pid ${server.pid}, port ${server.port}, version ${server.version ?? "unrecorded"})` : server.stale ? "down (stale pidfile)" : "down"}`,
     );
   });
 }
@@ -323,8 +368,7 @@ function cmdShow(): void {
   }
 
   ensureDist();
-  const st: ServerStatus = readServerStatus();
-  const port = st.running && st.port !== null ? st.port : spawnDetachedServer(Number(args.flag("--port") ?? process.env.AIVIEW_PORT ?? 4321));
+  const port = portOfInstalledServer();
   const pointer = { id: doc.id, components, ...(variant ? { variant } : {}) };
   const url = `http://localhost:${port}/#${pointerHash(pointer)}`;
   const answer = askServer("/api/show", pointer);
@@ -651,8 +695,7 @@ function cmdOpen(): void {
   // you are, and the agent never has to switch-then-open in two steps.
   setActive(index, d.project);
   index.close();
-  const st: ServerStatus = readServerStatus();
-  const port = st.running && st.port !== null ? st.port : spawnDetachedServer(Number(args.flag("--port") ?? process.env.AIVIEW_PORT ?? 4321));
+  const port = portOfInstalledServer();
   const url = `http://localhost:${port}/#doc=${d.id}`;
   if (args.has("--open")) {
     const [c, a] =
@@ -673,8 +716,7 @@ async function cmdServe(): Promise<void> {
       index.register(path.resolve(args.positional[0]), registerOpts());
       index.close();
     }
-    const st = readServerStatus();
-    const port = st.running && st.port !== null ? st.port : spawnDetachedServer(Number(args.flag("--port") ?? process.env.AIVIEW_PORT ?? 4321));
+    const port = portOfInstalledServer();
     emit({ server: readServerStatus() }, `aiview server up on http://localhost:${port}/`);
     return;
   }

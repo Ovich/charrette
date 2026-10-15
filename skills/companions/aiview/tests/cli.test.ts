@@ -156,6 +156,120 @@ test("open: registers, starts a detached server, second open reuses it", () => {
   }
 });
 
+// The installed collection: a skill folder under a plugin whose manifest carries the
+// version, inside the suite's temp dir so no test reads a real manifest.
+const installedSkill = (): string => path.join(toolRoot, "plugin", "skills", "companions", "aiview");
+const install = (version: string): void => {
+  write("plugin/.claude-plugin/plugin.json", JSON.stringify({ version }));
+  fs.mkdirSync(installedSkill(), { recursive: true });
+};
+const runInstalled = (...argv: string[]) =>
+  spawnSync(process.execPath, [CLI, ...argv], {
+    encoding: "utf8",
+    env: { ...process.env, AIVIEW_ROOT: installedSkill(), CHARRETTE_HOME: toolRoot },
+  });
+const openJson = (...argv: string[]) => {
+  const r = runInstalled("open", ...argv, "--json");
+  assert.equal(r.status, 0, r.stderr);
+  return JSON.parse(r.stdout) as { url: string; server: { pid: number; port: number; version: string | null } };
+};
+const isGone = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch {
+    return true;
+  }
+};
+
+test("a server records its version", () => {
+  install("1.0.0");
+  const f = write("docs/v.spec.md", "# V\n");
+  try {
+    const r = openJson(f, "--port", "0");
+    assert.equal(r.server.version, "1.0.0");
+    assert.equal(fs.readFileSync(path.join(toolRoot, "aiview.version"), "utf8"), "1.0.0");
+  } finally {
+    stopServer();
+  }
+});
+
+test("open reuses a server of the same version", () => {
+  install("1.0.0");
+  const f = write("docs/v.spec.md", "# V\n");
+  try {
+    const first = openJson(f, "--port", "0");
+    const second = openJson(f);
+    assert.equal(second.server.pid, first.server.pid);
+    assert.equal(second.url, first.url);
+  } finally {
+    stopServer();
+  }
+});
+
+test("open replaces a server of another version", () => {
+  install("1.0.0");
+  const f = write("docs/v.spec.md", "# V\n");
+  try {
+    const old = openJson(f, "--port", "0");
+    install("1.1.0");
+    const current = openJson(f);
+    assert.notEqual(current.server.pid, old.server.pid);
+    assert.ok(isGone(old.server.pid), "the older server is stopped");
+    assert.equal(current.server.port, old.server.port, "the installed one takes its port");
+    assert.equal(current.server.version, "1.1.0");
+    assert.equal(current.url, old.url);
+  } finally {
+    stopServer();
+  }
+});
+
+test("open replaces a server with no version recorded", () => {
+  install("1.0.0");
+  const f = write("docs/v.spec.md", "# V\n");
+  try {
+    const old = openJson(f, "--port", "0");
+    fs.rmSync(path.join(toolRoot, "aiview.version")); // a server from before versions were recorded
+    const current = openJson(f);
+    assert.notEqual(current.server.pid, old.server.pid);
+    assert.ok(isGone(old.server.pid), "the unversioned server is stopped");
+    assert.equal(current.server.version, "1.0.0");
+  } finally {
+    stopServer();
+  }
+});
+
+test("serve --detach replaces a server of another version", () => {
+  install("1.0.0");
+  const f = write("docs/v.spec.md", "# V\n");
+  try {
+    const old = openJson(f, "--port", "0");
+    install("2.0.0");
+    const r = runInstalled("serve", "--detach", "--json");
+    assert.equal(r.status, 0, r.stderr);
+    const server = (JSON.parse(r.stdout) as { server: { pid: number; version: string } }).server;
+    assert.notEqual(server.pid, old.server.pid);
+    assert.ok(isGone(old.server.pid), "the older server is stopped");
+    assert.equal(server.version, "2.0.0");
+  } finally {
+    stopServer();
+  }
+});
+
+test("status reports the version", () => {
+  install("1.0.0");
+  const f = write("docs/v.spec.md", "# V\n");
+  try {
+    openJson(f, "--port", "0");
+    const json = runInstalled("status", "--json");
+    assert.equal(json.status, 0, json.stderr);
+    assert.equal(JSON.parse(json.stdout).server.version, "1.0.0");
+    assert.match(runInstalled("status").stdout, /up \(pid \d+, port \d+, version 1\.0\.0\)/);
+  } finally {
+    stopServer();
+  }
+});
+
 test("show: names are held to the page the person sees, and the link is the pointer", () => {
   write("docs/tools.mockup.html", `<!doctype html><html><body><span data-component="Pill">v1</span></body></html>`);
   const host = write(
