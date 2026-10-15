@@ -62,7 +62,7 @@ test("a plan run draws its seven tiles, the timeline under the lock band, the me
   expect(part("SharedFilesList")).toBeNull();
 });
 
-test("a member's counts come from the stats: the waiting tag and the seats table read waitingMs, agreementsMade, endorsed, objections even where the fixture's spans and marks would count otherwise (D35, D40, S5.2)", () => {
+test("a member's counts come from the stats: the waiting tag and the seats table read waitingMs, agreementsMade, endorsed, objections even where the fixture's spans and marks would count otherwise; a seat not the skeptic shows its endorsements (D35, D40, D46, S5.2, SL11)", () => {
   // S4's waiting spans add up to one minute; its waitingMs is twelve
   showRun(LP_SUMMARY, PLAN_RUN);
   const time = rowOf(part("MembersTable")!, LP_S4.nick).querySelectorAll("td")[1];
@@ -74,7 +74,7 @@ test("a member's counts come from the stats: the waiting tag and the seats table
   const seats = part("SeatsTable")!;
   const cells = (nick: string) => [...rowOf(seats, nick).querySelectorAll("td")].slice(1).map((c) => c.textContent);
   expect(cells("Witty Heron")).toEqual(["5", "4", "3", "2", "1"]);
-  expect(cells("Jolly Walrus")).toEqual(["4", "2", "—", "0", "2"]);
+  expect(cells("Jolly Walrus")).toEqual(["4", "2", "1", "0", "2"]);
 });
 
 test("inferred spans are drawn apart, dashed, and the legend names silent: no command for 10 min, from silentAfterMs; both legends toggle (board D9, D33, SL5)", () => {
@@ -134,6 +134,31 @@ test("a shared file whose conflict is unknown reads conflict unknown (git older 
   const list = part("SharedFilesList")!;
   expect(rowOf(list, "src/session.ts").querySelectorAll("td")[2].textContent).toBe("none · conflict unknown (git older than 2.38)");
   expect(rowOf(list, "src/login.ts").querySelectorAll("td")[2].textContent).toBe("agreed 2m after · conflict at merge");
+});
+
+test("a shared file not told to every holder says so, its agreement not counted; an agreement before the tell reads so, never 0s after (D38, D46, SL11)", () => {
+  const plan = PLAN_RUN.runs[0].plan!;
+  const perFile = [
+    ...plan.shared.perFile,
+    { path: "src/token.ts", holders: ["login-page/S3", "login-page/S4"], told: false, agreement: 21, agreedAfterMs: 3 * 60_000, conflict: false, interface: false },
+    { path: "src/form.ts", holders: ["login-page/S3", "login-page/S4"], told: false, agreement: null, agreedAfterMs: null, conflict: false, interface: false },
+    { path: "src/early.ts", holders: ["login-page/S3", "login-page/S4"], told: true, agreement: 22, agreedAfterMs: -90_000, conflict: false, interface: false },
+  ];
+  showRun(LP_SUMMARY, { ...PLAN_RUN, runs: [{ ...PLAN_RUN.runs[0], plan: { ...plan, shared: { ...plan.shared, perFile } } }] });
+  const list = part("SharedFilesList")!;
+  const agreementOf = (path: string): HTMLElement => rowOf(list, path).querySelectorAll("td")[2] as HTMLElement;
+  expect(agreementOf("src/token.ts").textContent).toBe("agreed · not every holder told");
+  expect(agreementOf("src/token.ts").querySelector(".warn")).toBeTruthy();
+  expect(agreementOf("src/form.ts").textContent).toBe("none · not every holder told");
+  expect(agreementOf("src/early.ts").textContent).toBe("agreed before the tell");
+  expect(agreementOf("src/early.ts").querySelector(".warn")).toBeNull();
+  expect(list.textContent).not.toContain("0s after");
+});
+
+test("a run's length reads as swarm stats writes it, floored to the minute (D46, SL11)", () => {
+  showRun(LP_SUMMARY, { ...PLAN_RUN, runs: [{ ...PLAN_RUN.runs[0], lengthMs: 14 * 60_000 + 47_000 }] });
+  expect(tile("Length").querySelector(".v")!.textContent).toBe("14m");
+  expect(screen.getByText(/^plan · run 4 · /).textContent).toMatch(/ · 14m$/);
 });
 
 test("no exchange cap, question title, escalation, for the person or budget anywhere (D24, D29, SL5)", () => {

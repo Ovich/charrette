@@ -103,8 +103,8 @@ const LP_RUN: RunStats = {
       agreed: 1,
       agreedBeforeMerge: 1,
       perFile: [
-        { path: "src/login.ts", holders: [`${LP}/S3`, `${LP}/S4`], agreement: 14, agreedAfterMs: 2 * MIN, conflict: true, interface: false },
-        { path: "src/session.ts", holders: [`${LP}/S3`, `${LP}/S4`], agreement: null, agreedAfterMs: null, conflict: null, interface: false },
+        { path: "src/login.ts", holders: [`${LP}/S3`, `${LP}/S4`], told: true, agreement: 14, agreedAfterMs: 2 * MIN, conflict: true, interface: false },
+        { path: "src/session.ts", holders: [`${LP}/S3`, `${LP}/S4`], told: true, agreement: null, agreedAfterMs: null, conflict: null, interface: false },
       ],
       estimated: false,
     },
@@ -142,7 +142,7 @@ export const TT_SKEPTIC = member(`${TT}/skeptic`, "Witty Heron", "13:30", {
   objections: 2,
   unsourced: 1,
 });
-/** One agreement mark; `agreementsMade` says 2. */
+/** One agreement mark; `agreementsMade` says 2; one endorsement, a seat's that is not the skeptic (D46). */
 export const TT_USER = member(`${TT}/user`, "Jolly Walrus", "13:30", {
   ended: at("13:50"),
   marks: [{ at: at("13:39"), what: "agreement", seq: 30, path: "D1", note: "two names per token" }],
@@ -150,7 +150,7 @@ export const TT_USER = member(`${TT}/user`, "Jolly Walrus", "13:30", {
   postTimes: [at("13:33"), at("13:39")],
   waitingMs: null,
   agreementsMade: 2,
-  endorsed: 0,
+  endorsed: 1,
   objections: 0,
   unsourced: 2,
 });
@@ -217,7 +217,7 @@ const OLD_RUN: RunStats = {
       everyHolderTold: 1,
       agreed: 0,
       agreedBeforeMerge: null,
-      perFile: [{ path: "src/old-login.ts", holders: ["old-login/S1", "old-login/S2"], agreement: null, agreedAfterMs: null, conflict: null, interface: false }],
+      perFile: [{ path: "src/old-login.ts", holders: ["old-login/S1", "old-login/S2"], told: true, agreement: null, agreedAfterMs: null, conflict: null, interface: false }],
       estimated: true,
     },
     flags: 0,

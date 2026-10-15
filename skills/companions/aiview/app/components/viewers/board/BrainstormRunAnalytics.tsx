@@ -1,5 +1,5 @@
 import type { RunStats, Stats } from "../../../../../swarm/src/board/snapshot.ts";
-import { formatDuration, less, percent } from "../../../lib/board/analytics.ts";
+import { SOURCED_RULE, less, percent, runLength } from "../../../lib/board/analytics.ts";
 import { ORCHESTRATOR } from "../../../lib/board/view.ts";
 import { KpiTile } from "./KpiTile.tsx";
 import { QuestionsChart } from "./QuestionsChart.tsx";
@@ -7,8 +7,6 @@ import { RunTimeline, type LegendKey } from "./RunTimeline.tsx";
 import { SeatsTable } from "./SeatsTable.tsx";
 
 const LEGEND: LegendKey[] = ["post", "agreement", "endorsed", "objected"];
-/** The inferred rule a sourced claim is counted by (plan D23). */
-const SOURCED_RULE = "Inferred: a post counts as sourced when it carries file:line, #id or a URL.";
 
 const line = (n: number | null | undefined, write: (n: number) => string): string | null => (n === null || n === undefined ? null : write(n));
 
@@ -39,7 +37,7 @@ function BrainstormTiles({ stats, run }: { stats: Stats; run: RunStats }) {
         tone="warn"
         inferred={SOURCED_RULE}
       />
-      <KpiTile label="Length" value={line(run.lengthMs, formatDuration)} />
+      <KpiTile label="Length" value={line(run.lengthMs, runLength)} />
       <KpiTile label="Silent seats" value={line(b.silentSeats, String)} />
     </div>
   );

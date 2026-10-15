@@ -1,5 +1,5 @@
 import type { SharedFile } from "../../../../../swarm/src/board/snapshot.ts";
-import { ESTIMATED_TIP, formatDuration } from "../../../lib/board/analytics.ts";
+import { ESTIMATED_TIP, agreementText, countedWithoutAgreement } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";
 
 /** What a file's merge met: a conflict, none, or unknown (git older than 2.38, board D13); a run before
@@ -11,8 +11,8 @@ function ConflictNote({ conflict, recorded }: { conflict: boolean | null; record
 }
 
 /** The files two members held in this run (mockup #677 SharedFilesList): their holders, and whether the
- *  holders agreed and how long after, or none. `estimated`: a run before the shares record, its files the
- *  paths two members claimed, drawn as inferred (D44). */
+ *  holders agreed and how long after, or none, as the funnel counts it (D38, D46). `estimated`: a run before the shares
+ *  record, its files the paths two members claimed while both were members, drawn as inferred (D44, D46). */
 export function SharedFilesList({ perFile, recorded, estimated }: { perFile: SharedFile[]; recorded: boolean; estimated: boolean }) {
   return (
     <div
@@ -55,7 +55,7 @@ export function SharedFilesList({ perFile, recorded, estimated }: { perFile: Sha
                     </span>
                   </td>
                   <td>
-                    {f.agreement === null ? <span className="warn">none</span> : f.agreedAfterMs === null ? "agreed" : `agreed ${formatDuration(f.agreedAfterMs)} after`}
+                    {countedWithoutAgreement(f) ? <span className="warn">{agreementText(f)}</span> : agreementText(f)}
                     <ConflictNote conflict={f.conflict} recorded={recorded} />
                   </td>
                 </tr>

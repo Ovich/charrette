@@ -2,9 +2,6 @@ import type { MemberStats } from "../../../../../swarm/src/board/snapshot.ts";
 import { figure } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";
 
-/** The seat that endorses agreements (plan D30): every other seat reads "—" there. */
-const SKEPTIC = "skeptic";
-
 /** A count shown faint at 0, in `tone` past it, "not recorded" when unknown. */
 const countCell = (n: number | null, tone = ""): { className: string; text: string } => ({
   className: ["num", n === null ? "nr" : n === 0 ? "faint" : tone].join(" ").trim(),
@@ -12,7 +9,7 @@ const countCell = (n: number | null, tone = ""): { className: string; text: stri
 });
 
 /** A brainstorm run's seats in numbers (mockup #677 SeatsTable): posts, agreements made, endorsements
- *  (the skeptic's alone), objections (inferred, plan D23), claims without a source, each as swarm counts it (plan D40). */
+ *  (each seat's own, plan D46), objections (inferred, plan D23), claims without a source, each as swarm counts it (plan D40). */
 export function SeatsTable({ members }: { members: MemberStats[] }) {
   return (
     <div className="apanel" data-component="SeatsTable">
@@ -34,7 +31,7 @@ export function SeatsTable({ members }: { members: MemberStats[] }) {
               const cells = [
                 countCell(m.posts),
                 countCell(m.agreementsMade),
-                m.slice === SKEPTIC ? countCell(m.endorsed) : { className: "num faint", text: "—" },
+                countCell(m.endorsed),
                 countCell(m.objections),
                 countCell(m.unsourced, "warn"),
               ];

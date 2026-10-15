@@ -177,12 +177,42 @@ test("a runs-table cell whose two figures are null reads not recorded once; an e
   expect(settledOf(recorded.title).classList.contains("inferred")).toBe(false);
 });
 
-test("the funnel's footnote over an estimated scope says what an estimated shared file is; a recorded scope keeps the held-at-once rule (D44, D45, SL10)", () => {
+test("the funnel's footnote over an estimated scope says what an estimated shared file is; a recorded scope keeps the held-at-once rule (D44, D45, D46, SL10, SL11)", () => {
   openAcross();
   const foot = () => across().querySelector('[data-component="SharingFunnel"] .foot')!.textContent!;
-  expect(foot()).toContain("Estimated: a shared file is one two members claimed in the run, at once or not.");
+  expect(foot()).toContain("Estimated: a shared file is one two members claimed while both were members of the run.");
   expect(foot()).not.toContain("claimed while another held it");
   cleanup();
   openAcross({ ...ACROSS, totals: { ...ACROSS.totals, shared: { ...ACROSS.totals.shared, estimatedRuns: 0 } } });
   expect(foot()).toContain("A shared file is one a second member claimed while another held it");
+});
+
+test("the funnel's first drop reads not every holder told (D38, D46, SL11)", () => {
+  openAcross();
+  const funnel = across().querySelector('[data-component="SharingFunnel"]') as HTMLElement;
+  expect([...funnel.querySelectorAll(".drop")].map((d) => d.textContent)).toContain("−1 not every holder told");
+  expect(funnel.textContent).not.toContain("tagged one holder only");
+});
+
+/** The across view over brainstorm runs too: its debate figures filled. */
+const DEBATED: Stats = {
+  ...ACROSS,
+  totals: { ...ACROSS.totals, brainstorm: { questionsSettled: 7, questions: 8, exchangesMedian: 5, objectedThenAgreed: 2, sourcedShare: 0.75, silentSeats: null } },
+};
+const PLAN_TILES = ["Slices merged", "Slice time", "Lock wait", "Shared files settled", "Flags", "Rebase conflicts", "Silent members"];
+const BRAINSTORM_TILES = ["Questions settled", "Exchanges to agree", "Objected, then agreed again", "Claims with a source", "Silent seats"];
+const tileLabels = (): string[] => [...across().querySelectorAll<HTMLElement>('[data-component="KpiTile"] .k')].map((k) => k.firstChild!.textContent!);
+
+test("brainstorm chosen: a row of brainstorm tiles from totals.brainstorm; the plan tiles only while plan is chosen (D35, D46, SL11)", () => {
+  openAcross(DEBATED);
+  expect(tileLabels()).toEqual([...PLAN_TILES, ...BRAINSTORM_TILES]);
+  fireEvent.click(within(across()).getByRole("button", { name: "plan" }));
+  expect(tileLabels()).toEqual(BRAINSTORM_TILES);
+  const row = across().querySelector('[data-component="BrainstormTiles"]') as HTMLElement;
+  expect([...row.querySelectorAll(".v")].map((v) => v.textContent)).toEqual(["7of 8", "5median", "2questions", "75%", "not recorded"]);
+  expect(tile("Claims with a source").classList.contains("inferred")).toBe(true);
+  // plan alone: no brainstorm row
+  fireEvent.click(within(across()).getByRole("button", { name: "plan" }));
+  fireEvent.click(within(across()).getByRole("button", { name: "brainstorm" }));
+  expect(tileLabels()).toEqual(PLAN_TILES);
 });

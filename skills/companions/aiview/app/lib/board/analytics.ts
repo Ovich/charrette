@@ -115,15 +115,37 @@ export const ESTIMATED_TIP = "Estimated: this run closed before analytics record
 /** The tip of a member's spans and time estimated from the board's events for a run before the records (D45). */
 export const ESTIMATED_EVENTS_TIP = "Estimated: this run closed before analytics recorded it; read from its board events.";
 
-/** A duration as the board writes it: "40s", "1m 50s" under ten minutes, "18m", "2h 42m". */
+/** A duration as the board writes it: "40s", "1m 50s" under ten minutes, "18m", "2h 42m"; floored, never rounded up,
+ *  as `swarm stats` floors (D46). */
 export function formatDuration(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 10) return s % 60 ? `${m}m ${String(s % 60).padStart(2, "0")}s` : `${m}m`;
-  if (m < 60) return `${Math.round(s / 60)}m`;
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  const m = Math.floor(ms / 60_000);
+  const s = Math.floor((ms % 60_000) / 1000);
+  if (m < 10) return s ? `${m}m ${String(s).padStart(2, "0")}s` : `${m}m`;
+  if (m < 60) return `${m}m`;
   return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
 }
+
+/** The inferred rule a sourced claim is counted by (plan D23). */
+export const SOURCED_RULE = "Inferred: a post counts as sourced when it carries file:line, #id or a URL.";
+
+/** A run's length as `swarm stats` writes it on the run's line, one rule in both (D46): floored to the minute, "14m",
+ *  "2h 05m"; "40s" under a minute. */
+export function runLength(ms: number): string {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+  return minutes >= 1 ? `${minutes}m` : `${Math.round(ms / 1000)}s`;
+}
+
+/** A shared file's agreement as the funnel counts it (D38, D46): "agreed 2m after", "agreed before the tell", "none";
+ *  a file not told to every holder says so, its agreement not counted. */
+export function agreementText(file: { told: boolean; agreement: number | null; agreedAfterMs: number | null }): string {
+  const agreed = file.agreement === null ? "none" : file.agreedAfterMs === null ? "agreed" : file.agreedAfterMs < 0 ? "agreed before the tell" : `agreed ${formatDuration(file.agreedAfterMs)} after`;
+  return file.told ? agreed : `${file.agreement === null ? "none" : "agreed"} · not every holder told`;
+}
+
+/** A shared file the funnel counts without an agreement: none given, or its holders not all told (D38, D46). */
+export const countedWithoutAgreement = (file: { told: boolean; agreement: number | null }): boolean => file.agreement === null || !file.told;
 
 /** A nullable figure written, or "not recorded" (D34). */
 export const figure = (n: number | null | undefined, write: (n: number) => string = String): string =>
@@ -154,7 +176,7 @@ export function runLine(run: RunStats, totals: Totals): string {
   if (slices && slices.of !== null) parts.push(slices.merged === null ? plural(slices.of, "slice") : `${slices.merged} of ${plural(slices.of, "slice")}`);
   const { questionsSettled, questions } = totals.brainstorm;
   if (run.brainstorm && questions !== null) parts.push(`${questionsSettled ?? figure(null)} of ${plural(questions, "question")} settled`);
-  if (run.lengthMs !== null) parts.push(formatDuration(run.lengthMs));
+  if (run.lengthMs !== null) parts.push(runLength(run.lengthMs));
   return parts.join(" · ");
 }
 
