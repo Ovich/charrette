@@ -93,6 +93,13 @@ export interface ShowDoneEventPayload {
   type: "show-done";
 }
 
+/** Broadcast when a write through swarm's board moved a repository's board: an open
+ *  board reloads that repository. Never `changed`, which carries a document id (D5). */
+export interface BoardChangedEventPayload {
+  type: "board-changed";
+  repo: string;
+}
+
 /** What `POST /api/show` answers: how many tabs heard it, so the agent knows whether
  *  the person is looking or has to be handed the link. */
 export interface ShowResponse {

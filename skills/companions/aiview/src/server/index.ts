@@ -23,6 +23,7 @@ import { isName } from "../core/pointer.ts";
 import { clearServerFiles, writeServerFiles } from "../core/serverstate.ts";
 import { collectionVersion } from "../core/collectionversion.ts";
 import { DocWatcher, type DataChangedEvent } from "../core/watcher.ts";
+import { mountBoard } from "./board.ts";
 import { createSseHub } from "./sse.ts";
 
 export interface ServeOptions {
@@ -36,6 +37,9 @@ export interface ServeOptions {
   writeState?: boolean;
   /** How often open tabs are pinged. Injectable for tests. */
   heartbeatMs?: number;
+  /** swarm's board store; the data home's by default. Tests pass their own so a suite
+   *  run never opens the real board. */
+  boardDbPath?: string;
 }
 
 const MIME: Record<string, string> = {
@@ -72,9 +76,10 @@ function openBrowser(url: string): void {
 
 export function startServer(
   index: Index,
-  { port, open, startDoc, toolRoot = TOOL_ROOT, writeState = true, heartbeatMs }: ServeOptions,
+  { port, open, startDoc, toolRoot = TOOL_ROOT, writeState = true, heartbeatMs, boardDbPath }: ServeOptions,
 ): http.Server {
   const sse = createSseHub(heartbeatMs);
+  const board = mountBoard(sse, { dbPath: boardDbPath });
   const version = collectionVersion(toolRoot);
   const watcher = new DocWatcher((dir, name) =>
     index
@@ -117,6 +122,7 @@ export function startServer(
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://x");
+    if (board.handle(req, res, url)) return;
     const p = url.pathname;
     if (p === "/events") return sse.add(res);
     if (p === "/api/documents")
@@ -298,6 +304,7 @@ export function startServer(
   });
 
   server.on("close", () => {
+    board.close();
     watcher.close();
     sse.close();
   });
