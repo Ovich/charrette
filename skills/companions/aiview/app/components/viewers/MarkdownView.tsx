@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactElement } from "react";
-import Markdown from "react-markdown";
+import Markdown, { type Components, type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { assetUrl } from "../../lib/api.ts";
 import { CodeView } from "./CodeView.tsx";
@@ -22,28 +22,44 @@ const fenced = (children: unknown): { lang: string; source: string } | null => {
   return lang ? { lang, source: String(el?.props?.children ?? "") } : null;
 };
 
+/** A fenced block as aiview shows it: ```mermaid a diagram, other fences highlighted code, without the surrounding <pre>. */
+function FencedBlock({ node: _node, ...props }: ComponentProps<"pre"> & { node?: unknown }) {
+  const src = mermaidSource(props.children);
+  if (src !== null) return <MermaidView source={src} />;
+  const code = fenced(props.children);
+  if (code) return <CodeView source={code.source} lang={code.lang} />;
+  return <pre {...props} />;
+}
+
+/** aiview's markdown rendering, shared by documents and board posts: GitHub-flavoured, fences through
+ *  `FencedBlock`. A caller adds its own elements and remark plugins on top; the fences stay aiview's. */
+export function RenderedMarkdown({
+  source,
+  components,
+  remarkPlugins = [],
+}: {
+  source: string;
+  components?: Components;
+  remarkPlugins?: Options["remarkPlugins"];
+}) {
+  return (
+    <Markdown remarkPlugins={[remarkGfm, ...(remarkPlugins ?? [])]} components={{ ...components, pre: FencedBlock }}>
+      {source}
+    </Markdown>
+  );
+}
+
+/** Doc-relative images resolve through the asset route, keyed to this document. */
+const documentImages = (docId: number): Components => ({
+  img: ({ node: _node, src, ...rest }) => (
+    <img src={typeof src === "string" && isRelative(src) ? assetUrl(docId, src) : src} {...rest} />
+  ),
+});
+
 export function MarkdownView({ content, docId }: { content: string; docId: number }) {
   return (
     <article className="md" data-component="MarkdownView">
-      <Markdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          // ```mermaid fences render as diagrams, without the surrounding <pre>
-          pre: (props: ComponentProps<"pre">) => {
-            const src = mermaidSource(props.children);
-            if (src !== null) return <MermaidView source={src} />;
-            const code = fenced(props.children);
-            if (code) return <CodeView source={code.source} lang={code.lang} />;
-            return <pre {...props} />;
-          },
-          // doc-relative images resolve through the asset route, keyed to this document
-          img: ({ src, ...rest }: ComponentProps<"img">) => (
-            <img src={typeof src === "string" && isRelative(src) ? assetUrl(docId, src) : src} {...rest} />
-          ),
-        }}
-      >
-        {content}
-      </Markdown>
+      <RenderedMarkdown source={content} components={documentImages(docId)} />
     </article>
   );
 }
