@@ -341,6 +341,10 @@
 @media (max-width: 560px) { .board .analytics .kpis.six { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* an inferred figure (plan D23): dashed, its rule in its tip */
 .board .kpi.inferred { border-style: dashed; cursor: help; }
+/* an estimated figure, a run before the records (plan D44): drawn as an inferred one, dashed and faded */
+.board .apanel.inferred { border-style: dashed; }
+.board .kpi[data-state="estimated"] .v, .board .apanel.inferred .bar i, .board .t td.inferred .sub { opacity: .7; }
+.board .t td.inferred .sub { border-bottom: 1px dashed currentColor; cursor: help; }
 
 .board .chart .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .board .chart .head .label { margin: 0; }

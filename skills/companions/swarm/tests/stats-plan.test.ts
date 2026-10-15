@@ -155,7 +155,7 @@ test("the funnel is nested: an agreement given on a file whose holders were not 
   assert.deepEqual([totals.files, totals.everyHolderTold, totals.agreed, totals.agreedBeforeMerge], [2, 1, 1, 1]);
 });
 
-test("`totals` carries the scope's counts and a series point per run, a run with `recorded: false` a null point (D28, D32, D34, SL2)", async () => {
+test("`totals` carries the scope's counts and a series point per run, a run with `recorded: false` a null point where nothing was kept, an estimated one where it was (D28, D32, D34, D44, SL2, SL9)", async () => {
   const { board } = s;
   const early = planRun(board, "early", ["S1"]);
   clockTo(1);
@@ -181,12 +181,16 @@ test("`totals` carries the scope's counts and a series point per run, a run with
   assert.equal(out.totals.runs, 3);
   assert.deepEqual(out.totals.byKind, { plan: 2, brainstorm: 1 });
   assert.equal(out.totals.notRecorded, 1);
+  // flags are read from the board's messages (D43), slices and shared files from what every run kept (D44)
+  const kept = new Set(["flags", "slicesMerged", "sliceTimeP50", "sharedAgreed"]);
   for (const [name, points] of Object.entries(out.totals.series)) {
     assert.equal(points.length, 3, name);
-    // flags are read from the board's messages, kept for a run before the records (D43)
-    if (name !== "flags") assert.equal(points[0], null, `${name}: the unrecorded run is a gap`);
+    if (!kept.has(name)) assert.equal(points[0], null, `${name}: the unrecorded run is a gap`);
   }
-  assert.deepEqual(out.totals.series.slicesMerged.slice(0, 2), [null, 1]);
+  // the early run merged nothing: 0, estimated, never a gap
+  assert.deepEqual(out.totals.series.slicesMerged.slice(0, 2), [0, 1]);
+  assert.deepEqual(out.totals.series.sharedAgreed.slice(0, 2), [0, 0]);
+  assert.deepEqual([out.totals.slices.estimatedRuns, out.totals.shared.estimatedRuns], [1, 1]);
   assert.deepEqual(out.totals.series.flags, [0, 0, null]);
 });
 

@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from "react";
 import type { RunStats, Totals } from "../../../../../swarm/src/board/snapshot.ts";
-import { figure, formatDuration } from "../../../lib/board/analytics.ts";
+import { ESTIMATED_TIP, NOT_RECORDED, figure, formatDuration } from "../../../lib/board/analytics.ts";
 import { runHue, type RunId } from "../../../lib/board/view.ts";
 
 /** One run's row: what each column shows, and the value it sorts by (null last). */
-type Cell = { show: ReactNode; sortBy: number | string | null; className?: string };
+type Cell = { show: ReactNode; sortBy: number | string | null; className?: string; tip?: string };
 type Column = { heading: string; numeric: boolean; cell: (run: RunStats, i: number) => Cell };
 
 const notPlan = (): Cell => ({ show: "—", sortBy: null, className: "faint" });
@@ -42,9 +42,10 @@ export function RunsTable({ runs, series, onOpen }: { runs: RunStats[]; series: 
       numeric: false,
       cell: (r) => {
         if (!r.plan) return { show: <span className="sub">no claims in a brainstorm</span>, sortBy: null };
-        const { perFile, agreed, files } = r.plan.shared;
+        const { perFile, agreed, files, estimated } = r.plan.shared;
         return {
           sortBy: agreed,
+          ...(estimated ? { className: "inferred", tip: ESTIMATED_TIP } : {}),
           show: (
             <>
               {perFile.length > 0 && (
@@ -54,9 +55,8 @@ export function RunsTable({ runs, series, onOpen }: { runs: RunStats[]; series: 
                   ))}
                 </span>
               )}{" "}
-              <span className="sub">
-                {figure(agreed)} of {figure(files)}
-              </span>
+              {/* both unknown: "not recorded" once, never "not recorded of not recorded" */}
+              <span className="sub">{agreed === null && files === null ? NOT_RECORDED : `${figure(agreed)} of ${figure(files)}`}</span>
             </>
           ),
         };
@@ -115,7 +115,7 @@ export function RunsTable({ runs, series, onOpen }: { runs: RunStats[]; series: 
                 }}
               >
                 {cells.map((c, i) => (
-                  <td key={columns[i].heading} className={[columns[i].numeric ? "num" : "", c.className ?? ""].join(" ").trim() || undefined}>
+                  <td key={columns[i].heading} className={[columns[i].numeric ? "num" : "", c.className ?? ""].join(" ").trim() || undefined} title={c.tip}>
                     {c.show}
                   </td>
                 ))}

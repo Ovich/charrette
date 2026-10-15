@@ -48,6 +48,7 @@ function PlanTiles({ stats, run }: { stats: Stats; run: RunStats }) {
         value={line(t.slices.merged, String)}
         unit={line(t.slices.of, (n) => `of ${n}`)}
         delta={plan.slices.addedMidRun ? `+${plan.slices.addedMidRun} drawn mid-run` : null}
+        estimatedRuns={t.slices.estimatedRuns}
       />
       <KpiTile label="Length" value={line(run.lengthMs, formatDuration)} delta={line(run.firstMergeAtMs, (n) => `first merge at ${formatDuration(n)}`)} />
       <KpiTile label="Lock wait" value={line(t.lockWait.p50Ms, formatDuration)} unit="p50" delta={lockLine || null} tone="warn" newRecord />
@@ -57,6 +58,7 @@ function PlanTiles({ stats, run }: { stats: Stats; run: RunStats }) {
         unit={line(t.shared.files, (n) => `of ${n}`)}
         delta={withoutAgreement === 1 && unsettled ? `${basename(unsettled.path)}: none` : withoutAgreement ? `${withoutAgreement} with no agreement` : null}
         tone="warn"
+        estimatedRuns={t.shared.estimatedRuns}
       />
       <KpiTile label="Flags" value={line(plan.flags, String)} delta={flagLine(run.members, plan.flags)} tone="bad" />
       <KpiTile
@@ -98,7 +100,7 @@ export function PlanRunAnalytics({ stats, run, onOpenPost }: { stats: Stats; run
       />
       <div className="grid2 rundetail">
         <MembersTable members={run.members} recorded={run.recorded} runLengthMs={run.lengthMs} until={to} focus={focus} onFocus={setFocus} />
-        <SharedFilesList perFile={run.plan?.shared.perFile ?? []} recorded={run.recorded} />
+        <SharedFilesList perFile={run.plan?.shared.perFile ?? []} recorded={run.recorded} estimated={run.plan?.shared.estimated ?? false} />
       </div>
     </>
   );

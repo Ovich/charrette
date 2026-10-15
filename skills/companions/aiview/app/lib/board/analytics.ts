@@ -94,6 +94,9 @@ export function toggleKind(kinds: Kind[], kind: Kind): Kind[] {
 /** What a figure the store has no record of reads (plan US1, D34): never 0. */
 export const NOT_RECORDED = "not recorded";
 
+/** The tip of a figure estimated for a run before the records (D44), drawn as an inferred one (D23, D33). */
+export const ESTIMATED_TIP = "Estimated: this run closed before analytics recorded it; read from its claims and members.";
+
 /** A duration as the board writes it: "40s", "1m 50s" under ten minutes, "18m", "2h 42m". */
 export function formatDuration(ms: number): string {
   const s = Math.round(ms / 1000);

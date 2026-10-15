@@ -109,6 +109,14 @@ test("a run with recorded: false: the Not recorded line in place of the lanes, �
   expect(rowOf(part("MembersTable")!, "Quiet Llama").querySelectorAll("td")[1].textContent).toBe("—");
   expect(tile("Lock wait").querySelector(".v")!.textContent).toBe("not recorded");
   expect(tile("Rebase conflicts").querySelector(".v")!.textContent).toBe("not recorded");
+  // its slices and shared files estimated (D44): drawn as inferred, the list marked so
+  expect(tile("Slices merged").dataset.state).toBe("estimated");
+  expect(tile("Shared files settled").dataset.state).toBe("estimated");
+  expect(tile("Flags").dataset.state).toBe("filled");
+  const list = part("SharedFilesList")!;
+  expect(list.dataset.state).toBe("estimated");
+  expect(list.querySelector(".label .hint")!.textContent).toBe("estimated");
+  expect(rowOf(list, "src/old-login.ts").querySelectorAll("td")[2].textContent).toBe("none · conflict not recorded");
 });
 
 test("an open run's line says open (D32, D33, SL5)", () => {
