@@ -3,7 +3,7 @@
 // run's agent strip, the conversation, the claims row. aiview's theme; board.css reaches only `.board`.
 import { useCallback, useMemo, useState } from "react";
 import { useBoard } from "../../../hooks/useBoard.ts";
-import { agents, archive, claimRows, conversation, narrow, nicksOf, runHue, runTabs, type Narrow, type Pick, type RunId } from "../../../lib/board/view.ts";
+import { agents, archive, claimRows, conversation, narrow, nicksOf, openingRun, runHue, runTabs, type Narrow, type Pick, type RunId } from "../../../lib/board/view.ts";
 import { ConversationFilters } from "./ConversationFilters.tsx";
 import { NicksContext } from "./chips.tsx";
 import { AgentStrip } from "./AgentStrip.tsx";
@@ -47,6 +47,8 @@ export function BoardView({ repos, run }: { repos: string[]; run: number | null 
   const [query, setQuery] = useState<{ repo: string | null; run: number | null }>({ repo: run === null ? (repos[0] ?? null) : null, run });
   // a run in the URL opens its tab, a closed one as an archived tab (gap 3)
   const [pick, setPick] = useState<Pick>({ run, follow: null });
+  // false until the board has opened on a tab: the URL's run, or the one openingRun names (D17)
+  const [opened, setOpened] = useState(run !== null);
   const [menuOpen, setMenuOpen] = useState(false);
   // kept beside the pick, never in the URL: a reload starts unnarrowed
   const [narrowing, setNarrowing] = useState<Narrow>(UNNARROWED);
@@ -61,6 +63,11 @@ export function BoardView({ repos, run }: { repos: string[]; run: number | null 
     setQuery({ repo: repos[0] ?? null, run: null });
     setPick(ALL);
   }
+  // the first snapshot of the repository asked opens its tab by itself, unless the person picked first
+  if (!opened && snapshot && (query.repo === null || snapshot.repo === query.repo)) {
+    setOpened(true);
+    setPick((p) => ({ ...p, run: openingRun(snapshot) }));
+  }
   const tabs = useMemo(() => (snapshot ? runTabs(snapshot) : []), [snapshot]);
   const closedRuns = useMemo(() => (snapshot ? archive(snapshot, "") : []), [snapshot]);
   const searchArchive = useCallback((q: string) => (snapshot ? archive(snapshot, q) : []), [snapshot]);
@@ -74,6 +81,7 @@ export function BoardView({ repos, run }: { repos: string[]; run: number | null 
   const archivedLine = useMemo(() => (archived ? { closed: archived.closed, summary: `${archived.done} of ${archived.of} slices` } : null), [archived]);
 
   const pickRun = (r: RunId | null): void => {
+    setOpened(true);
     setPick({ run: r, follow: null });
     // the kind stays; the file goes when the new run has no item about it
     if (snapshot && narrowing.file && !conversation(snapshot, { run: r, follow: null }).some((i) => i.about === narrowing.file)) setNarrowing((n) => ({ ...n, file: null }));
@@ -83,6 +91,8 @@ export function BoardView({ repos, run }: { repos: string[]; run: number | null 
   const pickRepo = (repo: string): void => {
     setQuery({ repo, run: null });
     setPick(ALL);
+    // the person's pick of a repository opens it on All, as before D17
+    setOpened(true);
     setNarrowing((n) => ({ ...n, file: null }));
     setMenuOpen(false);
   };

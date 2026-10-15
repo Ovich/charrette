@@ -1,7 +1,7 @@
 // The conversation, rendered (plan D8, D9): the item's edge and tint by tier, every special word
 // and board event carrying its tip on hover and keyboard focus.
 import { afterEach, expect, test, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm/src/board/snapshot.ts";
@@ -136,4 +136,79 @@ test("a member reads code first, then nick (D10); the agreement word names the o
   const agreed = li(/S1 the top/);
   expect(agreed.querySelector('[data-component="RunnerTag"]')?.textContent).toBe("AL·S2");
   expect(screen.getByText("✔ agreed with AL·S1 Sleepy Otter")).toBeTruthy();
+});
+
+// ── What the board looked like before the move, kept (plan D9): board.css's source, and the DOM ──
+
+const boardCss = () => readFileSync(join(__dirname, "components/viewers/board/board.css"), "utf8");
+const ruleOf = (css: string, selector: string): string => {
+  const at = css.indexOf(`\n${selector} {`);
+  expect(at, selector).toBeGreaterThanOrEqual(0);
+  return css.slice(at + selector.length + 3, css.indexOf("}", at));
+};
+
+test("a post's diagram box and code box are drawn by board.css's rules, inside the board", async () => {
+  const FENCE = "```";
+  const said = item("alpha/S1", `the flow\n${FENCE}mermaid\nflowchart LR\n A-->B\n${FENCE}\n\n${FENCE}ts\nconst a = 1;\n${FENCE}`);
+  const { container } = render(
+    <div className="board">
+      <Conversation items={conversation({ ...SNAP, events: [said] }, { run: null, follow: null })} archived={null} fresh={new Set()} />
+    </div>,
+  );
+  await screen.findByTestId("drawn");
+  const shiki = await waitFor(
+    () => {
+      const box = container.querySelector(".shiki-box");
+      if (!box) throw new Error("not highlighted yet");
+      return box;
+    },
+    { timeout: 10_000 },
+  );
+  expect(shiki).not.toBeNull();
+  const css = boardCss();
+  // the selectors of board.css's rules for each box, every one matching the box as rendered
+  const selectorsFor = (box: string) =>
+    [...css.matchAll(/^([^{}\n@][^{}\n]*)\{/gm)].map((m) => m[1].trim()).filter((s) => s.includes(box) && !s.includes(" svg") && !s.includes(" span") && !s.includes(" pre") && !s.includes(" code"));
+  const mermaid = container.querySelector('[data-component="MermaidView"]')!;
+  expect(selectorsFor(".mermaid-box")).toEqual([".board .post-md .mermaid-box"]);
+  expect(mermaid.matches(".board .post-md .mermaid-box")).toBe(true);
+  expect(ruleOf(css, ".board .post-md .mermaid-box")).toContain("border: 1px solid var(--border)");
+  expect(shiki.querySelector("pre")!.matches(".board .post-md .shiki-box pre")).toBe(true);
+  expect(ruleOf(css, ".board .post-md .shiki-box span")).toContain("color: var(--shiki-light)");
+  expect(css).toContain("@media (prefers-color-scheme: dark) { .board .post-md .shiki-box span { color: var(--shiki-dark); } }");
+}, 20_000);
+
+test("the agent strip wraps its cards onto rows of 77px, padded 12px above and below, two rows at most, then scrolled", () => {
+  const strip = ruleOf(boardCss(), ".board .agent-strip");
+  expect(strip).toContain("--row: 77px");
+  expect(strip).toContain("grid-template-columns: repeat(auto-fill, minmax(236px, 1fr))");
+  expect(strip).toContain("grid-auto-rows: var(--row)");
+  expect(strip).toContain("padding: 12px 2px");
+  expect(strip).toContain("max-height: calc(2 * var(--row) + 10px + 24px)");
+  expect(strip).toContain("overflow-y: auto");
+  expect(strip).not.toMatch(/overflow-x|nowrap/);
+});
+
+test("messages run the full width: no measure caps a message's text", () => {
+  const css = boardCss();
+  expect(css).not.toMatch(/\d+ch\b/);
+  expect(ruleOf(css, ".board .item .text")).not.toMatch(/max-width/);
+});
+
+test("a board event's text sits below its author line, as a message's does", () => {
+  const { li } = show();
+  const event = li(/merged abc/);
+  const head = event.querySelector(":scope > .head")!;
+  const text = event.querySelector(":scope > .text")!;
+  expect(head.querySelector('[data-component="RunnerTag"]')).not.toBeNull();
+  expect(head.contains(text)).toBe(false);
+  expect(head.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(ruleOf(boardCss(), ".board .event .text")).toContain("grid-column: 2");
+});
+
+test("the time is centred on the head's 18px line, a message's and an event's", () => {
+  const css = boardCss();
+  expect(ruleOf(css, ".board .item .time")).toContain("padding-top: 0; line-height: 18px");
+  expect(ruleOf(css, ".board .event .time")).toContain("padding-top: 0; line-height: 18px");
+  expect(ruleOf(css, ".board .event .head")).toContain("min-height: 18px");
 });

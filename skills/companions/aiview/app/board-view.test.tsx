@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { BoardSnapshot } from "../../swarm/src/board/snapshot.ts";
 import type { BoardState } from "./hooks/useBoard.ts";
-import { APP, CLOSED, LIVE, NICKS, OTHER, REPOS, SITE } from "./board-fixtures.ts";
+import { ALL_CLOSED, APP, CLOSED, LIVE, NICKS, OTHER, REPOS, SITE } from "./board-fixtures.ts";
 
 const source = vi.hoisted(() => ({
   calls: [] as { repo: string | null; run: number | null }[],
@@ -257,4 +257,44 @@ test("RepoList shows with two repositories, not with one; picking the second ask
   expect(source.calls.at(-1)).toEqual({ repo: OTHER, run: null });
   expect(pressed()?.textContent).toBe("All");
   expect(tabs().getByText("The landing page")).toBeTruthy();
+});
+
+// ── The tab the board opens on by itself (D17) ──────────────────────────────────────
+
+test("one open run: the board opens on its tab; All stays clickable", () => {
+  show([OTHER], null, [SITE]);
+  expect(pressed()).toBe(tabOf("The landing page"));
+  fireEvent.click(tabs().getByText("All"));
+  expect(pressed()?.textContent).toBe("All");
+});
+
+test("two or more open runs: the board opens on All", () => {
+  show([APP], null);
+  expect(pressed()?.textContent).toBe("All");
+});
+
+test("no open run: the board opens on the most recently closed, as its archived tab", () => {
+  show([APP], null, [ALL_CLOSED]);
+  const archived = screen.getByText("Theme tokens").closest('[data-component="ArchivedTab"]') as HTMLElement;
+  expect(archived.getAttribute("aria-pressed")).toBe("true");
+  expect(convo().getByText(/read only · 2 of 2 slices/)).toBeTruthy();
+});
+
+test("no run at all: All, and the board says it has none yet", () => {
+  show([OTHER], null, [{ ...SITE, runs: [], events: [], roster: [] }]);
+  expect(pressed()?.textContent).toBe("All");
+  expect(screen.getByText("No run on charrette-site yet.")).toBeTruthy();
+});
+
+test("a run from the URL wins over the opening rule", () => {
+  show([OTHER, APP], 4, [SITE, LIVE]);
+  expect(screen.getByText("The login page").closest('[data-component="ArchivedTab"]')!.getAttribute("aria-pressed")).toBe("true");
+});
+
+test("the person's pick wins: a board that changes later does not move the tab", () => {
+  const { rerender } = show([OTHER], null, [SITE]);
+  fireEvent.click(tabs().getByText("All"));
+  source.boards = { [OTHER]: { ...SITE, events: [...SITE.events] } };
+  rerender(<BoardView repos={[OTHER]} run={null} />);
+  expect(pressed()?.textContent).toBe("All");
 });

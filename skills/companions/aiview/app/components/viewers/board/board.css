@@ -110,6 +110,14 @@
 .board .post-md table { border-collapse: collapse; font-size: 12.5px; display: block; overflow-x: auto; }
 .board .post-md th, .board .post-md td { border: 1px solid var(--border); padding: 3px 8px; text-align: left; vertical-align: top; }
 .board .post-md th { background: var(--surface-2); font-weight: 600; }
+/* aiview's diagram and code boxes in a post (MermaidView, CodeView): styles.css draws them under .md
+   only. The diagram as a post drew it before the move; the code on Shiki's two themes, the OS's. */
+.board .post-md .mermaid-box { margin: 6px 0; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px; background: var(--surface-2); display: flex; justify-content: center; overflow-x: auto; white-space: normal; }
+.board .post-md .mermaid-box svg { max-width: 100%; height: auto; }
+.board .post-md .shiki-box pre { background: var(--surface-2) !important; }
+.board .post-md .shiki-box code { background: none; border: 0; padding: 0; }
+.board .post-md .shiki-box span { color: var(--shiki-light); }
+@media (prefers-color-scheme: dark) { .board .post-md .shiki-box span { color: var(--shiki-dark); } }
 
 /* SL5: the tab row (RunTabs, the merge lock at its end) and the archive drawer (mockup #643) */
 .board .runs { flex: none; position: sticky; top: 0; z-index: 20; display: flex; align-items: stretch; gap: 2px; padding: 0 0 0 12px; border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; background: var(--background); }
