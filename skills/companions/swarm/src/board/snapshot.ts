@@ -4,11 +4,13 @@
 // The board and the data home load only when a reader opens: the board page imports this module
 // for its pure helpers, and a browser cannot evaluate node:sqlite or the home's node:os.
 import type { BoardSnapshot, RepoSummary } from "./board.ts";
+import type { Stats, StatsScope } from "./stats.ts";
 
 export type { BoardSnapshot, RepoSummary, RunSummary, SnapshotRunner, SnapshotEvent } from "./board.ts";
 // The pure helpers the board page needs, so the page too reaches swarm through this door (D18).
 export { planCode, nameHandle, parseMentions } from "./mentions.ts";
 export type { Kind } from "./kinds.ts";
+export type { Stats, StatsScope, Totals, RunStats, MemberStats, PlanRunStats, SharedFile, FileAcrossRuns, Interval, Mark, QuestionStats, BrainstormRunStats } from "./stats.ts";
 
 export interface BoardReader {
   /** Most recently active first, as Board.repos(). */
@@ -17,6 +19,8 @@ export interface BoardReader {
   snapshot(repo: string): BoardSnapshot;
   /** As Board.onChange: the listener hears the repository whose board moved; returns the unsubscribe. */
   onChange(listener: (repo: string) => void): () => void;
+  /** As Board.stats: the figures of the scope's runs, one read, no write. */
+  stats(scope: StatsScope): Stats;
   close(): void;
 }
 
@@ -28,6 +32,7 @@ export async function openBoardReader(dbPath?: string): Promise<BoardReader> {
     repos: () => board.repos(),
     snapshot: (repo) => board.snapshot(repo),
     onChange: (listener) => board.onChange(listener),
+    stats: (scope) => board.stats(scope),
     close: () => board.close(),
   };
 }

@@ -7,7 +7,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { SQLITE_PATH } from "./home.ts";
 import { nameHandle, parseMentions, planCode } from "./mentions.ts";
-import { claimsOf } from "./claims.ts";
+import { claimsOf, type HeldMergeLock } from "./claims.ts";
+import { statsOf, summarize, type Stats, type StatsScope } from "./stats.ts";
 import { type Kind, profileOf } from "./kinds.ts";
 import { type EventName, type Subscription, EVENTS, formatSubscriptions, mentions as mentionsMe, parseSubscriptions as parseOn, wakes } from "./events.ts";
 import { funnyName } from "./names.ts";
@@ -15,6 +16,11 @@ import { funnyName } from "./names.ts";
 export type RunId = number;
 export type { Kind } from "./kinds.ts";
 export type { EventName, Subscription } from "./events.ts";
+export type { HeldMergeLock } from "./claims.ts";
+/** What a merge's rebase met, as the board records it: the conflicted files (repository-relative,
+ *  maybe none), or unknown and why (board D13). The CLI's conflicts.ts answers in it. */
+export type Conflicts = { files: string[] } | { unknown: "old-git" | "no-reflog" };
+export type { Stats, StatsScope, Totals, RunStats, MemberStats, PlanRunStats, SharedFile, FileAcrossRuns, Interval, Mark, QuestionStats, BrainstormRunStats } from "./stats.ts";
 /** A seat of a run (D22). `link`: the slice document's URL, opaque to the board (D44). */
 export type SeatSpec = { id: string; title: string; role?: string; blockers: string[]; link?: string | null; on?: string[] };
 /** Kept: the plan's own word (D41). */
@@ -128,7 +134,8 @@ export type SnapshotRunner = {
   /** Its last call to the board, else when it joined (D20: quiet n min). */
   lastCall: string;
 };
-/** What a merged event told, as data (D11): `rebase` holds or declared a changed file, `tell` is whom to tell of a resolved conflict. */
+/** What a merged event told, as data (D11): `rebase` holds or declared a changed file, `tell` is whom to tell of a resolved conflict,
+ *  of a conflicted path only once the conflicts are known (D5). */
 export type MergedMeta = { rebase: string[]; tell: string[] };
 /** `event`, `mentions`, `meta`: absent on rows written before D11. */
 export type SnapshotEvent = {
@@ -225,18 +232,24 @@ export interface Board {
 
   /** A claim before an edit of `path` (absolute, or repository-relative), `swarm claim` (D58).
    *  Free: claimed, silently. Held by others (D40, D41): `p`'s first claim is held until `p` has
-   *  posted about the path mentioning a holder; then `p` holds it too, the other holders named
+   *  posted about the path mentioning every holder; then `p` holds it too, the other holders named
    *  once. `interface`: claimed as an interface, an `inside` claim of `p` widened. */
   checkEdit(p: Participant, path: string, opts?: { interface?: boolean }): EditAllowed | EditHeld;
   // checkEdit, reconcileWrites, release, lockMerge, merged: refused when the caller's kind has no claims
   /** Paths written outside the claim: a free one is claimed, a held one flagged on the thread. */
   reconcileWrites(p: Participant, changed: string[]): Flag[];
   release(p: Participant, path: string): void;
-  lockMerge(p: Participant, onto?: string): { granted: true } | { granted: false; holder: string };
+  /** `reflogMark`: the length of the caller's HEAD reflog at the call, kept with a new grant so `merged` replays only a later rebase (D36). */
+  lockMerge(p: Participant, onto?: string, reflogMark?: number): { granted: true } | { granted: false; holder: string };
   /** Releases the lock; tells whoever holds or declared one of `files` to rebase onto `sha`,
    *  every plan on the repository when one of them is an interface (D26). Returns, for each
-   *  merged path, every other runner that holds it, or held it during `p`'s run (D63). */
-  merged(p: Participant, sha: string, files: string[]): Sharer[];
+   *  merged path, every other runner that holds it, or held it during `p`'s run (D63); once `conflicts` are known,
+   *  of a conflicted path only (D5). Records the merge with its conflicts, absent recorded as unknown (D25). */
+  merged(p: Participant, sha: string, files: string[], conflicts?: Conflicts): Sharer[];
+  /** The merge lock `p` holds, its grant time, branch and reflog mark, for the CLI to replay the rebase since (D33, D36); null when it holds none. */
+  heldMergeLock(p: Participant): HeldMergeLock | null;
+  /** The figures of the scope's runs (D33, D34): one read, no write; a figure not recorded or not computed yet is null, never 0. */
+  stats(scope: StatsScope): Stats;
 
   // the page (D39)
   /** Every repository with an open run or a closed run within the retention (D46); a run kept only as a pruned author never. */
@@ -256,10 +269,16 @@ const ORCHESTRATOR = "orchestrator";
 const WAIT_POLL_MS = 1000;
 const LINE_WIDTH = 100;
 const STALE_MS = 10 * 60 * 1000;
+/** A pending wait's looks are logged in call_log at most this often: well under STALE_MS, never a row per tick. */
+const WAIT_LOG_EVERY_MS = 60 * 1000;
 /** The board's upkeep runs at most this often, from any process (D16). */
 export const UPKEEP_EVERY_MS = 5 * 60 * 1000;
 /** The settings row holding the last upkeep's time, ISO: the board's own, never a user setting. */
 const LAST_UPKEEP = "last-upkeep";
+/** The settings row holding when the analytics records began, ISO: the board's own (D33). */
+const RECORDS_SINCE = "records-since";
+/** The settings row holding when the shares record began, ISO: a run opened before has no shares known (D39). */
+const SHARES_SINCE = "shares-since";
 const RETENTION_DEFAULT_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** The page shows the last this many messages of a thread. */
@@ -287,6 +306,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   const { DatabaseSync } = await import("node:sqlite");
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
+  // the analytics records (call_log, lock_requests, run_stats) start with the store that first creates them:
+  // a run opened before reads recorded: false (D33)
+  const recordsAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'call_log'").get() === undefined;
+  // the shares record starts with the store that first creates it, the same way (D39)
+  const sharesAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'shares'").get() === undefined;
   db.exec(`
     PRAGMA journal_mode = DELETE;
     -- Several CLI processes write, and aiview reads, concurrently; without a busy timeout a
@@ -349,12 +373,24 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       since_seq INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (repo, path, participant)
     );
-    -- every claim made, kept past its release: who held a path during a run (D63)
+    -- every claim made, kept past its release: who held a path during a run (D63), and whether as an
+    -- interface: widened to 'interface' when the claim is made or widened so, never narrowed (D42)
     CREATE TABLE IF NOT EXISTS claim_log (
       repo TEXT NOT NULL,
       path TEXT NOT NULL,
       participant INTEGER NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'inside',
       PRIMARY KEY (repo, path, participant)
+    );
+    -- a claim granted beside a live holder of the path, kept past both claims' release: who held a path
+    -- at the same time as whom during a run, from the seq it began (D39); append-only, deleted with its run
+    CREATE TABLE IF NOT EXISTS shares (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      other INTEGER NOT NULL,
+      seq INTEGER NOT NULL,
+      PRIMARY KEY (repo, path, participant, other)
     );
     -- a holder of a shared path already told of another holder (D41): once per runner and path
     CREATE TABLE IF NOT EXISTS notices (
@@ -403,16 +439,40 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       repo TEXT PRIMARY KEY,
       version INTEGER NOT NULL
     );
+    -- one row per merge, written by merged, deleted with its run by prune (D25): files and conflicts JSON, conflicts NULL for unknown
+    CREATE TABLE IF NOT EXISTS merges (
+      participant INTEGER NOT NULL,
+      run INTEGER NOT NULL,
+      sha TEXT NOT NULL,
+      at TEXT NOT NULL,
+      files TEXT NOT NULL,
+      conflicts TEXT
+    );
+    CREATE INDEX IF NOT EXISTS merges_run ON merges (run);
+    -- one row per counted call, written by countCall in the verb's transaction (D25); deleted with its run
+    CREATE TABLE IF NOT EXISTS call_log (participant INTEGER NOT NULL, at TEXT NOT NULL, verb TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS call_log_by_participant ON call_log (participant, at);
+    -- one row per merge-lock turn: asked, granted, merged; refused counts the refusals (D25); deleted with its run
+    CREATE TABLE IF NOT EXISTS lock_requests (repo TEXT NOT NULL, participant INTEGER NOT NULL, asked_at TEXT NOT NULL,
+      granted_at TEXT, merged_at TEXT, refused INTEGER NOT NULL DEFAULT 0);
+    CREATE INDEX IF NOT EXISTS lock_requests_by_participant ON lock_requests (participant, asked_at);
+    -- a closed run's figures, RunStats JSON, written once at close or by prune first; never pruned (D20, D21)
+    CREATE TABLE IF NOT EXISTS run_stats (run INTEGER PRIMARY KEY, repo TEXT NOT NULL, kind TEXT NOT NULL,
+      closed_at TEXT NOT NULL, body TEXT NOT NULL);
     -- board settings (D32): retention-days; the board's own last-upkeep (D16)
     CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
     -- the identities and hook_seen tables, left in stores from before D58, are no longer read or written
   `);
+  if (recordsAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(RECORDS_SINCE, new Date().toISOString());
+  if (sharesAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(SHARES_SINCE, new Date().toISOString());
   // Schema upkeep for stores created by earlier versions: add a column when it is missing.
   const upkeep = (table: string, column: string, ddl: string): void => {
     const cols = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
     if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
   };
   upkeep("participants", "worktree", "worktree TEXT");
+  // a claim's kind kept past its release, so a closed run read live still knows its interfaces (D42)
+  upkeep("claim_log", "kind", "kind TEXT NOT NULL DEFAULT 'inside'");
   upkeep("participants", "last_call", "last_call TEXT");
   upkeep("participants", "calls", "calls INTEGER NOT NULL DEFAULT 0");
   upkeep("participants", "waiting", "waiting INTEGER NOT NULL DEFAULT 0");
@@ -430,6 +490,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   upkeep("messages", "meta", "meta TEXT");
   // the branch a merge lands in, named by merge-lock --onto (D9)
   upkeep("merge_locks", "onto", "onto TEXT");
+  // the holder's HEAD reflog length at the grant: merged replays only a rebase past it (D36)
+  upkeep("merge_locks", "reflog_mark", "reflog_mark INTEGER");
   upkeep("slices", "link", "link TEXT");
   // what kind of work a run is (D25); a run from before is a plan run
   upkeep("runs", "kind", "kind TEXT NOT NULL DEFAULT 'plan'");
@@ -691,7 +753,16 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
       for (const r of rows) mark.run(me.id, Number(r.seq));
       // a delivery is a call to the board: the runner's last call (D31)
-      db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(now(), me.id);
+      const at = now();
+      db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(at, me.id);
+      // a wait's look is a sign of life by the stale rule, so the timeline logs it too (board D12, D37); a wait looks
+      // every second, so at most one row a minute. A deliver verb is logged by countCall instead
+      if (fromWait) {
+        const last = db.prepare("SELECT MAX(at) AS at FROM call_log WHERE participant = ?").get(me.id) as Row;
+        if (last.at == null || Date.parse(at) - Date.parse(String(last.at)) >= WAIT_LOG_EVERY_MS) {
+          db.prepare("INSERT INTO call_log (participant, at, verb) VALUES (?, ?, 'deliver')").run(me.id, at);
+        }
+      }
       if (!fromWait) {
         // a call after a wait that never returned (killed): the runner is no longer waiting
         const r = db.prepare("UPDATE participants SET waiting = 0 WHERE id = ? AND waiting = 1").run(me.id);
@@ -774,6 +845,13 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   };
   const sameSub = (a: Subscription, b: Subscription): boolean => a.event === b.event && a.scope === b.scope;
 
+  /** The closed run's summary into run_stats (D20); summarize reads, this writes. */
+  const storeRunStats = (run: RunId): void => {
+    const body = summarize(db, run, STALE_MS);
+    const r = runRow(run);
+    db.prepare("INSERT OR REPLACE INTO run_stats (run, repo, kind, closed_at, body) VALUES (?, ?, ?, ?, ?)").run(run, String(r.repo), body.kind, String(r.closed_at), JSON.stringify(body));
+  };
+
   const board: Board = {
     openRun({ repo, kind = "plan", group, title, link, seats }) {
       const profile = profileOf(kind);
@@ -841,6 +919,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         db.prepare("UPDATE runs SET state = 'closed', closed_at = ? WHERE id = ?").run(now(), run);
         bump(String(runRow(run).repo));
         db.prepare("UPDATE participants SET ended_at = COALESCE(ended_at, ?) WHERE run = ?").run(now(), run);
+        // the run's figures, kept past pruning, read while its claims still say which are interfaces (D37); the summary
+        // only reads before its one write, so a failure leaves the close whole: close succeeds, prune writes it later (D25)
+        try {
+          storeRunStats(run);
+        } catch {}
         for (const p of db.prepare("SELECT id FROM participants WHERE run = ?").all(run) as Row[]) claims.releaseAll(Number(p.id));
       });
     },
@@ -848,7 +931,16 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     prune(at = new Date()) {
       return transaction(() => {
         const cutoff = retentionCutoff(at);
-        const expired = db.prepare("SELECT id, repo FROM runs WHERE state = 'closed' AND closed_at < ? AND pruned_at IS NULL").all(cutoff) as Row[];
+        // a run with no summary is summarized before its raw rows go; one whose summary throws keeps them for the next upkeep (D33)
+        const expired = (db.prepare("SELECT id, repo FROM runs WHERE state = 'closed' AND closed_at < ? AND pruned_at IS NULL").all(cutoff) as Row[]).filter((r) => {
+          if (db.prepare("SELECT 1 FROM run_stats WHERE run = ?").get(Number(r.id))) return true;
+          try {
+            storeRunStats(Number(r.id));
+            return true;
+          } catch {
+            return false;
+          }
+        });
         const touched = new Set(expired.map((r) => String(r.repo)));
         const runIds = expired.map((r) => Number(r.id));
         const inExpired = runIds.length ? `run IN (${runIds.join(", ")})` : "0";
@@ -870,14 +962,16 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         for (const run of runIds) {
           for (const r of db.prepare("SELECT id FROM participants WHERE run = ?").all(run) as Row[]) {
             const id = Number(r.id);
-            for (const table of ["claim_log", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries", "claim_requests", "flag_posts"]) {
+            for (const table of ["claim_log", "shares", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries", "claim_requests", "flag_posts", "call_log", "lock_requests"]) {
               db.prepare(`DELETE FROM ${table} WHERE participant = ?`).run(id);
             }
             db.prepare("DELETE FROM notices WHERE other = ?").run(id);
+            db.prepare("DELETE FROM shares WHERE other = ?").run(id);
             // a member authoring a kept message stays, so the message still reads its author
             if (!db.prepare("SELECT 1 FROM messages WHERE author = ? LIMIT 1").get(id)) db.prepare("DELETE FROM participants WHERE id = ?").run(id);
           }
           db.prepare("DELETE FROM slices WHERE run = ?").run(run);
+          db.prepare("DELETE FROM merges WHERE run = ?").run(run);
           // the row stays, stamped: its id is never handed to a new run (D61)
           db.prepare("UPDATE runs SET pruned_at = ? WHERE id = ?").run(at.toISOString(), run);
         }
@@ -1161,12 +1255,20 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       claims.release(gated(live(p), "release"), file);
     },
 
-    lockMerge(p, onto) {
-      return claims.lockMerge(gated(live(p), "merge-lock"), onto);
+    lockMerge(p, onto, reflogMark) {
+      return claims.lockMerge(gated(live(p), "merge-lock"), onto, reflogMark);
     },
 
-    merged(p, sha, files) {
-      return claims.merged(gated(live(p), "merged"), sha, files);
+    merged(p, sha, files, conflicts) {
+      return claims.merged(gated(live(p), "merged"), sha, files, conflicts);
+    },
+
+    heldMergeLock(p) {
+      return claims.heldMergeLock(p);
+    },
+
+    stats(scope) {
+      return statsOf(db, scope, STALE_MS);
     },
 
     repos() {
@@ -1354,8 +1456,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   // Every verb a runner calls is one call to the board, counted here and nowhere else (D66):
   // what the card's call count shows, and the last sign of life "stale" is measured from.
   // `reconcileWrites` is part of `merge-lock` and `end`, not a call.
-  const countCall = (p: Participant): void => {
-    db.prepare("UPDATE participants SET calls = calls + 1, last_call = ? WHERE id = ?").run(now(), p.id);
+  const countCall = (p: Participant, verb: string): void => {
+    const at = now();
+    db.prepare("UPDATE participants SET calls = calls + 1, last_call = ? WHERE id = ?").run(at, p.id);
+    // the call itself, for the member's timeline (D25)
+    db.prepare("INSERT INTO call_log (participant, at, verb) VALUES (?, ?, ?)").run(p.id, at, verb);
     // a member's call clears its run's stale mark, so a later silence flags again (D19)
     db.prepare("UPDATE runs SET stale_flagged = 0 WHERE id = ? AND stale_flagged = 1").run(p.run);
     // an orchestrator marked quiet is back: one back event, and the mark cleared (D15)
@@ -1365,29 +1470,29 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   };
   // the verb and its count in one transaction: the page sees one change, and a refused call
   // (an ended runner, an unknown path) counts none
-  const counted = <A extends unknown[], R>(verb: (p: Participant, ...rest: A) => R) =>
+  const counted = <A extends unknown[], R>(name: string, verb: (p: Participant, ...rest: A) => R) =>
     (p: Participant, ...rest: A): R =>
       transaction(() => {
         const out = verb(p, ...rest);
-        countCall(p);
+        countCall(p, name);
         return out;
       });
-  board.setDoing = counted(board.setDoing);
-  board.subscribe = counted(board.subscribe);
-  board.unsubscribe = counted(board.unsubscribe);
-  board.end = counted(board.end);
-  board.post = counted(board.post);
-  board.endorse = counted(board.endorse);
-  board.deliver = counted(board.deliver);
-  board.wait = counted(board.wait);
-  board.checkEdit = counted(board.checkEdit);
-  board.release = counted(board.release);
-  board.lockMerge = counted(board.lockMerge);
-  board.merged = counted(board.merged);
+  board.setDoing = counted("setDoing", board.setDoing);
+  board.subscribe = counted("subscribe", board.subscribe);
+  board.unsubscribe = counted("unsubscribe", board.unsubscribe);
+  board.end = counted("end", board.end);
+  board.post = counted("post", board.post);
+  board.endorse = counted("endorse", board.endorse);
+  board.deliver = counted("deliver", board.deliver);
+  board.wait = counted("wait", board.wait);
+  board.checkEdit = counted("checkEdit", board.checkEdit);
+  board.release = counted("release", board.release);
+  board.lockMerge = counted("lockMerge", board.lockMerge);
+  board.merged = counted("merged", board.merged);
   const read = board.read;
   board.read = (seq, by) => {
     const m = read(seq);
-    if (by) transaction(() => countCall(by));
+    if (by) transaction(() => countCall(by, "read"));
     return m;
   };
   return board;

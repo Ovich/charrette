@@ -1,16 +1,21 @@
 // The project's board, drawn by aiview (companions-merge §3): the repositories when the document
 // names several, the tab row (☰ archive, All, the open runs, the merge lock at its end), the picked
-// run's agent strip, the conversation, the claims row. aiview's theme; board.css reaches only `.board`.
-import { useCallback, useMemo, useState } from "react";
+// run's switch between its conversation (the agent strip, the conversation, the claims row) and its
+// Analytics, and the across-runs view. aiview's theme; board.css reaches only `.board`.
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBoard } from "../../../hooks/useBoard.ts";
 import { agents, archive, claimRows, conversation, narrow, nicksOf, openingRun, runHue, runTabs, type Narrow, type Pick, type RunId } from "../../../lib/board/view.ts";
+import { DEFAULT_SCOPE, hashWithAcross, hashWithRunAnalytics, readAcross, readRunAnalytics, summaryLine, type AcrossScope, type RunView } from "../../../lib/board/analytics.ts";
+import { AcrossRunsView } from "./AcrossRunsView.tsx";
 import { ConversationFilters } from "./ConversationFilters.tsx";
 import { NicksContext } from "./chips.tsx";
 import { AgentStrip } from "./AgentStrip.tsx";
 import { ArchivePanel } from "./ArchivePanel.tsx";
 import { ClaimsRow } from "./ClaimsRow.tsx";
 import { RepoList } from "./RepoList.tsx";
+import { RunAnalytics } from "./RunAnalytics.tsx";
 import { RunTabs } from "./RunTabs.tsx";
+import { RunViewSwitch } from "./RunViewSwitch.tsx";
 import { Conversation } from "./Conversation.tsx";
 import { TipLayer } from "./Tip.tsx";
 import "./board.css";
@@ -43,7 +48,13 @@ const NONE = new Set<never>();
 const ALL: Pick = { run: null, follow: null };
 const UNNARROWED: Narrow = { kind: "all", file: null };
 
-export function BoardView({ repos, run }: { repos: string[]; run: number | null }) {
+/** The hash, replaced and never pushed: it keeps the document and its pointer, and hashchange stays App's. */
+const replaceHash = (hash: string): void => history.replaceState(history.state, "", `#${hash}`);
+
+export function BoardView({ repos, run: asked }: { repos: string[]; run: number | null }) {
+  // a run's Analytics in the URL reopens that run on it after a reload (D31); a run the document names wins
+  const [analyticsInUrl] = useState<RunId | null>(() => readRunAnalytics(location.hash));
+  const run = asked ?? analyticsInUrl;
   const [query, setQuery] = useState<{ repo: string | null; run: number | null }>({ repo: run === null ? (repos[0] ?? null) : null, run });
   // a run in the URL opens its tab, a closed one as an archived tab (gap 3)
   const [pick, setPick] = useState<Pick>({ run, follow: null });
@@ -52,6 +63,12 @@ export function BoardView({ repos, run }: { repos: string[]; run: number | null 
   const [menuOpen, setMenuOpen] = useState(false);
   // kept beside the pick, never in the URL: a reload starts unnarrowed
   const [narrowing, setNarrowing] = useState<Narrow>(UNNARROWED);
+  // the across-runs view and its scope, in the URL: a reload reopens them (D31)
+  const [across, setAcross] = useState<AcrossScope | null>(() => readAcross(location.hash));
+  // a picked run tab opens on its conversation; Analytics is in the URL (D31)
+  const [runView, setRunView] = useState<RunView>(run !== null && run === analyticsInUrl ? "analytics" : "conversation");
+  // a timeline mark clicked: the post to bring into view once the conversation shows
+  const [postToShow, setPostToShow] = useState<number | null>(null);
   const board = useBoard(query);
   const snapshot = board.snapshot;
   const focus = pick.follow;
@@ -80,12 +97,43 @@ export function BoardView({ repos, run }: { repos: string[]; run: number | null 
   const shown = useMemo(() => narrow(items, narrowing), [items, narrowing]);
   const archivedLine = useMemo(() => (archived ? { closed: archived.closed, summary: `${archived.done} of ${archived.of} slices` } : null), [archived]);
 
+  useEffect(() => {
+    if (postToShow === null || runView !== "conversation") return;
+    document.getElementById(`seq-${postToShow}`)?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    setPostToShow(null);
+  }, [postToShow, runView]);
+
+  const showAcross = (scope: AcrossScope | null): void => {
+    setAcross(scope);
+    // the across view takes a run's Analytics out of the URL: a reload reopens the across view
+    replaceHash(hashWithRunAnalytics(hashWithAcross(location.hash, scope), null));
+  };
+  const showRunView = (r: RunId | null, view: RunView): void => {
+    setRunView(view);
+    replaceHash(hashWithRunAnalytics(location.hash, view === "analytics" ? r : null));
+  };
+
   const pickRun = (r: RunId | null): void => {
+    // a run tab or All leaves the across view
+    if (across) showAcross(null);
+    showRunView(r, "conversation");
     setOpened(true);
     setPick({ run: r, follow: null });
     // the kind stays; the file goes when the new run has no item about it
     if (snapshot && narrowing.file && !conversation(snapshot, { run: r, follow: null }).some((i) => i.about === narrowing.file)) setNarrowing((n) => ({ ...n, file: null }));
     setMenuOpen(false);
+  };
+  // a RunsTable row: the run's tab, on its Analytics (D33)
+  const openRunAnalytics = (r: RunId): void => {
+    pickRun(r);
+    showRunView(r, "analytics");
+  };
+  // a timeline mark: the run's conversation, unnarrowed, scrolled to the post
+  const openPost = (seq: number): void => {
+    showRunView(picked, "conversation");
+    setNarrowing(UNNARROWED);
+    setFocus(null);
+    setPostToShow(seq);
   };
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const pickRepo = (repo: string): void => {
@@ -115,15 +163,30 @@ export function BoardView({ repos, run }: { repos: string[]; run: number | null 
         <TipLayer />
         {repos.length >= 2 && <RepoList repos={listed} selected={snapshot.repo} onSelect={pickRepo} />}
         <div className="content">
-          <RunTabs tabs={tabs} archived={archived} pick={picked} lock={snapshot.lock} menuOpen={menuOpen} onMenu={setMenuOpen} onPick={pickRun} />
+          <RunTabs
+            tabs={tabs}
+            archived={archived}
+            pick={picked}
+            lock={snapshot.lock}
+            menuOpen={menuOpen}
+            onMenu={setMenuOpen}
+            onPick={pickRun}
+            analytics={across !== null}
+            onAnalytics={() => showAcross(across ?? DEFAULT_SCOPE)}
+          />
           {menuOpen && <ArchivePanel runs={searchArchive} total={closedRuns.length} onPick={pickRun} onClose={closeMenu} />}
           {missingRun !== null && <p className="notice">run {missingRun} is not on this board</p>}
-          {snapshot.runs.length === 0 ? (
+          {across !== null ? (
+            <AcrossRunsView repo={snapshot.repo} repoName={snapshot.name} scope={across} onScope={showAcross} onOpenRun={openRunAnalytics} />
+          ) : snapshot.runs.length === 0 ? (
             <p className="none" data-component="EmptyState">
               No run on {snapshot.name} yet.
             </p>
+          ) : selectedRun && runView === "analytics" ? (
+            <RunAnalytics key={selectedRun.run} repo={snapshot.repo} summary={selectedRun} onView={(v) => showRunView(selectedRun.run, v)} onOpenPost={openPost} />
           ) : (
             <>
+              {selectedRun && <RunViewSwitch view="conversation" line={summaryLine(selectedRun)} json={null} onView={(v) => showRunView(selectedRun.run, v)} />}
               <AgentStrip agents={members} hue={selectedRun ? runHue(selectedRun.code) : 0} follow={focus} onFollow={setFocus} />
               <ConversationFilters items={items} narrow={narrowing} onNarrow={setNarrowing} />
               <Conversation items={shown} archived={archivedLine} fresh={NONE} />

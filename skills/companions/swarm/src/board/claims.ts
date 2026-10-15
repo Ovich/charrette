@@ -2,7 +2,7 @@
 // second module that sees SQL. The Board's verbs of the same names delegate here after the
 // kind gate; behaviour and wording are the board's, moved, not rewritten.
 import type { DatabaseSync } from "node:sqlite";
-import type { Declared, EditAllowed, MergedMeta, EditHeld, Flag, Message, MessageKind, Participant, Sharer } from "./board.ts";
+import type { Conflicts, Declared, EditAllowed, MergedMeta, EditHeld, Flag, Message, MessageKind, Participant, Sharer } from "./board.ts";
 import { type EventName, EVENTS } from "./events.ts";
 import { profileOf } from "./kinds.ts";
 
@@ -26,10 +26,13 @@ export interface Claims {
   reconcileWrites(p: Participant, changed: string[]): Flag[];
   release(p: Participant, file: string): void;
   /** `onto`: the branch the merge lands in, recorded with the lock for the merged event (D9). */
-  lockMerge(p: Participant, onto?: string): { granted: true } | { granted: false; holder: string };
-  /** After a refused claim, `m` (by `p`, about the path, mentioning a holder) makes `p` a sharer, as the second claim would (D7). */
+  lockMerge(p: Participant, onto?: string, reflogMark?: number): { granted: true } | { granted: false; holder: string };
+  /** After a refused claim, `m` (by `p`, about the path, mentioning every holder, in it or before it) makes `p` a sharer, as the second claim would (D7). */
   claimByPost(p: Participant, m: Message): PostClaim | null;
-  merged(p: Participant, sha: string, files: string[]): Sharer[];
+  /** The merge lock `p` holds: when it was granted and the branch it lands in (D33); null when `p` holds none. */
+  heldMergeLock(p: Participant): HeldMergeLock | null;
+  /** `conflicts` absent: unknown. Writes the merge's row; known conflicts narrow the sharers to the conflicted paths (D5, D25). */
+  merged(p: Participant, sha: string, files: string[], conflicts?: Conflicts): Sharer[];
   /** join's declared files, claimed where free */
   claimDeclared(p: Participant, files: Declared[]): void;
   /** end, closeRun, slice done */
@@ -47,6 +50,9 @@ export interface Claims {
 
 /** What a post settled: the claimed path and its other holders' names. */
 export type PostClaim = { path: string; sharedWith: string[] };
+/** `grantedAt` ISO; `onto` null for a lock taken without a branch; `reflogMark` the holder's HEAD reflog
+ *  length at the grant, null when none was given (D36). */
+export type HeldMergeLock = { grantedAt: string; onto: string | null; reflogMark: number | null };
 
 type Row = Record<string, unknown>;
 type ClaimRow = { participant: number; kind: string; since: number };
@@ -78,7 +84,10 @@ export function claimsOf(deps: ClaimsDeps): Claims {
            ON CONFLICT (repo, path, participant) DO UPDATE SET kind = excluded.kind WHERE claims.kind = 'inside' AND excluded.kind = 'interface'`,
         )
         .run(p.repo, rel, p.id, kind, lastSeq());
-      db.prepare("INSERT OR IGNORE INTO claim_log (repo, path, participant) VALUES (?, ?, ?)").run(p.repo, rel, p.id);
+      db.prepare(
+        `INSERT INTO claim_log (repo, path, participant, kind) VALUES (?, ?, ?, ?)
+         ON CONFLICT (repo, path, participant) DO UPDATE SET kind = 'interface' WHERE excluded.kind = 'interface'`,
+      ).run(p.repo, rel, p.id, kind);
       if (Number(r.changes) === 0) return false;
       bump(p.repo);
       return true;
@@ -110,6 +119,11 @@ export function claimsOf(deps: ClaimsDeps): Claims {
       return told.some((r) => r.seq > h.since && (r.mentions.includes(o.name) || r.mentions.includes(`${o.plan}/*`)));
     });
   };
+  /** `me` was granted `rel` beside each of `people`, live holders of it: kept for the run's figures (D39). */
+  const recordShares = (me: Participant, rel: string, people: Participant[]): void => {
+    const share = db.prepare("INSERT OR IGNORE INTO shares (repo, path, participant, other, seq) VALUES (?, ?, ?, ?, ?)");
+    for (const o of people) share.run(me.repo, rel, me.id, o.id, lastSeq());
+  };
   /** The other holders `me` is told of, once per runner and path (D40). */
   const noticeOf = (me: Participant, rel: string, people: Participant[]): string | null => {
     const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
@@ -129,6 +143,23 @@ export function claimsOf(deps: ClaimsDeps): Claims {
     const rows = db.prepare("SELECT participant FROM lock_waiters WHERE repo = ? ORDER BY rowid").all(repo) as Row[];
     db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(repo);
     return rows.map((r) => Number(r.participant)).filter(isLive).map((id) => participantById(id).name);
+  };
+  /** `p`'s lock turn still going (D25): its latest, not merged, and not closed by an `end` since it was asked,
+   *  the end's call row being what closes it. Undefined when it has none. */
+  const openTurn = (p: Participant): Row | undefined =>
+    db
+      .prepare(
+        `SELECT rowid AS id, granted_at FROM lock_requests t WHERE participant = ? AND merged_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM call_log c WHERE c.participant = t.participant AND c.verb = 'end' AND c.at >= t.asked_at)
+         ORDER BY rowid DESC LIMIT 1`,
+      )
+      .get(p.id) as Row | undefined;
+  /** The turn granted at `at`: the open one stamped when it waited, else a new one asked and granted at once.
+   *  `anew`: a new grant, so a turn granted before and lost since (a slice set done) is over. */
+  const grantTurn = (p: Participant, at: string, anew: boolean): void => {
+    const turn = openTurn(p);
+    if (turn && turn.granted_at == null) db.prepare("UPDATE lock_requests SET granted_at = ? WHERE rowid = ?").run(at, Number(turn.id));
+    else if (!turn || anew) db.prepare("INSERT INTO lock_requests (repo, participant, asked_at, granted_at) VALUES (?, ?, ?, ?)").run(p.repo, p.id, at, at);
   };
   const declared = (id: number): Declared[] => JSON.parse(String((db.prepare("SELECT files FROM participants WHERE id = ?").get(id) as Row).files)) as Declared[];
 
@@ -157,6 +188,7 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         hold(me, rel, String(asked.kind) === "interface" ? "interface" : "inside");
         db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
         const people = others.map((c) => participantById(c.participant));
+        recordShares(me, rel, people);
         return { path: rel, sharedWith: people.map((o) => o.name) };
       });
     },
@@ -233,6 +265,7 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         }
         hold(me, rel, kind); // a new holder, or an `inside` claim widened to an interface
         db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
+        recordShares(me, rel, people);
         const sharedWith = people.map((o) => ({ runner: o.name, doing: doingOf(o.id) }));
         return { allowed: true, sharedWith, notice: noticeOf(me, rel, people) };
       });
@@ -285,27 +318,45 @@ export function claimsOf(deps: ClaimsDeps): Claims {
       });
     },
 
-    lockMerge(me, onto) {
+    lockMerge(me, onto, reflogMark) {
       return transaction(() => {
         const r = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo) as Row | undefined;
         if (r && Number(r.participant) !== me.id && isLive(Number(r.participant))) {
           db.prepare("INSERT OR IGNORE INTO lock_waiters (repo, participant) VALUES (?, ?)").run(me.repo, me.id);
+          // the turn opens at the first ask and counts each refusal; a turn granted once and lost since is over
+          const turn = openTurn(me);
+          if (turn && turn.granted_at == null) db.prepare("UPDATE lock_requests SET refused = refused + 1 WHERE rowid = ?").run(Number(turn.id));
+          else db.prepare("INSERT INTO lock_requests (repo, participant, asked_at, refused) VALUES (?, ?, ?, 1)").run(me.repo, me.id, now());
           return { granted: false as const, holder: participantById(Number(r.participant)).name };
         }
         if (r && Number(r.participant) === me.id) {
           if (onto) db.prepare("UPDATE merge_locks SET onto = ? WHERE repo = ?").run(onto, me.repo);
+          // a lock granted before the records began has no turn yet: it gets one, at the grant
+          grantTurn(me, String((db.prepare("SELECT at FROM merge_locks WHERE repo = ?").get(me.repo) as Row).at), false);
           return { granted: true as const };
         }
         // a new holder: the waiters on the one before are not this one's (D65)
         db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(me.repo);
-        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at, onto) VALUES (?, ?, ?, ?)").run(me.repo, me.id, now(), onto ?? null);
+        // the mark is the grant's: a holder asking again keeps it, as it keeps the grant's time (D36)
+        const at = now();
+        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at, onto, reflog_mark) VALUES (?, ?, ?, ?, ?)").run(me.repo, me.id, at, onto ?? null, reflogMark ?? null);
+        grantTurn(me, at, true);
         bump(me.repo);
         return { granted: true as const };
       });
     },
 
-    merged(me, sha, files) {
+    heldMergeLock(me) {
+      const r = db.prepare("SELECT at, onto, reflog_mark FROM merge_locks WHERE repo = ? AND participant = ?").get(me.repo, me.id) as Row | undefined;
+      return r
+        ? { grantedAt: String(r.at), onto: r.onto == null ? null : String(r.onto), reflogMark: r.reflog_mark == null ? null : Number(r.reflog_mark) }
+        : null;
+    },
+
+    merged(me, sha, files, conflicts) {
       const rels = [...new Set(files.map((f) => relPath(me.repo, f)).filter((x): x is string => x !== null))];
+      // known: the conflicted paths, as the claims key them; null: unknown, every shared path told as before (D5)
+      const conflicted = conflicts && "files" in conflicts ? new Set(conflicts.files.map((f) => fold(slashes(f)))) : null;
       const wanted = new Set(rels);
       const told = new Set<string>();
       const iface = new Set<string>();
@@ -322,6 +373,9 @@ export function claimsOf(deps: ClaimsDeps): Claims {
           if (lock && Number(lock.participant) === me.id && lock.onto != null) onto = String(lock.onto);
           db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
           db.prepare("UPDATE participants SET merged = 1 WHERE id = ?").run(me.id);
+          // the holder's lock turn ends with the merge (D25)
+          const turn = openTurn(me);
+          if (turn) db.prepare("UPDATE lock_requests SET merged_at = ? WHERE rowid = ?").run(now(), Number(turn.id));
           waiters = takeLockWaiters(me.repo).filter((n) => n !== me.name);
         });
         // every holder of a merged path, a shared one included (D40)
@@ -353,8 +407,10 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         if (iface.size) lines.push(`@swarm interface changed: ${[...iface].join(", ")}.`);
         if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);
         lines.push(`files: ${rels.join(", ") || "-"}`);
-        // whom to tell of a resolved conflict (D63): a holder from any run, or one of this run that held it
+        // whom to tell of a resolved conflict (D63): a holder from any run, or one of this run that held it;
+        // once the conflicts are known, of a conflicted path only (D5)
         for (const rel of rels) {
+          if (conflicted && !conflicted.has(fold(rel))) continue;
           const ids = new Set(holdersOf(me.repo, rel).map((c) => c.participant));
           const held = db
             .prepare("SELECT l.participant FROM claim_log l JOIN participants p ON p.id = l.participant WHERE l.repo = ? AND l.path = ? AND p.run = ? ORDER BY l.rowid")
@@ -365,6 +421,15 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         }
         const meta: MergedMeta = { rebase: [...told], tell: [...new Set(sharers.map((o) => o.runner))] };
         insertMessage(me, lines.join("\n"), null, "event", [...new Set([...told, ...waiters, ...all])], { event: EVENTS.merged.name, meta });
+        // the merge, for the stats: its files and conflicts, null for unknown (D25)
+        db.prepare("INSERT INTO merges (participant, run, sha, at, files, conflicts) VALUES (?, ?, ?, ?, ?, ?)").run(
+          me.id,
+          me.run,
+          sha,
+          now(),
+          JSON.stringify(rels),
+          conflicts && "files" in conflicts ? JSON.stringify(conflicts.files.map(slashes)) : null,
+        );
       });
       return sharers;
     },

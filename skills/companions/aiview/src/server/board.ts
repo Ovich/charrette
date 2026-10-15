@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import type http from "node:http";
 import path from "node:path";
-import { openBoardReader, type BoardReader } from "../../../swarm/src/board/snapshot.ts";
+import { openBoardReader, type BoardReader, type Kind, type StatsScope } from "../../../swarm/src/board/snapshot.ts";
 import type { BoardChangedEventPayload } from "../core/api.ts";
 import { DATA_ROOT } from "../core/home.ts";
 import type { SseHub } from "./sse.ts";
@@ -58,35 +58,79 @@ export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRo
     res.end(JSON.stringify(obj));
   };
 
-  /** One repository's whole board, as swarm's page server resolved it; `/api/run?id=` kept as `?run=`. */
-  const answerBoard = (board: BoardReader, url: URL, res: http.ServerResponse): void => {
+  /** The repository a request names, as swarm's page server resolved it: a run's, a repository, or
+   *  the most recently active; `missing` is the 404's message. `/api/run?id=` kept as `?run=`. */
+  const repoNamed = (board: BoardReader, url: URL): { repo: string } | { missing: string } => {
     const run = url.searchParams.get(url.pathname === "/api/run" ? "id" : "run");
     const key = url.searchParams.get("repo");
     const repos = board.repos();
-    let repo: string | undefined;
     if (run !== null) {
-      repo = repos.find((r) => r.runs.some((x) => x.run === Number(run)))?.repo;
-      if (!repo) return json(res, { error: `no run ${run}` }, 404);
-    } else if (key !== null) {
-      repo = repos.find((r) => r.repo === key)?.repo;
-      if (!repo) return json(res, { error: `no repository ${key}` }, 404);
-    } else {
-      repo = repos[0]?.repo; // the most recently active: repos() lists it first
-      if (!repo) return json(res, { error: "no repository on the board" }, 404);
+      const repo = repos.find((r) => r.runs.some((x) => x.run === Number(run)))?.repo;
+      return repo ? { repo } : { missing: `no run ${run}` };
     }
-    json(res, { repos, snapshot: board.snapshot(repo) });
+    if (key !== null) {
+      const repo = repos.find((r) => r.repo === key)?.repo;
+      return repo ? { repo } : { missing: `no repository ${key}` };
+    }
+    const repo = repos[0]?.repo; // the most recently active: repos() lists it first
+    return repo ? { repo } : { missing: "no repository on the board" };
   };
+
+  /** One repository's whole board. */
+  const answerBoard = (board: BoardReader, url: URL, res: http.ServerResponse): void => {
+    const named = repoNamed(board, url);
+    if ("missing" in named) return json(res, { error: named.missing }, 404);
+    json(res, { repos: board.repos(), snapshot: board.snapshot(named.repo) });
+  };
+
+  /** The figures of a scope, `BoardReader.stats()` as it answers; the scope maps the CLI's flags one to one
+   *  (D34): `since=all` is `--all` (no since, every run kept), `closedOnly=1` is `--closed`, `kind` is `--kind`. */
+  const answerStats = (board: BoardReader, url: URL, res: http.ServerResponse): void => {
+    const q = url.searchParams;
+    const key = q.get("repo");
+    // a named repository is read as `swarm stats --repo` reads it, its run whatever its age, pruned with its summary
+    // kept or not in the board's list (plan D40); a run named alone is found among the runs the board lists
+    const named = key !== null ? (board.repos().some((r) => r.repo === key) ? { repo: key } : { missing: `no repository ${key}` }) : repoNamed(board, url);
+    if ("missing" in named) return json(res, { error: named.missing }, 404);
+    const run = q.get("run");
+    const since = q.get("since");
+    const kinds = (q.get("kind") ?? "").split(",").filter(Boolean) as Kind[];
+    // the keys in the CLI's order, so the two bodies are the same text
+    const scope: StatsScope = {
+      repo: named.repo,
+      ...(run !== null ? { run: Number(run) } : {}),
+      ...(since !== null && since !== "all" ? { since } : {}),
+      ...(kinds.length ? { kinds } : {}),
+      ...(q.get("closedOnly") === "1" ? { closedOnly: true } : {}),
+    };
+    let stats: ReturnType<BoardReader["stats"]>;
+    try {
+      stats = board.stats(scope);
+    } catch (err) {
+      // a run unknown to the named repository is a 404, as an unknown repository is
+      if (scope.run !== undefined && (err as Error).message === `no run ${scope.run}`) return json(res, { error: (err as Error).message }, 404);
+      throw err;
+    }
+    json(res, stats);
+  };
+
+  const ROUTES = new Map<string, (board: BoardReader, url: URL, res: http.ServerResponse) => void>([
+    ["/api/board", answerBoard],
+    ["/api/run", answerBoard],
+    ["/api/stats", answerStats],
+  ]);
 
   return {
     handle(req, res, url) {
-      if (url.pathname !== "/api/board" && url.pathname !== "/api/run") return false;
+      const answer = ROUTES.get(url.pathname);
+      if (!answer) return false;
       if (req.method !== "GET" && req.method !== "HEAD") return false; // aiview's own 404 answers it
       if (!reader && !fs.existsSync(dbPath)) {
         json(res, { error: "no run on the board yet" }, 404);
         return true;
       }
       openReader()
-        .then((board) => answerBoard(board, url, res))
+        .then((board) => answer(board, url, res))
         .catch((err: unknown) => json(res, { error: (err as Error).message }, 500));
       return true;
     },

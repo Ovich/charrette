@@ -3,7 +3,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { openBoard, type Board, type Declared, type Delivery, type Flag, type Kind, type Message, type Participant, type RosterEntry, type SliceSpec, type SliceState } from "../board/board.ts";
+import { openBoard, type Board, type Declared, type Delivery, type Flag, type Kind, type Message, type Participant, type RosterEntry, type RunStats, type SliceSpec, type SliceState } from "../board/board.ts";
 import { profileOf } from "../board/kinds.ts";
 import { EVENTS, eventOf, formatSubscriptions, parseSubscriptions, type Subscription } from "../board/events.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
@@ -12,6 +12,8 @@ import { fullText, seqLine } from "./format.ts";
 import { nameHandle, unmatchedMentions } from "../board/mentions.ts";
 import { registerBoardDocument } from "./aiview-document.ts";
 import { unclaimedLines } from "./unclaimed.ts";
+import { git } from "./git.ts";
+import { conflictsOf, headReflogLength } from "./conflicts.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
@@ -55,6 +57,36 @@ const CODE_USAGE = [
   "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase and who was refused the lock, names whom to tell of a resolved conflict",
 ].join("\n");
 
+/** `stats` is for an outside reader, never a member: not in USAGE, its own help (D33). */
+const STATS_USAGE = [
+  "usage: swarm stats [--repo <path>] [--run <id>] [--since 30d|<ISO> | --all] [--closed] [--kind plan|brainstorm[,…]] [--json]",
+  "  the figures of a repository's runs, oldest first, with the scope's totals; a figure not recorded or not computed yet is null, never 0",
+  "  --since: runs open, or closed since then, default 30d, none with --run; --all: every run kept; --closed: closed runs only",
+  "  without --json: one line per run; --json carries every figure, with the run ids, members and seqs to follow with swarm read <seq>",
+].join("\n");
+
+/** A length as an agent reads it: `2h 05m`, `12m`, `40s`; `—` when not known. */
+const lengthText = (ms: number | null): string => {
+  if (ms === null) return "—";
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+  return minutes >= 1 ? `${minutes}m` : `${Math.round(ms / 1000)}s`;
+};
+/** `stats`' line for a run (D34, D35): `<code> <title> · <kind> · <length> · <open|closed> · conflicts <n|unknown>`. */
+const statsLine = (r: RunStats): string => {
+  const c = r.plan?.conflicts;
+  // no merge: —; not recorded: unknown; some merges unknown: <n> + <m> unknown
+  const conflicts =
+    !c || (r.recorded && r.firstMergeAtMs === null)
+      ? "—"
+      : c.known === null
+        ? "unknown"
+        : c.unknownMerges
+          ? `${c.known} + ${c.unknownMerges} unknown`
+          : String(c.known);
+  return `${r.code} ${r.title} · ${r.kind} · ${lengthText(r.lengthMs)} · ${r.closedAt === null ? "open" : "closed"} · conflicts ${conflicts}`;
+};
+
 class CliError extends Error {}
 const fail = (msg: string): never => {
   throw new CliError(msg);
@@ -65,11 +97,6 @@ const emit = (json: unknown, human: string | (() => void)): void => {
   else if (typeof human === "string") {
     if (human) console.log(human);
   } else human();
-};
-
-const git = (cwd: string, ...argv: string[]): string | null => {
-  const r = spawnSync("git", argv, { cwd, encoding: "utf8" });
-  return r.status === 0 ? r.stdout.trim() : null;
 };
 
 /** The repository (D29): its common git dir, so every worktree of one repository is one. */
@@ -544,7 +571,9 @@ async function main(board: Board): Promise<void> {
       // what the branch wrote without a claim, committed or not, before the lock; a flag informs, never blocks
       const reconciled = p.worktree ? branchChangedIn(p.worktree, onto) : [];
       const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
-      const r = board.lockMerge(p, onto);
+      // where the worktree's HEAD reflog stands: merged replays only a rebase past it (D36)
+      const reflogMark = p.worktree ? (headReflogLength(p.worktree) ?? undefined) : undefined;
+      const r = board.lockMerge(p, onto, reflogMark);
       emit({ runner: p.name, ...r, reconciled, flags }, () => {
         printReconciled(reconciled, flags);
         console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait --mentions for its merged event`);
@@ -555,7 +584,10 @@ async function main(board: Board): Promise<void> {
       const p = caller(board);
       const sha = args.positional[0] ?? fail("merged: which sha?");
       const files = args.list("--files");
-      const sharers = board.merged(p, sha, files.map((f) => path.resolve(f)));
+      // what a rebase since the lock's grant met, read before the lock goes (D3, D25, D36); no worktree, no lock or no mark: unknown (D33)
+      const lock = board.heldMergeLock(p);
+      const conflicts = p.worktree && lock && lock.reflogMark !== null ? conflictsOf(p.worktree, lock.onto ?? "", lock.reflogMark) : undefined;
+      const sharers = board.merged(p, sha, files.map((f) => path.resolve(f)), conflicts);
       // the post after a resolved conflict, prompted by the command just run (D63)
       const tell = sharers.map(
         (o) => `if you resolved a conflict in ${o.path}, tell them: swarm post "@${o.runner} I resolved ${o.path}: <how>" --about ${o.path}`,
@@ -575,6 +607,36 @@ async function main(board: Board): Promise<void> {
       emit({ runner: p.name, ended: true, reconciled, flags }, () => {
         printReconciled(reconciled, flags);
         console.log(`${p.name} ended`);
+      });
+      break;
+    }
+    case "stats": {
+      // an outside reader's verb: no member identity, no write of its own (board D6)
+      const raw = args.flag("--run");
+      const run = raw === undefined ? undefined : Number(raw);
+      if (run !== undefined && !Number.isInteger(run)) fail(`--run takes a run id, got ${raw}`);
+      const all = args.has("--all");
+      const since = args.flag("--since");
+      if (all && args.has("--since")) fail("stats: --since or --all, not both");
+      const kinds = args.list("--kind").map((k) => {
+        try {
+          return profileOf(k).kind;
+        } catch (e) {
+          return fail(`stats: ${(e as Error).message}`);
+        }
+      });
+      const stats = board.stats({
+        repo: repoOf(path.resolve(args.flag("--repo") ?? process.cwd())),
+        ...(run !== undefined ? { run } : {}),
+        // a named run is read whatever its age: no default period (plan D40)
+        ...(all ? {} : since !== undefined ? { since } : run !== undefined ? {} : { since: "30d" }),
+        ...(kinds.length ? { kinds } : {}),
+        ...(args.has("--closed") ? { closedOnly: true } : {}),
+      });
+      emit(stats, () => {
+        if (!stats.runs.length) console.log("no run in this scope");
+        for (const r of stats.runs) console.log(statsLine(r));
+        console.log("swarm stats --json for every figure");
       });
       break;
     }
@@ -602,6 +664,10 @@ async function main(board: Board): Promise<void> {
 if (!args.verb) {
   console.error(USAGE);
   process.exit(1);
+}
+if (args.verb === "stats" && args.has("--help")) {
+  console.log(STATS_USAGE);
+  process.exit(0);
 }
 if (args.verb === "--help") {
   // the core verbs; `--help code` the claim and merge verbs (D22)
