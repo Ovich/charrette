@@ -205,6 +205,10 @@ export function eventLine(body: string): { word: string | null; strong: boolean;
 
 // ── the one conversation (D1, D8, D13-D16) ──────────────────────────────────────────
 
+/** A brainstorm run's count, "3 seats": its slice rows are seats, never slices to merge. The tab, the archive and a
+ *  closed run's archived line read it alike. */
+export const seatCount = (of: number): string => `${of} ${of === 1 ? "seat" : "seats"}`;
+
 /** An open run as a tab: `quiet` while its orchestrator has a `quiet` event no `back` answered. */
 export type RunTab = { run: RunId; code: string; title: string; kind: Kind; state: "live" | "quiet" | "closed"; done: number; of: number };
 /** A closed run in the archive; `outcome` null while the snapshot holds none (D18). */

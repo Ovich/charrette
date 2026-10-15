@@ -4,7 +4,7 @@
 // Analytics, and the across-runs view. aiview's theme; board.css reaches only `.board`.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBoard } from "../../../hooks/useBoard.ts";
-import { agents, archive, claimRows, conversation, narrow, nicksOf, openingRun, runHue, runTabs, type Narrow, type Pick, type RunId } from "../../../lib/board/view.ts";
+import { agents, archive, claimRows, conversation, narrow, nicksOf, openingRun, runHue, runTabs, seatCount, type Narrow, type Pick, type RunId } from "../../../lib/board/view.ts";
 import {
   boardFieldsOf,
   DEFAULT_SCOPE,
@@ -127,9 +127,9 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
   const archived = closedRuns.find((r) => r.run === picked) ?? null;
   const nicks = useMemo(() => (snapshot ? nicksOf(snapshot) : new Map<string, string>()), [snapshot]);
   const items = useMemo(() => (snapshot ? conversation(snapshot, { run: picked, follow: focus }) : []), [snapshot, picked, focus]);
-  // a closed run picked reads "Archived <when> · read only · <done> of <of> slices" first
+  // a closed run picked reads "Archived <when> · read only · <done> of <of> slices" first, a brainstorm its seats
   const shown = useMemo(() => narrow(items, narrowing), [items, narrowing]);
-  const archivedLine = useMemo(() => (archived ? { closed: archived.closed, summary: `${archived.done} of ${archived.of} slices` } : null), [archived]);
+  const archivedLine = useMemo(() => (archived ? { closed: archived.closed, summary: archived.kind === "brainstorm" ? seatCount(archived.of) : `${archived.done} of ${archived.of} slices` } : null), [archived]);
 
   useEffect(() => {
     if (postToShow === null || runView !== "conversation") return;

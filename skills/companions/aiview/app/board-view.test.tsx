@@ -305,13 +305,14 @@ test("two or more open runs: the board opens on All", () => {
   expect(pressed()?.textContent).toBe("All");
 });
 
-test("no open run: the board opens on the most recently closed, as its archived tab, a brainstorm counting its seats (SL10)", () => {
+test("no open run: the board opens on the most recently closed, as its archived tab, a brainstorm counting its seats, in its tab and its archived line (SL10, SL11)", () => {
   show([APP], null, [ALL_CLOSED]);
   const archived = screen.getByText("Theme tokens").closest('[data-component="ArchivedTab"]') as HTMLElement;
   expect(archived.getAttribute("aria-pressed")).toBe("true");
   expect(archived.textContent).toContain("2 seats");
   expect(archived.textContent).not.toContain("2/2");
-  expect(convo().getByText(/read only · 2 of 2 slices/)).toBeTruthy();
+  expect(convo().getByText(/read only · 2 seats$/)).toBeTruthy();
+  expect(convo().queryByText(/slices/)).toBeNull();
 });
 
 test("no run at all: All, and the board says it has none yet", () => {
