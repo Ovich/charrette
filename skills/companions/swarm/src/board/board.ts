@@ -277,6 +277,8 @@ export const UPKEEP_EVERY_MS = 5 * 60 * 1000;
 const LAST_UPKEEP = "last-upkeep";
 /** The settings row holding when the analytics records began, ISO: the board's own (D33). */
 const RECORDS_SINCE = "records-since";
+/** The settings row holding when the shares record began, ISO: a run opened before has no shares known (D39). */
+const SHARES_SINCE = "shares-since";
 const RETENTION_DEFAULT_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** The page shows the last this many messages of a thread. */
@@ -307,6 +309,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   // the analytics records (call_log, lock_requests, run_stats) start with the store that first creates them:
   // a run opened before reads recorded: false (D33)
   const recordsAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'call_log'").get() === undefined;
+  // the shares record starts with the store that first creates it, the same way (D39)
+  const sharesAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'shares'").get() === undefined;
   db.exec(`
     PRAGMA journal_mode = DELETE;
     -- Several CLI processes write, and aiview reads, concurrently; without a busy timeout a
@@ -375,6 +379,16 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       path TEXT NOT NULL,
       participant INTEGER NOT NULL,
       PRIMARY KEY (repo, path, participant)
+    );
+    -- a claim granted beside a live holder of the path, kept past both claims' release: who held a path
+    -- at the same time as whom during a run, from the seq it began (D39); append-only, deleted with its run
+    CREATE TABLE IF NOT EXISTS shares (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      other INTEGER NOT NULL,
+      seq INTEGER NOT NULL,
+      PRIMARY KEY (repo, path, participant, other)
     );
     -- a holder of a shared path already told of another holder (D41): once per runner and path
     CREATE TABLE IF NOT EXISTS notices (
@@ -448,6 +462,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     -- the identities and hook_seen tables, left in stores from before D58, are no longer read or written
   `);
   if (recordsAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(RECORDS_SINCE, new Date().toISOString());
+  if (sharesAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(SHARES_SINCE, new Date().toISOString());
   // Schema upkeep for stores created by earlier versions: add a column when it is missing.
   const upkeep = (table: string, column: string, ddl: string): void => {
     const cols = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
@@ -943,10 +958,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         for (const run of runIds) {
           for (const r of db.prepare("SELECT id FROM participants WHERE run = ?").all(run) as Row[]) {
             const id = Number(r.id);
-            for (const table of ["claim_log", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries", "claim_requests", "flag_posts", "call_log", "lock_requests"]) {
+            for (const table of ["claim_log", "shares", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries", "claim_requests", "flag_posts", "call_log", "lock_requests"]) {
               db.prepare(`DELETE FROM ${table} WHERE participant = ?`).run(id);
             }
             db.prepare("DELETE FROM notices WHERE other = ?").run(id);
+            db.prepare("DELETE FROM shares WHERE other = ?").run(id);
             // a member authoring a kept message stays, so the message still reads its author
             if (!db.prepare("SELECT 1 FROM messages WHERE author = ? LIMIT 1").get(id)) db.prepare("DELETE FROM participants WHERE id = ?").run(id);
           }

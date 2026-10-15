@@ -118,6 +118,8 @@ const CASELESS = process.platform === "win32";
 const foldPath = (p: string): string => (CASELESS ? p.toLowerCase() : p);
 /** The settings row the board writes when the analytics records begin (D33). */
 const RECORDS_SINCE = "records-since";
+/** The settings row the board writes when the shares record begins (D39). */
+const SHARES_SINCE = "shares-since";
 const ORCHESTRATOR = "orchestrator";
 /** The seat id of a brainstorm's skeptic (D30). */
 const SKEPTIC = "skeptic";
@@ -211,6 +213,9 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
   const since = db.prepare("SELECT value FROM settings WHERE name = ?").get(RECORDS_SINCE) as Row | undefined;
   // opened before the records began: its new-record figures null (D32, D33)
   const recorded = since !== undefined && ms(openedAt) >= ms(since.value);
+  const sharesSince = db.prepare("SELECT value FROM settings WHERE name = ?").get(SHARES_SINCE) as Row | undefined;
+  // opened before the shares record began: which paths were held at once is unknown, its funnel null (D39)
+  const sharesRecorded = sharesSince !== undefined && ms(openedAt) >= ms(sharesSince.value);
 
   const people = db.prepare("SELECT * FROM participants WHERE run = ? ORDER BY id").all(id) as Row[];
   const ids = people.map((p) => Number(p.id));
@@ -219,6 +224,10 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
   const messages = db.prepare(`SELECT * FROM messages WHERE run = ? OR (run IS NULL AND author IN (${marks})) ORDER BY seq`).all(id, ...ids) as Row[];
   const merges = recorded ? (db.prepare("SELECT * FROM merges WHERE run = ? ORDER BY rowid").all(id) as Row[]) : [];
   const claimLog = db.prepare(`SELECT path, participant FROM claim_log WHERE participant IN (${marks}) ORDER BY rowid`).all(...ids) as Row[];
+  // shares: a claim granted beside another member of the run still holding the path (D39)
+  const shares = db
+    .prepare(`SELECT path, participant, other FROM shares WHERE participant IN (${marks}) AND other IN (${marks})`)
+    .all(...ids, ...ids) as Row[];
   const orchestrators = new Set(people.filter((p) => String(p.slice) === ORCHESTRATOR).map((p) => Number(p.id)));
 
   const conflictedOf = (m: Row): string[] | null => (m.conflicts == null ? null : (JSON.parse(String(m.conflicts)) as string[]));
@@ -349,7 +358,7 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
   const sliceCount = Number((db.prepare("SELECT COUNT(*) AS n FROM slices WHERE run = ?").get(id) as Row).n);
   const addedMidRun = messages.filter((m) => m.kind === "event" && orchestrators.has(Number(m.author)) && /^added \S+: /.test(String(m.body))).length;
 
-  // shared files: a path two members of the run held (D40), its holders in the order they took it
+  // shared files: a path two members of the run held at the same time (D39), its holders in the order they took it
   const holdersByPath = new Map<string, { path: string; holders: number[] }>();
   for (const c of claimLog) {
     const key = foldPath(String(c.path));
@@ -357,6 +366,9 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
     if (!entry.holders.includes(Number(c.participant))) entry.holders.push(Number(c.participant));
     holdersByPath.set(key, entry);
   }
+  // a holder counts when it held the path at once with another member, either side of a share
+  const sharersOf = (path: string): Set<number> =>
+    new Set(shares.filter((sh) => foldPath(String(sh.path)) === foldPath(path)).flatMap((sh) => [Number(sh.participant), Number(sh.other)]));
   const byId = new Map(people.map((p) => [Number(p.id), p]));
   const namesPath = (m: Row, path: string): boolean => {
     if (aboutNames(m.about, path)) return true;
@@ -371,7 +383,9 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
   let everyHolderTold = 0;
   let agreed = 0;
   let agreedBeforeMerge = 0;
-  for (const { path, holders } of holdersByPath.values()) {
+  for (const { path, holders: everyHolder } of holdersByPath.values()) {
+    const sharers = sharersOf(path);
+    const holders = everyHolder.filter((h) => sharers.has(h));
     if (holders.length < 2) continue;
     // each later holder posted about the path mentioning every earlier one (D41); the file is shared from the first such post
     const tellTimes: number[] = [];
@@ -433,7 +447,9 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
     plan: {
       slices: { merged: recorded ? mergedSlices : null, of: sliceCount, addedMidRun, timesMs },
       lock: { waitsMs: lockWaitsMs, racesLost },
-      shared: { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge, perFile },
+      shared: sharesRecorded
+        ? { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge, perFile }
+        : { files: null, everyHolderTold: null, agreed: null, agreedBeforeMerge: null, perFile: [] },
       flags: messages.filter((m) => m.event === "flag").length,
       conflicts: recorded ? { known, inShared, unknownMerges } : { known: null, inShared: null, unknownMerges: null },
     },

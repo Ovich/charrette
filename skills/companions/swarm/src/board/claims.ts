@@ -116,6 +116,11 @@ export function claimsOf(deps: ClaimsDeps): Claims {
       return told.some((r) => r.seq > h.since && (r.mentions.includes(o.name) || r.mentions.includes(`${o.plan}/*`)));
     });
   };
+  /** `me` was granted `rel` beside each of `people`, live holders of it: kept for the run's figures (D39). */
+  const recordShares = (me: Participant, rel: string, people: Participant[]): void => {
+    const share = db.prepare("INSERT OR IGNORE INTO shares (repo, path, participant, other, seq) VALUES (?, ?, ?, ?, ?)");
+    for (const o of people) share.run(me.repo, rel, me.id, o.id, lastSeq());
+  };
   /** The other holders `me` is told of, once per runner and path (D40). */
   const noticeOf = (me: Participant, rel: string, people: Participant[]): string | null => {
     const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
@@ -180,6 +185,7 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         hold(me, rel, String(asked.kind) === "interface" ? "interface" : "inside");
         db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
         const people = others.map((c) => participantById(c.participant));
+        recordShares(me, rel, people);
         return { path: rel, sharedWith: people.map((o) => o.name) };
       });
     },
@@ -256,6 +262,7 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         }
         hold(me, rel, kind); // a new holder, or an `inside` claim widened to an interface
         db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
+        recordShares(me, rel, people);
         const sharedWith = people.map((o) => ({ runner: o.name, doing: doingOf(o.id) }));
         return { allowed: true, sharedWith, notice: noticeOf(me, rel, people) };
       });
