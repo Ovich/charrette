@@ -21,6 +21,7 @@ import { resolveBindings } from "../core/bind.ts";
 import { formatOf, isHtml, isPdf, readDoc } from "../core/paths.ts";
 import { isName } from "../core/pointer.ts";
 import { clearServerFiles, writeServerFiles } from "../core/serverstate.ts";
+import { collectionVersion } from "../core/collectionversion.ts";
 import { DocWatcher, type DataChangedEvent } from "../core/watcher.ts";
 import { createSseHub } from "./sse.ts";
 
@@ -54,17 +55,6 @@ const MIME: Record<string, string> = {
   ".woff2": "font/woff2",
   ".ico": "image/x-icon",
 };
-
-/** The version the collection ships as: `.claude-plugin/plugin.json`, two levels above the
- *  skill in a checkout and in the plugin cache alike. Read once; the file does not move. */
-export function collectionVersion(toolRoot: string): string | null {
-  try {
-    const manifest = JSON.parse(fs.readFileSync(path.join(toolRoot, "..", "..", ".claude-plugin", "plugin.json"), "utf8")) as { version?: unknown };
-    return typeof manifest.version === "string" ? manifest.version : null;
-  } catch {
-    return null;
-  }
-}
 
 function openBrowser(url: string): void {
   const [c, args] =
