@@ -58,23 +58,29 @@ export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRo
     res.end(JSON.stringify(obj));
   };
 
-  /** One repository's whole board, as swarm's page server resolved it; `/api/run?id=` kept as `?run=`. */
-  const answerBoard = (board: BoardReader, url: URL, res: http.ServerResponse): void => {
+  /** The repository a request names, as swarm's page server resolved it: a run's, a repository, or
+   *  the most recently active; `missing` is the 404's message. `/api/run?id=` kept as `?run=`. */
+  const repoNamed = (board: BoardReader, url: URL): { repo: string } | { missing: string } => {
     const run = url.searchParams.get(url.pathname === "/api/run" ? "id" : "run");
     const key = url.searchParams.get("repo");
     const repos = board.repos();
-    let repo: string | undefined;
     if (run !== null) {
-      repo = repos.find((r) => r.runs.some((x) => x.run === Number(run)))?.repo;
-      if (!repo) return json(res, { error: `no run ${run}` }, 404);
-    } else if (key !== null) {
-      repo = repos.find((r) => r.repo === key)?.repo;
-      if (!repo) return json(res, { error: `no repository ${key}` }, 404);
-    } else {
-      repo = repos[0]?.repo; // the most recently active: repos() lists it first
-      if (!repo) return json(res, { error: "no repository on the board" }, 404);
+      const repo = repos.find((r) => r.runs.some((x) => x.run === Number(run)))?.repo;
+      return repo ? { repo } : { missing: `no run ${run}` };
     }
-    json(res, { repos, snapshot: board.snapshot(repo) });
+    if (key !== null) {
+      const repo = repos.find((r) => r.repo === key)?.repo;
+      return repo ? { repo } : { missing: `no repository ${key}` };
+    }
+    const repo = repos[0]?.repo; // the most recently active: repos() lists it first
+    return repo ? { repo } : { missing: "no repository on the board" };
+  };
+
+  /** One repository's whole board. */
+  const answerBoard = (board: BoardReader, url: URL, res: http.ServerResponse): void => {
+    const named = repoNamed(board, url);
+    if ("missing" in named) return json(res, { error: named.missing }, 404);
+    json(res, { repos: board.repos(), snapshot: board.snapshot(named.repo) });
   };
 
   return {
