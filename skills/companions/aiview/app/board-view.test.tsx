@@ -133,6 +133,36 @@ test("the archive's search matches title, code and orchestrator", () => {
   expect(panel.getByText("No archived run matches.")).toBeTruthy();
 });
 
+test("an archive row carries its kind as a chip: a brainstorm counts seats, a plan its slices", () => {
+  show([APP], null);
+  fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+  const panel = within(screen.getByRole("dialog", { name: "Archive" }));
+  const row = (code: string) => panel.getAllByRole("button").find((b) => b.classList.contains("arow") && b.querySelector(".code")?.textContent === code)!;
+  const brainstorm = row("TT");
+  const chip = brainstorm.querySelector('[data-component="KindChip"]') as HTMLElement;
+  expect(chip.textContent).toBe("brainstorm");
+  expect(chip.classList.contains("brainstorm")).toBe(true);
+  expect(brainstorm.querySelector(".am")?.textContent).toMatch(/^2 seats · /);
+  expect(brainstorm.textContent).not.toMatch(/slices/);
+  const plan = row("LP");
+  const planChip = plan.querySelector('[data-component="KindChip"]') as HTMLElement;
+  expect(planChip.textContent).toBe("plan");
+  expect(planChip.classList.contains("plan")).toBe(true);
+  expect(plan.querySelector(".am")?.textContent).toMatch(/^4\/4 slices · /);
+});
+
+test("the archive's search matches the kind", () => {
+  show([APP], null);
+  fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+  const panel = within(screen.getByRole("dialog", { name: "Archive" }));
+  const search = panel.getByRole("searchbox");
+  const codes = () => panel.queryAllByRole("button").filter((b) => b.classList.contains("arow")).map((r) => r.querySelector(".code")?.textContent);
+  fireEvent.change(search, { target: { value: "brainstorm" } });
+  expect(codes()).toEqual(["TT"]);
+  fireEvent.change(search, { target: { value: "Plan" } });
+  expect(codes()).toEqual(["LP"]);
+});
+
 test("Escape closes the archive", () => {
   show([APP], null);
   fireEvent.click(screen.getByRole("button", { name: "Archive" }));

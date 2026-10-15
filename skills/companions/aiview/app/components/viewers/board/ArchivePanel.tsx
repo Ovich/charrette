@@ -1,5 +1,5 @@
-// The archive (D7, D18, mockup #643): every closed run, newest first, searchable on title, code
-// and orchestrator; a drawer from the left. A row picks the run; ×, Escape or a click outside closes.
+// The archive (D7, D18, mockup #643): every closed run, newest first, searchable on title, code,
+// orchestrator and kind; a drawer from the left. A row picks the run; ×, Escape or a click outside closes.
 import { useEffect, useRef, useState } from "react";
 import type { ArchivedRun, RunId } from "../../../lib/board/view.ts";
 
@@ -9,6 +9,12 @@ function closedAt(iso: string): string {
   if (Number.isNaN(d.getTime())) return "";
   const day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return `${day}, ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** A row's meta: a plan counts its slices, a brainstorm its seats (its slice rows are seats). */
+function runMeta(r: ArchivedRun): string {
+  const count = r.kind === "brainstorm" ? `${r.of} ${r.of === 1 ? "seat" : "seats"}` : `${r.done}/${r.of} slices`;
+  return `${count} · ${r.orchestrator}`;
 }
 
 export function ArchivePanel({
@@ -53,7 +59,7 @@ export function ArchivePanel({
             ×
           </button>
         </div>
-        <input ref={search} type="search" placeholder="Find a run by title, code or orchestrator" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input ref={search} type="search" placeholder="Find a run by title, code, orchestrator or kind" value={query} onChange={(e) => setQuery(e.target.value)} />
         {matches.length === 0 ? (
           <p className="aempty">No archived run matches.</p>
         ) : (
@@ -62,12 +68,12 @@ export function ArchivePanel({
               <span className="code">{r.code}</span>
               <span className="at">
                 {r.title}
-                <span className="ak">{r.kind}</span>
+                <span className={`kchip ${r.kind}`} data-component="KindChip">
+                  {r.kind}
+                </span>
               </span>
               <span className="ad">{closedAt(r.closed)}</span>
-              <span className="am">
-                {r.of > 0 ? `${r.done}/${r.of} slices` : r.kind} · {r.orchestrator}
-              </span>
+              <span className="am">{runMeta(r)}</span>
             </button>
           ))
         )}

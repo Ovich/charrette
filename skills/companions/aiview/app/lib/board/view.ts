@@ -291,7 +291,7 @@ export function runTabs(snap: BoardSnapshot): RunTab[] {
     .map((r) => tabOf(snap, r));
 }
 
-/** The closed runs, newest first, matched on title, code and orchestrator. */
+/** The closed runs, newest first, matched on title, code, orchestrator and kind. */
 export function archive(snap: BoardSnapshot, query: string): ArchivedRun[] {
   const q = query.trim().toLowerCase();
   return snap.runs
@@ -302,7 +302,7 @@ export function archive(snap: BoardSnapshot, query: string): ArchivedRun[] {
       const orchestrator = snap.roster.find((m) => m.runner === orch)?.nick || orch;
       return { ...tabOf(snap, r), closed: closedAt, outcome: null, orchestrator };
     })
-    .filter((a) => !q || [a.title, a.code, a.orchestrator].some((s) => s.toLowerCase().includes(q)))
+    .filter((a) => !q || [a.title, a.code, a.orchestrator, a.kind].some((s) => s.toLowerCase().includes(q)))
     .sort((a, b) => b.closed.localeCompare(a.closed) || b.run - a.run);
 }
 
