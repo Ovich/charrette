@@ -269,6 +269,8 @@ const ORCHESTRATOR = "orchestrator";
 const WAIT_POLL_MS = 1000;
 const LINE_WIDTH = 100;
 const STALE_MS = 10 * 60 * 1000;
+/** A pending wait's looks are logged in call_log at most this often: well under STALE_MS, never a row per tick. */
+const WAIT_LOG_EVERY_MS = 60 * 1000;
 /** The board's upkeep runs at most this often, from any process (D16). */
 export const UPKEEP_EVERY_MS = 5 * 60 * 1000;
 /** The settings row holding the last upkeep's time, ISO: the board's own, never a user setting. */
@@ -732,7 +734,16 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
       for (const r of rows) mark.run(me.id, Number(r.seq));
       // a delivery is a call to the board: the runner's last call (D31)
-      db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(now(), me.id);
+      const at = now();
+      db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(at, me.id);
+      // a wait's look is a sign of life by the stale rule, so the timeline logs it too (board D12, D37); a wait looks
+      // every second, so at most one row a minute. A deliver verb is logged by countCall instead
+      if (fromWait) {
+        const last = db.prepare("SELECT MAX(at) AS at FROM call_log WHERE participant = ?").get(me.id) as Row;
+        if (last.at == null || Date.parse(at) - Date.parse(String(last.at)) >= WAIT_LOG_EVERY_MS) {
+          db.prepare("INSERT INTO call_log (participant, at, verb) VALUES (?, ?, 'deliver')").run(me.id, at);
+        }
+      }
       if (!fromWait) {
         // a call after a wait that never returned (killed): the runner is no longer waiting
         const r = db.prepare("UPDATE participants SET waiting = 0 WHERE id = ? AND waiting = 1").run(me.id);
@@ -889,12 +900,13 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         db.prepare("UPDATE runs SET state = 'closed', closed_at = ? WHERE id = ?").run(now(), run);
         bump(String(runRow(run).repo));
         db.prepare("UPDATE participants SET ended_at = COALESCE(ended_at, ?) WHERE run = ?").run(now(), run);
+        // the run's figures, kept past pruning, read while its claims still say which are interfaces (D37); the summary
+        // only reads before its one write, so a failure leaves the close whole: close succeeds, prune writes it later (D25)
+        try {
+          storeRunStats(run);
+        } catch {}
         for (const p of db.prepare("SELECT id FROM participants WHERE run = ?").all(run) as Row[]) claims.releaseAll(Number(p.id));
       });
-      // the run's figures, kept past pruning; a failed summary never fails close, prune writes it later (D25)
-      try {
-        transaction(() => storeRunStats(run));
-      } catch {}
     },
 
     prune(at = new Date()) {

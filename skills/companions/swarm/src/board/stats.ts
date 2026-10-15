@@ -34,7 +34,15 @@ export type PlanRunStats = {
    *  `unknownMerges`: merges whose conflicts git could not tell (board D13, D16). */
   conflicts: { known: number | null; inShared: number | null; unknownMerges: number | null };
 };
-export type SharedFile = { path: string; holders: string[]; agreement: number | null /* seq */; agreedAfterMs: number | null; conflict: boolean | null };
+export type SharedFile = {
+  path: string;
+  holders: string[];
+  agreement: number | null /* seq */;
+  agreedAfterMs: number | null;
+  conflict: boolean | null;
+  /** A holder declared it an interface at join, or claimed it as one (D37); null on a summary from before. */
+  interface: boolean | null;
+};
 export type QuestionStats = { id: string /* D<n> */; firstPost: string; outcome: { at: string; seq: number; kind: "agreed" } | null; exchanges: number | null };
 export type BrainstormRunStats = {
   questions: QuestionStats[];
@@ -333,6 +341,8 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
     return body.includes(foldPath(path)) || body.includes(foldPath(path.split("/").pop()!));
   };
   const said = messages.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
+  // the claims still held; closeRun summarizes before it releases them
+  const interfaceClaims = db.prepare(`SELECT path, participant FROM claims WHERE kind = 'interface' AND participant IN (${marks})`).all(...ids) as Row[];
   const perFile: SharedFile[] = [];
   let everyHolderTold = 0;
   let agreedBeforeMerge = 0;
@@ -359,9 +369,15 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
     if (agreement && (firstMergeOfPath === null || ms(agreement.at) < firstMergeOfPath)) agreedBeforeMerge++;
     const met = mergedWith.map(conflictedOf);
     const conflict = !recorded ? null : met.some((c) => c?.some((f) => foldPath(f) === foldPath(path))) ? true : met.some((c) => c === null) ? null : false;
+    // an interface: declared so at join (repository-relative), or claimed so (D37)
+    const declaredInterface = holders.some((h) =>
+      (JSON.parse(String(byId.get(h)!.files ?? "[]")) as { path: string; interface?: boolean }[]).some((d) => d.interface === true && aboutNames(d.path, path)),
+    );
+    const claimedInterface = interfaceClaims.some((c) => holders.includes(Number(c.participant)) && foldPath(String(c.path)) === foldPath(path));
     perFile.push({
       path,
       holders: holders.map((h) => nameOf(byId.get(h)!)),
+      interface: declaredInterface || claimedInterface,
       agreement: agreement ? Number(agreement.seq) : null,
       agreedAfterMs: agreement && sharedAt !== null ? Math.max(0, ms(agreement.at) - sharedAt) : null,
       conflict,
@@ -462,12 +478,12 @@ function totalsOf(runs: RunStats[]): Totals {
 
 /** The files members met in across the scope's runs, most runs first (D33). */
 function filesAcross(runs: RunStats[]): FileAcrossRuns[] {
-  const byPath = new Map<string, { path: string; perRun: { run: RunId; holders: string[]; agreed: boolean; conflict: boolean | null }[] }>();
+  const byPath = new Map<string, { path: string; perRun: { run: RunId; holders: string[]; agreed: boolean; conflict: boolean | null; interface: boolean | null }[] }>();
   for (const r of runs) {
     for (const f of r.plan?.shared.perFile ?? []) {
       const key = foldPath(f.path);
       const entry = byPath.get(key) ?? { path: f.path, perRun: [] };
-      entry.perRun.push({ run: r.run, holders: f.holders, agreed: f.agreement !== null, conflict: f.conflict });
+      entry.perRun.push({ run: r.run, holders: f.holders, agreed: f.agreement !== null, conflict: f.conflict, interface: f.interface ?? null });
       byPath.set(key, entry);
     }
   }
@@ -478,8 +494,8 @@ function filesAcross(runs: RunStats[]): FileAcrossRuns[] {
       holders: new Set(perRun.flatMap((x) => x.holders)).size,
       agreements: perRun.filter((x) => x.agreed).length,
       conflicts: perRun.every((x) => x.conflict === null) ? null : perRun.filter((x) => x.conflict === true).length,
-      // whether a holder declared it an interface is not in a run's figures: not computed
-      declaredInterface: null,
+      // the runs in which a holder declared or claimed it an interface; null when none knows (summaries from before D37)
+      declaredInterface: perRun.every((x) => x.interface === null) ? null : perRun.filter((x) => x.interface === true).length,
       perRun: perRun.map((x) => ({ run: x.run, holders: x.holders.length, conflict: x.conflict })),
     }))
     .sort((a, b) => b.runs.length - a.runs.length || a.path.localeCompare(b.path));
