@@ -4,6 +4,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { useBoard } from "../../../hooks/useBoard.ts";
 import { agents, archive, claimRows, conversation, narrow, nicksOf, openingRun, runHue, runTabs, type Narrow, type Pick, type RunId } from "../../../lib/board/view.ts";
+import { DEFAULT_SCOPE, hashWithAcross, readAcross, type AcrossScope } from "../../../lib/board/analytics.ts";
+import { AcrossRunsView } from "./AcrossRunsView.tsx";
 import { ConversationFilters } from "./ConversationFilters.tsx";
 import { NicksContext } from "./chips.tsx";
 import { AgentStrip } from "./AgentStrip.tsx";
@@ -52,6 +54,8 @@ export function BoardView({ repos, run }: { repos: string[]; run: number | null 
   const [menuOpen, setMenuOpen] = useState(false);
   // kept beside the pick, never in the URL: a reload starts unnarrowed
   const [narrowing, setNarrowing] = useState<Narrow>(UNNARROWED);
+  // the across-runs view and its scope, in the URL: a reload reopens them (D31)
+  const [across, setAcross] = useState<AcrossScope | null>(() => readAcross(location.hash));
   const board = useBoard(query);
   const snapshot = board.snapshot;
   const focus = pick.follow;
@@ -80,7 +84,15 @@ export function BoardView({ repos, run }: { repos: string[]; run: number | null 
   const shown = useMemo(() => narrow(items, narrowing), [items, narrowing]);
   const archivedLine = useMemo(() => (archived ? { closed: archived.closed, summary: `${archived.done} of ${archived.of} slices` } : null), [archived]);
 
+  const showAcross = (scope: AcrossScope | null): void => {
+    setAcross(scope);
+    // replaced, never pushed: the hash keeps the document and its pointer, and hashchange stays App's
+    history.replaceState(history.state, "", `#${hashWithAcross(location.hash, scope)}`);
+  };
+
   const pickRun = (r: RunId | null): void => {
+    // a run tab or All leaves the across view
+    if (across) showAcross(null);
     setOpened(true);
     setPick({ run: r, follow: null });
     // the kind stays; the file goes when the new run has no item about it
@@ -115,10 +127,22 @@ export function BoardView({ repos, run }: { repos: string[]; run: number | null 
         <TipLayer />
         {repos.length >= 2 && <RepoList repos={listed} selected={snapshot.repo} onSelect={pickRepo} />}
         <div className="content">
-          <RunTabs tabs={tabs} archived={archived} pick={picked} lock={snapshot.lock} menuOpen={menuOpen} onMenu={setMenuOpen} onPick={pickRun} />
+          <RunTabs
+            tabs={tabs}
+            archived={archived}
+            pick={picked}
+            lock={snapshot.lock}
+            menuOpen={menuOpen}
+            onMenu={setMenuOpen}
+            onPick={pickRun}
+            analytics={across !== null}
+            onAnalytics={() => showAcross(across ?? DEFAULT_SCOPE)}
+          />
           {menuOpen && <ArchivePanel runs={searchArchive} total={closedRuns.length} onPick={pickRun} onClose={closeMenu} />}
           {missingRun !== null && <p className="notice">run {missingRun} is not on this board</p>}
-          {snapshot.runs.length === 0 ? (
+          {across !== null ? (
+            <AcrossRunsView repo={snapshot.repo} repoName={snapshot.name} scope={across} onScope={showAcross} onOpenRun={pickRun} />
+          ) : snapshot.runs.length === 0 ? (
             <p className="none" data-component="EmptyState">
               No run on {snapshot.name} yet.
             </p>

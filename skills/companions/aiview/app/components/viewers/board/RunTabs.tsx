@@ -1,7 +1,9 @@
 // The board's top row (D7, mockup #643): ☰ opens the archive, All, one tab per open run, an
 // archived run picked as a tab with ×, and the merge lock at the row's end, always visible.
+// Analytics, beside the lock, opens the across-runs view; while it shows, no run tab is pressed.
 import type { BoardSnapshot } from "../../../../../swarm/src/board/snapshot.ts";
 import { runHue, type RunId, type RunTab } from "../../../lib/board/view.ts";
+import { AnalyticsButton } from "./AnalyticsButton.tsx";
 import { MergeLock } from "./MergeLock.tsx";
 
 function RunTabButton({ tab, picked, onPick }: { tab: RunTab; picked: boolean; onPick: () => void }) {
@@ -29,6 +31,8 @@ export function RunTabs({
   menuOpen,
   onMenu,
   onPick,
+  analytics,
+  onAnalytics,
 }: {
   tabs: RunTab[];
   archived: RunTab | null;
@@ -37,6 +41,9 @@ export function RunTabs({
   menuOpen: boolean;
   onMenu: (open: boolean) => void;
   onPick: (run: RunId | null) => void;
+  /** The across-runs view is shown. */
+  analytics: boolean;
+  onAnalytics: () => void;
 }) {
   return (
     <nav className="runs" data-component="RunTabs" aria-label="Runs">
@@ -53,14 +60,14 @@ export function RunTabs({
           <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
         </svg>
       </button>
-      <button className="run" aria-pressed={pick === null} onClick={() => onPick(null)}>
+      <button className="run" aria-pressed={!analytics && pick === null} onClick={() => onPick(null)}>
         All
       </button>
       {tabs.map((t) => (
-        <RunTabButton key={t.run} tab={t} picked={pick === t.run} onPick={() => onPick(t.run)} />
+        <RunTabButton key={t.run} tab={t} picked={!analytics && pick === t.run} onPick={() => onPick(t.run)} />
       ))}
       {archived && (
-        <span className="run archived" data-component="ArchivedTab" aria-pressed={pick === archived.run}>
+        <span className="run archived" data-component="ArchivedTab" aria-pressed={!analytics && pick === archived.run}>
           <span className="code" style={{ color: `hsl(${runHue(archived.code)} 55% 45%)` }}>
             {archived.code}
           </span>
@@ -77,6 +84,7 @@ export function RunTabs({
         </span>
       )}
       <span className="lockwrap">
+        <AnalyticsButton pressed={analytics} onPress={onAnalytics} />
         <MergeLock lock={lock} />
       </span>
     </nav>
