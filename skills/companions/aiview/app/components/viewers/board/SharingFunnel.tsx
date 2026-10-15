@@ -41,11 +41,17 @@ export function SharingFunnel({ shared, conflictsInShared }: { shared: Totals["s
         );
       })}
       <div className="foot">
-        A shared file is one a second member claimed while another held it; each step counts the files that made it that far. At merge,{" "}
-        <span className={conflictsInShared ? "bad" : undefined}>
-          {figure(conflictsInShared)} of the {figure(shared.files)}
-        </span>{" "}
-        met a conflict.
+        A shared file is one a second member claimed while another held it; each step counts the files that made it that far.
+        {/* the conflict line only when both its figures are recorded (D43) */}
+        {conflictsInShared !== null && shared.files !== null ? (
+          <>
+            {" "}
+            At merge, <span className={conflictsInShared ? "bad" : undefined}>
+              {figure(conflictsInShared)} of the {figure(shared.files)}
+            </span>{" "}
+            met a conflict.
+          </>
+        ) : null}
       </div>
     </div>
   );

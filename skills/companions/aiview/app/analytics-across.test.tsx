@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { LIVE } from "./board-fixtures.ts";
 import { ACROSS, ACROSS_ALL_KNOWN, ACROSS_EMPTY, PLAN_RUN, bodyOf } from "./stats-fixtures.ts";
 import { source, standIn } from "./stats-stand-in.ts";
+import type { Stats } from "../../swarm/src/board/snapshot.ts";
 
 vi.mock("./hooks/useBoard.ts", async () => ({ useBoard: (await import("./stats-stand-in.ts")).useBoardStandIn }));
 vi.mock("./hooks/useStats.ts", async () => ({ useStats: (await import("./stats-stand-in.ts")).useStatsStandIn }));
@@ -48,6 +49,23 @@ test("the page counts nothing (D28, D34, D35)", () => {
   const lock = across().querySelector('[data-component="MergeLockPanel"]') as HTMLElement;
   expect(lock.textContent).toContain("23 merges · p50 4m 10s · p90 9m");
   expect([...lock.querySelectorAll(".hist .col span")].map((n) => n.textContent)).toEqual(["6", "5", "7", "3", "2"]);
+});
+
+test("the funnel's conflict line reads only when both its figures are recorded, left out when either is null (D43)", () => {
+  const foot = (): string => across().querySelector('[data-component="SharingFunnel"] .foot')!.textContent!;
+  openAcross();
+  expect(foot()).toContain("At merge, 3 of the 9 met a conflict.");
+  const notRecorded: [string, Stats][] = [
+    ["conflicts in shared files", { ...ACROSS, totals: { ...ACROSS.totals, conflicts: { ...ACROSS.totals.conflicts, inShared: null } } }],
+    ["shared files", { ...ACROSS, totals: { ...ACROSS.totals, shared: { ...ACROSS.totals.shared, files: null } } }],
+  ];
+  for (const [missing, stats] of notRecorded) {
+    cleanup();
+    openAcross(stats);
+    expect(foot(), missing).toContain("each step counts the files that made it that far.");
+    expect(foot(), missing).not.toContain("At merge");
+    expect(foot(), missing).not.toContain("conflict");
+  }
 });
 
 test("a null figure reads not recorded, never 0; a tile over runs some unrecorded says N runs not recorded; the sparkline has a gap at the unrecorded run (US1, D32, D33)", () => {
