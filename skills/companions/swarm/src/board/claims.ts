@@ -136,6 +136,23 @@ export function claimsOf(deps: ClaimsDeps): Claims {
     db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(repo);
     return rows.map((r) => Number(r.participant)).filter(isLive).map((id) => participantById(id).name);
   };
+  /** `p`'s lock turn still going (D25): its latest, not merged, and not closed by an `end` since it was asked,
+   *  the end's call row being what closes it. Undefined when it has none. */
+  const openTurn = (p: Participant): Row | undefined =>
+    db
+      .prepare(
+        `SELECT rowid AS id, granted_at FROM lock_requests t WHERE participant = ? AND merged_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM call_log c WHERE c.participant = t.participant AND c.verb = 'end' AND c.at >= t.asked_at)
+         ORDER BY rowid DESC LIMIT 1`,
+      )
+      .get(p.id) as Row | undefined;
+  /** The turn granted at `at`: the open one stamped when it waited, else a new one asked and granted at once.
+   *  `anew`: a new grant, so a turn granted before and lost since (a slice set done) is over. */
+  const grantTurn = (p: Participant, at: string, anew: boolean): void => {
+    const turn = openTurn(p);
+    if (turn && turn.granted_at == null) db.prepare("UPDATE lock_requests SET granted_at = ? WHERE rowid = ?").run(at, Number(turn.id));
+    else if (!turn || anew) db.prepare("INSERT INTO lock_requests (repo, participant, asked_at, granted_at) VALUES (?, ?, ?, ?)").run(p.repo, p.id, at, at);
+  };
   const declared = (id: number): Declared[] => JSON.parse(String((db.prepare("SELECT files FROM participants WHERE id = ?").get(id) as Row).files)) as Declared[];
 
   return {
@@ -296,16 +313,24 @@ export function claimsOf(deps: ClaimsDeps): Claims {
         const r = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo) as Row | undefined;
         if (r && Number(r.participant) !== me.id && isLive(Number(r.participant))) {
           db.prepare("INSERT OR IGNORE INTO lock_waiters (repo, participant) VALUES (?, ?)").run(me.repo, me.id);
+          // the turn opens at the first ask and counts each refusal; a turn granted once and lost since is over
+          const turn = openTurn(me);
+          if (turn && turn.granted_at == null) db.prepare("UPDATE lock_requests SET refused = refused + 1 WHERE rowid = ?").run(Number(turn.id));
+          else db.prepare("INSERT INTO lock_requests (repo, participant, asked_at, refused) VALUES (?, ?, ?, 1)").run(me.repo, me.id, now());
           return { granted: false as const, holder: participantById(Number(r.participant)).name };
         }
         if (r && Number(r.participant) === me.id) {
           if (onto) db.prepare("UPDATE merge_locks SET onto = ? WHERE repo = ?").run(onto, me.repo);
+          // a lock granted before the records began has no turn yet: it gets one, at the grant
+          grantTurn(me, String((db.prepare("SELECT at FROM merge_locks WHERE repo = ?").get(me.repo) as Row).at), false);
           return { granted: true as const };
         }
         // a new holder: the waiters on the one before are not this one's (D65)
         db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(me.repo);
         // the mark is the grant's: a holder asking again keeps it, as it keeps the grant's time (D36)
-        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at, onto, reflog_mark) VALUES (?, ?, ?, ?, ?)").run(me.repo, me.id, now(), onto ?? null, reflogMark ?? null);
+        const at = now();
+        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at, onto, reflog_mark) VALUES (?, ?, ?, ?, ?)").run(me.repo, me.id, at, onto ?? null, reflogMark ?? null);
+        grantTurn(me, at, true);
         bump(me.repo);
         return { granted: true as const };
       });
@@ -338,6 +363,9 @@ export function claimsOf(deps: ClaimsDeps): Claims {
           if (lock && Number(lock.participant) === me.id && lock.onto != null) onto = String(lock.onto);
           db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
           db.prepare("UPDATE participants SET merged = 1 WHERE id = ?").run(me.id);
+          // the holder's lock turn ends with the merge (D25)
+          const turn = openTurn(me);
+          if (turn) db.prepare("UPDATE lock_requests SET merged_at = ? WHERE rowid = ?").run(now(), Number(turn.id));
           waiters = takeLockWaiters(me.repo).filter((n) => n !== me.name);
         });
         // every holder of a merged path, a shared one included (D40)

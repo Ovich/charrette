@@ -1,7 +1,8 @@
 // The calculation behind `swarm stats` and the Analytics views: internal to the board, imported by
 // board.ts only, as claims.ts. Reads the store, never git or the CLI. Every figure is nullable
-// (D34): null means not recorded or not computed yet, never 0; a list may be empty. This first cut
-// fills each run's identity and times and a plan run's conflicts (from `merges`); the rest is null.
+// (D34): null means not recorded or not computed yet, never 0; a list may be empty. A run with a
+// run_stats row is read whole from it (D20); an open run, or a closed one with none, is computed from
+// the raw rows (D21, D22). The brainstorm block is not computed yet: absent, its totals null.
 import type { DatabaseSync } from "node:sqlite";
 import type { RunId } from "./board.ts";
 import { type Kind, profileOf } from "./kinds.ts";
@@ -94,8 +95,16 @@ export type Stats = { scope: StatsScope; runs: RunStats[] /* oldest first */; to
 type Row = Record<string, unknown>;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
 const CASELESS = process.platform === "win32";
 const foldPath = (p: string): string => (CASELESS ? p.toLowerCase() : p);
+/** The settings row the board writes when the analytics records begin (D33). */
+const RECORDS_SINCE = "records-since";
+const ORCHESTRATOR = "orchestrator";
+/** A post is sourced when it carries file:line, #id or a URL (D23). */
+const SOURCE = /[\w./\\-]+\.\w+:\d+|#\d+|https?:\/\/\S+/;
+/** The lock wait histogram's upper bounds, the last bin open-ended: < 1m, 1–2m, 2–5m, 5–10m, 10m + (D28). */
+const WAIT_BINS_MS = [1, 2, 5, 10].map((m) => m * MINUTE_MS);
 
 /** The period's start, ISO: `<n>d` back from now, or an ISO time; absent, no start. */
 function periodStart(since: string | undefined): string | null {
@@ -106,76 +115,382 @@ function periodStart(since: string | undefined): string | null {
   return new Date(at).toISOString();
 }
 
-/** Nothing computed yet: every figure null, every list empty (D34). */
-const totalsNotComputed = (): Totals => ({
-  runs: null,
-  byKind: { plan: null, brainstorm: null },
-  notRecorded: null,
-  members: null,
-  silentMembers: null,
-  slices: { merged: null, of: null, p50Ms: null, p90Ms: null },
-  lockWait: { merges: null, p50Ms: null, p90Ms: null, bins: [] },
-  shared: { files: null, everyHolderTold: null, agreed: null, agreedBeforeMerge: null, withoutAgreement: null },
-  flags: null,
-  runsWithoutFlag: null,
-  conflicts: { known: null, inShared: null, unknownMerges: null },
-  brainstorm: { questionsSettled: null, questions: null, exchangesMedian: null, objectedThenAgreed: null, sourcedShare: null, silentSeats: null },
-  series: { slicesMerged: [], sliceTimeP50: [], lockWaitP50: [], sharedAgreed: [], flags: [], conflicts: [], silentMembers: [] },
-});
+const ms = (at: unknown): number => Date.parse(String(at));
+const iso = (t: number): string => new Date(t).toISOString();
+const firstLine = (body: string): string => body.split(/\r?\n/)[0].slice(0, 120);
 
-/** A plan run's conflicts from its `merges` rows; the rest of the block not computed yet. */
-function planRunStats(db: DatabaseSync, run: RunId): PlanRunStats {
-  const merges = db.prepare("SELECT participant, conflicts FROM merges WHERE run = ? ORDER BY rowid").all(run) as Row[];
-  // a path another member of the run held, now or before (claim_log keeps a released claim)
-  const heldBy = db.prepare("SELECT l.path, l.participant FROM claim_log l JOIN participants p ON p.id = l.participant WHERE p.run = ?").all(run) as Row[];
-  const heldByOther = (path: string, merger: number): boolean =>
-    heldBy.some((h) => Number(h.participant) !== merger && foldPath(String(h.path)) === foldPath(path));
-  let known = 0;
-  let inShared = 0;
-  let unknownMerges = 0;
-  for (const m of merges) {
-    if (m.conflicts == null) {
-      unknownMerges++;
-      continue;
-    }
-    const files = JSON.parse(String(m.conflicts)) as string[];
-    known += files.length;
-    inShared += files.filter((f) => heldByOther(f, Number(m.participant))).length;
-  }
-  return {
-    slices: { merged: null, of: null, addedMidRun: null, timesMs: [] },
-    lock: { waitsMs: [], racesLost: [] },
-    shared: { files: null, everyHolderTold: null, agreed: null, agreedBeforeMerge: null, perFile: [] },
-    flags: null,
-    conflicts: { known, inShared, unknownMerges },
-  };
+/** Nearest rank; null for no values. */
+function percentile(values: number[], p: number): number | null {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)];
+}
+/** The sum of the figures known; null when none is (D34). */
+function sumKnown(values: (number | null | undefined)[]): number | null {
+  const known = values.filter((v): v is number => typeof v === "number");
+  return known.length ? known.reduce((a, b) => a + b, 0) : null;
 }
 
-function runStats(db: DatabaseSync, r: Row, now: number): RunStats {
+/** `about` (a path, or its tail) names `path`. */
+const aboutNames = (about: unknown, path: string): boolean => {
+  if (about == null) return false;
+  const a = foldPath(String(about).replace(/\\/g, "/"));
+  const f = foldPath(path);
+  return a === f || f.endsWith(`/${a}`);
+};
+
+/** One lock turn of a member, its times in ms; `over`: when it ended, by its merge, an end call, or the member's end. */
+type LockTurn = { asked: number; granted: number | null; merged: number | null; refused: number; over: number };
+type Span = { from: number; to: number; what: Interval["what"] };
+
+/** The member's timeline (board D9, D12): the lock's waits and merges exact, working and silent inferred,
+ *  silent being the whole gap between two calls longer than `silentAfterMs` (D33). */
+function timeline(joined: number, over: number, calls: number[], turns: LockTurn[], silentAfterMs: number): Interval[] {
+  if (!(over > joined)) return [];
+  const exact: Span[] = [];
+  for (const t of turns) {
+    if (t.refused > 0) exact.push({ from: t.asked, to: t.granted ?? t.over, what: "waiting" });
+    if (t.granted !== null) exact.push({ from: t.granted, to: t.merged ?? t.over, what: "merging" });
+  }
+  const points = [joined, ...calls.filter((c) => c > joined && c < over), over].sort((a, b) => a - b);
+  const silent: Span[] = [];
+  for (let i = 1; i < points.length; i++) if (points[i] - points[i - 1] > silentAfterMs) silent.push({ from: points[i - 1], to: points[i], what: "silent" });
+  const clip = (t: number): number => Math.min(over, Math.max(joined, t));
+  const bounds = [...new Set([joined, over, ...[...exact, ...silent].flatMap((s) => [clip(s.from), clip(s.to)])])].sort((a, b) => a - b);
+  const inside = (spans: Span[], what: Interval["what"], at: number): boolean => spans.some((s) => s.what === what && s.from <= at && at < s.to);
+  const out: Interval[] = [];
+  for (let i = 1; i < bounds.length; i++) {
+    const from = bounds[i - 1];
+    const to = bounds[i];
+    const mid = (from + to) / 2;
+    // the exact spans win over the inferred ones
+    const what: Interval["what"] = inside(exact, "merging", mid)
+      ? "merging"
+      : inside(exact, "waiting", mid)
+        ? "waiting"
+        : inside(silent, "silent", mid)
+          ? "silent"
+          : "working";
+    const last = out[out.length - 1];
+    if (last && last.what === what && ms(last.to) === from) last.to = iso(to);
+    else out.push({ from: iso(from), to: iso(to), what, inferred: what === "working" || what === "silent" });
+  }
+  return out;
+}
+
+/** The run's figures computed from the raw rows; `now` ends an open run and a member still there. Reads, never writes. */
+function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number): RunStats {
   const id = Number(r.id);
+  const repo = String(r.repo);
   const kind = profileOf(String(r.kind ?? "plan")).kind;
   const openedAt = String(r.opened_at);
   const closedAt = r.closed_at == null ? null : String(r.closed_at);
-  const end = closedAt ? Date.parse(closedAt) : now;
-  return {
+  const runOver = closedAt ? ms(closedAt) : now;
+  const since = db.prepare("SELECT value FROM settings WHERE name = ?").get(RECORDS_SINCE) as Row | undefined;
+  // opened before the records began: its new-record figures null (D32, D33)
+  const recorded = since !== undefined && ms(openedAt) >= ms(since.value);
+
+  const people = db.prepare("SELECT * FROM participants WHERE run = ? ORDER BY id").all(id) as Row[];
+  const ids = people.map((p) => Number(p.id));
+  const marks = ids.map(() => "?").join(", ") || "NULL";
+  const nameOf = (p: Row): string => `${r.plan}/${p.slice}`;
+  const messages = db.prepare(`SELECT * FROM messages WHERE run = ? OR (run IS NULL AND author IN (${marks})) ORDER BY seq`).all(id, ...ids) as Row[];
+  const merges = recorded ? (db.prepare("SELECT * FROM merges WHERE run = ? ORDER BY rowid").all(id) as Row[]) : [];
+  const claimLog = db.prepare(`SELECT path, participant FROM claim_log WHERE participant IN (${marks}) ORDER BY rowid`).all(...ids) as Row[];
+  const orchestrators = new Set(people.filter((p) => String(p.slice) === ORCHESTRATOR).map((p) => Number(p.id)));
+
+  const conflictedOf = (m: Row): string[] | null => (m.conflicts == null ? null : (JSON.parse(String(m.conflicts)) as string[]));
+  const filesOf = (m: Row): string[] => JSON.parse(String(m.files)) as string[];
+
+  // every grant on the repository, any run's: what a race is lost to (D33)
+  const grants = recorded
+    ? (db
+        .prepare(
+          `SELECT t.participant, t.asked_at, t.granted_at, p.slice, r.plan FROM lock_requests t
+             LEFT JOIN participants p ON p.id = t.participant LEFT JOIN runs r ON r.id = p.run
+           WHERE t.repo = ? AND t.granted_at IS NOT NULL ORDER BY t.granted_at`,
+        )
+        .all(repo) as Row[])
+    : [];
+  const lockWaitsMs: number[] = [];
+  const racesLost: PlanRunStats["lock"]["racesLost"] = [];
+
+  const members: MemberStats[] = people.map((p) => {
+    const pid = Number(p.id);
+    const joined = ms(p.joined_at);
+    const over = Math.min(p.ended_at == null ? runOver : ms(p.ended_at), Math.max(now, joined));
+    const calls = recorded ? (db.prepare("SELECT at, verb FROM call_log WHERE participant = ? ORDER BY at").all(pid) as Row[]) : [];
+    const endCalls = calls.filter((c) => c.verb === "end").map((c) => ms(c.at));
+    const turns: LockTurn[] = recorded
+      ? (db.prepare("SELECT * FROM lock_requests WHERE participant = ? ORDER BY rowid").all(pid) as Row[]).map((t) => {
+          const asked = ms(t.asked_at);
+          const merged = t.merged_at == null ? null : ms(t.merged_at);
+          return {
+            asked,
+            granted: t.granted_at == null ? null : ms(t.granted_at),
+            merged,
+            refused: Number(t.refused),
+            // a turn without a merge is closed by the member's next end call (D25), else by its end
+            over: merged ?? endCalls.find((e) => e >= asked) ?? over,
+          };
+        })
+      : [];
+    const memberMarks: Mark[] = [];
+    // a race lost: a refused turn still pending while the lock goes to a member who asked later (D33);
+    // waitedMs: how long it had waited at the last race it lost
+    let lost = 0;
+    let waitedMs: number | null = null;
+    for (const t of turns) {
+      if (t.granted !== null) lockWaitsMs.push(t.granted - t.asked);
+      if (t.refused === 0) continue;
+      const until = t.granted ?? t.over;
+      for (const g of grants) {
+        const at = ms(g.granted_at);
+        if (Number(g.participant) === pid || !(ms(g.asked_at) > t.asked) || !(at > t.asked && at < until)) continue;
+        lost++;
+        waitedMs = Math.max(waitedMs ?? 0, at - t.asked);
+        const winner = g.slice == null ? "a member" : `${g.plan}/${g.slice}`;
+        memberMarks.push({ at: iso(at), what: "race", note: `the merge lock went to ${winner}, who asked later` });
+      }
+    }
+    if (lost) racesLost.push({ member: nameOf(p), lost, waitedMs });
+
+    const own = messages.filter((m) => Number(m.author) === pid);
+    const posts = own.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
+    const flagged = own.filter((m) => m.event === "flag");
+    for (const m of own) {
+      if (m.kind !== "agreement" && m.event !== "flag") continue;
+      memberMarks.push({
+        at: String(m.at),
+        what: m.kind === "agreement" ? "agreement" : "flag",
+        seq: Number(m.seq),
+        ...(m.about != null ? { path: String(m.about) } : {}),
+        note: firstLine(String(m.body)),
+      });
+    }
+    for (const m of merges.filter((x) => Number(x.participant) === pid)) {
+      for (const f of conflictedOf(m) ?? []) memberMarks.push({ at: String(m.at), what: "conflict", path: f, note: `the rebase met a conflict in ${f}` });
+    }
+    memberMarks.sort((a, b) => ms(a.at) - ms(b.at));
+    return {
+      member: nameOf(p),
+      nick: p.nick == null ? String(p.slice) : String(p.nick),
+      slice: String(p.slice),
+      joined: String(p.joined_at),
+      ended: p.ended_at == null ? null : String(p.ended_at),
+      intervals: recorded ? timeline(joined, over, calls.map((c) => ms(c.at)), turns, silentAfterMs) : [],
+      marks: memberMarks,
+      posts: posts.length,
+      postTimes: posts.map((m) => String(m.at)),
+      claims: claimLog.filter((c) => Number(c.participant) === pid).length,
+      flags: flagged.length,
+      unsourced: posts.filter((m) => !SOURCE.test(String(m.body))).length,
+    };
+  });
+
+  const firstMerge = merges.length ? Math.min(...merges.map((m) => ms(m.at))) : null;
+  const length = runOver - ms(openedAt);
+  const base: RunStats = {
     run: id,
     kind,
     code: planCode(String(r.plan)),
     title: String(r.title),
     openedAt,
     closedAt,
-    lengthMs: Number.isNaN(end - Date.parse(openedAt)) ? null : end - Date.parse(openedAt),
-    recorded: true,
-    firstMergeAtMs: null,
-    racesLost: null,
-    members: [],
-    ...(kind === "plan" ? { plan: planRunStats(db, id) } : {}),
+    lengthMs: Number.isNaN(length) ? null : length,
+    recorded,
+    firstMergeAtMs: recorded && firstMerge !== null ? firstMerge - ms(openedAt) : null,
+    racesLost: recorded ? racesLost.reduce((n, x) => n + (x.lost ?? 0), 0) : null,
+    members,
+  };
+  // a brainstorm run's own block is not computed yet: listed with its members only
+  if (kind !== "plan") return base;
+
+  // a slice's time: its join to its first merge, else to its end (board D9)
+  const timesMs = recorded
+    ? people.flatMap((p) => {
+        if (orchestrators.has(Number(p.id))) return [];
+        const mergedAt = merges.filter((m) => Number(m.participant) === Number(p.id)).map((m) => ms(m.at));
+        const end = mergedAt.length ? Math.min(...mergedAt) : p.ended_at == null ? null : ms(p.ended_at);
+        return end === null ? [] : [end - ms(p.joined_at)];
+      })
+    : [];
+  const sliceCount = Number((db.prepare("SELECT COUNT(*) AS n FROM slices WHERE run = ?").get(id) as Row).n);
+  const addedMidRun = messages.filter((m) => m.kind === "event" && orchestrators.has(Number(m.author)) && /^added \S+: /.test(String(m.body))).length;
+
+  // shared files: a path two members of the run held (D40), its holders in the order they took it
+  const holdersByPath = new Map<string, { path: string; holders: number[] }>();
+  for (const c of claimLog) {
+    const key = foldPath(String(c.path));
+    const entry = holdersByPath.get(key) ?? { path: String(c.path), holders: [] };
+    if (!entry.holders.includes(Number(c.participant))) entry.holders.push(Number(c.participant));
+    holdersByPath.set(key, entry);
+  }
+  const byId = new Map(people.map((p) => [Number(p.id), p]));
+  const namesPath = (m: Row, path: string): boolean => {
+    if (aboutNames(m.about, path)) return true;
+    const body = foldPath(String(m.body));
+    return body.includes(foldPath(path)) || body.includes(foldPath(path.split("/").pop()!));
+  };
+  const said = messages.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
+  const perFile: SharedFile[] = [];
+  let everyHolderTold = 0;
+  let agreedBeforeMerge = 0;
+  for (const { path, holders } of holdersByPath.values()) {
+    if (holders.length < 2) continue;
+    // each later holder posted about the path mentioning every earlier one (D41); the file is shared from the first such post
+    const tellTimes: number[] = [];
+    let told = true;
+    for (let i = 1; i < holders.length; i++) {
+      const tells = said.filter((m) => Number(m.author) === holders[i] && namesPath(m, path));
+      tellTimes.push(...tells.map((m) => ms(m.at)));
+      const mentioned = (e: number): boolean =>
+        tells.some((m) => {
+          const named = JSON.parse(String(m.mentions)) as string[];
+          return named.includes(nameOf(byId.get(e)!)) || named.includes(`${r.plan}/*`);
+        });
+      if (!holders.slice(0, i).every(mentioned)) told = false;
+    }
+    const sharedAt = tellTimes.length ? Math.min(...tellTimes) : null;
+    if (told) everyHolderTold++;
+    const agreement = messages.find((m) => m.kind === "agreement" && aboutNames(m.about, path));
+    const mergedWith = merges.filter((m) => filesOf(m).some((f) => foldPath(f) === foldPath(path)));
+    const firstMergeOfPath = mergedWith.length ? Math.min(...mergedWith.map((m) => ms(m.at))) : null;
+    if (agreement && (firstMergeOfPath === null || ms(agreement.at) < firstMergeOfPath)) agreedBeforeMerge++;
+    const met = mergedWith.map(conflictedOf);
+    const conflict = !recorded ? null : met.some((c) => c?.some((f) => foldPath(f) === foldPath(path))) ? true : met.some((c) => c === null) ? null : false;
+    perFile.push({
+      path,
+      holders: holders.map((h) => nameOf(byId.get(h)!)),
+      agreement: agreement ? Number(agreement.seq) : null,
+      agreedAfterMs: agreement && sharedAt !== null ? Math.max(0, ms(agreement.at) - sharedAt) : null,
+      conflict,
+    });
+  }
+
+  // conflicts: paths over the merges whose conflicts are known; inShared, those another member held (board D13, D16)
+  let known = 0;
+  let inShared = 0;
+  let unknownMerges = 0;
+  for (const m of merges) {
+    const files = conflictedOf(m);
+    if (files === null) {
+      unknownMerges++;
+      continue;
+    }
+    known += files.length;
+    inShared += files.filter((f) => claimLog.some((c) => Number(c.participant) !== Number(m.participant) && foldPath(String(c.path)) === foldPath(f))).length;
+  }
+  const mergedSlices = new Set(merges.map((m) => Number(m.participant)).filter((pid) => !orchestrators.has(pid))).size;
+  return {
+    ...base,
+    plan: {
+      slices: { merged: recorded ? mergedSlices : null, of: sliceCount, addedMidRun, timesMs },
+      lock: { waitsMs: lockWaitsMs, racesLost },
+      shared: { files: perFile.length, everyHolderTold, agreed: perFile.filter((f) => f.agreement !== null).length, agreedBeforeMerge, perFile },
+      flags: messages.filter((m) => m.event === "flag").length,
+      conflicts: recorded ? { known, inShared, unknownMerges } : { known: null, inShared: null, unknownMerges: null },
+    },
   };
 }
 
-/** The scope's runs, oldest first, a pruned run never; one read. `silentAfterMs`: the board's silent rule. */
+/** A run kept: not pruned, or pruned with its summary kept (D21). */
+const KEPT = "(pruned_at IS NULL OR id IN (SELECT run FROM run_stats))";
+
+/** A closed run's summary, for its run_stats row (D20); the caller stores it. Reads, never writes. */
+export function summarize(db: DatabaseSync, run: RunId, silentAfterMs: number): RunStats {
+  const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run) as Row | undefined;
+  if (!r) throw new Error(`no run ${run}`);
+  return computeRun(db, r, Date.now(), silentAfterMs);
+}
+
+/** The scope's totals, from its runs' figures alone, stored or computed alike (D28, D34). */
+function totalsOf(runs: RunStats[]): Totals {
+  const plans = runs.flatMap((r) => (r.plan ? [r.plan] : []));
+  const recorded = runs.filter((r) => r.recorded);
+  const recordedPlans = recorded.flatMap((r) => (r.plan ? [r.plan] : []));
+  const silentOf = (r: RunStats): number => r.members.filter((m) => m.intervals.some((i) => i.what === "silent")).length;
+  const times = recordedPlans.flatMap((p) => p.slices.timesMs);
+  const waits = recordedPlans.flatMap((p) => p.lock.waitsMs);
+  const bins = [...WAIT_BINS_MS, Infinity].map((upper, i) => waits.filter((w) => w >= (WAIT_BINS_MS[i - 1] ?? 0) && w < upper).length);
+  const shared = (pick: (s: PlanRunStats["shared"]) => number | null): number | null => sumKnown(plans.map((p) => pick(p.shared)));
+  const files = shared((s) => s.files);
+  const agreed = shared((s) => s.agreed);
+  // one point per run; a run before the records is a gap (D32)
+  const series = (figure: (r: RunStats) => number | null): (number | null)[] => runs.map((r) => (r.recorded ? figure(r) : null));
+  return {
+    runs: runs.length,
+    byKind: { plan: runs.filter((r) => r.kind === "plan").length, brainstorm: runs.filter((r) => r.kind === "brainstorm").length },
+    notRecorded: runs.length - recorded.length,
+    members: runs.length ? runs.reduce((n, r) => n + r.members.length, 0) : null,
+    silentMembers: sumKnown(recorded.map(silentOf)),
+    slices: {
+      merged: sumKnown(plans.map((p) => p.slices.merged)),
+      of: sumKnown(plans.map((p) => p.slices.of)),
+      p50Ms: percentile(times, 0.5),
+      p90Ms: percentile(times, 0.9),
+    },
+    // merges: the lock turns granted, each one merge's wait
+    lockWait: { merges: recordedPlans.length ? waits.length : null, p50Ms: percentile(waits, 0.5), p90Ms: percentile(waits, 0.9), bins: recordedPlans.length ? bins : [] },
+    shared: {
+      files,
+      everyHolderTold: shared((s) => s.everyHolderTold),
+      agreed,
+      agreedBeforeMerge: shared((s) => s.agreedBeforeMerge),
+      withoutAgreement: files === null || agreed === null ? null : files - agreed,
+    },
+    flags: sumKnown(plans.map((p) => p.flags)),
+    runsWithoutFlag: plans.length ? plans.filter((p) => p.flags === 0).length : null,
+    conflicts: {
+      known: sumKnown(plans.map((p) => p.conflicts.known)),
+      inShared: sumKnown(plans.map((p) => p.conflicts.inShared)),
+      unknownMerges: sumKnown(plans.map((p) => p.conflicts.unknownMerges)),
+    },
+    // the brainstorm figures are not computed yet (D34)
+    brainstorm: { questionsSettled: null, questions: null, exchangesMedian: null, objectedThenAgreed: null, sourcedShare: null, silentSeats: null },
+    series: {
+      slicesMerged: series((r) => r.plan?.slices.merged ?? null),
+      sliceTimeP50: series((r) => (r.plan ? percentile(r.plan.slices.timesMs, 0.5) : null)),
+      lockWaitP50: series((r) => (r.plan ? percentile(r.plan.lock.waitsMs, 0.5) : null)),
+      sharedAgreed: series((r) => r.plan?.shared.agreed ?? null),
+      flags: series((r) => r.plan?.flags ?? null),
+      conflicts: series((r) => r.plan?.conflicts.known ?? null),
+      silentMembers: series(silentOf),
+    },
+  };
+}
+
+/** The files members met in across the scope's runs, most runs first (D33). */
+function filesAcross(runs: RunStats[]): FileAcrossRuns[] {
+  const byPath = new Map<string, { path: string; perRun: { run: RunId; holders: string[]; agreed: boolean; conflict: boolean | null }[] }>();
+  for (const r of runs) {
+    for (const f of r.plan?.shared.perFile ?? []) {
+      const key = foldPath(f.path);
+      const entry = byPath.get(key) ?? { path: f.path, perRun: [] };
+      entry.perRun.push({ run: r.run, holders: f.holders, agreed: f.agreement !== null, conflict: f.conflict });
+      byPath.set(key, entry);
+    }
+  }
+  return [...byPath.values()]
+    .map(({ path, perRun }) => ({
+      path,
+      runs: perRun.map((x) => x.run),
+      holders: new Set(perRun.flatMap((x) => x.holders)).size,
+      agreements: perRun.filter((x) => x.agreed).length,
+      conflicts: perRun.every((x) => x.conflict === null) ? null : perRun.filter((x) => x.conflict === true).length,
+      // whether a holder declared it an interface is not in a run's figures: not computed
+      declaredInterface: null,
+      perRun: perRun.map((x) => ({ run: x.run, holders: x.holders.length, conflict: x.conflict })),
+    }))
+    .sort((a, b) => b.runs.length - a.runs.length || a.path.localeCompare(b.path));
+}
+
+/** The scope's runs, oldest first, in one read (D22): a run with a run_stats row read whole from it, pruned or not;
+ *  the rest computed. Throws on an unknown run or kind, or an unreadable since. `silentAfterMs`: the board's silent rule (board D12). */
 export function statsOf(db: DatabaseSync, scope: StatsScope, silentAfterMs: number): Stats {
-  const where = ["repo = ?", "pruned_at IS NULL"];
+  for (const k of scope.kinds ?? []) profileOf(k);
+  const start = periodStart(scope.since);
+  const where = ["repo = ?", KEPT];
   const params: (string | number)[] = [scope.repo];
   if (scope.run !== undefined) {
     where.push("id = ?");
@@ -186,16 +501,23 @@ export function statsOf(db: DatabaseSync, scope: StatsScope, silentAfterMs: numb
     params.push(...scope.kinds);
   }
   if (scope.closedOnly) where.push("state = 'closed'");
-  const start = periodStart(scope.since);
   if (start) {
     where.push("(state = 'open' OR closed_at >= ?)");
     params.push(start);
   }
   db.exec("BEGIN");
   try {
+    if (scope.run !== undefined && !db.prepare(`SELECT 1 FROM runs WHERE id = ? AND repo = ? AND ${KEPT}`).get(scope.run, scope.repo)) {
+      throw new Error(`no run ${scope.run}`);
+    }
     const rows = db.prepare(`SELECT * FROM runs WHERE ${where.join(" AND ")} ORDER BY opened_at, id`).all(...params) as Row[];
+    const stored = db.prepare("SELECT body FROM run_stats WHERE run = ?");
     const now = Date.now();
-    return { scope, runs: rows.map((r) => runStats(db, r, now)), totals: totalsNotComputed(), files: [], silentAfterMs };
+    const runs = rows.map((r) => {
+      const row = stored.get(Number(r.id)) as Row | undefined;
+      return row ? (JSON.parse(String(row.body)) as RunStats) : computeRun(db, r, now, silentAfterMs);
+    });
+    return { scope, runs, totals: totalsOf(runs), files: filesAcross(runs), silentAfterMs };
   } finally {
     db.exec("COMMIT");
   }
