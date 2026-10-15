@@ -1,5 +1,5 @@
 // src/cli/index.ts
-import { spawnSync as spawnSync2 } from "node:child_process";
+import { spawnSync as spawnSync3 } from "node:child_process";
 import fs3 from "node:fs";
 import path4 from "node:path";
 
@@ -179,7 +179,10 @@ function claimsOf(deps) {
       `INSERT INTO claims (repo, path, participant, kind, since_seq) VALUES (?, ?, ?, ?, ?)
            ON CONFLICT (repo, path, participant) DO UPDATE SET kind = excluded.kind WHERE claims.kind = 'inside' AND excluded.kind = 'interface'`
     ).run(p.repo, rel, p.id, kind, lastSeq());
-    db.prepare("INSERT OR IGNORE INTO claim_log (repo, path, participant) VALUES (?, ?, ?)").run(p.repo, rel, p.id);
+    db.prepare(
+      `INSERT INTO claim_log (repo, path, participant, kind) VALUES (?, ?, ?, ?)
+         ON CONFLICT (repo, path, participant) DO UPDATE SET kind = 'interface' WHERE excluded.kind = 'interface'`
+    ).run(p.repo, rel, p.id, kind);
     if (Number(r.changes) === 0) return false;
     bump(p.repo);
     return true;
@@ -206,6 +209,10 @@ function claimsOf(deps) {
       return told.some((r) => r.seq > h.since && (r.mentions.includes(o.name) || r.mentions.includes(`${o.plan}/*`)));
     });
   };
+  const recordShares = (me, rel, people) => {
+    const share = db.prepare("INSERT OR IGNORE INTO shares (repo, path, participant, other, seq) VALUES (?, ?, ?, ?, ?)");
+    for (const o of people) share.run(me.repo, rel, me.id, o.id, lastSeq());
+  };
   const noticeOf = (me, rel, people) => {
     const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
     const fresh = people.filter((o) => Number(told.run(me.repo, rel, me.id, o.id).changes) > 0);
@@ -223,6 +230,16 @@ function claimsOf(deps) {
     const rows = db.prepare("SELECT participant FROM lock_waiters WHERE repo = ? ORDER BY rowid").all(repo);
     db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(repo);
     return rows.map((r) => Number(r.participant)).filter(isLive).map((id) => participantById(id).name);
+  };
+  const openTurn = (p) => db.prepare(
+    `SELECT rowid AS id, granted_at FROM lock_requests t WHERE participant = ? AND merged_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM call_log c WHERE c.participant = t.participant AND c.verb = 'end' AND c.at >= t.asked_at)
+         ORDER BY rowid DESC LIMIT 1`
+  ).get(p.id);
+  const grantTurn = (p, at, anew) => {
+    const turn = openTurn(p);
+    if (turn && turn.granted_at == null) db.prepare("UPDATE lock_requests SET granted_at = ? WHERE rowid = ?").run(at, Number(turn.id));
+    else if (!turn || anew) db.prepare("INSERT INTO lock_requests (repo, participant, asked_at, granted_at) VALUES (?, ?, ?, ?)").run(p.repo, p.id, at, at);
   };
   const declared = (id) => JSON.parse(String(db.prepare("SELECT files FROM participants WHERE id = ?").get(id).files));
   return {
@@ -247,6 +264,7 @@ function claimsOf(deps) {
         hold(me, rel, String(asked.kind) === "interface" ? "interface" : "inside");
         db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
         const people = others.map((c) => participantById(c.participant));
+        recordShares(me, rel, people);
         return { path: rel, sharedWith: people.map((o) => o.name) };
       });
     },
@@ -311,6 +329,7 @@ function claimsOf(deps) {
         }
         hold(me, rel, kind);
         db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
+        recordShares(me, rel, people);
         const sharedWith = people.map((o) => ({ runner: o.name, doing: doingOf(o.id) }));
         return { allowed: true, sharedWith, notice: noticeOf(me, rel, people) };
       });
@@ -355,25 +374,36 @@ function claimsOf(deps) {
         bump(me.repo);
       });
     },
-    lockMerge(me, onto) {
+    lockMerge(me, onto, reflogMark) {
       return transaction(() => {
         const r = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo);
         if (r && Number(r.participant) !== me.id && isLive(Number(r.participant))) {
           db.prepare("INSERT OR IGNORE INTO lock_waiters (repo, participant) VALUES (?, ?)").run(me.repo, me.id);
+          const turn = openTurn(me);
+          if (turn && turn.granted_at == null) db.prepare("UPDATE lock_requests SET refused = refused + 1 WHERE rowid = ?").run(Number(turn.id));
+          else db.prepare("INSERT INTO lock_requests (repo, participant, asked_at, refused) VALUES (?, ?, ?, 1)").run(me.repo, me.id, now());
           return { granted: false, holder: participantById(Number(r.participant)).name };
         }
         if (r && Number(r.participant) === me.id) {
           if (onto) db.prepare("UPDATE merge_locks SET onto = ? WHERE repo = ?").run(onto, me.repo);
+          grantTurn(me, String(db.prepare("SELECT at FROM merge_locks WHERE repo = ?").get(me.repo).at), false);
           return { granted: true };
         }
         db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(me.repo);
-        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at, onto) VALUES (?, ?, ?, ?)").run(me.repo, me.id, now(), onto ?? null);
+        const at = now();
+        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at, onto, reflog_mark) VALUES (?, ?, ?, ?, ?)").run(me.repo, me.id, at, onto ?? null, reflogMark ?? null);
+        grantTurn(me, at, true);
         bump(me.repo);
         return { granted: true };
       });
     },
-    merged(me, sha, files) {
+    heldMergeLock(me) {
+      const r = db.prepare("SELECT at, onto, reflog_mark FROM merge_locks WHERE repo = ? AND participant = ?").get(me.repo, me.id);
+      return r ? { grantedAt: String(r.at), onto: r.onto == null ? null : String(r.onto), reflogMark: r.reflog_mark == null ? null : Number(r.reflog_mark) } : null;
+    },
+    merged(me, sha, files, conflicts) {
       const rels = [...new Set(files.map((f) => relPath(me.repo, f)).filter((x) => x !== null))];
+      const conflicted = conflicts && "files" in conflicts ? new Set(conflicts.files.map((f) => fold(slashes(f)))) : null;
       const wanted = new Set(rels);
       const told = /* @__PURE__ */ new Set();
       const iface = /* @__PURE__ */ new Set();
@@ -389,6 +419,8 @@ function claimsOf(deps) {
           if (lock && Number(lock.participant) === me.id && lock.onto != null) onto = String(lock.onto);
           db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
           db.prepare("UPDATE participants SET merged = 1 WHERE id = ?").run(me.id);
+          const turn = openTurn(me);
+          if (turn) db.prepare("UPDATE lock_requests SET merged_at = ? WHERE rowid = ?").run(now(), Number(turn.id));
           waiters = takeLockWaiters(me.repo).filter((n) => n !== me.name);
         });
         for (const rel of rels) {
@@ -414,6 +446,7 @@ function claimsOf(deps) {
         if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);
         lines.push(`files: ${rels.join(", ") || "-"}`);
         for (const rel of rels) {
+          if (conflicted && !conflicted.has(fold(rel))) continue;
           const ids = new Set(holdersOf(me.repo, rel).map((c) => c.participant));
           const held = db.prepare("SELECT l.participant FROM claim_log l JOIN participants p ON p.id = l.participant WHERE l.repo = ? AND l.path = ? AND p.run = ? ORDER BY l.rowid").all(me.repo, rel, me.run);
           for (const r of held) ids.add(Number(r.participant));
@@ -422,10 +455,527 @@ function claimsOf(deps) {
         }
         const meta = { rebase: [...told], tell: [...new Set(sharers.map((o) => o.runner))] };
         insertMessage(me, lines.join("\n"), null, "event", [.../* @__PURE__ */ new Set([...told, ...waiters, ...all])], { event: EVENTS.merged.name, meta });
+        db.prepare("INSERT INTO merges (participant, run, sha, at, files, conflicts) VALUES (?, ?, ?, ?, ?, ?)").run(
+          me.id,
+          me.run,
+          sha,
+          now(),
+          JSON.stringify(rels),
+          conflicts && "files" in conflicts ? JSON.stringify(conflicts.files.map(slashes)) : null
+        );
       });
       return sharers;
     }
   };
+}
+
+// src/board/stats.ts
+var DAY_MS = 24 * 60 * 60 * 1e3;
+var MINUTE_MS = 60 * 1e3;
+var CASELESS = process.platform === "win32";
+var foldPath = (p) => CASELESS ? p.toLowerCase() : p;
+var RECORDS_SINCE = "records-since";
+var SHARES_SINCE = "shares-since";
+var ORCHESTRATOR = "orchestrator";
+var SKEPTIC = "skeptic";
+var QUESTION = /^D\d+$/;
+var SOURCE = /[\w./\\-]+\.\w+:\d+|#\d+|https?:\/\/\S+/;
+var WAIT_BINS_MS = [1, 2, 5, 10].map((m) => m * MINUTE_MS);
+function periodStart(since) {
+  if (since === void 0) return null;
+  const days = since.match(/^(\d+)d$/);
+  const at = days ? Date.now() - Number(days[1]) * DAY_MS : Date.parse(since);
+  if (Number.isNaN(at)) throw new Error(`since takes <n>d or an ISO time, got ${since}`);
+  return new Date(at).toISOString();
+}
+var ms = (at) => Date.parse(String(at));
+var iso = (t) => new Date(t).toISOString();
+var firstLine = (body) => body.split(/\r?\n/)[0].slice(0, 120);
+function percentile(values, p) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)];
+}
+function sumKnown(values) {
+  const known = values.filter((v) => typeof v === "number");
+  return known.length ? known.reduce((a, b) => a + b, 0) : null;
+}
+var aboutNames = (about, path5) => {
+  if (about == null) return false;
+  const a = foldPath(String(about).replace(/\\/g, "/"));
+  const f = foldPath(path5);
+  return a === f || f.endsWith(`/${a}`);
+};
+function timeline(joined, over, calls, turns, silentAfterMs) {
+  if (!(over > joined)) return [];
+  const exact = [];
+  for (const t of turns) {
+    if (t.refused > 0) exact.push({ from: t.asked, to: t.granted ?? t.over, what: "waiting" });
+    if (t.granted !== null) exact.push({ from: t.granted, to: t.merged ?? t.over, what: "merging" });
+  }
+  const points = [joined, ...calls.filter((c) => c > joined && c < over), over].sort((a, b) => a - b);
+  const silent = [];
+  for (let i = 1; i < points.length; i++) if (points[i] - points[i - 1] > silentAfterMs) silent.push({ from: points[i - 1], to: points[i], what: "silent" });
+  const clip = (t) => Math.min(over, Math.max(joined, t));
+  const bounds = [.../* @__PURE__ */ new Set([joined, over, ...[...exact, ...silent].flatMap((s) => [clip(s.from), clip(s.to)])])].sort((a, b) => a - b);
+  const inside = (spans, what, at) => spans.some((s) => s.what === what && s.from <= at && at < s.to);
+  const out = [];
+  for (let i = 1; i < bounds.length; i++) {
+    const from = bounds[i - 1];
+    const to = bounds[i];
+    const mid = (from + to) / 2;
+    const what = inside(exact, "merging", mid) ? "merging" : inside(exact, "waiting", mid) ? "waiting" : inside(silent, "silent", mid) ? "silent" : "working";
+    const last = out[out.length - 1];
+    if (last && last.what === what && ms(last.to) === from) last.to = iso(to);
+    else out.push({ from: iso(from), to: iso(to), what, inferred: what === "working" || what === "silent" });
+  }
+  return out;
+}
+function computeRun(db, r, now, silentAfterMs) {
+  const id = Number(r.id);
+  const repo = String(r.repo);
+  const kind = profileOf(String(r.kind ?? "plan")).kind;
+  const openedAt = String(r.opened_at);
+  const closedAt = r.closed_at == null ? null : String(r.closed_at);
+  const runOver = closedAt ? ms(closedAt) : now;
+  const since = db.prepare("SELECT value FROM settings WHERE name = ?").get(RECORDS_SINCE);
+  const recorded = since !== void 0 && ms(openedAt) >= ms(since.value);
+  const sharesSince = db.prepare("SELECT value FROM settings WHERE name = ?").get(SHARES_SINCE);
+  const sharesRecorded = sharesSince !== void 0 && ms(openedAt) >= ms(sharesSince.value);
+  const people = db.prepare("SELECT * FROM participants WHERE run = ? ORDER BY id").all(id);
+  const ids = people.map((p) => Number(p.id));
+  const marks = ids.map(() => "?").join(", ") || "NULL";
+  const nameOf = (p) => `${r.plan}/${p.slice}`;
+  const messages = db.prepare(`SELECT * FROM messages WHERE run = ? OR (run IS NULL AND author IN (${marks})) ORDER BY seq`).all(id, ...ids);
+  const merges = recorded ? db.prepare("SELECT * FROM merges WHERE run = ? ORDER BY rowid").all(id) : [];
+  const claimLog = db.prepare(`SELECT path, participant, kind FROM claim_log WHERE participant IN (${marks}) ORDER BY rowid`).all(...ids);
+  const shares = db.prepare(`SELECT path, participant, other FROM shares WHERE participant IN (${marks}) AND other IN (${marks})`).all(...ids, ...ids);
+  const orchestrators = new Set(people.filter((p) => String(p.slice) === ORCHESTRATOR).map((p) => Number(p.id)));
+  const conflictedOf = (m) => m.conflicts == null ? null : JSON.parse(String(m.conflicts));
+  const filesOf = (m) => JSON.parse(String(m.files));
+  const grants = recorded ? db.prepare(
+    `SELECT t.participant, t.asked_at, t.granted_at, p.slice, r.plan FROM lock_requests t
+             LEFT JOIN participants p ON p.id = t.participant LEFT JOIN runs r ON r.id = p.run
+           WHERE t.repo = ? AND t.granted_at IS NOT NULL ORDER BY t.granted_at`
+  ).all(repo) : [];
+  const lockWaitsMs = [];
+  const racesLost = [];
+  const members = people.map((p) => {
+    const pid = Number(p.id);
+    const joined = ms(p.joined_at);
+    const over = Math.min(p.ended_at == null ? runOver : ms(p.ended_at), Math.max(now, joined));
+    const calls = recorded ? db.prepare("SELECT at, verb FROM call_log WHERE participant = ? ORDER BY at").all(pid) : [];
+    const endCalls = calls.filter((c) => c.verb === "end").map((c) => ms(c.at));
+    const turns = recorded ? db.prepare("SELECT * FROM lock_requests WHERE participant = ? ORDER BY rowid").all(pid).map((t) => {
+      const asked = ms(t.asked_at);
+      const merged = t.merged_at == null ? null : ms(t.merged_at);
+      return {
+        asked,
+        granted: t.granted_at == null ? null : ms(t.granted_at),
+        merged,
+        refused: Number(t.refused),
+        // a turn without a merge is closed by the member's next end call (D25), else by its end
+        over: merged ?? endCalls.find((e) => e >= asked) ?? over
+      };
+    }) : [];
+    const memberMarks = [];
+    let lost = 0;
+    let waitedMs = null;
+    for (const t of turns) {
+      if (t.granted !== null) lockWaitsMs.push(t.granted - t.asked);
+      if (t.refused === 0) continue;
+      const until = t.granted ?? t.over;
+      for (const g of grants) {
+        const at = ms(g.granted_at);
+        if (Number(g.participant) === pid || !(ms(g.asked_at) > t.asked) || !(at > t.asked && at < until)) continue;
+        lost++;
+        waitedMs = Math.max(waitedMs ?? 0, at - t.asked);
+        const winner = g.slice == null ? "a member" : `${g.plan}/${g.slice}`;
+        memberMarks.push({ at: iso(at), what: "race", note: `the merge lock went to ${winner}, who asked later` });
+      }
+    }
+    if (lost) racesLost.push({ member: nameOf(p), lost, waitedMs });
+    const own = messages.filter((m) => Number(m.author) === pid);
+    const posts = own.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
+    const flagged = own.filter((m) => m.event === "flag");
+    for (const m of own) {
+      if (m.kind !== "agreement" && m.event !== "flag") continue;
+      memberMarks.push({
+        at: String(m.at),
+        what: m.kind === "agreement" ? "agreement" : "flag",
+        seq: Number(m.seq),
+        ...m.about != null ? { path: String(m.about) } : {},
+        note: firstLine(String(m.body))
+      });
+    }
+    for (const m of merges.filter((x) => Number(x.participant) === pid)) {
+      for (const f of conflictedOf(m) ?? []) memberMarks.push({ at: String(m.at), what: "conflict", path: f, note: `the rebase met a conflict in ${f}` });
+    }
+    memberMarks.sort((a, b) => ms(a.at) - ms(b.at));
+    return {
+      member: nameOf(p),
+      nick: p.nick == null ? String(p.slice) : String(p.nick),
+      slice: String(p.slice),
+      joined: String(p.joined_at),
+      ended: p.ended_at == null ? null : String(p.ended_at),
+      intervals: recorded ? timeline(joined, over, calls.map((c) => ms(c.at)), turns, silentAfterMs) : [],
+      marks: memberMarks,
+      posts: posts.length,
+      postTimes: posts.map((m) => String(m.at)),
+      claims: claimLog.filter((c) => Number(c.participant) === pid).length,
+      flags: flagged.length,
+      unsourced: posts.filter((m) => !SOURCE.test(String(m.body))).length,
+      // read from its spans and marks once they are whole, below (D40)
+      waitingMs: null,
+      agreementsMade: null,
+      endorsed: null,
+      objections: null
+    };
+  });
+  const firstMerge = merges.length ? Math.min(...merges.map((m) => ms(m.at))) : null;
+  const length = runOver - ms(openedAt);
+  const base = {
+    run: id,
+    kind,
+    code: planCode(String(r.plan)),
+    title: String(r.title),
+    openedAt,
+    closedAt,
+    lengthMs: Number.isNaN(length) ? null : length,
+    recorded,
+    firstMergeAtMs: recorded && firstMerge !== null ? firstMerge - ms(openedAt) : null,
+    racesLost: recorded ? racesLost.reduce((n, x) => n + (x.lost ?? 0), 0) : null,
+    members
+  };
+  if (kind === "brainstorm") {
+    const { brainstorm, marksOf, unsourcedOf } = debateOf(db, id, people.filter((p) => !orchestrators.has(Number(p.id))), messages);
+    members.forEach((m, i) => {
+      const pid = Number(people[i].id);
+      m.marks = [...m.marks, ...marksOf.get(pid) ?? []].sort((a, b) => ms(a.at) - ms(b.at));
+      m.unsourced = unsourcedOf.get(pid) ?? 0;
+    });
+    return { ...base, brainstorm };
+  }
+  if (kind !== "plan") return base;
+  const timesMs = recorded ? people.flatMap((p) => {
+    if (orchestrators.has(Number(p.id))) return [];
+    const mergedAt = merges.filter((m) => Number(m.participant) === Number(p.id)).map((m) => ms(m.at));
+    const end = mergedAt.length ? Math.min(...mergedAt) : p.ended_at == null ? null : ms(p.ended_at);
+    return end === null ? [] : [end - ms(p.joined_at)];
+  }) : [];
+  const sliceCount = Number(db.prepare("SELECT COUNT(*) AS n FROM slices WHERE run = ?").get(id).n);
+  const addedMidRun = messages.filter((m) => m.kind === "event" && orchestrators.has(Number(m.author)) && /^added \S+: /.test(String(m.body))).length;
+  const holdersByPath = /* @__PURE__ */ new Map();
+  for (const c of claimLog) {
+    const key = foldPath(String(c.path));
+    const entry = holdersByPath.get(key) ?? { path: String(c.path), holders: [] };
+    if (!entry.holders.includes(Number(c.participant))) entry.holders.push(Number(c.participant));
+    holdersByPath.set(key, entry);
+  }
+  const sharersOf = (path5) => new Set(shares.filter((sh) => foldPath(String(sh.path)) === foldPath(path5)).flatMap((sh) => [Number(sh.participant), Number(sh.other)]));
+  const byId = new Map(people.map((p) => [Number(p.id), p]));
+  const namesPath = (m, path5) => {
+    if (aboutNames(m.about, path5)) return true;
+    const body = foldPath(String(m.body));
+    return body.includes(foldPath(path5)) || body.includes(foldPath(path5.split("/").pop()));
+  };
+  const said = messages.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
+  const interfaceClaims = claimLog.filter((c) => c.kind === "interface");
+  const perFile = [];
+  let everyHolderTold = 0;
+  let agreed = 0;
+  let agreedBeforeMerge = 0;
+  for (const { path: path5, holders: everyHolder } of holdersByPath.values()) {
+    const sharers = sharersOf(path5);
+    const holders = everyHolder.filter((h) => sharers.has(h));
+    if (holders.length < 2) continue;
+    const tellTimes = [];
+    let told = true;
+    for (let i = 1; i < holders.length; i++) {
+      const tells = said.filter((m) => Number(m.author) === holders[i] && namesPath(m, path5));
+      tellTimes.push(...tells.map((m) => ms(m.at)));
+      const mentioned = (e) => tells.some((m) => {
+        const named = JSON.parse(String(m.mentions));
+        return named.includes(nameOf(byId.get(e))) || named.includes(`${r.plan}/*`);
+      });
+      if (!holders.slice(0, i).every(mentioned)) told = false;
+    }
+    const sharedAt = tellTimes.length ? Math.min(...tellTimes) : null;
+    const agreement = messages.find((m) => m.kind === "agreement" && aboutNames(m.about, path5));
+    const mergedWith = merges.filter((m) => filesOf(m).some((f) => foldPath(f) === foldPath(path5)));
+    const firstMergeOfPath = mergedWith.length ? Math.min(...mergedWith.map((m) => ms(m.at))) : null;
+    if (told) {
+      everyHolderTold++;
+      if (agreement) {
+        agreed++;
+        if (firstMergeOfPath === null || ms(agreement.at) < firstMergeOfPath) agreedBeforeMerge++;
+      }
+    }
+    const met = mergedWith.map(conflictedOf);
+    const conflict = !recorded ? null : met.some((c) => c?.some((f) => foldPath(f) === foldPath(path5))) ? true : met.some((c) => c === null) ? null : false;
+    const declaredInterface = holders.some(
+      (h) => JSON.parse(String(byId.get(h).files ?? "[]")).some((d) => d.interface === true && aboutNames(d.path, path5))
+    );
+    const claimedInterface = interfaceClaims.some((c) => holders.includes(Number(c.participant)) && foldPath(String(c.path)) === foldPath(path5));
+    perFile.push({
+      path: path5,
+      holders: holders.map((h) => nameOf(byId.get(h))),
+      interface: declaredInterface || claimedInterface,
+      agreement: agreement ? Number(agreement.seq) : null,
+      agreedAfterMs: agreement && sharedAt !== null ? Math.max(0, ms(agreement.at) - sharedAt) : null,
+      conflict
+    });
+  }
+  let known = 0;
+  let inShared = 0;
+  let unknownMerges = 0;
+  for (const m of merges) {
+    const files = conflictedOf(m);
+    if (files === null) {
+      unknownMerges++;
+      continue;
+    }
+    known += files.length;
+    inShared += files.filter((f) => claimLog.some((c) => Number(c.participant) !== Number(m.participant) && foldPath(String(c.path)) === foldPath(f))).length;
+  }
+  const mergedSlices = new Set(merges.map((m) => Number(m.participant)).filter((pid) => !orchestrators.has(pid))).size;
+  return {
+    ...base,
+    plan: {
+      slices: { merged: recorded ? mergedSlices : null, of: sliceCount, addedMidRun, timesMs },
+      lock: { waitsMs: lockWaitsMs, racesLost },
+      shared: sharesRecorded ? { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge, perFile } : { files: null, everyHolderTold: null, agreed: null, agreedBeforeMerge: null, perFile: [] },
+      flags: messages.filter((m) => m.event === "flag").length,
+      conflicts: recorded ? { known, inShared, unknownMerges } : { known: null, inShared: null, unknownMerges: null }
+    }
+  };
+}
+function skepticOf(db, run2, seats) {
+  const seated = (slice) => new Set(seats.filter((p) => String(p.slice) === slice).map((p) => Number(p.id)));
+  const named = seated(SKEPTIC);
+  if (named.size) return named;
+  const rows = db.prepare("SELECT id, on_events FROM slices WHERE run = ? AND on_events IS NOT NULL ORDER BY ord").all(run2);
+  const subscribesToAgreement = (row) => JSON.parse(String(row.on_events)).flatMap((e) => e.split(",")).some((e) => e.trim().replace(/^(any|main):/, "") === "agreement");
+  const subscribed = rows.find(subscribesToAgreement);
+  return subscribed ? seated(String(subscribed.id)) : /* @__PURE__ */ new Set();
+}
+function debateOf(db, run2, seats, messages) {
+  const skeptic = skepticOf(db, run2, seats);
+  const seatIds = new Set(seats.map((p) => Number(p.id)));
+  const questionOf = (m) => {
+    const about = m.about == null ? "" : String(m.about).trim();
+    return QUESTION.test(about) ? about : null;
+  };
+  const spoken = (m) => Number(m.by_board ?? 0) === 0 && (m.kind === "msg" || m.kind === "urgent" || m.kind === "agreement");
+  const bySeq = new Map(messages.map((m) => [Number(m.seq), m]));
+  const endorsedSeqs = /* @__PURE__ */ new Set();
+  const endorsements = [];
+  for (const m of messages) {
+    if (m.kind !== "endorsement" || !skeptic.has(Number(m.author)) || m.endorses == null) continue;
+    const agreement = bySeq.get(Number(m.endorses));
+    const question = agreement && agreement.kind === "agreement" ? questionOf(agreement) : null;
+    if (question === null) continue;
+    endorsements.push({ endorsement: m, question });
+    endorsedSeqs.add(Number(m.endorses));
+  }
+  const outcomeOf = /* @__PURE__ */ new Map();
+  for (const m of messages) {
+    const q = questionOf(m);
+    if (q !== null && m.kind === "agreement" && endorsedSeqs.has(Number(m.seq)) && !outcomeOf.has(q)) outcomeOf.set(q, m);
+  }
+  const questions = /* @__PURE__ */ new Map();
+  const marksOf = /* @__PURE__ */ new Map();
+  const unsourcedOf = /* @__PURE__ */ new Map();
+  const mark = (pid, x) => void marksOf.set(pid, [...marksOf.get(pid) ?? [], x]);
+  const lastAgreementOn = /* @__PURE__ */ new Map();
+  let agreements = 0;
+  let sourced = 0;
+  let claims = 0;
+  for (const m of messages) {
+    const q = questionOf(m);
+    if (q === null || !spoken(m)) continue;
+    const author = Number(m.author);
+    const question = questions.get(q) ?? { id: q, firstPost: String(m.at), outcome: null, exchanges: 0 };
+    questions.set(q, question);
+    const outcome = outcomeOf.get(q);
+    const upToOutcome = !outcome || Number(m.seq) <= Number(outcome.seq);
+    if (upToOutcome && seatIds.has(author)) question.exchanges = (question.exchanges ?? 0) + 1;
+    if (m.kind === "agreement") {
+      agreements++;
+      lastAgreementOn.set(q, m);
+      continue;
+    }
+    if (upToOutcome) {
+      claims++;
+      if (SOURCE.test(String(m.body))) sourced++;
+      else unsourcedOf.set(author, (unsourcedOf.get(author) ?? 0) + 1);
+    }
+    const last = lastAgreementOn.get(q);
+    if (skeptic.has(author) && last && Number(last.author) !== author && !endorsedSeqs.has(Number(last.seq))) {
+      mark(author, { at: String(m.at), what: "objected", seq: Number(m.seq), path: q, note: `objects to #${last.seq}: ${firstLine(String(m.body))}` });
+    }
+  }
+  for (const { endorsement, question } of endorsements) {
+    mark(Number(endorsement.author), { at: String(endorsement.at), what: "endorsed", seq: Number(endorsement.seq), path: question, note: `endorses #${endorsement.endorses}` });
+  }
+  for (const [q, outcome] of outcomeOf) {
+    const question = questions.get(q);
+    if (question) question.outcome = { at: String(outcome.at), seq: Number(outcome.seq), kind: "agreed" };
+  }
+  return {
+    brainstorm: {
+      questions: [...questions.values()].sort((a, b) => ms(a.firstPost) - ms(b.firstPost)),
+      agreements,
+      endorsed: endorsements.length,
+      claimsWithSource: { n: sourced, of: claims, inferred: true }
+    },
+    marksOf,
+    unsourcedOf
+  };
+}
+function withMemberFigures(run2) {
+  const debated = run2.brainstorm !== void 0;
+  const marked = (m, what) => m.marks.filter((x) => x.what === what).length;
+  const lengthOf = (i) => ms(i.to) - ms(i.from);
+  const members = run2.members.map((m) => ({
+    ...m,
+    waitingMs: m.waitingMs ?? (run2.recorded ? m.intervals.filter((i) => i.what === "waiting").reduce((n, i) => n + lengthOf(i), 0) : null),
+    agreementsMade: m.agreementsMade ?? marked(m, "agreement"),
+    endorsed: m.endorsed ?? (debated ? marked(m, "endorsed") : null),
+    objections: m.objections ?? (debated ? marked(m, "objected") : null)
+  }));
+  return { ...run2, members };
+}
+var KEPT = "(pruned_at IS NULL OR id IN (SELECT run FROM run_stats))";
+function summarize(db, run2, silentAfterMs) {
+  const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run2);
+  if (!r) throw new Error(`no run ${run2}`);
+  return withMemberFigures(computeRun(db, r, Date.now(), silentAfterMs));
+}
+function totalsOf(runs) {
+  const plans = runs.flatMap((r) => r.plan ? [r.plan] : []);
+  const recorded = runs.filter((r) => r.recorded);
+  const recordedPlans = recorded.flatMap((r) => r.plan ? [r.plan] : []);
+  const silentOf = (r) => r.members.filter((m) => m.intervals.some((i) => i.what === "silent")).length;
+  const times = recordedPlans.flatMap((p) => p.slices.timesMs);
+  const waits = recordedPlans.flatMap((p) => p.lock.waitsMs);
+  const bins = [...WAIT_BINS_MS, Infinity].map((upper, i) => waits.filter((w) => w >= (WAIT_BINS_MS[i - 1] ?? 0) && w < upper).length);
+  const shared = (pick) => sumKnown(plans.map((p) => pick(p.shared)));
+  const files = shared((s) => s.files);
+  const agreed = shared((s) => s.agreed);
+  const series = (figure) => runs.map((r) => r.recorded ? figure(r) : null);
+  return {
+    runs: runs.length,
+    byKind: { plan: runs.filter((r) => r.kind === "plan").length, brainstorm: runs.filter((r) => r.kind === "brainstorm").length },
+    notRecorded: runs.length - recorded.length,
+    members: runs.length ? runs.reduce((n, r) => n + r.members.length, 0) : null,
+    silentMembers: sumKnown(recorded.map(silentOf)),
+    slices: {
+      merged: sumKnown(plans.map((p) => p.slices.merged)),
+      of: sumKnown(plans.map((p) => p.slices.of)),
+      p50Ms: percentile(times, 0.5),
+      p90Ms: percentile(times, 0.9)
+    },
+    // merges: the lock turns granted, each one merge's wait
+    lockWait: { merges: recordedPlans.length ? waits.length : null, p50Ms: percentile(waits, 0.5), p90Ms: percentile(waits, 0.9), bins: recordedPlans.length ? bins : [] },
+    shared: {
+      files,
+      everyHolderTold: shared((s) => s.everyHolderTold),
+      agreed,
+      agreedBeforeMerge: shared((s) => s.agreedBeforeMerge),
+      withoutAgreement: files === null || agreed === null ? null : files - agreed
+    },
+    flags: sumKnown(plans.map((p) => p.flags)),
+    runsWithoutFlag: plans.length ? plans.filter((p) => p.flags === 0).length : null,
+    conflicts: {
+      known: sumKnown(plans.map((p) => p.conflicts.known)),
+      inShared: sumKnown(plans.map((p) => p.conflicts.inShared)),
+      unknownMerges: sumKnown(plans.map((p) => p.conflicts.unknownMerges))
+    },
+    brainstorm: brainstormTotalsOf(runs),
+    series: {
+      slicesMerged: series((r) => r.plan?.slices.merged ?? null),
+      sliceTimeP50: series((r) => r.plan ? percentile(r.plan.slices.timesMs, 0.5) : null),
+      lockWaitP50: series((r) => r.plan ? percentile(r.plan.lock.waitsMs, 0.5) : null),
+      sharedAgreed: series((r) => r.plan?.shared.agreed ?? null),
+      flags: series((r) => r.plan?.flags ?? null),
+      conflicts: series((r) => r.plan?.conflicts.known ?? null),
+      silentMembers: series(silentOf)
+    }
+  };
+}
+function brainstormTotalsOf(runs) {
+  const debated = runs.flatMap((r) => r.brainstorm ? [{ run: r, debate: r.brainstorm }] : []);
+  const questions = debated.flatMap((d) => d.debate.questions);
+  const settled = questions.filter((q) => q.outcome !== null);
+  const objectedOf = (r, q) => q.outcome !== null && r.members.some((m) => m.marks.some((x) => x.what === "objected" && x.path === q.id && x.seq !== void 0 && x.seq < q.outcome.seq));
+  const n = sumKnown(debated.map((d) => d.debate.claimsWithSource.n));
+  const of = sumKnown(debated.map((d) => d.debate.claimsWithSource.of));
+  const silentSeatsOf = (r) => r.members.filter((m) => m.slice !== ORCHESTRATOR && m.intervals.some((i) => i.what === "silent")).length;
+  return {
+    questionsSettled: debated.length ? settled.length : null,
+    questions: debated.length ? questions.length : null,
+    exchangesMedian: percentile(settled.flatMap((q) => q.exchanges === null ? [] : [q.exchanges]), 0.5),
+    objectedThenAgreed: debated.length ? debated.reduce((k, d) => k + d.debate.questions.filter((q) => objectedOf(d.run, q)).length, 0) : null,
+    sourcedShare: n === null || !of ? null : n / of,
+    silentSeats: sumKnown(debated.filter((d) => d.run.recorded).map((d) => silentSeatsOf(d.run)))
+  };
+}
+function filesAcross(runs) {
+  const byPath = /* @__PURE__ */ new Map();
+  for (const r of runs) {
+    for (const f of r.plan?.shared.perFile ?? []) {
+      const key = foldPath(f.path);
+      const entry = byPath.get(key) ?? { path: f.path, perRun: [] };
+      entry.perRun.push({ run: r.run, holders: f.holders, agreed: f.agreement !== null, conflict: f.conflict, interface: f.interface ?? null });
+      byPath.set(key, entry);
+    }
+  }
+  return [...byPath.values()].map(({ path: path5, perRun }) => ({
+    path: path5,
+    runs: perRun.map((x) => x.run),
+    holders: new Set(perRun.flatMap((x) => x.holders)).size,
+    agreements: perRun.filter((x) => x.agreed).length,
+    conflicts: perRun.every((x) => x.conflict === null) ? null : perRun.filter((x) => x.conflict === true).length,
+    // the runs in which a holder declared or claimed it an interface; null when none knows (summaries from before D37)
+    declaredInterface: perRun.every((x) => x.interface === null) ? null : perRun.filter((x) => x.interface === true).length,
+    perRun: perRun.map((x) => ({ run: x.run, holders: x.holders.length, conflict: x.conflict }))
+  })).sort((a, b) => b.runs.length - a.runs.length || a.path.localeCompare(b.path));
+}
+function statsOf(db, scope, silentAfterMs) {
+  for (const k of scope.kinds ?? []) profileOf(k);
+  const start = periodStart(scope.since);
+  const where = ["repo = ?", KEPT];
+  const params = [scope.repo];
+  if (scope.run !== void 0) {
+    where.push("id = ?");
+    params.push(scope.run);
+  }
+  if (scope.kinds?.length) {
+    where.push(`kind IN (${scope.kinds.map(() => "?").join(", ")})`);
+    params.push(...scope.kinds);
+  }
+  if (scope.closedOnly) where.push("state = 'closed'");
+  if (start) {
+    where.push("(state = 'open' OR closed_at >= ?)");
+    params.push(start);
+  }
+  db.exec("BEGIN");
+  try {
+    if (scope.run !== void 0 && !db.prepare(`SELECT 1 FROM runs WHERE id = ? AND repo = ? AND ${KEPT}`).get(scope.run, scope.repo)) {
+      throw new Error(`no run ${scope.run}`);
+    }
+    const rows = db.prepare(`SELECT * FROM runs WHERE ${where.join(" AND ")} ORDER BY opened_at, id`).all(...params);
+    const stored = db.prepare("SELECT body FROM run_stats WHERE run = ?");
+    const now = Date.now();
+    const runs = rows.map((r) => {
+      const row = stored.get(Number(r.id));
+      return withMemberFigures(row ? JSON.parse(String(row.body)) : computeRun(db, r, now, silentAfterMs));
+    });
+    return { scope, runs, totals: totalsOf(runs), files: filesAcross(runs), silentAfterMs };
+  } finally {
+    db.exec("COMMIT");
+  }
 }
 
 // src/board/names.ts
@@ -506,16 +1056,19 @@ function funnyName(taken, random = Math.random) {
 
 // src/board/board.ts
 var SLICE_STATES = /* @__PURE__ */ new Set(["ready", "running", "done", "blocked"]);
-var ORCHESTRATOR = "orchestrator";
+var ORCHESTRATOR2 = "orchestrator";
 var WAIT_POLL_MS = 1e3;
 var LINE_WIDTH = 100;
 var STALE_MS = 10 * 60 * 1e3;
+var WAIT_LOG_EVERY_MS = 60 * 1e3;
 var UPKEEP_EVERY_MS = 5 * 60 * 1e3;
 var LAST_UPKEEP = "last-upkeep";
+var RECORDS_SINCE2 = "records-since";
+var SHARES_SINCE2 = "shares-since";
 var RETENTION_DEFAULT_DAYS = 30;
-var DAY_MS = 24 * 60 * 60 * 1e3;
+var DAY_MS2 = 24 * 60 * 60 * 1e3;
 var EVENTS_SHOWN = 500;
-var CASELESS = process.platform === "win32";
+var CASELESS2 = process.platform === "win32";
 function messageLine(m) {
   const first = m.body.split(/\r?\n/)[0];
   const text = first.length > LINE_WIDTH ? `${first.slice(0, LINE_WIDTH - 1)}\u2026` : first;
@@ -531,6 +1084,8 @@ async function openBoard(dbPath = SQLITE_PATH) {
   const { DatabaseSync } = await import("node:sqlite");
   fs.mkdirSync(path2.dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
+  const recordsAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'call_log'").get() === void 0;
+  const sharesAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'shares'").get() === void 0;
   db.exec(`
     PRAGMA journal_mode = DELETE;
     -- Several CLI processes write, and aiview reads, concurrently; without a busy timeout a
@@ -593,12 +1148,24 @@ async function openBoard(dbPath = SQLITE_PATH) {
       since_seq INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (repo, path, participant)
     );
-    -- every claim made, kept past its release: who held a path during a run (D63)
+    -- every claim made, kept past its release: who held a path during a run (D63), and whether as an
+    -- interface: widened to 'interface' when the claim is made or widened so, never narrowed (D42)
     CREATE TABLE IF NOT EXISTS claim_log (
       repo TEXT NOT NULL,
       path TEXT NOT NULL,
       participant INTEGER NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'inside',
       PRIMARY KEY (repo, path, participant)
+    );
+    -- a claim granted beside a live holder of the path, kept past both claims' release: who held a path
+    -- at the same time as whom during a run, from the seq it began (D39); append-only, deleted with its run
+    CREATE TABLE IF NOT EXISTS shares (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      other INTEGER NOT NULL,
+      seq INTEGER NOT NULL,
+      PRIMARY KEY (repo, path, participant, other)
     );
     -- a holder of a shared path already told of another holder (D41): once per runner and path
     CREATE TABLE IF NOT EXISTS notices (
@@ -647,15 +1214,38 @@ async function openBoard(dbPath = SQLITE_PATH) {
       repo TEXT PRIMARY KEY,
       version INTEGER NOT NULL
     );
+    -- one row per merge, written by merged, deleted with its run by prune (D25): files and conflicts JSON, conflicts NULL for unknown
+    CREATE TABLE IF NOT EXISTS merges (
+      participant INTEGER NOT NULL,
+      run INTEGER NOT NULL,
+      sha TEXT NOT NULL,
+      at TEXT NOT NULL,
+      files TEXT NOT NULL,
+      conflicts TEXT
+    );
+    CREATE INDEX IF NOT EXISTS merges_run ON merges (run);
+    -- one row per counted call, written by countCall in the verb's transaction (D25); deleted with its run
+    CREATE TABLE IF NOT EXISTS call_log (participant INTEGER NOT NULL, at TEXT NOT NULL, verb TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS call_log_by_participant ON call_log (participant, at);
+    -- one row per merge-lock turn: asked, granted, merged; refused counts the refusals (D25); deleted with its run
+    CREATE TABLE IF NOT EXISTS lock_requests (repo TEXT NOT NULL, participant INTEGER NOT NULL, asked_at TEXT NOT NULL,
+      granted_at TEXT, merged_at TEXT, refused INTEGER NOT NULL DEFAULT 0);
+    CREATE INDEX IF NOT EXISTS lock_requests_by_participant ON lock_requests (participant, asked_at);
+    -- a closed run's figures, RunStats JSON, written once at close or by prune first; never pruned (D20, D21)
+    CREATE TABLE IF NOT EXISTS run_stats (run INTEGER PRIMARY KEY, repo TEXT NOT NULL, kind TEXT NOT NULL,
+      closed_at TEXT NOT NULL, body TEXT NOT NULL);
     -- board settings (D32): retention-days; the board's own last-upkeep (D16)
     CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
     -- the identities and hook_seen tables, left in stores from before D58, are no longer read or written
   `);
+  if (recordsAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(RECORDS_SINCE2, (/* @__PURE__ */ new Date()).toISOString());
+  if (sharesAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(SHARES_SINCE2, (/* @__PURE__ */ new Date()).toISOString());
   const upkeep = (table, column, ddl) => {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
     if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
   };
   upkeep("participants", "worktree", "worktree TEXT");
+  upkeep("claim_log", "kind", "kind TEXT NOT NULL DEFAULT 'inside'");
   upkeep("participants", "last_call", "last_call TEXT");
   upkeep("participants", "calls", "calls INTEGER NOT NULL DEFAULT 0");
   upkeep("participants", "waiting", "waiting INTEGER NOT NULL DEFAULT 0");
@@ -667,6 +1257,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
   upkeep("runs", "link", "link TEXT");
   upkeep("messages", "meta", "meta TEXT");
   upkeep("merge_locks", "onto", "onto TEXT");
+  upkeep("merge_locks", "reflog_mark", "reflog_mark INTEGER");
   upkeep("slices", "link", "link TEXT");
   upkeep("runs", "kind", "kind TEXT NOT NULL DEFAULT 'plan'");
   upkeep("messages", "run", "run INTEGER");
@@ -794,7 +1385,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
   const lastSeq = () => Number(db.prepare("SELECT COALESCE(MAX(seq), 0) AS s FROM messages").get().s);
   const openPlans = (repo) => db.prepare("SELECT DISTINCT plan FROM runs WHERE repo = ? AND state = 'open'").all(repo).map((r) => String(r.plan));
   const activeNames = (repo) => {
-    const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL AND p.slice != '${ORCHESTRATOR}'`).all(repo);
+    const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL AND p.slice != '${ORCHESTRATOR2}'`).all(repo);
     return new Map(rows.map((r) => [nameHandle(nickOf(r)), `${r.plan}/${r.slice}`]));
   };
   const insertMessage = (p, body, about, kind, named, extra = {}) => {
@@ -816,7 +1407,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
     return fresh;
   };
   const isLive = (id) => db.prepare("SELECT 1 FROM participants p JOIN runs r ON r.id = p.run WHERE p.id = ? AND p.ended_at IS NULL AND r.state = 'open'").get(id) !== void 0;
-  const fold = (s) => CASELESS ? s.toLowerCase() : s;
+  const fold = (s) => CASELESS2 ? s.toLowerCase() : s;
   const slashes = (rel) => rel.split(/[\\/]+/).filter((x) => x && x !== ".").join("/");
   const roots = (repo) => {
     const out = /* @__PURE__ */ new Set();
@@ -851,7 +1442,14 @@ async function openBoard(dbPath = SQLITE_PATH) {
       const rows = mentionsOnly ? heard.filter(woken) : heard;
       const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
       for (const r of rows) mark.run(me.id, Number(r.seq));
-      db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(now(), me.id);
+      const at = now();
+      db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(at, me.id);
+      if (fromWait) {
+        const last = db.prepare("SELECT MAX(at) AS at FROM call_log WHERE participant = ?").get(me.id);
+        if (last.at == null || Date.parse(at) - Date.parse(String(last.at)) >= WAIT_LOG_EVERY_MS) {
+          db.prepare("INSERT INTO call_log (participant, at, verb) VALUES (?, ?, 'deliver')").run(me.id, at);
+        }
+      }
       if (!fromWait) {
         const r = db.prepare("UPDATE participants SET waiting = 0 WHERE id = ? AND waiting = 1").run(me.id);
         if (Number(r.changes) > 0) bump(me.repo);
@@ -872,7 +1470,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
     const r = db.prepare("SELECT value FROM settings WHERE name = 'retention-days'").get();
     return r ? Number(r.value) : RETENTION_DEFAULT_DAYS;
   };
-  const retentionCutoff = (at) => new Date(at.getTime() - retentionDays() * DAY_MS).toISOString();
+  const retentionCutoff = (at) => new Date(at.getTime() - retentionDays() * DAY_MS2).toISOString();
   const listedRuns = () => db.prepare("SELECT * FROM runs WHERE pruned_at IS NULL AND (state = 'open' OR (state = 'closed' AND closed_at >= ?)) ORDER BY id").all(retentionCutoff(/* @__PURE__ */ new Date()));
   const runSummary = (r) => {
     const id = Number(r.id);
@@ -887,7 +1485,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
       title: String(r.title),
       link: r.link == null ? null : String(r.link),
       open,
-      runners: open ? count(`SELECT COUNT(*) AS n FROM participants WHERE run = ? AND slice != '${ORCHESTRATOR}' AND ended_at IS NULL`) : 0,
+      runners: open ? count(`SELECT COUNT(*) AS n FROM participants WHERE run = ? AND slice != '${ORCHESTRATOR2}' AND ended_at IS NULL`) : 0,
       done: count("SELECT COUNT(*) AS n FROM slices WHERE run = ? AND state = 'done'"),
       of: count("SELECT COUNT(*) AS n FROM slices WHERE run = ?")
     };
@@ -918,6 +1516,11 @@ async function openBoard(dbPath = SQLITE_PATH) {
     return subs;
   };
   const sameSub = (a, b) => a.event === b.event && a.scope === b.scope;
+  const storeRunStats = (run2) => {
+    const body = summarize(db, run2, STALE_MS);
+    const r = runRow(run2);
+    db.prepare("INSERT OR REPLACE INTO run_stats (run, repo, kind, closed_at, body) VALUES (?, ?, ?, ?, ?)").run(run2, String(r.repo), body.kind, String(r.closed_at), JSON.stringify(body));
+  };
   const board = {
     openRun({ repo, kind = "plan", group, title, link, seats }) {
       const profile = profileOf(kind);
@@ -927,7 +1530,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
         seats.forEach((s, i) => insertSlice(run2, s, i));
         const orchestrator = db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at, subs, nick) VALUES (?, ?, ?, ?, ?, ?)").run(
           run2,
-          ORCHESTRATOR,
+          ORCHESTRATOR2,
           lastSeq(),
           now(),
           JSON.stringify(profile.defaults.orchestrator),
@@ -956,7 +1559,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
     addSlice(run2, spec) {
       const r = runRow(run2);
       if (r.state !== "open") throw new Error(`run ${run2} is closed`);
-      if (spec.id === ORCHESTRATOR) throw new Error(`"${ORCHESTRATOR}" is not a slice`);
+      if (spec.id === ORCHESTRATOR2) throw new Error(`"${ORCHESTRATOR2}" is not a slice`);
       return transaction(() => {
         const ids = db.prepare("SELECT id FROM slices WHERE run = ?").all(run2).map((x) => String(x.id));
         if (ids.includes(spec.id)) throw new Error(`slice ${spec.id} is already in run ${run2}`);
@@ -964,7 +1567,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
         if (unknown.length) throw new Error(`unknown blocker ${unknown.join(", ")} in run ${run2}`);
         const ord = Number(db.prepare("SELECT COALESCE(MAX(ord), -1) AS o FROM slices WHERE run = ?").get(run2).o) + 1;
         insertSlice(run2, spec, ord);
-        const orchestrator = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, ORCHESTRATOR);
+        const orchestrator = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, ORCHESTRATOR2);
         insertMessage(participantById(Number(orchestrator.id)), `added ${spec.id}: ${spec.title}`, null, "event");
         return toRun(runRow(run2)).slices.find((x) => x.id === spec.id);
       });
@@ -972,18 +1575,30 @@ async function openBoard(dbPath = SQLITE_PATH) {
     closeRun(run2) {
       runRow(run2);
       transaction(() => {
-        const author = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, ORCHESTRATOR) ?? db.prepare("SELECT id FROM participants WHERE run = ? ORDER BY id LIMIT 1").get(run2);
+        const author = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, ORCHESTRATOR2) ?? db.prepare("SELECT id FROM participants WHERE run = ? ORDER BY id LIMIT 1").get(run2);
         if (author) insertMessage(participantById(Number(author.id)), `run ${run2} closed`, null, "event", void 0, { event: EVENTS.closed.name });
         db.prepare("UPDATE runs SET state = 'closed', closed_at = ? WHERE id = ?").run(now(), run2);
         bump(String(runRow(run2).repo));
         db.prepare("UPDATE participants SET ended_at = COALESCE(ended_at, ?) WHERE run = ?").run(now(), run2);
+        try {
+          storeRunStats(run2);
+        } catch {
+        }
         for (const p of db.prepare("SELECT id FROM participants WHERE run = ?").all(run2)) claims.releaseAll(Number(p.id));
       });
     },
     prune(at = /* @__PURE__ */ new Date()) {
       return transaction(() => {
         const cutoff = retentionCutoff(at);
-        const expired = db.prepare("SELECT id, repo FROM runs WHERE state = 'closed' AND closed_at < ? AND pruned_at IS NULL").all(cutoff);
+        const expired = db.prepare("SELECT id, repo FROM runs WHERE state = 'closed' AND closed_at < ? AND pruned_at IS NULL").all(cutoff).filter((r) => {
+          if (db.prepare("SELECT 1 FROM run_stats WHERE run = ?").get(Number(r.id))) return true;
+          try {
+            storeRunStats(Number(r.id));
+            return true;
+          } catch {
+            return false;
+          }
+        });
         const touched = new Set(expired.map((r) => String(r.repo)));
         const runIds = expired.map((r) => Number(r.id));
         const inExpired = runIds.length ? `run IN (${runIds.join(", ")})` : "0";
@@ -1002,13 +1617,15 @@ async function openBoard(dbPath = SQLITE_PATH) {
         for (const run2 of runIds) {
           for (const r of db.prepare("SELECT id FROM participants WHERE run = ?").all(run2)) {
             const id = Number(r.id);
-            for (const table of ["claim_log", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries", "claim_requests", "flag_posts"]) {
+            for (const table of ["claim_log", "shares", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries", "claim_requests", "flag_posts", "call_log", "lock_requests"]) {
               db.prepare(`DELETE FROM ${table} WHERE participant = ?`).run(id);
             }
             db.prepare("DELETE FROM notices WHERE other = ?").run(id);
+            db.prepare("DELETE FROM shares WHERE other = ?").run(id);
             if (!db.prepare("SELECT 1 FROM messages WHERE author = ? LIMIT 1").get(id)) db.prepare("DELETE FROM participants WHERE id = ?").run(id);
           }
           db.prepare("DELETE FROM slices WHERE run = ?").run(run2);
+          db.prepare("DELETE FROM merges WHERE run = ?").run(run2);
           db.prepare("UPDATE runs SET pruned_at = ? WHERE id = ?").run(at.toISOString(), run2);
         }
         for (const repo of touched) bump(repo);
@@ -1042,7 +1659,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
     flagStale(at = /* @__PURE__ */ new Date()) {
       const silentBefore = at.getTime() - STALE_MS;
       return transaction(() => {
-        const quiet = db.prepare("SELECT p.id, p.last_call, p.joined_at FROM participants p JOIN runs r ON r.id = p.run WHERE r.state = 'open' AND p.slice = ? AND p.ended_at IS NULL AND p.quiet_flagged = 0").all(ORCHESTRATOR);
+        const quiet = db.prepare("SELECT p.id, p.last_call, p.joined_at FROM participants p JOIN runs r ON r.id = p.run WHERE r.state = 'open' AND p.slice = ? AND p.ended_at IS NULL AND p.quiet_flagged = 0").all(ORCHESTRATOR2);
         for (const o of quiet) {
           const silentSince = Date.parse(String(o.last_call ?? o.joined_at));
           if (silentSince >= silentBefore) continue;
@@ -1055,9 +1672,9 @@ async function openBoard(dbPath = SQLITE_PATH) {
           const id = Number(r.id);
           const members = db.prepare("SELECT id, slice, last_call, joined_at FROM participants WHERE run = ? AND ended_at IS NULL").all(id);
           if (!members.length || members.some((m) => Date.parse(String(m.last_call ?? m.joined_at)) >= silentBefore)) continue;
-          const author = members.find((m) => String(m.slice) === ORCHESTRATOR) ?? members[0];
+          const author = members.find((m) => String(m.slice) === ORCHESTRATOR2) ?? members[0];
           const group = String(r.plan);
-          insertMessage(participantById(Number(author.id)), `run ${id} (${group}) is stale: every member silent; close it or dispatch again`, null, "event", [`${group}/${ORCHESTRATOR}`], {
+          insertMessage(participantById(Number(author.id)), `run ${id} (${group}) is stale: every member silent; close it or dispatch again`, null, "event", [`${group}/${ORCHESTRATOR2}`], {
             event: EVENTS.stale.name
           });
           db.prepare("UPDATE runs SET stale_flagged = 1 WHERE id = ?").run(id);
@@ -1072,7 +1689,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
     join({ run: run2, slice, doing, files, worktree, on }) {
       const r = runRow(run2);
       if (r.state !== "open") throw new Error(`run ${run2} is closed`);
-      if (slice === ORCHESTRATOR) throw new Error(`"${ORCHESTRATOR}" is not a slice`);
+      if (slice === ORCHESTRATOR2) throw new Error(`"${ORCHESTRATOR2}" is not a slice`);
       const profile = profileOf(String(r.kind ?? "plan"));
       if (files.length && !profile.claims) throw new Error(`join: a ${profile.kind} run has no claims`);
       const where = worktree && profile.worktree ? path2.resolve(worktree) : null;
@@ -1247,11 +1864,17 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
     release(p, file) {
       claims.release(gated(live(p), "release"), file);
     },
-    lockMerge(p, onto) {
-      return claims.lockMerge(gated(live(p), "merge-lock"), onto);
+    lockMerge(p, onto, reflogMark) {
+      return claims.lockMerge(gated(live(p), "merge-lock"), onto, reflogMark);
     },
-    merged(p, sha, files) {
-      return claims.merged(gated(live(p), "merged"), sha, files);
+    merged(p, sha, files, conflicts) {
+      return claims.merged(gated(live(p), "merged"), sha, files, conflicts);
+    },
+    heldMergeLock(p) {
+      return claims.heldMergeLock(p);
+    },
+    stats(scope) {
+      return statsOf(db, scope, STALE_MS);
     },
     repos() {
       const byRepo = /* @__PURE__ */ new Map();
@@ -1286,7 +1909,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       }
       const everClaimed = db.prepare("SELECT 1 FROM claim_log WHERE repo = ? AND path = ? AND participant = ?");
       for (const r of people) {
-        if (String(r.slice) === ORCHESTRATOR || !isLive(Number(r.id))) continue;
+        if (String(r.slice) === ORCHESTRATOR2 || !isLive(Number(r.id))) continue;
         const name = `${r.plan}/${r.slice}`;
         for (const d of JSON.parse(String(r.files))) {
           const f = files.get(relPath(repo, d.path) ?? d.path);
@@ -1297,7 +1920,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       const roster = people.map((r) => {
         const id = Number(r.id);
         const slice = String(r.slice);
-        const orchestrator = slice === ORCHESTRATOR;
+        const orchestrator = slice === ORCHESTRATOR2;
         const s = sliceOf.get(`${r.run}/${slice}`);
         const ended = r.ended_at != null;
         const state = orchestrator ? runOpen.get(Number(r.run)) ? "watching" : "done" : s?.state === "done" ? "done" : ended ? "ended" : lockHolder === id ? "merging" : Number(r.waiting) === 1 ? "waiting" : "working";
@@ -1396,34 +2019,36 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       db.close();
     }
   };
-  const countCall = (p) => {
-    db.prepare("UPDATE participants SET calls = calls + 1, last_call = ? WHERE id = ?").run(now(), p.id);
+  const countCall = (p, verb) => {
+    const at = now();
+    db.prepare("UPDATE participants SET calls = calls + 1, last_call = ? WHERE id = ?").run(at, p.id);
+    db.prepare("INSERT INTO call_log (participant, at, verb) VALUES (?, ?, ?)").run(p.id, at, verb);
     db.prepare("UPDATE runs SET stale_flagged = 0 WHERE id = ? AND stale_flagged = 1").run(p.run);
     if (Number(db.prepare("UPDATE participants SET quiet_flagged = 0 WHERE id = ? AND quiet_flagged = 1").run(p.id).changes) > 0 && runRow(p.run).state === "open")
       insertMessage(participantById(p.id), "back", null, "event", [], { event: EVENTS.back.name });
     bump(participantById(p.id).repo);
   };
-  const counted = (verb) => (p, ...rest) => transaction(() => {
+  const counted = (name, verb) => (p, ...rest) => transaction(() => {
     const out = verb(p, ...rest);
-    countCall(p);
+    countCall(p, name);
     return out;
   });
-  board.setDoing = counted(board.setDoing);
-  board.subscribe = counted(board.subscribe);
-  board.unsubscribe = counted(board.unsubscribe);
-  board.end = counted(board.end);
-  board.post = counted(board.post);
-  board.endorse = counted(board.endorse);
-  board.deliver = counted(board.deliver);
-  board.wait = counted(board.wait);
-  board.checkEdit = counted(board.checkEdit);
-  board.release = counted(board.release);
-  board.lockMerge = counted(board.lockMerge);
-  board.merged = counted(board.merged);
+  board.setDoing = counted("setDoing", board.setDoing);
+  board.subscribe = counted("subscribe", board.subscribe);
+  board.unsubscribe = counted("unsubscribe", board.unsubscribe);
+  board.end = counted("end", board.end);
+  board.post = counted("post", board.post);
+  board.endorse = counted("endorse", board.endorse);
+  board.deliver = counted("deliver", board.deliver);
+  board.wait = counted("wait", board.wait);
+  board.checkEdit = counted("checkEdit", board.checkEdit);
+  board.release = counted("release", board.release);
+  board.lockMerge = counted("lockMerge", board.lockMerge);
+  board.merged = counted("merged", board.merged);
   const read = board.read;
   board.read = (seq, by) => {
     const m = read(seq);
-    if (by) transaction(() => countCall(by));
+    if (by) transaction(() => countCall(by, "read"));
     return m;
   };
   return board;
@@ -1452,7 +2077,8 @@ var VALUE_FLAGS = /* @__PURE__ */ new Set([
   "--on",
   "--blockers",
   "--role",
-  "--link"
+  "--link",
+  "--since"
 ]);
 var LIST_FLAGS = /* @__PURE__ */ new Set(["--files"]);
 function parseArgs(argv) {
@@ -1596,6 +2222,61 @@ function unclaimedLines(paths) {
   return lines;
 }
 
+// src/cli/git.ts
+import { spawnSync as spawnSync2 } from "node:child_process";
+var gitAnswer = (cwd, ...argv) => {
+  const r = spawnSync2("git", argv, { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  return { status: r.error ? null : r.status, stdout: r.stdout ?? "" };
+};
+var git = (cwd, ...argv) => {
+  const r = gitAnswer(cwd, ...argv);
+  return r.status === 0 ? r.stdout.trim() : null;
+};
+
+// src/cli/conflicts.ts
+var MERGE_TREE_SINCE = [2, 38];
+var REBASE_START = /^(?:pull --)?rebase(?: -[a-z]+)? \(start\):/;
+function gitHasMergeTree(worktree) {
+  const m = (git(worktree, "version") ?? "").match(/(\d+)\.(\d+)/);
+  if (!m) return false;
+  const [major, minor] = [Number(m[1]), Number(m[2])];
+  return major > MERGE_TREE_SINCE[0] || major === MERGE_TREE_SINCE[0] && minor >= MERGE_TREE_SINCE[1];
+}
+function headReflog(worktree) {
+  const r = gitAnswer(worktree, "reflog", "show", "--format=%H%x09%gs", "HEAD");
+  if (r.status !== 0) return null;
+  return r.stdout.split(/\r?\n/).filter(Boolean).map((line) => {
+    const [commit, ...subject] = line.split("	");
+    return { commit, subject: subject.join("	") };
+  });
+}
+function headReflogLength(worktree) {
+  try {
+    return headReflog(worktree)?.length ?? null;
+  } catch {
+    return null;
+  }
+}
+function conflictsOf(worktree, onto, reflogMark) {
+  try {
+    if (!gitHasMergeTree(worktree)) return { unknown: "old-git" };
+    const reflog = headReflog(worktree);
+    if (!reflog || reflog.length < reflogMark) return { unknown: "no-reflog" };
+    const start = reflog.slice(0, reflog.length - reflogMark).findIndex((e) => REBASE_START.test(e.subject));
+    if (start < 0) return { files: [] };
+    const before = reflog[start + 1];
+    const target = reflog[start].commit || onto;
+    if (!before || !target) return { unknown: "no-reflog" };
+    const r = gitAnswer(worktree, "merge-tree", "--write-tree", "--name-only", "--no-messages", "-z", before.commit, target);
+    if (r.status === 0) return { files: [] };
+    if (r.status !== 1) return { unknown: "no-reflog" };
+    const [, ...paths] = r.stdout.split("\0").filter(Boolean);
+    return { files: [...new Set(paths)] };
+  } catch {
+    return { unknown: "no-reflog" };
+  }
+}
+
 // src/cli/index.ts
 var args = parseArgs(process.argv.slice(2));
 var asJson = args.has("--json");
@@ -1634,6 +2315,23 @@ var CODE_USAGE = [
   "  merge-lock --onto <branch> [--as <runner>]                      # one merge at a time per repository; claims or flags what your branch wrote unclaimed",
   "  merged  [--as <runner>] <sha> --files <path>...                 # releases the lock, tells who must rebase and who was refused the lock, names whom to tell of a resolved conflict"
 ].join("\n");
+var STATS_USAGE = [
+  "usage: swarm stats [--repo <path>] [--run <id>] [--since 30d|<ISO> | --all] [--closed] [--kind plan|brainstorm[,\u2026]] [--json]",
+  "  the figures of a repository's runs, oldest first, with the scope's totals; a figure not recorded or not computed yet is null, never 0",
+  "  --since: runs open, or closed since then, default 30d, none with --run; --all: every run kept; --closed: closed runs only",
+  "  without --json: one line per run; --json carries every figure, with the run ids, members and seqs to follow with swarm read <seq>"
+].join("\n");
+var lengthText = (ms2) => {
+  if (ms2 === null) return "\u2014";
+  const minutes = Math.floor(ms2 / 6e4);
+  if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+  return minutes >= 1 ? `${minutes}m` : `${Math.round(ms2 / 1e3)}s`;
+};
+var statsLine = (r) => {
+  const c = r.plan?.conflicts;
+  const conflicts = !c || r.recorded && r.firstMergeAtMs === null ? "\u2014" : c.known === null ? "unknown" : c.unknownMerges ? `${c.known} + ${c.unknownMerges} unknown` : String(c.known);
+  return `${r.code} ${r.title} \xB7 ${r.kind} \xB7 ${lengthText(r.lengthMs)} \xB7 ${r.closedAt === null ? "open" : "closed"} \xB7 conflicts ${conflicts}`;
+};
 var CliError = class extends Error {
 };
 var fail = (msg) => {
@@ -1644,10 +2342,6 @@ var emit = (json, human) => {
   else if (typeof human === "string") {
     if (human) console.log(human);
   } else human();
-};
-var git = (cwd, ...argv) => {
-  const r = spawnSync2("git", argv, { cwd, encoding: "utf8" });
-  return r.status === 0 ? r.stdout.trim() : null;
 };
 function repoOf(dir) {
   const common = git(dir, "rev-parse", "--git-common-dir");
@@ -1664,7 +2358,7 @@ function worktreeOf(dir) {
   return top ? path4.resolve(top) : null;
 }
 function changedIn(worktree) {
-  const r = spawnSync2("git", ["status", "--porcelain", "-z", "--untracked-files=all"], { cwd: worktree, encoding: "utf8" });
+  const r = spawnSync3("git", ["status", "--porcelain", "-z", "--untracked-files=all"], { cwd: worktree, encoding: "utf8" });
   if (r.status !== 0) return fail(`git status failed in ${worktree}: ${r.stderr.trim()}`);
   const parts = r.stdout.split("\0");
   const out = [];
@@ -1678,7 +2372,7 @@ function changedIn(worktree) {
 }
 function branchChangedIn(worktree, onto) {
   const base = git(worktree, "merge-base", onto, "HEAD") ?? fail(`no merge base between ${onto} and HEAD in ${worktree}: is --onto the branch you merge into?`);
-  const r = spawnSync2("git", ["diff", "--name-only", "-z", "--no-renames", `${base}..HEAD`], { cwd: worktree, encoding: "utf8" });
+  const r = spawnSync3("git", ["diff", "--name-only", "-z", "--no-renames", `${base}..HEAD`], { cwd: worktree, encoding: "utf8" });
   if (r.status !== 0) return fail(`git diff failed in ${worktree}: ${r.stderr.trim()}`);
   const committed = r.stdout.split("\0").filter(Boolean);
   return [.../* @__PURE__ */ new Set([...committed, ...changedIn(worktree)])];
@@ -2052,7 +2746,8 @@ ${USAGE}`);
       const onto = need("--onto");
       const reconciled = p.worktree ? branchChangedIn(p.worktree, onto) : [];
       const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
-      const r = board.lockMerge(p, onto);
+      const reflogMark = p.worktree ? headReflogLength(p.worktree) ?? void 0 : void 0;
+      const r = board.lockMerge(p, onto, reflogMark);
       emit({ runner: p.name, ...r, reconciled, flags }, () => {
         printReconciled(reconciled, flags);
         console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait --mentions for its merged event`);
@@ -2063,7 +2758,9 @@ ${USAGE}`);
       const p = caller(board);
       const sha = args.positional[0] ?? fail("merged: which sha?");
       const files = args.list("--files");
-      const sharers = board.merged(p, sha, files.map((f) => path4.resolve(f)));
+      const lock = board.heldMergeLock(p);
+      const conflicts = p.worktree && lock && lock.reflogMark !== null ? conflictsOf(p.worktree, lock.onto ?? "", lock.reflogMark) : void 0;
+      const sharers = board.merged(p, sha, files.map((f) => path4.resolve(f)), conflicts);
       const tell = sharers.map(
         (o) => `if you resolved a conflict in ${o.path}, tell them: swarm post "@${o.runner} I resolved ${o.path}: <how>" --about ${o.path}`
       );
@@ -2081,6 +2778,35 @@ ${USAGE}`);
       emit({ runner: p.name, ended: true, reconciled, flags }, () => {
         printReconciled(reconciled, flags);
         console.log(`${p.name} ended`);
+      });
+      break;
+    }
+    case "stats": {
+      const raw = args.flag("--run");
+      const run2 = raw === void 0 ? void 0 : Number(raw);
+      if (run2 !== void 0 && !Number.isInteger(run2)) fail(`--run takes a run id, got ${raw}`);
+      const all = args.has("--all");
+      const since = args.flag("--since");
+      if (all && args.has("--since")) fail("stats: --since or --all, not both");
+      const kinds = args.list("--kind").map((k) => {
+        try {
+          return profileOf(k).kind;
+        } catch (e) {
+          return fail(`stats: ${e.message}`);
+        }
+      });
+      const stats = board.stats({
+        repo: repoOf(path4.resolve(args.flag("--repo") ?? process.cwd())),
+        ...run2 !== void 0 ? { run: run2 } : {},
+        // a named run is read whatever its age: no default period (plan D40)
+        ...all ? {} : since !== void 0 ? { since } : run2 !== void 0 ? {} : { since: "30d" },
+        ...kinds.length ? { kinds } : {},
+        ...args.has("--closed") ? { closedOnly: true } : {}
+      });
+      emit(stats, () => {
+        if (!stats.runs.length) console.log("no run in this scope");
+        for (const r of stats.runs) console.log(statsLine(r));
+        console.log("swarm stats --json for every figure");
       });
       break;
     }
@@ -2106,6 +2832,10 @@ ${USAGE}`);
 if (!args.verb) {
   console.error(USAGE);
   process.exit(1);
+}
+if (args.verb === "stats" && args.has("--help")) {
+  console.log(STATS_USAGE);
+  process.exit(0);
 }
 if (args.verb === "--help") {
   console.log(args.positional[0] === "code" ? CODE_USAGE : USAGE);
