@@ -2,6 +2,7 @@
 // how a figure reads. Formats and selects, never aggregates (D34, D35): a figure the JSON does not
 // carry is not drawn here. Pure: no DOM, no fetch.
 import type { Kind } from "../../../../swarm/src/board/snapshot.ts";
+import type { RunId } from "./view.ts";
 
 /** "all": every run kept, `since` left out (D33). */
 export type Period = "30d" | "7d" | "all";
@@ -49,11 +50,16 @@ export function hashWithAcross(hash: string, scope: AcrossScope | null): string 
   return kept.join("&");
 }
 
-/** The route the across view asks: closed runs only (D33); every kind sends none, so the body equals
- *  `swarm stats --repo <repo> --since 30d --closed --json` (or `--all`), a kind subset `--kind` (D34). */
-export function statsUrl(repo: string, scope: AcrossScope): string {
-  const q = new URLSearchParams({ repo, since: scope.period });
-  if (scope.kinds.length < KINDS.length) q.set("kind", scope.kinds.join(","));
+/** What a view asks `/api/stats` for: the across view's scope, or one run (its tab's Analytics). */
+export type StatsAsk = AcrossScope | { run: RunId };
+
+/** The route a view asks. The across view: closed runs only (D33); every kind sends none, so the body
+ *  equals `swarm stats --repo <repo> --since 30d --closed --json` (or `--all`), a kind subset `--kind`
+ *  (D34). One run: no period, so the body equals `swarm stats --repo <repo> --run <id> --all --json`. */
+export function statsUrl(repo: string, ask: StatsAsk): string {
+  if ("run" in ask) return `/api/stats?${new URLSearchParams({ repo, run: String(ask.run) }).toString()}`;
+  const q = new URLSearchParams({ repo, since: ask.period });
+  if (ask.kinds.length < KINDS.length) q.set("kind", ask.kinds.join(","));
   q.set("closedOnly", "1");
   return `/api/stats?${q.toString()}`;
 }

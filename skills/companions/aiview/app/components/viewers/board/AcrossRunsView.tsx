@@ -91,7 +91,7 @@ export function AcrossRunsView({
   const empty = stats !== null && stats.runs.length === 0;
   const note = stats === null ? "" : empty ? "no closed run" : `${figure(stats.totals.runs)} runs · ${figure(stats.totals.members)} members · ${repoName}`;
   return (
-    <section className="across" data-component="AcrossRunsView" data-state={stats === null ? "loading" : empty ? "empty" : "across"}>
+    <section className="analytics" data-component="AcrossRunsView" data-state={stats === null ? "loading" : empty ? "empty" : "across"}>
       <AnalyticsToolbar scope={scope} note={note} unknownMerges={stats?.totals.conflicts.unknownMerges ?? null} body={body} onScope={onScope} />
       {stats === null ? null : empty ? (
         <div className="aempty">

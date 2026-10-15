@@ -1,9 +1,9 @@
-// A repository's figures for the across view, live: GET /api/stats with the scope, refetched on the
+// A repository's figures for an analytics view (across runs, or one run), live: GET /api/stats, refetched on the
 // repository's `board-changed` on aiview's /events, as useBoard is (D32). Keeps the body as the server
 // sent it, for "Copy as JSON" to put on the clipboard unchanged (US3).
 import { useEffect, useState } from "react";
 import type { Stats } from "../../../swarm/src/board/snapshot.ts";
-import { statsUrl, type AcrossScope } from "../lib/board/analytics.ts";
+import { statsUrl, type StatsAsk } from "../lib/board/analytics.ts";
 
 export interface StatsState {
   /** null while loading, or on error. */
@@ -14,9 +14,9 @@ export interface StatsState {
   error: string | null;
 }
 
-export function useStats(repo: string, scope: AcrossScope): StatsState {
+export function useStats(repo: string, ask: StatsAsk): StatsState {
   const [state, setState] = useState<StatsState>({ stats: null, body: null, error: null });
-  const url = statsUrl(repo, scope);
+  const url = statsUrl(repo, ask);
 
   useEffect(() => {
     let live = true;
