@@ -15,6 +15,8 @@ vi.mock("mermaid", () => ({
 }));
 
 afterEach(cleanup);
+// aiview's MermaidView picks its theme from the OS scheme; jsdom has no matchMedia
+vi.stubGlobal("matchMedia", () => ({ matches: false }));
 
 const AT = "2026-10-14T10:00:00Z";
 const RUN: RunSummary = { run: 1, kind: "plan", plan: "alpha", group: "alpha", code: "AL", title: "Alpha", link: null, open: true, runners: 2, done: 0, of: 2 };
@@ -124,7 +126,7 @@ test("a message carrying a mermaid fence shows it as a diagram in the conversati
   const snap = { ...SNAP, events: [said] };
   const { container } = render(<Conversation items={conversation(snap, { run: null, follow: null })} archived={null} fresh={new Set()} />);
   await screen.findByTestId("drawn");
-  const diagram = container.querySelector('[data-component="ConversationItem"] [data-component="PostDiagram"]');
+  const diagram = container.querySelector('[data-component="ConversationItem"] [data-component="MermaidView"]');
   expect(diagram).not.toBeNull();
   expect(screen.getByText("the flow")).toBeTruthy();
 });

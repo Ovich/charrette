@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { segments, seqRefs } from "./lib/board/post.ts";
+import { seqRefs } from "./lib/board/post.ts";
 
 const mermaidMock = vi.hoisted(() => ({
   imported: 0,
@@ -27,35 +27,6 @@ afterEach(cleanup);
 vi.stubGlobal("matchMedia", () => ({ matches: false }));
 
 const FENCE = "```";
-
-describe("segments", () => {
-  test("text only", () => {
-    expect(segments("hello @S3")).toEqual([{ type: "text", text: "hello @S3" }]);
-  });
-  test("one block", () => {
-    expect(segments(`${FENCE}mermaid\nflowchart LR\n A-->B\n${FENCE}`)).toEqual([{ type: "mermaid", source: "flowchart LR\n A-->B" }]);
-  });
-  test("two blocks with text between", () => {
-    expect(segments(`a\n${FENCE}mermaid\nX\n${FENCE}\nmid\n${FENCE}mermaid\nY\n${FENCE}\nz`)).toEqual([
-      { type: "text", text: "a" },
-      { type: "mermaid", source: "X" },
-      { type: "text", text: "mid" },
-      { type: "mermaid", source: "Y" },
-      { type: "text", text: "z" },
-    ]);
-  });
-  test("an unclosed fence stays text", () => {
-    const body = `see\n${FENCE}mermaid\nflowchart LR`;
-    expect(segments(body)).toEqual([{ type: "text", text: body }]);
-  });
-  test("a Mermaid info string, any case", () => {
-    expect(segments(`${FENCE}Mermaid\nX\n${FENCE}`)).toEqual([{ type: "mermaid", source: "X" }]);
-  });
-  test("a non-mermaid fence is left as text", () => {
-    const body = `${FENCE}ts\nconst a = 1;\n${FENCE}`;
-    expect(segments(body)).toEqual([{ type: "text", text: body }]);
-  });
-});
 
 describe("seqRefs", () => {
   test("finds #42, ignores #abc and a#42", () => {
