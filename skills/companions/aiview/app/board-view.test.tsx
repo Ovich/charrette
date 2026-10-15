@@ -46,12 +46,13 @@ const tabOf = (title: string) => tabs().getByText(title).closest("button")!;
 
 // ── RunTabs ────────────────────────────────────────────────────────────────────────
 
-test("the tab row: All, then each open run with its code, title and slices done/total; no closed run", () => {
+test("the tab row: All, then each open run with its code, title and slices done/total, a brainstorm its seats; no closed run (SL10)", () => {
   show([APP], null);
   const names = tabs().getAllByRole("button").map((b) => b.textContent);
   expect(names[1]).toBe("All");
   // the run tabs, then the Analytics pill drawn beside the merge lock at the row's end (SL4)
-  expect(names.slice(2)).toEqual(["RTSessions with refresh tokens2/7", "ALAudit log0/3", "NMNaming the kinds0/1", "Analytics"]);
+  // a brainstorm's slice rows are seats, never slices to merge: never "0/1"
+  expect(names.slice(2)).toEqual(["RTSessions with refresh tokens2/7", "ALAudit log0/3", "NMNaming the kinds1 seat", "Analytics"]);
   for (const r of CLOSED) expect(tabs().queryByText(r.title)).toBeNull();
   expect(pressed()?.textContent).toBe("All");
 });
@@ -304,10 +305,12 @@ test("two or more open runs: the board opens on All", () => {
   expect(pressed()?.textContent).toBe("All");
 });
 
-test("no open run: the board opens on the most recently closed, as its archived tab", () => {
+test("no open run: the board opens on the most recently closed, as its archived tab, a brainstorm counting its seats (SL10)", () => {
   show([APP], null, [ALL_CLOSED]);
   const archived = screen.getByText("Theme tokens").closest('[data-component="ArchivedTab"]') as HTMLElement;
   expect(archived.getAttribute("aria-pressed")).toBe("true");
+  expect(archived.textContent).toContain("2 seats");
+  expect(archived.textContent).not.toContain("2/2");
   expect(convo().getByText(/read only · 2 of 2 slices/)).toBeTruthy();
 });
 
