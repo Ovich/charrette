@@ -1,4 +1,4 @@
-import type { Mark, MemberStats } from "../../../../../swarm/src/board/snapshot.ts";
+import type { MemberStats } from "../../../../../swarm/src/board/snapshot.ts";
 import { figure } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";
 
@@ -12,9 +12,8 @@ const countCell = (n: number | null, tone = ""): { className: string; text: stri
 });
 
 /** A brainstorm run's seats in numbers (mockup #677 SeatsTable): posts, agreements made, endorsements
- *  (the skeptic's alone), objections (inferred, plan D23), claims without a source. */
+ *  (the skeptic's alone), objections (inferred, plan D23), claims without a source, each as swarm counts it (plan D40). */
 export function SeatsTable({ members }: { members: MemberStats[] }) {
-  const marked = (m: MemberStats, what: Mark["what"]): number => m.marks.filter((x) => x.what === what).length;
   return (
     <div className="apanel" data-component="SeatsTable">
       <div className="label">Seats in numbers</div>
@@ -34,9 +33,9 @@ export function SeatsTable({ members }: { members: MemberStats[] }) {
             {members.map((m) => {
               const cells = [
                 countCell(m.posts),
-                countCell(marked(m, "agreement")),
-                m.slice === SKEPTIC ? countCell(marked(m, "endorsed")) : { className: "num faint", text: "—" },
-                countCell(marked(m, "objected")),
+                countCell(m.agreementsMade),
+                m.slice === SKEPTIC ? countCell(m.endorsed) : { className: "num faint", text: "—" },
+                countCell(m.objections),
                 countCell(m.unsourced, "warn"),
               ];
               return (

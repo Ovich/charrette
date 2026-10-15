@@ -61,7 +61,7 @@ const CODE_USAGE = [
 const STATS_USAGE = [
   "usage: swarm stats [--repo <path>] [--run <id>] [--since 30d|<ISO> | --all] [--closed] [--kind plan|brainstorm[,…]] [--json]",
   "  the figures of a repository's runs, oldest first, with the scope's totals; a figure not recorded or not computed yet is null, never 0",
-  "  --since: runs open, or closed since then, default 30d; --all: every run kept; --closed: closed runs only",
+  "  --since: runs open, or closed since then, default 30d, none with --run; --all: every run kept; --closed: closed runs only",
   "  without --json: one line per run; --json carries every figure, with the run ids, members and seqs to follow with swarm read <seq>",
 ].join("\n");
 
@@ -616,6 +616,7 @@ async function main(board: Board): Promise<void> {
       const run = raw === undefined ? undefined : Number(raw);
       if (run !== undefined && !Number.isInteger(run)) fail(`--run takes a run id, got ${raw}`);
       const all = args.has("--all");
+      const since = args.flag("--since");
       if (all && args.has("--since")) fail("stats: --since or --all, not both");
       const kinds = args.list("--kind").map((k) => {
         try {
@@ -627,7 +628,8 @@ async function main(board: Board): Promise<void> {
       const stats = board.stats({
         repo: repoOf(path.resolve(args.flag("--repo") ?? process.cwd())),
         ...(run !== undefined ? { run } : {}),
-        ...(all ? {} : { since: args.flag("--since") ?? "30d" }),
+        // a named run is read whatever its age: no default period (plan D40)
+        ...(all ? {} : since !== undefined ? { since } : run !== undefined ? {} : { since: "30d" }),
         ...(kinds.length ? { kinds } : {}),
         ...(args.has("--closed") ? { closedOnly: true } : {}),
       });

@@ -12,7 +12,7 @@ const BAR_PX = 140;
 const lengthOf = (i: { from: string; to: string }): number => Date.parse(i.to) - Date.parse(i.from);
 
 /** Where each member's time went (mockup #677 MembersTable): its spans drawn as a bar in the run's
- *  scale, its time from joining to its end, its posts, claims and flags. "—" in Time when the run is
+ *  scale, its time from joining to its end and its waiting as swarm counts it (plan D40), its posts, claims and flags. "—" in Time when the run is
  *  not recorded (D33). A row focuses that member's lane. */
 export function MembersTable({
   members,
@@ -50,8 +50,6 @@ export function MembersTable({
           <tbody>
             {members.map((m) => {
               const spans = ORDER.flatMap((what) => m.intervals.filter((i) => i.what === what));
-              // the waiting beside the time is read from this member's own spans, as a tile's line is (plan D34)
-              const waitedMs = m.intervals.filter((i) => i.what === "waiting").reduce((n, i) => n + lengthOf(i), 0);
               return (
                 <tr
                   key={m.member}
@@ -75,7 +73,7 @@ export function MembersTable({
                         </span>{" "}
                         <span className="sub">
                           {formatDuration(lengthOf({ from: m.joined, to: m.ended ?? until }))}
-                          {waitedMs > LONG_WAIT_MS && <span className="warn"> · {formatDuration(waitedMs)} waiting</span>}
+                          {m.waitingMs !== null && m.waitingMs > LONG_WAIT_MS && <span className="warn"> · {formatDuration(m.waitingMs)} waiting</span>}
                         </span>
                       </>
                     ) : (

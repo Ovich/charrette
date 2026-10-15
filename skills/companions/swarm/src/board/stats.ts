@@ -25,6 +25,13 @@ export type MemberStats = {
   claims: number | null;
   flags: number | null;
   unsourced: number | null /* posts without a source, D23 */;
+  /** Its spans waiting for the merge lock, summed; null when the run is not recorded (D40). */
+  waitingMs: number | null;
+  /** Its agreements posted (D40). */
+  agreementsMade: number | null;
+  /** A brainstorm run's: its endorsements and its objections (inferred, D23); null on a plan run, which computes neither (D40). */
+  endorsed: number | null;
+  objections: number | null;
 };
 export type PlanRunStats = {
   slices: { merged: number | null; of: number | null; addedMidRun: number | null; timesMs: number[] };
@@ -316,6 +323,11 @@ function computeRun(db: DatabaseSync, r: Row, now: number, silentAfterMs: number
       claims: claimLog.filter((c) => Number(c.participant) === pid).length,
       flags: flagged.length,
       unsourced: posts.filter((m) => !SOURCE.test(String(m.body))).length,
+      // read from its spans and marks once they are whole, below (D40)
+      waitingMs: null,
+      agreementsMade: null,
+      endorsed: null,
+      objections: null,
     };
   });
 
@@ -555,6 +567,22 @@ function debateOf(
   };
 }
 
+/** The run with each member's own figures (D40), read from the member's spans and marks: those a summary carries
+ *  are kept, those it lacks (a summary from before) filled, so a stored run reads as a computed one. */
+function withMemberFigures(run: RunStats): RunStats {
+  const debated = run.brainstorm !== undefined;
+  const marked = (m: MemberStats, what: Mark["what"]): number => m.marks.filter((x) => x.what === what).length;
+  const lengthOf = (i: Interval): number => ms(i.to) - ms(i.from);
+  const members = run.members.map((m) => ({
+    ...m,
+    waitingMs: m.waitingMs ?? (run.recorded ? m.intervals.filter((i) => i.what === "waiting").reduce((n, i) => n + lengthOf(i), 0) : null),
+    agreementsMade: m.agreementsMade ?? marked(m, "agreement"),
+    endorsed: m.endorsed ?? (debated ? marked(m, "endorsed") : null),
+    objections: m.objections ?? (debated ? marked(m, "objected") : null),
+  }));
+  return { ...run, members };
+}
+
 /** A run kept: not pruned, or pruned with its summary kept (D21). */
 const KEPT = "(pruned_at IS NULL OR id IN (SELECT run FROM run_stats))";
 
@@ -562,7 +590,7 @@ const KEPT = "(pruned_at IS NULL OR id IN (SELECT run FROM run_stats))";
 export function summarize(db: DatabaseSync, run: RunId, silentAfterMs: number): RunStats {
   const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run) as Row | undefined;
   if (!r) throw new Error(`no run ${run}`);
-  return computeRun(db, r, Date.now(), silentAfterMs);
+  return withMemberFigures(computeRun(db, r, Date.now(), silentAfterMs));
 }
 
 /** The scope's totals, from its runs' figures alone, stored or computed alike (D28, D34). */
@@ -697,7 +725,7 @@ export function statsOf(db: DatabaseSync, scope: StatsScope, silentAfterMs: numb
     const now = Date.now();
     const runs = rows.map((r) => {
       const row = stored.get(Number(r.id)) as Row | undefined;
-      return row ? (JSON.parse(String(row.body)) as RunStats) : computeRun(db, r, now, silentAfterMs);
+      return withMemberFigures(row ? (JSON.parse(String(row.body)) as RunStats) : computeRun(db, r, now, silentAfterMs));
     });
     return { scope, runs, totals: totalsOf(runs), files: filesAcross(runs), silentAfterMs };
   } finally {
