@@ -1,6 +1,6 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { Interval, Mark } from "../../../../../swarm/src/board/snapshot.ts";
-import { formatDuration } from "../../../lib/board/analytics.ts";
+import { ESTIMATED_EVENTS_TIP, formatDuration } from "../../../lib/board/analytics.ts";
 import { hhmm, splitRunner } from "../../../lib/board/view.ts";
 import { RunnerTag } from "./chips.tsx";
 
@@ -56,7 +56,9 @@ function ticksOf(from: number, to: number, clock: boolean): { at: number; label:
  *  the orchestrator first like any member, under the merge lock band, the axis in clock time; for a
  *  brainstorm run a lane per seat, its posts and marks, the axis in minutes from the run's open. Exact
  *  spans solid, inferred ones (`Interval.inferred`) at reduced opacity with a dashed edge. Both legends
- *  toggle. `to` is now while the run is open (D32). */
+ *  toggle. `to` is now while the run is open (D32). `estimated`: a run before the records whose spans were read from
+ *  its board events (D45), its lanes drawn with the panel dashed and the estimate's tip; else such a run reads the
+ *  Not recorded line. */
 export function RunTimeline({
   title,
   clock,
@@ -66,6 +68,7 @@ export function RunTimeline({
   from,
   to,
   recorded,
+  estimated = false,
   silentAfterMs,
   focus,
   onFocus,
@@ -80,6 +83,7 @@ export function RunTimeline({
   from: string;
   to: string;
   recorded: boolean;
+  estimated?: boolean;
   silentAfterMs: number;
   focus: string | null;
   onFocus?: (member: string | null) => void;
@@ -126,9 +130,21 @@ export function RunTimeline({
   };
 
   return (
-    <div className="apanel chart" data-component="RunTimeline" data-state={recorded ? (focus ? "focused" : "lanes") : "not recorded"}>
+    <div
+      className={estimated ? "apanel chart inferred" : "apanel chart"}
+      data-component="RunTimeline"
+      data-state={recorded || estimated ? (focus ? "focused" : estimated ? "estimated" : "lanes") : "not recorded"}
+      data-tip={estimated ? ESTIMATED_EVENTS_TIP : undefined}
+    >
       <div className="head">
-        <div className="label">{title}</div>
+        <div className="label">
+          {title}
+          {estimated ? (
+            <span className="hint" title={ESTIMATED_EVENTS_TIP}>
+              estimated
+            </span>
+          ) : null}
+        </div>
         <div className="legend">
           {legend.map((k) => (
             <button key={k} aria-pressed={shown(k)} onClick={() => toggle(k)}>
@@ -138,7 +154,7 @@ export function RunTimeline({
           ))}
         </div>
       </div>
-      {!recorded ? (
+      {!recorded && !estimated ? (
         <p className="nr">{NOT_RECORDED_LINE}</p>
       ) : (
         <div className="scroll">

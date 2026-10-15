@@ -337,6 +337,11 @@
 .board .runhead .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
 .board .runhead .ghost { margin-left: auto; font-size: 12px; color: var(--accent); }
 .board .analytics .kpis.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+/* the across view's brainstorm row, under the plan row when both kinds are chosen (D46) */
+.board .analytics .kpis.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.board .analytics .kpis + .kpis { margin-top: 10px; }
+@media (max-width: 1100px) { .board .analytics .kpis.five { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .board .analytics .kpis.five { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .board .analytics .kpis.six { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .board .analytics .kpis.six { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* an inferred figure (plan D23): dashed, its rule in its tip */

@@ -60,7 +60,7 @@ test("the skeptic by id `skeptic`, else by its subscription to `agreement` (D30,
   assert.deepEqual(memberOf(subscribed, critic.name).marks.map((x) => x.what), ["endorsed"]);
 });
 
-test("exchanges count `msg`, `urgent` and `agreement` about `D<n>` before the outcome, never events or posts after (D33, SL3)", () => {
+test("exchanges count `msg`, `urgent` and `agreement` about `D<n>` strictly before the outcome, never the outcome's own agreement, events or posts after (D33, D46 point 4, SL3, SL11)", () => {
   const { board } = s;
   const { run, m: [skeptic, a, b] } = brainstormRun(board, "debate", ["skeptic", "a", "b"]);
   clockTo(1), board.post(a, "the store should stay one file", { about: "D1" });
@@ -71,7 +71,8 @@ test("exchanges count `msg`, `urgent` and `agreement` about `D<n>` before the ou
   clockTo(5), board.endorse(skeptic, g.seq);
   clockTo(6), board.post(b, "and after the outcome, one more thought", { about: "D1" });
   clockTo(7), board.post(a, "an agreement after the outcome", { about: "D1", kind: "agreement" });
-  assert.equal(question(runOf(run), "D1").exchanges, 3);
+  // the post and the urgent one; the outcome's agreement is none (D46)
+  assert.equal(question(runOf(run), "D1").exchanges, 2);
 });
 
 test("a post about anything but `D<n>` is no question and still counts in its author's posts (D4, SL3)", () => {
@@ -142,7 +143,7 @@ test("`totals.brainstorm` over the scope's brainstorm runs, null where not compu
     sourcedShare: null,
     silentSeats: null,
   });
-  // run one: D1 settled in 1 exchange, D2 in 2, D3 open
+  // run one: D1 settled with no exchange before its outcome, D2 after 1, D3 open
   const one = brainstormRun(board, "first", ["skeptic", "a"]);
   clockTo(1);
   const g1 = board.post(one.m[1], "keep one store", { about: "D1", kind: "agreement" });
@@ -151,7 +152,7 @@ test("`totals.brainstorm` over the scope's brainstorm runs, null where not compu
   const g2 = board.post(one.m[1], "one table", { about: "D2", kind: "agreement" });
   board.endorse(one.m[0], g2.seq);
   board.post(one.m[1], "D3 stays open", { about: "D3" });
-  // run two: D1 objected, then settled in 5 exchanges
+  // run two: D1 objected, then settled after 4 exchanges
   const two = brainstormRun(board, "second", ["skeptic", "a", "b"]);
   const [skeptic, a, b] = two.m;
   clockTo(2);
@@ -166,7 +167,8 @@ test("`totals.brainstorm` over the scope's brainstorm runs, null where not compu
   assert.deepEqual(t, {
     questionsSettled: 3,
     questions: 4,
-    exchangesMedian: 2,
+    // [0, 1, 4]: the outcome's own agreement is no exchange (D46)
+    exchangesMedian: 1,
     objectedThenAgreed: 1,
     // claims up to the outcome: run one's 2 posts (1 sourced), run two's 3 (1 sourced)
     sourcedShare: 2 / 5,

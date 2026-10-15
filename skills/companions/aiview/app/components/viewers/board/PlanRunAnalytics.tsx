@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { MemberStats, RunStats, Stats } from "../../../../../swarm/src/board/snapshot.ts";
-import { formatDuration, plural } from "../../../lib/board/analytics.ts";
+import { agreementText, countedWithoutAgreement, formatDuration, plural, runLength } from "../../../lib/board/analytics.ts";
 import { basename, splitRunner } from "../../../lib/board/view.ts";
 import { KpiTile } from "./KpiTile.tsx";
 import { MembersTable } from "./MembersTable.tsx";
@@ -38,8 +38,8 @@ function PlanTiles({ stats, run }: { stats: Stats; run: RunStats }) {
   const plan = run.plan!;
   const t = stats.totals;
   const withoutAgreement = t.shared.withoutAgreement;
-  // the one file without an agreement, named when there is one only
-  const unsettled = plan.shared.perFile.find((f) => f.agreement === null);
+  // the one file the funnel counts without an agreement, named when there is one only (D46)
+  const unsettled = plan.shared.perFile.find(countedWithoutAgreement);
   const lockLine = [line(t.lockWait.p90Ms, (n) => `p90 ${formatDuration(n)}`), line(run.racesLost, (n) => plural(n, "race lost", "races lost"))].filter(Boolean).join(" · ");
   return (
     <div className="kpis">
@@ -50,13 +50,13 @@ function PlanTiles({ stats, run }: { stats: Stats; run: RunStats }) {
         delta={plan.slices.addedMidRun ? `+${plan.slices.addedMidRun} drawn mid-run` : null}
         estimatedRuns={t.slices.estimatedRuns}
       />
-      <KpiTile label="Length" value={line(run.lengthMs, formatDuration)} delta={line(run.firstMergeAtMs, (n) => `first merge at ${formatDuration(n)}`)} />
+      <KpiTile label="Length" value={line(run.lengthMs, runLength)} delta={line(run.firstMergeAtMs, (n) => `first merge at ${formatDuration(n)}`)} />
       <KpiTile label="Lock wait" value={line(t.lockWait.p50Ms, formatDuration)} unit="p50" delta={lockLine || null} tone="warn" newRecord />
       <KpiTile
         label="Shared files settled"
         value={line(t.shared.agreed, String)}
         unit={line(t.shared.files, (n) => `of ${n}`)}
-        delta={withoutAgreement === 1 && unsettled ? `${basename(unsettled.path)}: none` : withoutAgreement ? `${withoutAgreement} with no agreement` : null}
+        delta={withoutAgreement === 1 && unsettled ? `${basename(unsettled.path)}: ${agreementText(unsettled)}` : withoutAgreement ? `${withoutAgreement} with no agreement` : null}
         tone="warn"
         estimatedRuns={t.shared.estimatedRuns}
       />
@@ -69,7 +69,7 @@ function PlanTiles({ stats, run }: { stats: Stats; run: RunStats }) {
         tone="bad"
         newRecord
       />
-      <KpiTile label="Silent members" value={line(t.silentMembers, String)} delta={silentLine(run.members, t.silentMembers)} />
+      <KpiTile label="Silent members" value={line(t.silentMembers, String)} delta={silentLine(run.members, t.silentMembers)} newRecord />
     </div>
   );
 }
@@ -93,6 +93,7 @@ export function PlanRunAnalytics({ stats, run, onOpenPost }: { stats: Stats; run
         from={run.openedAt}
         to={to}
         recorded={run.recorded}
+        estimated={run.members.some((m) => m.estimated)}
         silentAfterMs={stats.silentAfterMs}
         focus={focus}
         onFocus={setFocus}

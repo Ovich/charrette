@@ -7,7 +7,7 @@ import { ESTIMATED_TIP, figure, less, plural } from "../../../lib/board/analytic
 export function SharingFunnel({ shared, conflictsInShared }: { shared: Totals["shared"]; conflictsInShared: number | null }) {
   const steps: { label: string; tip: string; n: number | null; drop?: string }[] = [
     { label: "Shared", tip: "a second member claimed it", n: shared.files },
-    { label: "Every holder told", tip: "the post mentioned each holder", n: shared.everyHolderTold, drop: "tagged one holder only" },
+    { label: "Every holder told", tip: "the post mentioned each holder", n: shared.everyHolderTold, drop: "not every holder told" },
     { label: "Agreement given", tip: "the holder ran swarm agree", n: shared.agreed, drop: "never answered" },
     { label: "Agreement before the merge", tip: "it could still change the work", n: shared.agreedBeforeMerge, drop: "agreed after the merge" },
   ];
@@ -48,7 +48,9 @@ export function SharingFunnel({ shared, conflictsInShared }: { shared: Totals["s
         );
       })}
       <div className="foot">
-        A shared file is one a second member claimed while another held it; each step counts the files that made it that far.
+        {estimated
+          ? "Estimated: a shared file is one two members claimed while both were members of the run. Each step counts the files that made it that far."
+          : "A shared file is one a second member claimed while another held it; each step counts the files that made it that far."}
         {/* the conflict line only when both its figures are recorded (D43) */}
         {conflictsInShared !== null && shared.files !== null ? (
           <>

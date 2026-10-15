@@ -29,6 +29,7 @@ const member = (member: string, nick: string, joined: string, over: Partial<Memb
   agreementsMade: 0,
   endorsed: null,
   objections: null,
+  estimated: false,
   ...over,
 });
 
@@ -102,8 +103,8 @@ const LP_RUN: RunStats = {
       agreed: 1,
       agreedBeforeMerge: 1,
       perFile: [
-        { path: "src/login.ts", holders: [`${LP}/S3`, `${LP}/S4`], agreement: 14, agreedAfterMs: 2 * MIN, conflict: true, interface: false },
-        { path: "src/session.ts", holders: [`${LP}/S3`, `${LP}/S4`], agreement: null, agreedAfterMs: null, conflict: null, interface: false },
+        { path: "src/login.ts", holders: [`${LP}/S3`, `${LP}/S4`], told: true, agreement: 14, agreedAfterMs: 2 * MIN, conflict: true, interface: false },
+        { path: "src/session.ts", holders: [`${LP}/S3`, `${LP}/S4`], told: true, agreement: null, agreedAfterMs: null, conflict: null, interface: false },
       ],
       estimated: false,
     },
@@ -141,7 +142,7 @@ export const TT_SKEPTIC = member(`${TT}/skeptic`, "Witty Heron", "13:30", {
   objections: 2,
   unsourced: 1,
 });
-/** One agreement mark; `agreementsMade` says 2. */
+/** One agreement mark; `agreementsMade` says 2; one endorsement, a seat's that is not the skeptic (D46). */
 export const TT_USER = member(`${TT}/user`, "Jolly Walrus", "13:30", {
   ended: at("13:50"),
   marks: [{ at: at("13:39"), what: "agreement", seq: 30, path: "D1", note: "two names per token" }],
@@ -149,7 +150,7 @@ export const TT_USER = member(`${TT}/user`, "Jolly Walrus", "13:30", {
   postTimes: [at("13:33"), at("13:39")],
   waitingMs: null,
   agreementsMade: 2,
-  endorsed: 0,
+  endorsed: 1,
   objections: 0,
   unsourced: 2,
 });
@@ -216,7 +217,7 @@ const OLD_RUN: RunStats = {
       everyHolderTold: 1,
       agreed: 0,
       agreedBeforeMerge: null,
-      perFile: [{ path: "src/old-login.ts", holders: ["old-login/S1", "old-login/S2"], agreement: null, agreedAfterMs: null, conflict: null, interface: false }],
+      perFile: [{ path: "src/old-login.ts", holders: ["old-login/S1", "old-login/S2"], told: true, agreement: null, agreedAfterMs: null, conflict: null, interface: false }],
       estimated: true,
     },
     flags: 0,
@@ -238,6 +239,36 @@ export const UNRECORDED_RUN: Stats = {
   files: [],
   silentAfterMs: SILENT_AFTER_MS,
 };
+
+// ── A plan run before the records read from its board events: The old signup (run 9) ─────────
+
+const EVENTS_RUN: RunStats = {
+  ...OLD_RUN,
+  run: 9,
+  code: "OS",
+  title: "The old signup",
+  firstMergeAtMs: 20 * MIN,
+  // its spans read from its `joined`, `merged` and `ended` events, estimated (D45)
+  members: [
+    member("old-signup/S1", "Quiet Llama", "09:00", {
+      ended: at("09:25"),
+      waitingMs: null,
+      estimated: true,
+      intervals: [
+        { from: at("09:00"), to: at("09:20"), what: "working", inferred: true },
+        { from: at("09:20"), to: at("09:20"), what: "merging", inferred: true },
+      ],
+    }),
+    member("old-signup/S2", "Shy Otter", "09:05", {
+      ended: at("09:50"),
+      waitingMs: null,
+      estimated: true,
+      intervals: [{ from: at("09:05"), to: at("09:50"), what: "working", inferred: true }],
+    }),
+  ],
+  plan: { ...OLD_RUN.plan!, slices: { merged: 1, of: 2, addedMidRun: 0, timesMs: [20 * MIN, 45 * MIN], estimated: true }, shared: { ...OLD_RUN.plan!.shared, agreedBeforeMerge: 0 } },
+};
+export const EVENTS_READ_RUN: Stats = { ...UNRECORDED_RUN, scope: { repo: APP, run: 9 }, runs: [EVENTS_RUN] };
 
 // ── An open plan run: Sessions with refresh tokens (run 1), its spans to now ───────────────
 

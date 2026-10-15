@@ -1,5 +1,5 @@
 import type { Interval, MemberStats } from "../../../../../swarm/src/board/snapshot.ts";
-import { figure, formatDuration } from "../../../lib/board/analytics.ts";
+import { ESTIMATED_EVENTS_TIP, figure, formatDuration } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";
 
 /** The Time bar's order: working, silent, waiting, merging (mockup #677). */
@@ -12,8 +12,9 @@ const BAR_PX = 140;
 const lengthOf = (i: { from: string; to: string }): number => Date.parse(i.to) - Date.parse(i.from);
 
 /** Where each member's time went (mockup #677 MembersTable): its spans drawn as a bar in the run's
- *  scale, its time from joining to its end and its waiting as swarm counts it (plan D40), its posts, claims and flags. "—" in Time when the run is
- *  not recorded (D33). A row focuses that member's lane. */
+ *  scale, its time from joining to its end and its waiting as swarm counts it (plan D40), its posts, claims and flags. A member
+ *  `estimated` (D45), its spans read from the board's events, has its Time drawn as inferred with the estimate's tip; "—" in
+ *  Time when the run is not recorded and the member not estimated (D33). A row focuses that member's lane. */
 export function MembersTable({
   members,
   recorded,
@@ -63,8 +64,8 @@ export function MembersTable({
                   <td>
                     <RunnerTag name={m.member} /> <span className="nick">{m.nick}</span>
                   </td>
-                  <td>
-                    {recorded ? (
+                  <td className={m.estimated ? "inferred" : undefined} data-tip={m.estimated ? ESTIMATED_EVENTS_TIP : undefined}>
+                    {recorded || m.estimated ? (
                       <>
                         <span className="stack">
                           {spans.map((s, i) => (

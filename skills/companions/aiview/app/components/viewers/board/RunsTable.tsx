@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { RunStats, Totals } from "../../../../../swarm/src/board/snapshot.ts";
-import { ESTIMATED_TIP, NOT_RECORDED, figure, formatDuration } from "../../../lib/board/analytics.ts";
+import { ESTIMATED_TIP, NOT_RECORDED, figure, formatDuration, runLength } from "../../../lib/board/analytics.ts";
 import { runHue, type RunId } from "../../../lib/board/view.ts";
 
 /** One run's row: what each column shows, and the value it sorts by (null last). */
@@ -31,7 +31,7 @@ export function RunsTable({ runs, series, onOpen }: { runs: RunStats[]; series: 
       }),
     },
     { heading: "Members", numeric: true, cell: (r) => ({ show: r.members.length, sortBy: r.members.length }) },
-    { heading: "Length", numeric: true, cell: (r) => ({ show: figure(r.lengthMs, formatDuration), sortBy: r.lengthMs, className: r.lengthMs === null ? "nr" : undefined }) },
+    { heading: "Length", numeric: true, cell: (r) => ({ show: figure(r.lengthMs, runLength), sortBy: r.lengthMs, className: r.lengthMs === null ? "nr" : undefined }) },
     {
       heading: "Lock wait p50",
       numeric: true,

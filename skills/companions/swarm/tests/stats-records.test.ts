@@ -89,7 +89,7 @@ test("prune writes a missing summary first: a closed run with none still reads i
   assert.deepEqual(board.stats({ repo: REPO, run: plan.run }).runs, before.runs);
 });
 
-test("a run before the records reads `recorded: false`, its span, lock-wait and conflict figures null, never 0, its slices and shared files estimated, its message figures kept (US1, D21, D34, D39, D41, D44, SL2, SL3, SL9)", async () => {
+test("a run before the records reads `recorded: false`, its lock-wait and conflict figures null, never 0, its slices, shared files and spans estimated, its merges and message figures kept (US1, D21, D34, D39, D41, D44, D45, SL2, SL3, SL9, SL10)", async () => {
   const { board } = s;
   // the records begin a minute after the run opened
   const { run, m: [a, b] } = planRun(board, "app", ["S1", "S2"]);
@@ -108,9 +108,11 @@ test("a run before the records reads `recorded: false`, its span, lock-wait and 
   const out = board.stats({ repo: REPO, run });
   const r = out.runs[0];
   assert.equal(r.recorded, false);
-  assert.deepEqual([r.firstMergeAtMs, r.racesLost], [null, null]);
+  // the first merge read from its `merged` event (D45); races not kept
+  assert.deepEqual([r.firstMergeAtMs, r.racesLost], [8 * 60_000, null]);
   for (const m of r.members) {
-    assert.deepEqual(m.intervals, [], m.member);
+    assert.equal(m.estimated, true, m.member);
+    assert.ok(m.intervals.length > 0 && m.intervals.every((i) => i.inferred && (i.what === "working" || i.what === "merging")), m.member);
     assert.equal(m.waitingMs, null, m.member);
   }
   const p = r.plan!;
@@ -119,7 +121,8 @@ test("a run before the records reads `recorded: false`, its span, lock-wait and 
   assert.equal(p.slices.timesMs.length, 2);
   assert.deepEqual(p.lock.waitsMs, []);
   assert.deepEqual(p.conflicts, { known: null, inShared: null, unknownMerges: null });
-  assert.equal(p.shared.agreedBeforeMerge, null);
+  // the merges known from their events, the step is counted, never null: here no path two members claimed (D45)
+  assert.equal(p.shared.agreedBeforeMerge, 0);
   // the message figures are kept
   assert.equal(p.flags, 1);
   const byName = new Map(r.members.map((m) => [m.member, m]));
@@ -234,7 +237,7 @@ test("a closed run's flags are the board's flag messages, read after release: th
   });
 });
 
-test("a plan run before the records: slices merged from the members' rows, each merged member's join to its end, estimated; lock and conflicts null (D44, SL9)", async () => {
+test("a plan run before the records: slices merged from the members' rows, each member's join to its `merged` event, else to its end, estimated; lock and conflicts null (D44, D45, SL9, SL10)", async () => {
   const { board } = s;
   const { run, m: [a, b, c] } = planRun(board, "app", ["S1", "S2", "S3"]);
   clockTo(1), board.lockMerge(a, "main");
@@ -252,16 +255,17 @@ test("a plan run before the records: slices merged from the members' rows, each 
   const p = r.plan!;
   assert.equal(r.recorded, false);
   assert.deepEqual([p.slices.merged, p.slices.of, p.slices.estimated], [2, 3, true]);
-  // the end stands for the merge: 5 and 9 minutes
-  assert.deepEqual([...p.slices.timesMs].sort((x, y) => x - y), [5 * 60_000, 9 * 60_000]);
+  // the merges at 2 and 7 minutes, read from the board's events; c, never merged, to its end at 10 (D45)
+  assert.deepEqual([...p.slices.timesMs].sort((x, y) => x - y), [2 * 60_000, 7 * 60_000, 10 * 60_000]);
   assert.deepEqual(p.lock.waitsMs, []);
   assert.deepEqual(p.conflicts, { known: null, inShared: null, unknownMerges: null });
 });
 
-test("before shares-since a path claimed by two members is shared, estimated, its before-merge null; a path one member claimed is not (D44, SL9)", async () => {
+test("before shares-since a path claimed by two members is shared, estimated, its agreement before any merge counted; a path one member claimed is not (D44, D45, SL9, SL10)", async () => {
   const { board } = s;
   const { run, m: [a, b] } = planRun(board, "app", ["S1", "S2"]);
-  // held one after the other: a recorded run would not share it, an old one counts it
+  // held one after the other while both were members: a recorded run would not share it, an old one counts it, their
+  // memberships overlapping (D46)
   clockTo(1), board.checkEdit(a, "src/x.ts");
   clockTo(2), board.end(a);
   clockTo(3), board.checkEdit(b, "src/x.ts");
@@ -274,7 +278,7 @@ test("before shares-since a path claimed by two members is shared, estimated, it
   const out = board.stats({ repo: REPO, run });
   const shared = out.runs[0].plan!.shared;
   assert.equal(shared.estimated, true);
-  assert.deepEqual([shared.files, shared.everyHolderTold, shared.agreed, shared.agreedBeforeMerge], [1, 1, 1, null]);
+  assert.deepEqual([shared.files, shared.everyHolderTold, shared.agreed, shared.agreedBeforeMerge], [1, 1, 1, 1]);
   assert.deepEqual(shared.perFile.map((f) => [f.path, f.holders]), [["src/x.ts", [a.name, b.name]]]);
   // the hot files fill from it
   assert.deepEqual(out.files.map((f) => f.path), ["src/x.ts"]);
@@ -286,5 +290,6 @@ test("a recorded run reads both estimate flags false (D44, SL9)", () => {
   const out = board.stats({ repo: REPO, run: plan.run });
   const p = out.runs[0].plan!;
   assert.deepEqual([p.slices.estimated, p.shared.estimated], [false, false]);
+  assert.ok(out.runs[0].members.every((m) => m.estimated === false));
   assert.deepEqual([out.totals.slices.estimatedRuns, out.totals.shared.estimatedRuns], [0, 0]);
 });

@@ -2,9 +2,16 @@
 // archived run picked as a tab with ×, and the merge lock at the row's end, always visible.
 // Analytics, beside the lock, opens the across-runs view; while it shows, no run tab is pressed.
 import type { BoardSnapshot } from "../../../../../swarm/src/board/snapshot.ts";
-import { runHue, type RunId, type RunTab } from "../../../lib/board/view.ts";
+import { runHue, seatCount, type RunId, type RunTab } from "../../../lib/board/view.ts";
 import { AnalyticsButton } from "./AnalyticsButton.tsx";
 import { MergeLock } from "./MergeLock.tsx";
+
+/** A tab's count: a plan's slices merged of its slices, a brainstorm's seats (its slice rows are seats, never slices
+ *  to merge), as the archive reads them; none for a run with none. */
+function TabCount({ tab }: { tab: RunTab }) {
+  if (tab.of === 0) return null;
+  return <span className="of">{tab.kind === "brainstorm" ? seatCount(tab.of) : `${tab.done}/${tab.of}`}</span>;
+}
 
 function RunTabButton({ tab, picked, onPick }: { tab: RunTab; picked: boolean; onPick: () => void }) {
   return (
@@ -14,11 +21,7 @@ function RunTabButton({ tab, picked, onPick }: { tab: RunTab; picked: boolean; o
         {tab.code}
       </span>
       <span className="t">{tab.title}</span>
-      {tab.of > 0 && (
-        <span className="of">
-          {tab.done}/{tab.of}
-        </span>
-      )}
+      <TabCount tab={tab} />
     </button>
   );
 }
@@ -72,11 +75,7 @@ export function RunTabs({
             {archived.code}
           </span>
           <span className="t">{archived.title}</span>
-          {archived.of > 0 && (
-            <span className="of">
-              {archived.done}/{archived.of}
-            </span>
-          )}
+          <TabCount tab={archived} />
           <span className="of">archived</span>
           <button className="x" aria-label="Close the archived run" onClick={() => onPick(null)}>
             ×

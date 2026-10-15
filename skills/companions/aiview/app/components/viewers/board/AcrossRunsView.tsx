@@ -1,10 +1,11 @@
 // The across-runs view (board D10, mockup #677 `across` and `empty`): the closed runs of the scope as
 // `GET /api/stats` answers them. Every tile, the funnel and the lock panel read `Stats.totals`, each
-// sparkline `totals.series` (D28); the view formats and selects, never aggregates (D34, D35).
+// sparkline `totals.series` (D28); the view formats and selects, never aggregates (D34, D35). The plan tiles show
+// when plan is among the kinds chosen, the brainstorm tiles when brainstorm is (D46).
 import type { Stats } from "../../../../../swarm/src/board/snapshot.ts";
 import type { RunId } from "../../../lib/board/view.ts";
 import { useStats } from "../../../hooks/useStats.ts";
-import { figure, formatDuration, plural, share, type AcrossScope } from "../../../lib/board/analytics.ts";
+import { SOURCED_RULE, figure, formatDuration, percent, plural, share, type AcrossScope } from "../../../lib/board/analytics.ts";
 import { AnalyticsToolbar } from "./AnalyticsToolbar.tsx";
 import { HotFiles } from "./HotFiles.tsx";
 import { KpiTile } from "./KpiTile.tsx";
@@ -16,7 +17,7 @@ import { SharingFunnel } from "./SharingFunnel.tsx";
 const line = (n: number | null, write: (n: number) => string): string | null => (n === null ? null : write(n));
 const duration = (n: number | null): string | null => line(n, formatDuration);
 
-function Tiles({ stats }: { stats: Stats }) {
+function PlanTiles({ stats }: { stats: Stats }) {
   const t = stats.totals;
   // slices and shared files are estimated for a run before the records (D44), flags known for every run (D43):
   // only the figures nothing kept say "not recorded"
@@ -76,7 +77,26 @@ function Tiles({ stats }: { stats: Stats }) {
         spark={t.series.conflicts}
         notRecorded={notRecorded}
       />
-      <KpiTile label="Silent members" value={line(t.silentMembers, String)} unit={`past ${formatDuration(stats.silentAfterMs)}`} spark={t.series.silentMembers} notRecorded={notRecorded} />
+      <KpiTile label="Silent members" value={line(t.silentMembers, String)} unit={`past ${formatDuration(stats.silentAfterMs)}`} spark={t.series.silentMembers} notRecorded={notRecorded} newRecord />
+    </div>
+  );
+}
+
+/** The scope's brainstorm runs, from `totals.brainstorm` alone (D46): no sparkline, the series being the plan runs'. */
+function BrainstormTiles({ stats }: { stats: Stats }) {
+  const b = stats.totals.brainstorm;
+  return (
+    <div className="kpis five" data-component="BrainstormTiles">
+      <KpiTile
+        label="Questions settled"
+        value={line(b.questionsSettled, String)}
+        unit={line(b.questions, (n) => `of ${n}`)}
+        delta={line(stats.totals.byKind.brainstorm, (n) => plural(n, "brainstorm run"))}
+      />
+      <KpiTile label="Exchanges to agree" value={line(b.exchangesMedian, String)} unit="median" />
+      <KpiTile label="Objected, then agreed again" value={line(b.objectedThenAgreed, String)} unit="questions" />
+      <KpiTile label="Claims with a source" value={line(b.sourcedShare, percent)} tone="warn" inferred={SOURCED_RULE} />
+      <KpiTile label="Silent seats" value={line(b.silentSeats, String)} unit={`past ${formatDuration(stats.silentAfterMs)}`} notRecorded={stats.totals.notRecorded} newRecord />
     </div>
   );
 }
@@ -110,7 +130,8 @@ export function AcrossRunsView({
         </div>
       ) : (
         <>
-          <Tiles stats={stats} />
+          {scope.kinds.includes("plan") ? <PlanTiles stats={stats} /> : null}
+          {scope.kinds.includes("brainstorm") ? <BrainstormTiles stats={stats} /> : null}
           <div className="sparknote">
             Sparklines read oldest run to newest. <span className="newrec">new record</span> marks a figure the board does not keep today; it starts with the run after this ships.
           </div>
