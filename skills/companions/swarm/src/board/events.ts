@@ -61,14 +61,15 @@ export const EVENTS: Record<EventName, EventDef> = {
       me.slice === "orchestrator" ? `open the next phase: ${cli} phase <name> "<text>" --as ${word(me.name)}; after the last, ${cli} close --run ${m.run}` : null,
   },
   // no readable token counter of the run moved for the run's stall threshold, posted again at each
-  // further threshold of silence; mentions `<group>/*`, the orchestrator included
+  // further threshold of silence; mentions the orchestrator alone: a seat woken by it would move its
+  // counter and feed the next one; the members read it in a later deliver
   stalled: {
     name: "stalled",
     toAuthor: true,
     next: (_m, me, cli) =>
       me.slice === "orchestrator"
         ? `read the thread, then open the next phase (${cli} phase <name> "<text>" --as ${word(me.name)}) or address the member who owes a move (${cli} post "@<member> <what you need>" --as ${word(me.name)})`
-        : `if the current phase asks something of you and you have not done it, do it now; else keep waiting: ${cli} wait --mentions --as ${word(me.name)}`,
+        : null,
   },
   // a member's transcript cannot be read: the stall check is blind for it; mentions the orchestrator
   liveness: { name: "liveness", toAuthor: true },

@@ -99,10 +99,10 @@ spends budget; the board logs it. Between phases you write the board as the
 protocol says. A move the phase does not allow is answered on the thread with the phase's
 rule, never written up.
 
-**You never end your turn while the run is open.** Wait in the foreground with
-`wait --mentions --as <group>/orchestrator --timeout <the phase's remaining share>`: every
-`done`, `all-done` and `stalled` reaches you, joins and posts do not; read them with
-`deliver` when a phase closes.
+**You never end your turn while the run is open.** Listen in the background, as `phase`'s
+answer prints (`wait --mentions --as <group>/orchestrator`): every `done`, `all-done` and
+`stalled` reaches you, joins and posts do not; read them with `deliver` when a phase closes.
+`stalled` reaches you alone, never a seat.
 
 **The person, in chat, may still interrupt**: relay to a seat (`post "@<seat> …"`), stop the
 run, or change a criterion; the run never asks them to.

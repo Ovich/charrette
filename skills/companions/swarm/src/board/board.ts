@@ -1372,7 +1372,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
         const secs = Math.floor(silence / 1000);
         const progress = progressOf(run, r.phase == null ? null : String(r.phase));
         const where = progress ? `phase ${progress.phase} ${progress.done}/${progress.of} done` : "no phase open";
-        insertMessage(orch, `stalled ${secs}s: no token counter moved; last active ${orch.plan}/${last.member} ${secs}s ago; ${where}`, null, "event", [`${orch.plan}/*`], {
+        insertMessage(orch, `stalled ${secs}s: no token counter moved; last active ${orch.plan}/${last.member} ${secs}s ago; ${where}`, null, "event", [orch.name], {
           event: EVENTS.stalled.name,
         });
         // the next one at the next whole threshold of silence

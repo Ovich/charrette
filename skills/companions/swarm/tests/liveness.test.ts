@@ -87,7 +87,7 @@ const stalls = () => board.snapshot(REPO).events.filter((e) => e.event === "stal
 const warnings = () => board.snapshot(REPO).events.filter((e) => e.event === "liveness");
 const at = (base: number, s: number): Date => new Date(base + s * 1000);
 
-test("the stall rule: moves → nothing; flat 5 s → stalled; flat 10 s → a second; a move re-arms it", () => {
+test("the stall rule: moves → nothing; flat 5 s → stalled; flat 10 s → a second; a move re-arms it; the orchestrator alone is mentioned", () => {
   const { run, a, b, orchestrator } = setup();
   const base = Date.now() + 60_000;
   counters.set("o.jsonl", 2).set("a.jsonl", 2);
@@ -102,7 +102,7 @@ test("the stall rule: moves → nothing; flat 5 s → stalled; flat 10 s → a s
   assert.equal(stalls().length, 1);
   const first = stalls()[0];
   assert.equal(first.body, "stalled 5s: no token counter moved; last active idea/a 5s ago; no phase open");
-  assert.deepEqual(first.mentions, ["idea/*"]);
+  assert.deepEqual(first.mentions, ["idea/orchestrator"]);
   board.livenessTick(run.id, at(base, 7));
   board.livenessTick(run.id, at(base, 10));
   assert.equal(stalls().length, 1);
@@ -118,12 +118,37 @@ test("the stall rule: moves → nothing; flat 5 s → stalled; flat 10 s → a s
   board.livenessTick(run.id, at(base, 17));
   assert.equal(stalls().length, 3);
   assert.equal(stalls()[2].body, "stalled 5s: no token counter moved; last active idea/orchestrator 5s ago; phase diverge 0/2 done");
-  // every member and the orchestrator hear it, each told its next step
-  for (const p of [a, b, orchestrator]) assert.ok(board.deliver(p).full.some((m) => m.event === "stalled"), p.name);
+  // the orchestrator has it in full, told its next step; a seat sees it only as a line of a later deliver
+  assert.ok(board.deliver(orchestrator).full.some((m) => m.event === "stalled"));
+  for (const p of [a, b]) {
+    const d = board.deliver(p);
+    assert.ok(!d.full.some((m) => m.event === "stalled"), p.name);
+    assert.ok(d.lines.some((l) => /stalled/.test(l)), p.name);
+  }
   const m = board.read(stalls()[2].seq);
   assert.match(EVENTS.stalled.next!(m, orchestrator, "swarm")!, /^read the thread, then open the next phase .* or address the member who owes a move/);
-  assert.match(EVENTS.stalled.next!(m, a, "swarm")!, /^if the current phase asks something of you and you have not done it, do it now; else keep waiting/);
+  assert.equal(EVENTS.stalled.next!(m, a, "swarm"), null);
   assert.ok(!EVENTS.stalled.always);
+});
+
+test("stalled wakes the orchestrator's wait --mentions, never a seat's; its repeats count up while nothing moves", async () => {
+  const { run, a, orchestrator } = setup();
+  const base = Date.now() + 60_000;
+  counters.set("o.jsonl", 2).set("a.jsonl", 2);
+  board.livenessTick(run.id, at(base, 0));
+  // what was already for them (b's liveness warning, the joins) is had first
+  board.deliver(a);
+  board.deliver(orchestrator);
+  const seat = board.wait(a, { mentionsOnly: true, timeoutMs: 400 });
+  const orch = board.wait(orchestrator, { mentionsOnly: true, timeoutMs: 2000 });
+  for (const s of [5, 10, 15, 20]) board.livenessTick(run.id, at(base, s));
+  const [heardSeat, heardOrch] = await Promise.all([seat, orch]);
+  assert.deepEqual(heardSeat.full, [], "a seat is not woken by stalled");
+  assert.ok(heardOrch.full.some((m) => m.event === "stalled"));
+  assert.deepEqual(
+    stalls().map((e) => e.body.split(":")[0]),
+    ["stalled 5s", "stalled 10s", "stalled 15s", "stalled 20s"],
+  );
 });
 
 test("liveness warnings: no transcript at join, and a counter that stops reading, once per member and condition; unreadable counters are out of the rule", () => {

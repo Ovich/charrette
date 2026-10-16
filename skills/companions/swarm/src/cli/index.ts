@@ -14,6 +14,7 @@ import { registerBoardDocument } from "./aiview-document.ts";
 import { unclaimedLines } from "./unclaimed.ts";
 import { git } from "./git.ts";
 import { conflictsOf, headReflogLength } from "./conflicts.ts";
+import { readTranscript } from "../board/liveness.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
@@ -31,7 +32,7 @@ const USAGE = [
   "  phase   <name> <text> [--as <member>]                           # opens phase <name>; the current phase ends with it: a separator on the thread that wakes every member of the run (orchestrator)",
   "  done    <phase> [--as <member>]                                 # your part of the current phase is in: tells the orchestrator; when every member is done, the board tells it",
   "  close   --run <id>                                              # (orchestrator)",
-  '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # --slice <id> the same; prints the roster, then the command that starts your listener',
+  '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # --slice <id> the same; prints the roster, then how you listen: a seat waits in the foreground, a slice runner listens in the background',
   "          # --on <events>: what wakes your wait --mentions besides mentions and urgent posts, e.g. agreement,any:merged; else the seat row's on, else the kind's defaults",
   "  subscribe   [--as <member>] <events>                            # prints your subscriptions after",
   "  unsubscribe [--as <member>] <events>",
@@ -42,8 +43,9 @@ const USAGE = [
   "  read    <seq>",
   "  deliver [--as <member>]                                         # what you have not had: mentions in full, the rest one line",
   "  wait    [--as <member>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end; a newer wait supersedes it",
+  "          # once your run is closed, wait, deliver, read, roster --as, post, agree, endorse, doing and done answer: run <id> closed: run end …",
   "          # --mentions: only a mention of you, an urgent post or an event you subscribed to ends it; the rest stays for deliver",
-  "  roster  [--repo <path>]",
+  "  roster  [--repo <path>] [--as <member>]",
   "  end     [--as <member>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
   "  status                                                          # data home, open runs, each run's phase and its n/m done",
   "  config  retention [<days>]                                      # prints, or sets then prints, how many days closed runs and main's talk are kept",
@@ -101,6 +103,20 @@ const emit = (json: unknown, human: string | (() => void)): void => {
     if (human) console.log(human);
   } else human();
 };
+
+/** A `liveness` warning for a transcript `open` or `slice` registers, printed at once: a missing, empty or
+ *  unparseable file is no transcript (an empty task-output file is the usual mistake); null when it reads. */
+function transcriptWarning(member: string, file: string): string | null {
+  let size: number;
+  try {
+    size = fs.statSync(file).size;
+  } catch {
+    return `liveness: ${member}'s transcript ${file} does not exist: the stall check is blind for it; register the agent's own transcript`;
+  }
+  if (size === 0) return `liveness: ${member}'s transcript ${file} is empty: not a transcript, the stall check is blind for it; register the agent's own transcript, not its task output`;
+  if (!readTranscript(file, null)) return `liveness: ${member}'s transcript ${file} is in no known format: the stall check is blind for it; register the agent's own transcript`;
+  return null;
+}
 
 /** The repository (D29): its common git dir, so every worktree of one repository is one. */
 function repoOf(dir: string): string {
@@ -238,9 +254,27 @@ const shellWord = (w: string): string => (/^[\w@%+=:,./-]+$/.test(w) ? w : `"${w
  *  rule matches it; forward slashes, which Node takes on Windows too and no shell eats (D49). */
 const self = (): string[] => ["node", shellWord(process.argv[1].replace(/\\/g, "/"))];
 
-/** The line that starts a runner's listener: the exact command, --as included (D61). */
-const listenNow = (runner: string): string =>
-  `start your listener now, in the background (your harness's background task): ${[...self(), "wait", "--mentions", "--as", shellWord(runner)].join(" ")}`;
+/** How a member listens, the one source the docs point at: a seat waits in the foreground (a subagent
+ *  that ends its turn is gone, no background listener wakes it); the orchestrator and a slice runner
+ *  listen in the background while they work. */
+const listensInForeground = (p: Pick<Participant, "slice" | "kind">): boolean => p.slice !== "orchestrator" && profileOf(p.kind).member === "seat";
+const waitCommand = (name: string): string => [...self(), "wait", "--mentions", "--as", shellWord(name)].join(" ");
+/** The line that starts a member's listener: the exact command, --as included (D61). */
+const listenNow = (p: Pick<Participant, "name" | "slice" | "kind">): string =>
+  listensInForeground(p)
+    ? `wait now, in the foreground (never a background listener: a seat that ends its turn is gone): ${waitCommand(p.name)}`
+    : `start your listener now, in the background (your harness's background task): ${waitCommand(p.name)}`;
+
+/** A member whose run is closed (the close ended it): every member verb answers with this one line, exit 0. */
+const closedLine = (p: Participant): string =>
+  `run ${p.run} closed: run end and return your summary: ${[...self(), "end", "--as", shellWord(p.name)].join(" ")}`;
+/** True, having printed the closed line, when `p`'s run is closed: the verb writes nothing more. */
+const answeredClosed = (board: Board, p: Participant): boolean => {
+  if (board.runs().some((r) => r.id === p.run)) return false;
+  const line = closedLine(p);
+  emit({ run: p.run, closed: true, next: line }, line);
+  return true;
+};
 
 /** A verb's output, then the listener line when the caller has no `wait --mentions` pending and has
  *  not ended (D61), once per call; --json carries it as `next`. */
@@ -258,7 +292,7 @@ const unmatchedLines = (board: Board, p: Participant, body: string): string[] =>
 };
 
 const emitHeard = (p: Participant, json: object, human: string | (() => void)): void => {
-  const next = !p.ended && !p.listening ? listenNow(p.name) : null;
+  const next = !p.ended && !p.listening ? listenNow(p) : null;
   emit(next ? { ...json, next } : json, () => {
     if (typeof human === "string") console.log(human);
     else human();
@@ -419,15 +453,17 @@ async function main(board: Board): Promise<void> {
         ...(stallMs !== undefined ? { stallMs } : {}),
       });
       startPoller(run.id);
+      // a transcript that will not read, said now, naming the path
+      const warning = transcript ? transcriptWarning("orchestrator", path.resolve(transcript)) : null;
       // the person watches the project's board in aiview, pinned first (plan D17, D30, D39)
       const doc = registerBoardDocument({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run.repo });
       if (!doc.registered) {
         // the run is open all the same; swarm has no page of its own (companions-merge D13)
         console.error(`swarm: ${doc.reason}: the run is open; its board is read in aiview once aiview is installed and knows this project`);
-        emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url: null }, String(run.id));
+        emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url: null, ...(warning ? { warning } : {}) }, [String(run.id), warning].filter(Boolean).join("\n"));
         break;
       }
-      emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url: doc.url }, `${run.id}\n${doc.url}`);
+      emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url: doc.url, ...(warning ? { warning } : {}) }, [String(run.id), doc.url, warning].filter(Boolean).join("\n"));
       break;
     }
     case "slice": {
@@ -455,8 +491,14 @@ async function main(board: Board): Promise<void> {
       if (state !== undefined) board.setSliceState(run, id, state);
       // the dispatched member's transcript: its token counter, read for the stall check
       const liveness = transcript !== undefined ? board.registerTranscript(run, id, path.resolve(transcript)) : undefined;
-      const said = [state !== undefined ? `${id} ${state}` : null, liveness ? `${id} transcript ${liveness.state === "ok" ? `read, ${liveness.tokens} tokens` : "not readable yet: the board warned on the thread"}` : null];
-      emit({ run, slice: id, ...(state !== undefined ? { state } : {}), ...(liveness ? { liveness } : {}) }, said.filter(Boolean).join("\n"));
+      // a transcript that will not read, said now, naming the path
+      const warning = transcript !== undefined ? transcriptWarning(id, path.resolve(transcript)) : null;
+      const said = [
+        state !== undefined ? `${id} ${state}` : null,
+        liveness && !warning ? `${id} transcript ${liveness.state === "ok" ? `read, ${liveness.tokens} tokens` : "not readable yet: the board warned on the thread"}` : null,
+        warning,
+      ];
+      emit({ run, slice: id, ...(state !== undefined ? { state } : {}), ...(liveness ? { liveness } : {}), ...(warning ? { warning } : {}) }, said.filter(Boolean).join("\n"));
       break;
     }
     case "close": {
@@ -484,6 +526,7 @@ ${USAGE}`);
     }
     case "done": {
       const p = caller(board);
+      if (answeredClosed(board, p)) break;
       const name = args.positional[0] ?? fail(`done: which phase?\n${USAGE}`);
       const r = board.done(p, name);
       // the member's next step (rule 10): wait for the next phase
@@ -532,7 +575,7 @@ ${USAGE}`);
         ...(args.flag("--on") !== undefined ? { on: subscriptionsArg(args.flag("--on")!) } : {}),
       });
       // the runner's next step, last: its listener, started at once (D61)
-      const next = listenNow(runner.name);
+      const next = listenNow(runner);
       // a kind without worktree: the checkout is shared, so every call names the member (D21, D36)
       const shared = !profileOf(runner.kind).worktree;
       const as = shared ? `pass --as ${runner.name} on every call: this checkout is shared, the board cannot tell you apart` : null;
@@ -562,6 +605,7 @@ ${USAGE}`);
     }
     case "doing": {
       const p = caller(board);
+      if (answeredClosed(board, p)) break;
       const text = args.positional.join(" ") || fail("doing: what?");
       board.setDoing(p, text);
       emitHeard(p, { runner: p.name, doing: text }, `${p.name} doing: ${text}`);
@@ -570,6 +614,7 @@ ${USAGE}`);
     case "post":
     case "agree": {
       const p = caller(board);
+      if (answeredClosed(board, p)) break;
       const body = args.positional.join(" ") || fail(`${args.verb}: nothing to say`);
       const m = board.post(p, body, {
         about: aboutArg(),
@@ -586,6 +631,7 @@ ${USAGE}`);
     }
     case "endorse": {
       const p = caller(board);
+      if (answeredClosed(board, p)) break;
       const raw = (args.positional[0] ?? fail("endorse: which seq?")).replace(/^#/, "");
       const seq = Number(raw);
       if (!Number.isInteger(seq)) fail(`endorse takes a seq, got ${raw}`);
@@ -604,6 +650,7 @@ ${USAGE}`);
       } catch (e) {
         if (!(e instanceof CliError)) throw e;
       }
+      if (by && answeredClosed(board, by)) break;
       const m = board.read(seq, by);
       // the phase the message's run is in, first (the caller's run when one is known)
       const phase = phaseHeader(board, by?.run ?? m.run);
@@ -615,6 +662,7 @@ ${USAGE}`);
     }
     case "deliver": {
       const me = caller(board);
+      if (answeredClosed(board, me)) break;
       const d = withNext(me, board.deliver(me));
       // the run's phase heads every delivery that carries something
       const phase = d.full.length || d.lines.length ? phaseHeader(board, me.run) : null;
@@ -626,6 +674,7 @@ ${USAGE}`);
     }
     case "wait": {
       const p = caller(board);
+      if (answeredClosed(board, p)) break;
       const raw = args.flag("--timeout");
       const timeout = raw === undefined ? undefined : Number(raw);
       if (timeout !== undefined && !(timeout >= 0)) fail(`--timeout takes milliseconds, got ${raw}`);
@@ -633,6 +682,8 @@ ${USAGE}`);
       // a run whose members all wait still gets its quiet and stale events: the wait keeps the upkeep going
       const upkeepTicks = setInterval(() => boardUpkeep(board), WAIT_UPKEEP_TICK_MS);
       const d = withNext(p, await board.wait(p, { timeoutMs: timeout, mentionsOnly }).finally(() => clearInterval(upkeepTicks)));
+      // the run closed while this wait was pending: the close ended the member
+      if (answeredClosed(board, p)) break;
       if (d.superseded) {
         emit(d, "superseded by a newer wait"); // a newer wait of this runner gets what arrives (D64)
         break;
@@ -647,7 +698,11 @@ ${USAGE}`);
       if (args.flag("--as")) again.push("--as", shellWord(args.flag("--as")!));
       if (raw !== undefined) again.push("--timeout", raw);
       if (asJson) again.push("--json");
-      const next = `answer on the thread if needed, then start this listener again, in the background while you work, in the foreground when you are waiting: ${again.join(" ")}`;
+      const next = listensInForeground(p)
+        ? `answer on the thread if needed, then wait again, in the foreground: ${again.join(" ")}`
+        : p.slice === "orchestrator"
+          ? `act on it, then start this listener again, in the background: ${again.join(" ")}`
+          : `answer on the thread if needed, then start this listener again, in the background while you work, in the foreground when you are waiting: ${again.join(" ")}`;
       // the run's phase first, so a member always knows which phase it answers in
       const phase = phaseHeader(board, p.run);
       emit({ phase, next, ...d }, () => {
@@ -658,6 +713,8 @@ ${USAGE}`);
       break;
     }
     case "roster": {
+      // a member asking (--as) learns its run closed
+      if (args.flag("--as") && answeredClosed(board, caller(board))) break;
       const repo = repoOf(path.resolve(args.flag("--repo") ?? process.cwd()));
       const roster = board.roster(repo);
       // each run's title and phase above its members

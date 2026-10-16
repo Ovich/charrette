@@ -15,23 +15,20 @@ roster): work the phase it names, never one you remember. You run
 nothing of you, then wait as its answer says; you may post
 `@orchestrator back <phase>: <reason>` when a later phase shows an earlier one wrong.
 
-**`stalled` wakes you**: no member's token counter moved for the run's threshold. If the
-current phase asks something of you and you have not done it, do it now; else keep waiting.
-The line it ends on says the same.
-
 **Every call passes `--as <group>/<seat>`**, as your brief gives it; you have no worktree to be
 found by. **Run the line the previous command printed**; never compose a command the CLI could
 have printed you.
 
 **You never end your turn while the run is open**, and you never write the brainstorm board.
-A seat that ends its turn is not woken by its listener: it is gone.
+**You wait in the foreground, never with a background listener**: a seat that ends its turn is
+gone, and nothing wakes it. How to wait is the line the CLI prints; read it and run it.
 
 ## The checklist
 
 1. **Run the join line your brief gives, before anything else.** Read the roster it prints and
    your funny name.
-2. **Start the listener line `join` printed, in the background** (your harness's background
-   task).
+2. **Keep the wait line `join` printed last**: it is how you wait, in the foreground, whenever
+   you have nothing to do (step 9).
 3. **Read your role and the open questions**: your row in the strategy section of the
    brainstorm board, and its decisions rows, through the `aiview` skill.
 4. **Post per question**: `$S post "<your position>" --about D<n> --as <group>/<seat>`. **Posts
@@ -61,18 +58,18 @@ A seat that ends its turn is not woken by its listener: it is gone.
    `$S agree "<terms> because <reason>" --about D<n> --as <group>/<seat>`, naming the post
    `#<seq>` of the diagram when one carries it.
 6. **As the skeptic**, your seats row subscribes you to `agreement`, so every agreement of the
-   run wakes your listener, mentioned or not. An agreement reaching you ends on its line `back it: … endorse <seq>
+   run wakes your wait, mentioned or not. An agreement reaching you ends on its line `back it: … endorse <seq>
    --as …`: run that line only when its reason holds; otherwise post the objection,
    `--about D<n>`.
 7. **A new question**: `$S post "@orchestrator new question: …" --as <group>/<seat>`.
 8. **A mention from the orchestrator** (a relay from the person, a ruling, an interrupt) is
    acted on first.
-9. **The listener ended**: read its output; its first line is the command that re-arms it. Act,
-   then run that line again in the background.
-10. **Nothing to do**: `$S wait --mentions --as <group>/<seat>` in the **foreground**. It returns
-    with the message: act as in step 9. Empty: run it again. Never end your turn to wait.
-11. **The orchestrator closes the run, or mentions you to stop**: `$S end --as <group>/<seat>`,
-    then return your positions, the agreements you made or endorsed, and what you left open.
+9. **Nothing to do**: `$S wait --mentions --as <group>/<seat>` in the **foreground**. It returns
+   with the message, after the line that waits again: act, then run that line. Empty: run it
+   again. Never end your turn to wait.
+10. **The run is closed**: any call answers `run <id> closed: run end and return your summary:
+    <command>`. Run that command, then return your positions, the agreements you made or
+    endorsed, and what you left open. The same when the orchestrator mentions you to stop.
 
 ## Along the way
 
@@ -81,8 +78,8 @@ A seat that ends its turn is not woken by its listener: it is gone.
 - **`$S deliver --as <group>/<seat>`** gives what you have not had; `$S read <n> --as
   <group>/<seat>` a message in full.
 - **`$S roster --as <group>/<seat>`** for who sits where, and what wakes each.
-- **What wakes your `wait --mentions`**: a mention, an urgent post, and the events you are
-  subscribed to (your seats row's `on`, or `join --on`). Change them with
+- **What wakes your `wait --mentions`**: a mention, an urgent post, a phase, and the events you are
+  subscribed to; never `stalled`, which is the orchestrator's, read in a later `deliver` (your seats row's `on`, or `join --on`). Change them with
   `$S subscribe <events> --as <group>/<seat>` or `unsubscribe`; `$S --help` lists the events,
   `any:<event>` for one of any run, a plain `<event>` your own run's.
 - **Talk across runs** is a mention: `@<CODE>` a run, `@<CODE>·<id>` one of its members.

@@ -669,7 +669,8 @@ test("a seat joining from the shared checkout is told its --as and its next comm
     assert.ok(lines.some((l) => l.includes(` ${verb} `) && l.includes("--as idea/architect")), `${verb} line with --as`);
   }
   assert.doesNotMatch(r.stdout, /--slice/);
-  assert.match(lines.at(-1)!, /^start your listener now.* wait --mentions --as idea\/architect$/);
+  // a seat waits in the foreground, never a background listener
+  assert.match(lines.at(-1)!, /^wait now, in the foreground \(never a background listener.* wait --mentions --as idea\/architect$/);
   const json = JSON.parse(run("join", "--run", String(id), "--seat", "skeptic", "--doing", "doubting", "--json").stdout);
   assert.equal(json.as, "idea/skeptic");
   assert.equal(json.commands.length, 4);
@@ -947,6 +948,64 @@ test("end on an ended member, or on a closed run, exits 0 and says nothing", () 
   assert.deepEqual([closed.status, closed.stdout, closed.stderr], [0, "", ""]);
 });
 
+test("once its run is closed, a member's wait, deliver, read, roster, post and done answer the one closed line, exit 0, and write nothing", () => {
+  const id = openBrainstorm();
+  assert.equal(joinSeat(id, "architect").status, 0);
+  const seq = seqOf(run("post", "a thought", "--as", "idea/architect").stdout);
+  run("close", "--run", String(id));
+  const line = new RegExp(`^run ${id} closed: run end and return your summary: node .* end --as idea/architect$`);
+  const calls = [
+    ["wait", "--mentions", "--timeout", "5000"],
+    ["wait", "--timeout", "5000"],
+    ["deliver"],
+    ["read", seq],
+    ["roster"],
+    ["post", "still here?"],
+    ["agree", "terms"],
+    ["done", "diverge"],
+  ];
+  for (const argv of calls) {
+    const r = run(...argv, "--as", "idea/architect");
+    assert.equal(r.status, 0, `${argv[0]}: ${r.stderr}`);
+    assert.match(r.stdout.trimEnd(), line, argv.join(" "));
+    assert.equal(r.stdout.trimEnd().split("\n").length, 1, argv.join(" "));
+  }
+  const json = JSON.parse(run("deliver", "--as", "idea/architect", "--json").stdout);
+  assert.deepEqual([json.closed, json.run], [true, id]);
+  // the refused post was never written
+  for (const n of [1, 2, 3]) assert.doesNotMatch(run("read", String(Number(seq) + n)).stdout, /still here\?|terms/);
+});
+
+test("a wait pending when its run closes returns the closed line, exit 0", async () => {
+  const id = openBrainstorm();
+  assert.equal(joinSeat(id, "architect").status, 0);
+  run("deliver", "--as", "idea/architect");
+  const child = spawn(process.execPath, [CLI, "wait", "--mentions", "--as", "idea/architect", "--timeout", "15000"], { cwd: repo, env: env() });
+  let out = "";
+  child.stdout.on("data", (b) => (out += b));
+  const exited = new Promise<number | null>((resolve) => child.on("exit", resolve));
+  await new Promise((r) => setTimeout(r, 1500)); // the child is up and listening
+  run("close", "--run", String(id));
+  assert.equal(await exited, 0);
+  assert.match(out.trimEnd(), new RegExp(`^run ${id} closed: run end and return your summary: node .* end --as idea/architect$`));
+});
+
+test("how a member listens: a seat's wait re-arms in the foreground, the orchestrator's and a runner's in the background", () => {
+  const id = openBrainstorm();
+  assert.equal(joinSeat(id, "architect").status, 0);
+  run("deliver", "--as", "idea/architect");
+  run("deliver", "--as", "idea/orchestrator");
+  run("post", "@architect a question", "--as", "idea/orchestrator");
+  const seat = run("wait", "--mentions", "--as", "idea/architect", "--timeout", "3000").stdout;
+  assert.match(seat, /then wait again, in the foreground: node .* wait --mentions --as idea\/architect/);
+  assert.doesNotMatch(seat, /background/);
+  run("post", "@orchestrator an answer", "--as", "idea/architect");
+  const orch = run("wait", "--mentions", "--as", "idea/orchestrator", "--timeout", "3000").stdout;
+  assert.match(orch, /start this listener again, in the background: node .* wait --mentions --as idea\/orchestrator/);
+  const runner = run("join", "--run", String(openRun()), "--slice", "S3", "--doing", "x").stdout.trimEnd().split("\n");
+  assert.match(runner.at(-1)!, /^start your listener now, in the background/);
+});
+
 test("transcripts: open --transcript, slice --transcript after dispatch, the seats file's; none or unreadable warns once on the thread", () => {
   const good = path.join(toolRoot, "good.jsonl");
   fs.writeFileSync(good, JSON.stringify({ type: "assistant", message: { usage: { input_tokens: 3, output_tokens: 4, cache_creation_input_tokens: 0, cache_read_input_tokens: 5 } } }) + "\n");
@@ -964,13 +1023,33 @@ test("transcripts: open --transcript, slice --transcript after dispatch, the sea
   fs.writeFileSync(bad, "not json\n");
   const r = run("slice", "b", "--run", String(id), "--transcript", bad);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /b transcript not readable yet/);
+  // said at once, naming the path
+  assert.ok(r.stdout.includes(`liveness: b's transcript ${bad} is in no known format`), r.stdout);
   run("slice", "b", "--run", String(id), "--transcript", bad);
   const twice = run("deliver", "--as", "idea/orchestrator").stdout.match(/liveness: no readable transcript for idea\/b/g) ?? [];
   assert.equal(twice.length, 1, "once per member and condition");
   const ok = JSON.parse(run("slice", "b", "--run", String(id), "--transcript", good, "--json").stdout);
   assert.deepEqual([ok.liveness.state, ok.liveness.tokens], ["ok", 12]);
   assert.match(run("--help").stdout, /--transcript <path>/);
+});
+
+test("an empty transcript (a task-output file) is warned of at once by open and slice, naming the path; a good one is not", () => {
+  const empty = path.join(toolRoot, "task.output");
+  fs.writeFileSync(empty, "");
+  const seats = path.join(toolRoot, "seats.json");
+  fs.writeFileSync(seats, SEATS);
+  const opened = run("open", "--kind", "brainstorm", "--group", "idea", "--title", "I", "--seats", seats, "--transcript", empty);
+  assert.equal(opened.status, 0, opened.stderr);
+  const id = Number(opened.stdout.split("\n")[0]);
+  assert.ok(opened.stdout.includes(`liveness: orchestrator's transcript ${empty} is empty`), opened.stdout);
+  const r = run("slice", "architect", "--run", String(id), "--transcript", empty, "--json");
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(JSON.parse(r.stdout).warning.includes(`${empty} is empty`));
+  const missing = path.join(toolRoot, "none.jsonl");
+  assert.ok(run("slice", "architect", "--run", String(id), "--transcript", missing).stdout.includes(`${missing} does not exist`));
+  const good = path.join(toolRoot, "good.jsonl");
+  fs.writeFileSync(good, JSON.stringify({ type: "assistant", message: { usage: { output_tokens: 1 } } }) + "\n");
+  assert.doesNotMatch(run("slice", "architect", "--run", String(id), "--transcript", good).stdout, /liveness/);
 });
 
 test("open starts the run's poller, its pid in the data home; close stops it", async () => {

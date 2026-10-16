@@ -137,11 +137,12 @@ var EVENTS = {
     next: (m, me, cli) => me.slice === "orchestrator" ? `open the next phase: ${cli} phase <name> "<text>" --as ${word(me.name)}; after the last, ${cli} close --run ${m.run}` : null
   },
   // no readable token counter of the run moved for the run's stall threshold, posted again at each
-  // further threshold of silence; mentions `<group>/*`, the orchestrator included
+  // further threshold of silence; mentions the orchestrator alone: a seat woken by it would move its
+  // counter and feed the next one; the members read it in a later deliver
   stalled: {
     name: "stalled",
     toAuthor: true,
-    next: (_m, me, cli) => me.slice === "orchestrator" ? `read the thread, then open the next phase (${cli} phase <name> "<text>" --as ${word(me.name)}) or address the member who owes a move (${cli} post "@<member> <what you need>" --as ${word(me.name)})` : `if the current phase asks something of you and you have not done it, do it now; else keep waiting: ${cli} wait --mentions --as ${word(me.name)}`
+    next: (_m, me, cli) => me.slice === "orchestrator" ? `read the thread, then open the next phase (${cli} phase <name> "<text>" --as ${word(me.name)}) or address the member who owes a move (${cli} post "@<member> <what you need>" --as ${word(me.name)})` : null
   },
   // a member's transcript cannot be read: the stall check is blind for it; mentions the orchestrator
   liveness: { name: "liveness", toAuthor: true },
@@ -2076,7 +2077,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
         const secs = Math.floor(silence / 1e3);
         const progress = progressOf(run2, r.phase == null ? null : String(r.phase));
         const where = progress ? `phase ${progress.phase} ${progress.done}/${progress.of} done` : "no phase open";
-        insertMessage(orch, `stalled ${secs}s: no token counter moved; last active ${orch.plan}/${last.member} ${secs}s ago; ${where}`, null, "event", [`${orch.plan}/*`], {
+        insertMessage(orch, `stalled ${secs}s: no token counter moved; last active ${orch.plan}/${last.member} ${secs}s ago; ${where}`, null, "event", [orch.name], {
           event: EVENTS.stalled.name
         });
         db.prepare("UPDATE runs SET stall_posts = ? WHERE id = ?").run(Math.floor(silence / threshold), run2);
@@ -2611,7 +2612,7 @@ var USAGE = [
   "  phase   <name> <text> [--as <member>]                           # opens phase <name>; the current phase ends with it: a separator on the thread that wakes every member of the run (orchestrator)",
   "  done    <phase> [--as <member>]                                 # your part of the current phase is in: tells the orchestrator; when every member is done, the board tells it",
   "  close   --run <id>                                              # (orchestrator)",
-  '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,\u2026"]   # --slice <id> the same; prints the roster, then the command that starts your listener',
+  '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,\u2026"]   # --slice <id> the same; prints the roster, then how you listen: a seat waits in the foreground, a slice runner listens in the background',
   "          # --on <events>: what wakes your wait --mentions besides mentions and urgent posts, e.g. agreement,any:merged; else the seat row's on, else the kind's defaults",
   "  subscribe   [--as <member>] <events>                            # prints your subscriptions after",
   "  unsubscribe [--as <member>] <events>",
@@ -2622,8 +2623,9 @@ var USAGE = [
   "  read    <seq>",
   "  deliver [--as <member>]                                         # what you have not had: mentions in full, the rest one line",
   "  wait    [--as <member>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end; a newer wait supersedes it",
+  "          # once your run is closed, wait, deliver, read, roster --as, post, agree, endorse, doing and done answer: run <id> closed: run end \u2026",
   "          # --mentions: only a mention of you, an urgent post or an event you subscribed to ends it; the rest stays for deliver",
-  "  roster  [--repo <path>]",
+  "  roster  [--repo <path>] [--as <member>]",
   "  end     [--as <member>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
   "  status                                                          # data home, open runs, each run's phase and its n/m done",
   "  config  retention [<days>]                                      # prints, or sets then prints, how many days closed runs and main's talk are kept",
@@ -2665,6 +2667,17 @@ var emit = (json, human) => {
     if (human) console.log(human);
   } else human();
 };
+function transcriptWarning(member, file) {
+  let size;
+  try {
+    size = fs4.statSync(file).size;
+  } catch {
+    return `liveness: ${member}'s transcript ${file} does not exist: the stall check is blind for it; register the agent's own transcript`;
+  }
+  if (size === 0) return `liveness: ${member}'s transcript ${file} is empty: not a transcript, the stall check is blind for it; register the agent's own transcript, not its task output`;
+  if (!readTranscript(file, null)) return `liveness: ${member}'s transcript ${file} is in no known format: the stall check is blind for it; register the agent's own transcript`;
+  return null;
+}
 function repoOf(dir) {
   const common = git(dir, "rev-parse", "--git-common-dir");
   if (!common) fail(`not in a git repository: ${dir}`);
@@ -2766,7 +2779,16 @@ var printDelivery = (d) => {
 };
 var shellWord = (w) => /^[\w@%+=:,./-]+$/.test(w) ? w : `"${w.replace(/(["\\$`])/g, "\\$1")}"`;
 var self = () => ["node", shellWord(process.argv[1].replace(/\\/g, "/"))];
-var listenNow = (runner) => `start your listener now, in the background (your harness's background task): ${[...self(), "wait", "--mentions", "--as", shellWord(runner)].join(" ")}`;
+var listensInForeground = (p) => p.slice !== "orchestrator" && profileOf(p.kind).member === "seat";
+var waitCommand = (name) => [...self(), "wait", "--mentions", "--as", shellWord(name)].join(" ");
+var listenNow = (p) => listensInForeground(p) ? `wait now, in the foreground (never a background listener: a seat that ends its turn is gone): ${waitCommand(p.name)}` : `start your listener now, in the background (your harness's background task): ${waitCommand(p.name)}`;
+var closedLine = (p) => `run ${p.run} closed: run end and return your summary: ${[...self(), "end", "--as", shellWord(p.name)].join(" ")}`;
+var answeredClosed = (board, p) => {
+  if (board.runs().some((r) => r.id === p.run)) return false;
+  const line = closedLine(p);
+  emit({ run: p.run, closed: true, next: line }, line);
+  return true;
+};
 var unmatchedLines = (board, p, body) => {
   const roster = board.roster(p.repo);
   const runners = roster.filter((r) => r.slice !== "orchestrator");
@@ -2779,7 +2801,7 @@ var unmatchedLines = (board, p, body) => {
   });
 };
 var emitHeard = (p, json, human) => {
-  const next = !p.ended && !p.listening ? listenNow(p.name) : null;
+  const next = !p.ended && !p.listening ? listenNow(p) : null;
   emit(next ? { ...json, next } : json, () => {
     if (typeof human === "string") console.log(human);
     else human();
@@ -2917,14 +2939,14 @@ ${USAGE}`);
         ...stallMs !== void 0 ? { stallMs } : {}
       });
       startPoller(run2.id);
+      const warning = transcript ? transcriptWarning("orchestrator", path4.resolve(transcript)) : null;
       const doc = registerBoardDocument({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run2.repo });
       if (!doc.registered) {
         console.error(`swarm: ${doc.reason}: the run is open; its board is read in aiview once aiview is installed and knows this project`);
-        emit({ run: run2.id, repo: run2.repo, kind: run2.kind, group: run2.group, plan: run2.plan, url: null }, String(run2.id));
+        emit({ run: run2.id, repo: run2.repo, kind: run2.kind, group: run2.group, plan: run2.plan, url: null, ...warning ? { warning } : {} }, [String(run2.id), warning].filter(Boolean).join("\n"));
         break;
       }
-      emit({ run: run2.id, repo: run2.repo, kind: run2.kind, group: run2.group, plan: run2.plan, url: doc.url }, `${run2.id}
-${doc.url}`);
+      emit({ run: run2.id, repo: run2.repo, kind: run2.kind, group: run2.group, plan: run2.plan, url: doc.url, ...warning ? { warning } : {} }, [String(run2.id), doc.url, warning].filter(Boolean).join("\n"));
       break;
     }
     case "slice": {
@@ -2953,8 +2975,13 @@ ${USAGE}`);
       const state = transcript === void 0 ? need("--state") : args.flag("--state");
       if (state !== void 0) board.setSliceState(run2, id, state);
       const liveness = transcript !== void 0 ? board.registerTranscript(run2, id, path4.resolve(transcript)) : void 0;
-      const said = [state !== void 0 ? `${id} ${state}` : null, liveness ? `${id} transcript ${liveness.state === "ok" ? `read, ${liveness.tokens} tokens` : "not readable yet: the board warned on the thread"}` : null];
-      emit({ run: run2, slice: id, ...state !== void 0 ? { state } : {}, ...liveness ? { liveness } : {} }, said.filter(Boolean).join("\n"));
+      const warning = transcript !== void 0 ? transcriptWarning(id, path4.resolve(transcript)) : null;
+      const said = [
+        state !== void 0 ? `${id} ${state}` : null,
+        liveness && !warning ? `${id} transcript ${liveness.state === "ok" ? `read, ${liveness.tokens} tokens` : "not readable yet: the board warned on the thread"}` : null,
+        warning
+      ];
+      emit({ run: run2, slice: id, ...state !== void 0 ? { state } : {}, ...liveness ? { liveness } : {}, ...warning ? { warning } : {} }, said.filter(Boolean).join("\n"));
       break;
     }
     case "close": {
@@ -2981,6 +3008,7 @@ ${USAGE}`);
     }
     case "done": {
       const p = caller(board);
+      if (answeredClosed(board, p)) break;
       const name = args.positional[0] ?? fail(`done: which phase?
 ${USAGE}`);
       const r = board.done(p, name);
@@ -3026,7 +3054,7 @@ ${USAGE}`);
         worktree: worktreeOf(process.cwd()) ?? void 0,
         ...args.flag("--on") !== void 0 ? { on: subscriptionsArg(args.flag("--on")) } : {}
       });
-      const next = listenNow(runner.name);
+      const next = listenNow(runner);
       const shared = !profileOf(runner.kind).worktree;
       const as = shared ? `pass --as ${runner.name} on every call: this checkout is shared, the board cannot tell you apart` : null;
       const commands = shared ? seatCommands(runner.name) : null;
@@ -3053,6 +3081,7 @@ ${USAGE}`);
     }
     case "doing": {
       const p = caller(board);
+      if (answeredClosed(board, p)) break;
       const text = args.positional.join(" ") || fail("doing: what?");
       board.setDoing(p, text);
       emitHeard(p, { runner: p.name, doing: text }, `${p.name} doing: ${text}`);
@@ -3061,6 +3090,7 @@ ${USAGE}`);
     case "post":
     case "agree": {
       const p = caller(board);
+      if (answeredClosed(board, p)) break;
       const body = args.positional.join(" ") || fail(`${args.verb}: nothing to say`);
       const m = board.post(p, body, {
         about: aboutArg(),
@@ -3076,6 +3106,7 @@ ${USAGE}`);
     }
     case "endorse": {
       const p = caller(board);
+      if (answeredClosed(board, p)) break;
       const raw = (args.positional[0] ?? fail("endorse: which seq?")).replace(/^#/, "");
       const seq = Number(raw);
       if (!Number.isInteger(seq)) fail(`endorse takes a seq, got ${raw}`);
@@ -3093,6 +3124,7 @@ ${USAGE}`);
       } catch (e) {
         if (!(e instanceof CliError)) throw e;
       }
+      if (by && answeredClosed(board, by)) break;
       const m = board.read(seq, by);
       const phase = phaseHeader(board, by?.run ?? m.run);
       emit({ ...m, phase }, () => {
@@ -3103,6 +3135,7 @@ ${USAGE}`);
     }
     case "deliver": {
       const me = caller(board);
+      if (answeredClosed(board, me)) break;
       const d = withNext(me, board.deliver(me));
       const phase = d.full.length || d.lines.length ? phaseHeader(board, me.run) : null;
       emit({ phase, ...d }, () => {
@@ -3113,12 +3146,14 @@ ${USAGE}`);
     }
     case "wait": {
       const p = caller(board);
+      if (answeredClosed(board, p)) break;
       const raw = args.flag("--timeout");
       const timeout = raw === void 0 ? void 0 : Number(raw);
       if (timeout !== void 0 && !(timeout >= 0)) fail(`--timeout takes milliseconds, got ${raw}`);
       const mentionsOnly = args.has("--mentions");
       const upkeepTicks = setInterval(() => boardUpkeep(board), WAIT_UPKEEP_TICK_MS);
       const d = withNext(p, await board.wait(p, { timeoutMs: timeout, mentionsOnly }).finally(() => clearInterval(upkeepTicks)));
+      if (answeredClosed(board, p)) break;
       if (d.superseded) {
         emit(d, "superseded by a newer wait");
         break;
@@ -3132,7 +3167,7 @@ ${USAGE}`);
       if (args.flag("--as")) again.push("--as", shellWord(args.flag("--as")));
       if (raw !== void 0) again.push("--timeout", raw);
       if (asJson) again.push("--json");
-      const next = `answer on the thread if needed, then start this listener again, in the background while you work, in the foreground when you are waiting: ${again.join(" ")}`;
+      const next = listensInForeground(p) ? `answer on the thread if needed, then wait again, in the foreground: ${again.join(" ")}` : p.slice === "orchestrator" ? `act on it, then start this listener again, in the background: ${again.join(" ")}` : `answer on the thread if needed, then start this listener again, in the background while you work, in the foreground when you are waiting: ${again.join(" ")}`;
       const phase = phaseHeader(board, p.run);
       emit({ phase, next, ...d }, () => {
         if (phase) console.log(phase);
@@ -3142,6 +3177,7 @@ ${USAGE}`);
       break;
     }
     case "roster": {
+      if (args.flag("--as") && answeredClosed(board, caller(board))) break;
       const repo = repoOf(path4.resolve(args.flag("--repo") ?? process.cwd()));
       const roster = board.roster(repo);
       const runs = new Map(board.runs().filter((r) => r.repo === repo).map((r) => [r.id, r]));

@@ -39,16 +39,25 @@ except `open`, `slice`, `close` and `status`.
    session's transcript file; a seats row may carry its member's as `transcript`.
    `--stall-ms <ms>` sets the run's threshold, default 5000. A member with no readable
    transcript is named on the thread by a `liveness` event: the stall check is blind for it.
+   `open` and `slice --transcript` print a `liveness` line at once, naming the path, when the
+   file is missing, empty or unparseable: register the right one again.
+4. **The transcript paths, as the Claude Code adapter reads them**:
+   - **Yours**: `~/.claude/projects/<project-slug>/<session-id>.jsonl`.
+   - **A dispatched subagent's**:
+     `~/.claude/projects/<project-slug>/<session-id>/subagents/agent-<agentId>.jsonl`, the
+     `agentId` the `Agent` call returns. **Never the `tasks/<id>.output` file** the `Agent`
+     tool names: it stays empty, and the stall check would be blind.
 
 ## Dispatch
 
 **The `orchestrate` skill dispatches.** For a kind without worktree, no `isolation`, and each
-brief carries `--as <group>/<seat>` and the join line; a seat runs on the plugin's
+brief carries `--as <group>/<seat>` and the join line, whose answer tells the seat how it
+waits: in the foreground, never with a background listener; a seat runs on the plugin's
 `seat-runner` agent, as the `workshop` skill says.
 
 **After each dispatch, register the member's transcript**: `$S slice <id> --run <run>
---transcript <path>`, the path your harness gives for the dispatched agent's transcript. Its
-answer says whether the board reads it.
+--transcript <path>`, the dispatched agent's own transcript (step 4 of the open). Its answer
+says whether the board reads it.
 
 ## Slice states
 
@@ -63,12 +72,15 @@ answer says whether the board reads it.
 ## Watching the thread
 
 - **Listen in the background from the open**: `$S wait --mentions --as <group>/orchestrator`,
-  started with the harness's background-task feature. Your subscriptions (a runner's `merged`
+  started with the harness's background-task feature; you are not a subagent, its end reaches
+  you. The answers of `phase` and of your `wait` print this step: read them. Your subscriptions (a runner's `merged`
   and `ended`, `stale`), every `done`, `stalled` and `liveness` event and every mention of
   you wake it. When it ends, read its output, act, and start again the command its first line
   names; empty, start it again. `close` makes it return.
 - **`stalled` means act now**: no token counter of the run moved for the threshold, and it is
-  posted again at each further threshold until one moves. The line it ends on is your step.
+  posted again at each further threshold until one moves (`stalled 5s`, `10s`, `15s`…). It
+  wakes you alone: the seats read it only in a later `deliver`, so their reading it does not
+  reset the silence. The line it ends on is your step.
 - **A `merged` event is a slice to check**: re-run its check on the branch it merged into then,
   not when the runner's report arrives; the report adds what it found.
 - **`$S deliver --as <plan>/orchestrator`** between other work: what was said since, mentions of
@@ -104,4 +116,5 @@ runner, which joins the same slice.
 ## Close
 
 **`$S close --run <run>`** once every slice is done, or the brainstorm concluded; it archives
-the run's posts.
+the run's posts. A member's pending `wait`, and any call it makes after, answers with the
+`end` command to run and the summary to return.

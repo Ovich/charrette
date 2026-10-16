@@ -9111,11 +9111,12 @@ var init_events = __esm({
         next: (m, me, cli) => me.slice === "orchestrator" ? `open the next phase: ${cli} phase <name> "<text>" --as ${word(me.name)}; after the last, ${cli} close --run ${m.run}` : null
       },
       // no readable token counter of the run moved for the run's stall threshold, posted again at each
-      // further threshold of silence; mentions `<group>/*`, the orchestrator included
+      // further threshold of silence; mentions the orchestrator alone: a seat woken by it would move its
+      // counter and feed the next one; the members read it in a later deliver
       stalled: {
         name: "stalled",
         toAuthor: true,
-        next: (_m, me, cli) => me.slice === "orchestrator" ? `read the thread, then open the next phase (${cli} phase <name> "<text>" --as ${word(me.name)}) or address the member who owes a move (${cli} post "@<member> <what you need>" --as ${word(me.name)})` : `if the current phase asks something of you and you have not done it, do it now; else keep waiting: ${cli} wait --mentions --as ${word(me.name)}`
+        next: (_m, me, cli) => me.slice === "orchestrator" ? `read the thread, then open the next phase (${cli} phase <name> "<text>" --as ${word(me.name)}) or address the member who owes a move (${cli} post "@<member> <what you need>" --as ${word(me.name)})` : null
       },
       // a member's transcript cannot be read: the stall check is blind for it; mentions the orchestrator
       liveness: { name: "liveness", toAuthor: true },
@@ -11041,7 +11042,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
         const secs = Math.floor(silence / 1e3);
         const progress = progressOf(run2, r.phase == null ? null : String(r.phase));
         const where = progress ? `phase ${progress.phase} ${progress.done}/${progress.of} done` : "no phase open";
-        insertMessage(orch, `stalled ${secs}s: no token counter moved; last active ${orch.plan}/${last.member} ${secs}s ago; ${where}`, null, "event", [`${orch.plan}/*`], {
+        insertMessage(orch, `stalled ${secs}s: no token counter moved; last active ${orch.plan}/${last.member} ${secs}s ago; ${where}`, null, "event", [orch.name], {
           event: EVENTS.stalled.name
         });
         db.prepare("UPDATE runs SET stall_posts = ? WHERE id = ?").run(Math.floor(silence / threshold), run2);
