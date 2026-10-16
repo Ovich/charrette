@@ -20,7 +20,7 @@ replies; the final text. The board alone tells the whole run. **It is also the s
 | Field | Content | Recommended |
 |---|---|---|
 | questions | one row: what the text must do, for whom, its length and tone | from the ask |
-| seats | a `researcher`, doing the homework on the reader and their context; one `writer`, choosing its voice; one `editor`, owning the hierarchy: what is core and leads, what supports, what gets one clause, what is cut, from the sources' own ranking, **the text running from the core down to the least prominent**; an `impact` analyst, weighing every sentence for its effect on the reader and proposing a stronger one the sources still carry; a `checker` holding the sources; readers, each the reader the text is for or one on the way to them, given what that reader knows chosen per template: researcher + writer + editor + impact + checker + 1 to 2 readers for a persuasive text; for an explaining one, a newcomer who must follow it in place of impact |
+| seats | a `researcher`, doing the homework on the reader and their context; one `writer`, choosing its voice; one `editor`, owning the hierarchy: what is core and leads, what supports, what gets one clause, what is cut, from the sources' own ranking, **the text running from the core down to the least prominent**; an `impact` analyst, weighing every sentence for its effect on the reader and proposing a stronger one the sources still carry; a `checker` holding the sources; readers, each the reader the text is for or one on the way to them, given what that reader knows | chosen per template: researcher + writer + editor + impact + checker + 1 to 2 readers for a persuasive text; for an explaining one, a newcomer who must follow it in place of impact |
 | template | the document skeleton the run fills, binding on the writer; the editor's hierarchy orders the proofs inside it | from the ask |
 | altitude | the level of detail the text stays at: strategic (what, why it matters, what it changed for people; a mechanism only when it is the differentiator, named one level up, never its parts), operational, or technical | from the template |
 | manifests | per seat: the shared part and its own (role, rules, persona, evidence), given verbatim | from the project |
@@ -43,7 +43,7 @@ replies; the final text. The board alone tells the whole run. **It is also the s
 
 **Every post that hands work on mentions whoever acts next** (`@writer`, `@checker`…): a seat is woken only by a mention, so a hand-off without one stops the chain.
 
-**Altitude**: the editor holds it in every phase; a sentence below the template's altitude (a component, a tool, a configuration where the reader is owed what and why) is blocking in polish, whole text and read, and is cut or lifted, never refined. Readers judge whether the text is credible at that altitude, never ask it to go lower.
+**Altitude**: the editor holds it in every phase; a sentence below the template's altitude (a component, a tool, a configuration where the reader is owed what and why) is blocking in polish, read and final check, and is cut or lifted, never refined. Readers judge whether the text is credible at that altitude, never ask it to go lower.
 
 **Highlights only**: every sentence carries a strength the sources hold; what they do not hold is left unsaid, never conceded. No phase asks a seat for lessons, limits or gaps, which invites them, and a gap analysis given as evidence is background, never content. A concession found in reading is blocking.
 
@@ -52,4 +52,4 @@ replies; the final text. The board alone tells the whole run. **It is also the s
 Register each seat's transcript right after dispatching it (the `swarm` skill's orchestrator
 side), so a stalled phase is seen within seconds.
 
-**Close** when the last round's revision is posted: the final text on the board.
+**Close** after the final check: the final text on the board.
