@@ -9,9 +9,11 @@ each must do, length, tone, and its **altitude**: the level of detail the reader
 for that seat alone: its role, rules, reader persona, evidence).
 
 **Board**: the text's own document through the `aiview` skill, `YYYY-MM-DD-<topic>.report.md`,
-its sections in the order of the phases: the human part, the strategy fields, **Research**,
-**Strategy settled**, **Angles**, **The text** (the current version), **Polish** (per paragraph, per iteration), **Whole text**, **Reader notes** (per
-round), **Log** (each phase's posts verbatim, with their `#<seq>`). Swarm kind `brainstorm`.
+its sections in the order of the phases. **Every phase's work is written into it as the phase
+closes**, in full, never as a pointer to the thread: the research dossier; the strategy answers
+and the settled strategy; every angle and the pick; the draft; each polish iteration's table,
+strikes and whole text; the read notes and the rulings; each revision with its per-note
+replies; the final text. The board alone tells the whole run.
 
 **Strategy, beyond the shared fields:**
 
@@ -24,7 +26,7 @@ round), **Log** (each phase's posts verbatim, with their `#<seq>`). Swarm kind `
 | manifests | per seat: the shared part and its own (role, rules, persona, evidence), given verbatim | from the project |
 | evidence | adds `given`: the files and links handed over with the ask (a brief, a draft, a spec), read and cited, never edited | `given, web` |
 | criteria | what the text must achieve and what is ruled out | from the ask |
-| iterations | polish iterations per paragraph, at most | 3 |
+| iterations | polish iterations on the whole text, at most | 2 |
 | rounds | read-and-revise rounds on the whole text | 1 |
 
 | Phase | Who | May | May not | You, after |
@@ -34,10 +36,9 @@ round), **Log** (each phase's posts verbatim, with their `#<seq>`). Swarm kind `
 | **3 angles** (blind) | every seat | post one angle within the strategy: the opening, the proofs in order, the close, each proof tied to its source | read the others' angles first, write the text | nothing |
 | **4 pick** | — | — | — | pick an angle, or merge, against the strategy; the pick and its reason posted and written under *Angles* |
 | **5 draft** | writer | post the full text, one block | — | the text on the board |
-| **6 polish** | impact, checker, writer, one paragraph at a time from the first | per iteration: the impact analyst posts the paragraph's table, one row per sentence: the sentence, its impact now (strong · medium · weak) and why, a stronger version, the source that carries it, or `keep` / `cut`, and below the table the sentence order it proposes (reorder, merge, split); a move to another paragraph is proposed to the editor, who rules; the checker strikes any row that outruns its source; the writer posts the paragraph's next version, keeping its voice, taking the rows left or saying why not; when no row is left to take it posts `P<n> unchanged` and hands back at once, never silence | touch another paragraph | the paragraph replaced on the board; the next iteration, until every row says `keep` or the iterations are spent, then the next paragraph |
-| **7 whole text** | impact and editor, together, on the assembled text | one post each on what no paragraph shows: every fact said once, no verb or phrase repeated, tenses consistent, each work's room matching its weight, every duty of the reader's brief answered, and every complex sentence made simpler to read (one claim, plain words, jargon glossed or cut); the writer then posts the assembled text with them applied | add a fact | the assembled text on the board |
-| **8 read** | every seat but the writer and the impact analyst | per note, at most 5, on the whole text: the line quoted, the reaction as that seat, the change asked; a claim's note names what the source lacks; the editor's note on a work out of order, or a minor one given more room than a core one, is blocking | rewrite the text | the notes on the board, the round numbered; your rulings where notes conflict, the checker winning on truth over impact |
-| **9 revise** | writer | post the new text, then per note: taken, or declined with why | — | the text replaced; phases 8 and 9 again while rounds remain |
+| **6 polish** | impact, checker, writer, on the whole text | per iteration: the impact analyst posts one table covering every sentence of the whole text, paragraph by paragraph: the sentence, its impact now (strong · medium · weak) and why, a stronger version, the source that carries it, or `keep` / `cut`; below it, what only the whole shows: every fact said once, no verb or phrase repeated, tenses consistent, each work's room matching its weight, every duty of the reader's brief answered, complex sentences made simple, and any move between paragraphs (the editor rules on those); the checker strikes any row that outruns its source; the writer posts the whole next version, taking the rows left or saying why not, `unchanged` at once when nothing is left | rework one paragraph in isolation | the whole text replaced on the board, with the table and the strikes; the next iteration, until every row says `keep` or the iterations are spent |
+| **7 read** | every seat but the writer and the impact analyst | per note, at most 5, on the whole text: the line quoted, the reaction as that seat, the change asked; a claim's note names what the source lacks; the editor's note on a work out of order, or a minor one given more room than a core one, is blocking | rewrite the text | the notes on the board, the round numbered; your rulings where notes conflict, the checker winning on truth over impact |
+| **8 revise** | writer | post the whole new text, then per note: taken, or declined with why; the text is revised as a whole, never patched sentence by sentence | — | the text replaced; phases 7 and 8 again while rounds remain |
 
 **Every post that hands work on mentions whoever acts next** (`@writer`, `@checker`…): a seat is woken only by a mention, so a hand-off without one stops the chain.
 
