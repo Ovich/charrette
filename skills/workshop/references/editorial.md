@@ -13,7 +13,7 @@ its sections in the order of the phases. **Every phase's work is written into it
 closes**, in full, never as a pointer to the thread: the research dossier; the strategy answers
 and the settled strategy; every angle and the pick; the draft; each polish iteration's table,
 strikes and whole text; the read notes and the rulings; each revision with its per-note
-replies; the final text. The board alone tells the whole run.
+replies; the final text. The board alone tells the whole run. **It is also the seats' working memory**: every seat reads it in full at the start of each phase and builds on what is there (the dossier feeds the strategy, the strategy and angles feed the draft, the polish record feeds the read). So it holds the work only, never a word about the person.
 
 **Strategy, beyond the shared fields:**
 

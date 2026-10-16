@@ -16,8 +16,8 @@ reads the result after; every choice in between is yours, made against the strat
 
 **Seats know the orchestrator and each other, never the person.** A seat asks `@orchestrator`
 and you answer; nothing a seat reads (its brief, its role, the protocol file, your posts) names
-the person or waits on one. Seats never read the board: their work is on the thread, the board
-is yours.
+the person or waits on one. Seats read the board only where the protocol makes it their record (the
+editorial run record); it then holds the work alone, never the person. You alone write it.
 
 **The protocol decides the board, the phases, the moves allowed in each and what comes out.**
 Read its file before the strategy:
