@@ -97,6 +97,16 @@ describe("conversation: what an item is (D8, D16)", () => {
     expect(answered[0]).toMatchObject({ kind: "held", word: "held file · answered", state: "answered" });
   });
 
+  test("a stall shows only while live, as one row, the latest; a stall something came after leaves the thread", () => {
+    const stall = (s: number) => item(1, "alpha/orchestrator", `stalled ${s}s: no token counter moved; last active alpha/S1 ${s}s ago; phase draft 1/2 done`, { kind: "event", event: "stalled" } as Partial<SnapshotEvent>);
+    const live = conversation(board(RUNS, ROSTER, [item(1, "alpha/S1", "a post"), stall(5), stall(10), stall(15)]), { run: 1, follow: null });
+    expect(live.map((i) => i.kind)).toEqual(["message", "stalled"]);
+    expect(live[1].text).toBe("idle 15s · last active S1 · phase draft 1/2 done");
+    expect(live[1]).toMatchObject({ word: "◷ idle" });
+    const passed = conversation(board(RUNS, ROSTER, [stall(5), stall(10), item(1, "alpha/S1", "back")]), { run: 1, follow: null });
+    expect(passed.map((i) => i.kind)).toEqual(["message"]);
+  });
+
   test("a post about a path by its holder, or naming no holder, is a plain message", () => {
     const own = item(1, "alpha/S1", "@BE·S2 I change a.ts", { about: "a.ts" });
     const nobody = item(2, "beta/S2", "about a.ts in general", { about: "a.ts" });

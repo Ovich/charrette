@@ -134,13 +134,10 @@ test("a closed run's phase events, as /api/run sends them, draw one separator ea
   expect(convo().queryAllByText(/^phase research:/)).toHaveLength(0);
 });
 
-test("stalled and liveness draw rows of their own, told apart from the board's plain lines", async () => {
+test("liveness draws a row of its own; a stall something came after has passed and leaves the thread", async () => {
   render(<BoardView repos={[REPO]} run={32} />);
-  await waitFor(() => expect(document.querySelector('[data-kind="stalled"]')).not.toBeNull());
-  const stalled = document.querySelector('[data-kind="stalled"]')!;
-  expect(stalled.getAttribute("data-tier")).toBe("act");
-  expect(stalled.textContent).toMatch(/◷ stalled/);
-  expect(stalled.textContent).toMatch(/no token counter moved/);
+  await waitFor(() => expect(document.querySelector('[data-kind="liveness"]')).not.toBeNull());
+  expect(document.querySelector('[data-kind="stalled"]')).toBeNull();
   const blind = document.querySelector('[data-kind="liveness"]')!;
   expect(blind.textContent).toMatch(/liveness · blind/);
   expect(blind.textContent).toMatch(/letter4\/checker/);

@@ -9031,8 +9031,8 @@ var init_kinds = __esm({
     "use strict";
     run = (...events) => events.map((event) => ({ event, scope: "run" }));
     PROFILES = {
-      plan: { kind: "plan", claims: true, mergeLock: true, worktree: true, member: "runner", defaults: { member: [], orchestrator: run("merged", "ended", "stale") } },
-      brainstorm: { kind: "brainstorm", claims: false, mergeLock: false, worktree: false, member: "seat", defaults: { member: [], orchestrator: run("agreement", "endorsement", "ended", "stale") } }
+      plan: { kind: "plan", claims: true, mergeLock: true, worktree: true, member: "runner", wholeThread: false, defaults: { member: [], orchestrator: run("merged", "ended", "stale") } },
+      brainstorm: { kind: "brainstorm", claims: false, mergeLock: false, worktree: false, member: "seat", wholeThread: true, defaults: { member: [], orchestrator: run("agreement", "endorsement", "ended", "stale") } }
     };
   }
 });
@@ -10210,7 +10210,7 @@ async function openBoard(dbPath = SQLITE_PATH2, opts = {}) {
   });
   const { DatabaseSync: DatabaseSync2 } = await import("node:sqlite");
   fs8.mkdirSync(path9.dirname(dbPath), { recursive: true });
-  const db = new DatabaseSync2(dbPath);
+  const db = new DatabaseSync2(dbPath, { timeout: 5e3 });
   const recordsAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'call_log'").get() === void 0;
   const sharesAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'shares'").get() === void 0;
   db.exec(`
@@ -10575,6 +10575,8 @@ async function openBoard(dbPath = SQLITE_PATH2, opts = {}) {
   const deliverTo = (p, fromWait, mentionsOnly = false) => {
     const me = participantById(p.id);
     const named = (m) => mentions(m, me) || (m.kind === "agreement" || m.kind === "endorsement") && m.about != null && claims.holds(me, m.about);
+    const whole = profileOf(me.kind).wholeThread;
+    const ownPost = (m) => whole && m.run === me.run && m.kind !== "event";
     const messages = transaction(() => {
       const unseen = db.prepare(
         `SELECT m.* FROM messages m
@@ -10584,7 +10586,7 @@ async function openBoard(dbPath = SQLITE_PATH2, opts = {}) {
       ).all(me.repo, Number(db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id).since_seq), me.id, me.id);
       const woken = (r) => named(toMessage(r)) || wakes(toMessage(r), me, me.subscriptions);
       const heard = unseen.filter((r) => toMessage(r).run === me.run || woken(r));
-      const rows = mentionsOnly ? heard.filter(woken) : heard;
+      const rows = !mentionsOnly ? heard : !heard.some(woken) || !whole ? heard.filter(woken) : heard.filter((r) => woken(r) || ownPost(toMessage(r)));
       const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
       for (const r of rows) mark.run(me.id, Number(r.seq));
       const at = now2();
@@ -10605,7 +10607,7 @@ async function openBoard(dbPath = SQLITE_PATH2, opts = {}) {
         return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}` } : m;
       });
     });
-    const full = (m) => named(m) || mentionsOnly && wakes(m, me, me.subscriptions);
+    const full = (m) => named(m) || mentionsOnly && wakes(m, me, me.subscriptions) || ownPost(m);
     return {
       full: messages.filter(full),
       lines: messages.filter((m) => !full(m)).map(messageLine)
@@ -11090,6 +11092,15 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       const author = participantById(Number(r.author));
       const about = r.about == null ? null : String(r.about);
       return insertMessage(fresh, `endorses #${seq}`, about, "endorsement", [author.name], { endorses: seq });
+    },
+    thread(p, name) {
+      const fresh = participantById(p.id);
+      const phase = name ?? phaseOf(runRow(fresh.run))?.name;
+      if (!phase) return [];
+      const opened = db.prepare("SELECT MAX(seq) AS s FROM messages WHERE run = ? AND event = ? AND json_extract(meta, '$.phase') = ?").get(fresh.run, EVENTS.phase.name, phase);
+      if (opened.s == null) throw new Error(`thread: phase ${phase} was never opened in run ${fresh.run}`);
+      const next = db.prepare("SELECT MIN(seq) AS s FROM messages WHERE run = ? AND event = ? AND seq > ?").get(fresh.run, EVENTS.phase.name, Number(opened.s));
+      return db.prepare("SELECT * FROM messages WHERE run = ? AND seq > ? AND seq < ? AND kind != 'event' ORDER BY seq").all(fresh.run, Number(opened.s), next.s == null ? Number.MAX_SAFE_INTEGER : Number(next.s)).map(toMessage);
     },
     read(seq) {
       const r = db.prepare("SELECT * FROM messages WHERE seq = ?").get(seq);

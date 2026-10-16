@@ -251,7 +251,7 @@ export const TIPS = {
   closed: "Closed: the run is over; its conversation is in the archive (☰).",
   joined: "Joined: a member arrived on the board and took its slice or seat.",
   ended: "Ended: the member left the board and its claims were released.",
-  stalled: "Stalled: no member's token counter moved for the run's stall threshold. Every member is told: the orchestrator opens the next phase or asks the member who owes a move.",
+  stalled: "Idle: no member's token counter has moved for this long. The orchestrator is told: it opens the next phase or asks the member who owes a move. The row keeps only the latest count and leaves once anything happens.",
   liveness: "Liveness: the board cannot read this member's transcript, so the stall check cannot see whether it works.",
 } as const;
 
@@ -347,6 +347,14 @@ function heldFileOf(snap: BoardSnapshot, e: SnapshotEvent, ctx: MentionCtx): { p
 
 const QUESTION = /^@orchestrator new question:/;
 
+/** The stall poller's line as the audience reads it: `idle 35s · last active recruiter · phase polish 3/6 done`. */
+function idleText(body: string): string {
+  const secs = /^stalled (\d+)s/.exec(body)?.[1];
+  const who = /last active (?:[\w.-]+\/)?([\w.-]+)/.exec(body)?.[1];
+  const phase = /(phase .+ done|no phase open)\s*$/.exec(body)?.[1];
+  return [secs ? `idle ${secs}s` : "idle", who ? `last active ${who}` : null, phase].filter(Boolean).join(" · ");
+}
+
 /** One event as an item: its tier, word, tip and state, read from the thread (D8, D9, D16). */
 function itemOf(snap: BoardSnapshot, e: SnapshotEvent, run: RunSummary, ctx: MentionCtx): Item {
   const base = { seq: e.seq, at: e.at, run: run.run, from: e.from, about: e.about ?? null };
@@ -367,7 +375,7 @@ function itemOf(snap: BoardSnapshot, e: SnapshotEvent, run: RunSummary, ctx: Men
     return said("flag", "act", "⚑ flag · open", TIPS.flag, answer.state);
   }
   // the stall poller's events, told apart from the board's plain lines (`swarm` liveness)
-  if (e.kind === "event" && e.event === "stalled") return said("stalled", "act", "◷ stalled", TIPS.stalled);
+  if (e.kind === "event" && e.event === "stalled") return { ...said("stalled", "wait", "◷ idle", TIPS.stalled), text: idleText(e.body) };
   if (e.kind === "event" && e.event === "liveness") return said("liveness", "wait", "liveness · blind", TIPS.liveness);
   if (isQuiet(e)) {
     const minutes = /(\d+)\s*min/.exec(e.body)?.[1];
@@ -421,7 +429,10 @@ export function conversation(snap: BoardSnapshot, pick: Pick): Item[] {
     const joins = item.kind === "message" && prev?.kind === "message" && prev.from === item.from;
     items.push(joins ? { ...item, joined: true } : item);
   }
-  return items;
+  // a stall is the orchestrator's alarm, not the conversation: only the live one shows, as one row, the
+  // latest; a stall anything came after has passed and leaves the thread clean
+  const last = items[items.length - 1];
+  return items.filter((i) => i.kind !== "stalled" || i === last);
 }
 
 // ── the conversation's filters (SL11) ───────────────────────────────────────────────
