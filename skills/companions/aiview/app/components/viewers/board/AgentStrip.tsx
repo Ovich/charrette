@@ -68,7 +68,6 @@ function AgentCard({ p, hue, followed, onFollow, now, stallMs }: { p: SnapshotRu
       </span>
       <span className="slice">{orch ? "orchestrator" : p.title ? `${p.slice} · ${p.title}` : p.slice}</span>
       <span className="doing">{p.doing}</span>
-      <Counter p={p} now={now} stallMs={stallMs} />
     </button>
   );
 }

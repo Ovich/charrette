@@ -179,9 +179,9 @@ test("a post's diagram box and code box are drawn by board.css's rules, inside t
   expect(css).toContain("@media (prefers-color-scheme: dark) { .board .post-md .shiki-box span { color: var(--shiki-dark); } }");
 }, 20_000);
 
-test("the agent strip: five cards a row (the person's decision), rows of 104px with the token counter, padded 12px above and below, two rows at most, then scrolled", () => {
+test("the agent strip: five cards a row (the person's decision), rows of 77px, padded 12px above and below, two rows at most, then scrolled", () => {
   const strip = ruleOf(boardCss(), ".board .agent-strip");
-  expect(strip).toContain("--row: 104px");
+  expect(strip).toContain("--row: 77px");
   expect(strip).toContain("grid-template-columns: repeat(5, minmax(0, 1fr))");
   expect(boardCss()).toMatch(/five cards a row, the orchestrator one of them: the person's decision/);
   expect(strip).toContain("grid-auto-rows: var(--row)");

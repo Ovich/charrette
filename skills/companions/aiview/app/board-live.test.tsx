@@ -153,14 +153,8 @@ test("the agent strip: the orchestrator is its first card; each card shows its c
   expect(cards).toHaveLength(6);
   expect(cards.every((c) => c.getAttribute("data-component") === "AgentCard")).toBe(true);
   expect(cards[0].className).toMatch(/\borch\b/);
-  const counter = (i: number) => cards[i].querySelector('[data-component="TokenCounter"]')!;
-  expect(counter(0).textContent).toMatch(/^120K tok · [12]s$/);
-  expect(counter(1).textContent).toMatch(/^10K tok · [78]s$/);
-  expect(counter(0).getAttribute("data-state")).toBe("moving");
-  expect(counter(1).getAttribute("data-state")).toBe("flat");
-  expect(counter(1).className).toBe("counter flat");
-  expect(counter(2).textContent).toBe("no transcript");
-  expect(counter(3).textContent).toBe("transcript unreadable");
+  // the token counter is not drawn on the cards (user, 2026-10-16: it misled); the stall check reads it
+  expect(document.querySelector('[data-component="TokenCounter"]')).toBeNull();
 });
 
 test("a tab of an older build reloads on the server's hello; the same build, or none named, does not", async () => {
