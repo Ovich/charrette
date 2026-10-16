@@ -259,11 +259,25 @@ const self = (): string[] => ["node", shellWord(process.argv[1].replace(/\\/g, "
  *  listen in the background while they work. */
 const listensInForeground = (p: Pick<Participant, "slice" | "kind">): boolean => p.slice !== "orchestrator" && profileOf(p.kind).member === "seat";
 const waitCommand = (name: string): string => [...self(), "wait", "--mentions", "--as", shellWord(name)].join(" ");
-/** The line that starts a member's listener: the exact command, --as included (D61). */
-const listenNow = (p: Pick<Participant, "name" | "slice" | "kind">): string =>
+/** The line that starts a member's listener: the exact command, --as included (D61); `afterPhase`: it
+ *  follows the owed-phase line, so a seat waits only once its part is in. */
+const listenNow = (p: Pick<Participant, "name" | "slice" | "kind">, afterPhase = false): string =>
   listensInForeground(p)
-    ? `wait now, in the foreground (never a background listener: a seat that ends its turn is gone): ${waitCommand(p.name)}`
+    ? `${afterPhase ? "only then wait" : "wait now"}, in the foreground (never a background listener: a seat that ends its turn is gone): ${waitCommand(p.name)}`
     : `start your listener now, in the background (your harness's background task): ${waitCommand(p.name)}`;
+
+/** The step a member owing the run's open phase takes before any wait: a member that joined, or woke,
+ *  after the phase event passed does its part now, never sleeps through it; null when it owes none. */
+const owedLine = (board: Board, p: Participant): string | null => {
+  const ph = board.owedPhase(p);
+  return ph ? `phase ${ph.name} is open and asks: ${ph.text}. Do your part now, then: ${[...self(), "done", shellWord(ph.name), "--as", shellWord(p.name)].join(" ")}` : null;
+};
+/** A member's next step where it would be told to listen: the owed phase first, when it owes one. */
+const nextStep = (board: Board, p: Participant): string => {
+  const owed = owedLine(board, p);
+  return owed ? `${owed}
+${listenNow(p, true)}` : listenNow(p);
+};
 
 /** A member whose run is closed (the close ended it): every member verb answers with this one line, exit 0. */
 const closedLine = (p: Participant): string =>
@@ -291,8 +305,8 @@ const unmatchedLines = (board: Board, p: Participant, body: string): string[] =>
   });
 };
 
-const emitHeard = (p: Participant, json: object, human: string | (() => void)): void => {
-  const next = !p.ended && !p.listening ? listenNow(p) : null;
+const emitHeard = (board: Board, p: Participant, json: object, human: string | (() => void)): void => {
+  const next = !p.ended && !p.listening ? nextStep(board, p) : null;
   emit(next ? { ...json, next } : json, () => {
     if (typeof human === "string") console.log(human);
     else human();
@@ -574,8 +588,8 @@ ${USAGE}`);
         worktree: worktreeOf(process.cwd()) ?? undefined,
         ...(args.flag("--on") !== undefined ? { on: subscriptionsArg(args.flag("--on")!) } : {}),
       });
-      // the runner's next step, last: its listener, started at once (D61)
-      const next = listenNow(runner);
+      // the runner's next step, last: the open phase it owes, then its listener (D61)
+      const next = nextStep(board, runner);
       // a kind without worktree: the checkout is shared, so every call names the member (D21, D36)
       const shared = !profileOf(runner.kind).worktree;
       const as = shared ? `pass --as ${runner.name} on every call: this checkout is shared, the board cannot tell you apart` : null;
@@ -600,7 +614,7 @@ ${USAGE}`);
       const p = caller(board);
       const subs = subscriptionsArg(args.positional.join(",") || fail(`${args.verb}: which events?`));
       const after = args.verb === "subscribe" ? board.subscribe(p, subs) : board.unsubscribe(p, subs);
-      emitHeard(p, { runner: p.name, subscriptions: after }, `${p.name} wakes on: ${formatSubscriptions(after) || "mentions and urgent posts only"}`);
+      emitHeard(board, p, { runner: p.name, subscriptions: after }, `${p.name} wakes on: ${formatSubscriptions(after) || "mentions and urgent posts only"}`);
       break;
     }
     case "doing": {
@@ -608,7 +622,7 @@ ${USAGE}`);
       if (answeredClosed(board, p)) break;
       const text = args.positional.join(" ") || fail("doing: what?");
       board.setDoing(p, text);
-      emitHeard(p, { runner: p.name, doing: text }, `${p.name} doing: ${text}`);
+      emitHeard(board, p, { runner: p.name, doing: text }, `${p.name} doing: ${text}`);
       break;
     }
     case "post":
@@ -621,7 +635,7 @@ ${USAGE}`);
         kind: args.verb === "agree" ? "agreement" : "msg",
       });
       const unmatched = unmatchedLines(board, p, body);
-      emitHeard(p, { seq: m.seq, mentions: m.mentions, run: m.run, ...(unmatched.length ? { unmatched } : {}), ...(m.claimed ? { claimed: m.claimed } : {}) }, () => {
+      emitHeard(board, p, { seq: m.seq, mentions: m.mentions, run: m.run, ...(unmatched.length ? { unmatched } : {}), ...(m.claimed ? { claimed: m.claimed } : {}) }, () => {
         console.log(seqLine(m));
         // posting is claiming (D7)
         if (m.claimed) console.log(`claimed ${m.claimed.path}, shared with ${m.claimed.sharedWith.join(", ")}`);
@@ -636,7 +650,7 @@ ${USAGE}`);
       const seq = Number(raw);
       if (!Number.isInteger(seq)) fail(`endorse takes a seq, got ${raw}`);
       const m = board.endorse(p, seq);
-      emitHeard(p, { seq: m.seq, endorses: m.endorses, run: m.run }, seqLine(m));
+      emitHeard(board, p, { seq: m.seq, endorses: m.endorses, run: m.run }, seqLine(m));
       break;
     }
     case "read": {
@@ -654,9 +668,12 @@ ${USAGE}`);
       const m = board.read(seq, by);
       // the phase the message's run is in, first (the caller's run when one is known)
       const phase = phaseHeader(board, by?.run ?? m.run);
-      emit({ ...m, phase }, () => {
+      // a member owing the open phase is told to do it, last
+      const owes = by ? owedLine(board, by) : null;
+      emit({ ...m, phase, ...(owes ? { next: owes } : {}) }, () => {
         if (phase) console.log(phase);
         console.log(fullText(m));
+        if (owes) console.log(owes);
       });
       break;
     }
@@ -666,9 +683,12 @@ ${USAGE}`);
       const d = withNext(me, board.deliver(me));
       // the run's phase heads every delivery that carries something
       const phase = d.full.length || d.lines.length ? phaseHeader(board, me.run) : null;
-      emit({ phase, ...d }, () => {
+      // a member owing the open phase is told to do it, last
+      const owes = owedLine(board, me);
+      emit({ phase, ...d, ...(owes ? { next: owes } : {}) }, () => {
         if (phase) console.log(phase);
         printDelivery(d);
+        if (owes) console.log(owes);
       });
       break;
     }
@@ -698,11 +718,18 @@ ${USAGE}`);
       if (args.flag("--as")) again.push("--as", shellWord(args.flag("--as")!));
       if (raw !== undefined) again.push("--timeout", raw);
       if (asJson) again.push("--json");
-      const next = listensInForeground(p)
-        ? `answer on the thread if needed, then wait again, in the foreground: ${again.join(" ")}`
+      // a member owing the open phase does it before it waits again
+      const owes = owedLine(board, p);
+      const rearm = listensInForeground(p)
+        ? owes
+          ? `${owes}
+only then wait again, in the foreground: ${again.join(" ")}`
+          : `answer on the thread if needed, then wait again, in the foreground: ${again.join(" ")}`
         : p.slice === "orchestrator"
           ? `act on it, then start this listener again, in the background: ${again.join(" ")}`
           : `answer on the thread if needed, then start this listener again, in the background while you work, in the foreground when you are waiting: ${again.join(" ")}`;
+      const next = owes && !listensInForeground(p) ? `${owes}
+${rearm}` : rearm;
       // the run's phase first, so a member always knows which phase it answers in
       const phase = phaseHeader(board, p.run);
       emit({ phase, next, ...d }, () => {
@@ -739,7 +766,7 @@ ${USAGE}`);
       const verdict = board.checkEdit(p, abs, { interface: args.has("--interface") });
       // held (D41): exit 3, the runner posts about the path and claims again
       if (!verdict.allowed) process.exitCode = 3;
-      emitHeard(p, verdict, () => {
+      emitHeard(board, p, verdict, () => {
         if (!verdict.allowed) return console.log(verdict.refusal);
         // the other holders are named once per runner and path, when the board says so (D40)
         const also = verdict.notice

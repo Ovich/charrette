@@ -11007,6 +11007,15 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       const r = runRow(run2);
       return progressOf(run2, r.phase == null ? null : String(r.phase));
     },
+    owedPhase(p) {
+      const row = db.prepare("SELECT id, run, slice, ended_at FROM participants WHERE id = ?").get(p.id);
+      if (!row || row.ended_at != null || String(row.slice) === ORCHESTRATOR2) return null;
+      const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(Number(row.run));
+      const current = r && r.state === "open" ? phaseOf(r) : null;
+      if (!current) return null;
+      const done = db.prepare("SELECT 1 FROM phase_done WHERE run = ? AND participant = ? AND phase = ?").get(Number(row.run), Number(row.id), current.name);
+      return done ? null : current;
+    },
     registerTranscript(run2, member, file) {
       const r = runRow(run2);
       if (r.state !== "open") throw new Error(`run ${run2} is closed`);

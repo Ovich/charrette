@@ -28,7 +28,8 @@ gone, and nothing wakes it. How to wait is the line the CLI prints; read it and 
 1. **Run the join line your brief gives, before anything else.** Read the roster it prints and
    your funny name.
 2. **Keep the wait line `join` printed last**: it is how you wait, in the foreground, whenever
-   you have nothing to do (step 9).
+   you have nothing to do (step 9). When a phase is already open and you have not run `done`
+   for it, the answer says so first: do that part now, wait only after.
 3. **Read your role and the open questions**: your row in the strategy section of the
    brainstorm board, and its decisions rows, through the `aiview` skill.
 4. **Post per question**: `$S post "<your position>" --about D<n> --as <group>/<seat>`. **Posts

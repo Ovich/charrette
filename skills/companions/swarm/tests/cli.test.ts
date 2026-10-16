@@ -1106,3 +1106,39 @@ test("on a plan run too: the current phase heads wait, deliver and read, follows
   assert.match(run("status").stdout, new RegExp(`run ${id} {2}plan {2}review-tool {2}A plan {2}phase build: the first wave {2}0/2 done`));
   assert.deepEqual(JSON.parse(run("status", "--json").stdout).open[0].phase, { name: "build", text: "the first wave" });
 });
+
+test("a member owing the open phase is told to do it before any wait: at join, after deliver, read, post and a wake; after done, the wait step again", () => {
+  const id = openBrainstorm();
+  // join before any phase: the wait step, nothing owed
+  const early = joinSeat(id, "architect");
+  assert.equal(early.status, 0, early.stderr);
+  assert.doesNotMatch(early.stdout, /is open and asks/);
+  assert.match(early.stdout.trimEnd().split("\n").at(-1)!, /^wait now, in the foreground .* wait --mentions --as idea\/architect$/);
+
+  run("phase", "ping", "say", "hi", "--as", "idea/orchestrator");
+  const owed = /^phase ping is open and asks: say hi\. Do your part now, then: node \S+ done ping --as idea\/skeptic$/m;
+  // a late join: the do-it step, then only then the wait
+  const late = joinSeat(id, "skeptic");
+  assert.equal(late.status, 0, late.stderr);
+  const lines = late.stdout.trimEnd().split("\n");
+  assert.match(lines.at(-2)!, owed);
+  assert.match(lines.at(-1)!, /^only then wait, in the foreground .* wait --mentions --as idea\/skeptic$/);
+  assert.match(JSON.parse(run("deliver", "--as", "idea/skeptic", "--json").stdout).next, owed);
+  const posted = run("post", "hello", "--as", "idea/skeptic");
+  assert.match(posted.stdout, owed);
+  assert.match(run("read", seqOf(posted.stdout), "--as", "idea/skeptic").stdout, owed);
+  assert.match(run("deliver", "--as", "idea/skeptic").stdout, owed);
+  // a member woken by the phase event is told to do it before it waits again
+  const woken = run("wait", "--mentions", "--as", "idea/architect", "--timeout", "3000");
+  assert.match(woken.stdout, /^phase ping is open and asks: say hi\. Do your part now, then: node \S+ done ping --as idea\/architect$/m);
+  assert.match(woken.stdout, /^only then wait again, in the foreground: .* wait --mentions --as idea\/architect/m);
+
+  // after done: the wait step, nothing owed
+  assert.equal(run("done", "ping", "--as", "idea/skeptic").status, 0);
+  const after = run("post", "again", "--as", "idea/skeptic");
+  assert.doesNotMatch(after.stdout, /is open and asks/);
+  assert.match(after.stdout.trimEnd().split("\n").at(-1)!, /^wait now, in the foreground .* wait --mentions --as idea\/skeptic$/);
+  assert.equal(JSON.parse(run("deliver", "--as", "idea/skeptic", "--json").stdout).next, undefined);
+  // the orchestrator never owes a phase
+  assert.doesNotMatch(run("deliver", "--as", "idea/orchestrator").stdout, /is open and asks/);
+});

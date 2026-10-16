@@ -2042,6 +2042,15 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       const r = runRow(run2);
       return progressOf(run2, r.phase == null ? null : String(r.phase));
     },
+    owedPhase(p) {
+      const row = db.prepare("SELECT id, run, slice, ended_at FROM participants WHERE id = ?").get(p.id);
+      if (!row || row.ended_at != null || String(row.slice) === ORCHESTRATOR2) return null;
+      const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(Number(row.run));
+      const current = r && r.state === "open" ? phaseOf(r) : null;
+      if (!current) return null;
+      const done = db.prepare("SELECT 1 FROM phase_done WHERE run = ? AND participant = ? AND phase = ?").get(Number(row.run), Number(row.id), current.name);
+      return done ? null : current;
+    },
     registerTranscript(run2, member, file) {
       const r = runRow(run2);
       if (r.state !== "open") throw new Error(`run ${run2} is closed`);
@@ -2781,7 +2790,16 @@ var shellWord = (w) => /^[\w@%+=:,./-]+$/.test(w) ? w : `"${w.replace(/(["\\$`])
 var self = () => ["node", shellWord(process.argv[1].replace(/\\/g, "/"))];
 var listensInForeground = (p) => p.slice !== "orchestrator" && profileOf(p.kind).member === "seat";
 var waitCommand = (name) => [...self(), "wait", "--mentions", "--as", shellWord(name)].join(" ");
-var listenNow = (p) => listensInForeground(p) ? `wait now, in the foreground (never a background listener: a seat that ends its turn is gone): ${waitCommand(p.name)}` : `start your listener now, in the background (your harness's background task): ${waitCommand(p.name)}`;
+var listenNow = (p, afterPhase = false) => listensInForeground(p) ? `${afterPhase ? "only then wait" : "wait now"}, in the foreground (never a background listener: a seat that ends its turn is gone): ${waitCommand(p.name)}` : `start your listener now, in the background (your harness's background task): ${waitCommand(p.name)}`;
+var owedLine = (board, p) => {
+  const ph = board.owedPhase(p);
+  return ph ? `phase ${ph.name} is open and asks: ${ph.text}. Do your part now, then: ${[...self(), "done", shellWord(ph.name), "--as", shellWord(p.name)].join(" ")}` : null;
+};
+var nextStep = (board, p) => {
+  const owed = owedLine(board, p);
+  return owed ? `${owed}
+${listenNow(p, true)}` : listenNow(p);
+};
 var closedLine = (p) => `run ${p.run} closed: run end and return your summary: ${[...self(), "end", "--as", shellWord(p.name)].join(" ")}`;
 var answeredClosed = (board, p) => {
   if (board.runs().some((r) => r.id === p.run)) return false;
@@ -2800,8 +2818,8 @@ var unmatchedLines = (board, p, body) => {
     return `@${name} matched nobody on the board${guesses.length ? `: did you mean ${guesses.join(", ")}?` : ""}`;
   });
 };
-var emitHeard = (p, json, human) => {
-  const next = !p.ended && !p.listening ? listenNow(p) : null;
+var emitHeard = (board, p, json, human) => {
+  const next = !p.ended && !p.listening ? nextStep(board, p) : null;
   emit(next ? { ...json, next } : json, () => {
     if (typeof human === "string") console.log(human);
     else human();
@@ -3054,7 +3072,7 @@ ${USAGE}`);
         worktree: worktreeOf(process.cwd()) ?? void 0,
         ...args.flag("--on") !== void 0 ? { on: subscriptionsArg(args.flag("--on")) } : {}
       });
-      const next = listenNow(runner);
+      const next = nextStep(board, runner);
       const shared = !profileOf(runner.kind).worktree;
       const as = shared ? `pass --as ${runner.name} on every call: this checkout is shared, the board cannot tell you apart` : null;
       const commands = shared ? seatCommands(runner.name) : null;
@@ -3076,7 +3094,7 @@ ${USAGE}`);
       const p = caller(board);
       const subs = subscriptionsArg(args.positional.join(",") || fail(`${args.verb}: which events?`));
       const after = args.verb === "subscribe" ? board.subscribe(p, subs) : board.unsubscribe(p, subs);
-      emitHeard(p, { runner: p.name, subscriptions: after }, `${p.name} wakes on: ${formatSubscriptions(after) || "mentions and urgent posts only"}`);
+      emitHeard(board, p, { runner: p.name, subscriptions: after }, `${p.name} wakes on: ${formatSubscriptions(after) || "mentions and urgent posts only"}`);
       break;
     }
     case "doing": {
@@ -3084,7 +3102,7 @@ ${USAGE}`);
       if (answeredClosed(board, p)) break;
       const text = args.positional.join(" ") || fail("doing: what?");
       board.setDoing(p, text);
-      emitHeard(p, { runner: p.name, doing: text }, `${p.name} doing: ${text}`);
+      emitHeard(board, p, { runner: p.name, doing: text }, `${p.name} doing: ${text}`);
       break;
     }
     case "post":
@@ -3097,7 +3115,7 @@ ${USAGE}`);
         kind: args.verb === "agree" ? "agreement" : "msg"
       });
       const unmatched = unmatchedLines(board, p, body);
-      emitHeard(p, { seq: m.seq, mentions: m.mentions, run: m.run, ...unmatched.length ? { unmatched } : {}, ...m.claimed ? { claimed: m.claimed } : {} }, () => {
+      emitHeard(board, p, { seq: m.seq, mentions: m.mentions, run: m.run, ...unmatched.length ? { unmatched } : {}, ...m.claimed ? { claimed: m.claimed } : {} }, () => {
         console.log(seqLine(m));
         if (m.claimed) console.log(`claimed ${m.claimed.path}, shared with ${m.claimed.sharedWith.join(", ")}`);
         for (const line of unmatched) console.log(line);
@@ -3111,7 +3129,7 @@ ${USAGE}`);
       const seq = Number(raw);
       if (!Number.isInteger(seq)) fail(`endorse takes a seq, got ${raw}`);
       const m = board.endorse(p, seq);
-      emitHeard(p, { seq: m.seq, endorses: m.endorses, run: m.run }, seqLine(m));
+      emitHeard(board, p, { seq: m.seq, endorses: m.endorses, run: m.run }, seqLine(m));
       break;
     }
     case "read": {
@@ -3127,9 +3145,11 @@ ${USAGE}`);
       if (by && answeredClosed(board, by)) break;
       const m = board.read(seq, by);
       const phase = phaseHeader(board, by?.run ?? m.run);
-      emit({ ...m, phase }, () => {
+      const owes = by ? owedLine(board, by) : null;
+      emit({ ...m, phase, ...owes ? { next: owes } : {} }, () => {
         if (phase) console.log(phase);
         console.log(fullText(m));
+        if (owes) console.log(owes);
       });
       break;
     }
@@ -3138,9 +3158,11 @@ ${USAGE}`);
       if (answeredClosed(board, me)) break;
       const d = withNext(me, board.deliver(me));
       const phase = d.full.length || d.lines.length ? phaseHeader(board, me.run) : null;
-      emit({ phase, ...d }, () => {
+      const owes = owedLine(board, me);
+      emit({ phase, ...d, ...owes ? { next: owes } : {} }, () => {
         if (phase) console.log(phase);
         printDelivery(d);
+        if (owes) console.log(owes);
       });
       break;
     }
@@ -3167,7 +3189,11 @@ ${USAGE}`);
       if (args.flag("--as")) again.push("--as", shellWord(args.flag("--as")));
       if (raw !== void 0) again.push("--timeout", raw);
       if (asJson) again.push("--json");
-      const next = listensInForeground(p) ? `answer on the thread if needed, then wait again, in the foreground: ${again.join(" ")}` : p.slice === "orchestrator" ? `act on it, then start this listener again, in the background: ${again.join(" ")}` : `answer on the thread if needed, then start this listener again, in the background while you work, in the foreground when you are waiting: ${again.join(" ")}`;
+      const owes = owedLine(board, p);
+      const rearm = listensInForeground(p) ? owes ? `${owes}
+only then wait again, in the foreground: ${again.join(" ")}` : `answer on the thread if needed, then wait again, in the foreground: ${again.join(" ")}` : p.slice === "orchestrator" ? `act on it, then start this listener again, in the background: ${again.join(" ")}` : `answer on the thread if needed, then start this listener again, in the background while you work, in the foreground when you are waiting: ${again.join(" ")}`;
+      const next = owes && !listensInForeground(p) ? `${owes}
+${rearm}` : rearm;
       const phase = phaseHeader(board, p.run);
       emit({ phase, next, ...d }, () => {
         if (phase) console.log(phase);
@@ -3200,7 +3226,7 @@ ${USAGE}`);
       const rel = repoRelative(abs);
       const verdict = board.checkEdit(p, abs, { interface: args.has("--interface") });
       if (!verdict.allowed) process.exitCode = 3;
-      emitHeard(p, verdict, () => {
+      emitHeard(board, p, verdict, () => {
         if (!verdict.allowed) return console.log(verdict.refusal);
         const also = verdict.notice ? verdict.sharedWith.map((o) => `${o.runner} \xB7 ${board.participant(o.runner)?.nick ?? "?"}: ${o.doing}`).join("; ") : "";
         console.log(also ? `claimed ${rel}, also held by ${also}` : `claimed ${rel}`);

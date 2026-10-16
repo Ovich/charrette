@@ -219,6 +219,9 @@ export interface Board {
   done(p: Participant, name: string): { progress: PhaseProgress; all: boolean; already: boolean; message: Message | null };
   /** The current phase's done count; null before the first phase. */
   phaseProgress(run: RunId): PhaseProgress | null;
+  /** The run's current phase when `p` owes it: a member (not the orchestrator), not ended, that has not run
+   *  `done` for it; null otherwise, and before the first phase. */
+  owedPhase(p: Participant): Phase | null;
   /** Registers `member`'s transcript (a seat or slice id, or `orchestrator`) and reads it once: an unreadable
    *  one posts the liveness warning. Refused on a closed run or an unknown member. */
   registerTranscript(run: RunId, member: string, file: string): Liveness;
@@ -1333,6 +1336,16 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
     phaseProgress(run) {
       const r = runRow(run);
       return progressOf(run, r.phase == null ? null : String(r.phase));
+    },
+
+    owedPhase(p) {
+      const row = db.prepare("SELECT id, run, slice, ended_at FROM participants WHERE id = ?").get(p.id) as Row | undefined;
+      if (!row || row.ended_at != null || String(row.slice) === ORCHESTRATOR) return null;
+      const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(Number(row.run)) as Row | undefined;
+      const current = r && r.state === "open" ? phaseOf(r) : null;
+      if (!current) return null;
+      const done = db.prepare("SELECT 1 FROM phase_done WHERE run = ? AND participant = ? AND phase = ?").get(Number(row.run), Number(row.id), current.name);
+      return done ? null : current;
     },
 
     registerTranscript(run, member, file) {
