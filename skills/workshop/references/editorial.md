@@ -5,7 +5,7 @@ say. Out: the final text, its rounds kept beside it.
 
 **The protocol is the same for any text; the kind of text lives in two inputs the run is given**:
 the **template**, the document the seats work on (its skeleton: sections or paragraphs and what
-each must do, length, tone), and the **manifests**, one per seat (a part every seat reads, a part
+each must do, length, tone, and its **altitude**: the level of detail the reader is owed), and the **manifests**, one per seat (a part every seat reads, a part
 for that seat alone: its role, rules, reader persona, evidence).
 
 **Board**: the text's own document through the `aiview` skill, `YYYY-MM-DD-<topic>.report.md`,
@@ -20,6 +20,7 @@ round), **Log** (each phase's posts verbatim, with their `#<seq>`). Swarm kind `
 | questions | one row: what the text must do, for whom, its length and tone | from the ask |
 | seats | a `researcher`, doing the homework on the reader and their context; one `writer`, choosing its voice; one `editor`, owning the hierarchy: what is core and leads, what supports, what gets one clause, what is cut, from the sources' own ranking, **the text running from the core down to the least prominent**; an `impact` analyst, weighing every sentence for its effect on the reader and proposing a stronger one the sources still carry; a `checker` holding the sources; readers, each the reader the text is for or one on the way to them, given what that reader knows chosen per template: researcher + writer + editor + impact + checker + 1 to 2 readers for a persuasive text; for an explaining one, a newcomer who must follow it in place of impact |
 | template | the document skeleton the run fills, binding on the writer; the editor's hierarchy orders the proofs inside it | from the ask |
+| altitude | the level of detail the text stays at: strategic (what, why it matters, what it changed for people; a mechanism only when it is the differentiator, named one level up, never its parts), operational, or technical | from the template |
 | manifests | per seat: the shared part and its own (role, rules, persona, evidence), given verbatim | from the project |
 | evidence | adds `given`: the files and links handed over with the ask (a brief, a draft, a spec), read and cited, never edited | `given, web` |
 | criteria | what the text must achieve and what is ruled out | from the ask |
@@ -37,6 +38,8 @@ round), **Log** (each phase's posts verbatim, with their `#<seq>`). Swarm kind `
 | **7 whole text** | impact and editor, together, on the assembled text | one post each on what no paragraph shows: every fact said once, no verb or phrase repeated, tenses consistent, each work's room matching its weight, every duty of the reader's brief answered, and every complex sentence made simpler to read (one claim, plain words, jargon glossed or cut); the writer then posts the assembled text with them applied | add a fact | the assembled text on the board |
 | **8 read** | every seat but the writer and the impact analyst | per note, at most 5, on the whole text: the line quoted, the reaction as that seat, the change asked; a claim's note names what the source lacks; the editor's note on a work out of order, or a minor one given more room than a core one, is blocking | rewrite the text | the notes on the board, the round numbered; your rulings where notes conflict, the checker winning on truth over impact |
 | **9 revise** | writer | post the new text, then per note: taken, or declined with why | — | the text replaced; phases 8 and 9 again while rounds remain |
+
+**Altitude**: the editor holds it in every phase; a sentence below the template's altitude (a component, a tool, a configuration where the reader is owed what and why) is blocking in polish, whole text and read, and is cut or lifted, never refined. Readers judge whether the text is credible at that altitude, never ask it to go lower.
 
 **Highlights only**: every sentence carries a strength the sources hold; what they do not hold is left unsaid, never conceded. No phase asks a seat for lessons, limits or gaps, which invites them, and a gap analysis given as evidence is background, never content. A concession found in reading is blocking.
 
