@@ -360,7 +360,9 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
   });
   const { DatabaseSync } = await import("node:sqlite");
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  const db = new DatabaseSync(dbPath);
+  // the busy timeout set at open, not by the pragma below: the first reads already need it, and
+  // without it a verb that opens while another process writes fails outright with SQLITE_BUSY
+  const db = new DatabaseSync(dbPath, { timeout: 5000 });
   // the analytics records (call_log, lock_requests, run_stats) start with the store that first creates them:
   // a run opened before reads recorded: false (D33)
   const recordsAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'call_log'").get() === undefined;

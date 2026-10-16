@@ -1245,7 +1245,7 @@ async function openBoard(dbPath = SQLITE_PATH, opts = {}) {
   });
   const { DatabaseSync } = await import("node:sqlite");
   fs2.mkdirSync(path2.dirname(dbPath), { recursive: true });
-  const db = new DatabaseSync(dbPath);
+  const db = new DatabaseSync(dbPath, { timeout: 5e3 });
   const recordsAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'call_log'").get() === void 0;
   const sharesAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'shares'").get() === void 0;
   db.exec(`
