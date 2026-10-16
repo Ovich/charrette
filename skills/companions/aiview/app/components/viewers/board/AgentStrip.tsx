@@ -11,7 +11,7 @@ function statusOf(p: SnapshotRunner): { text: string; className: string } {
   if (p.state === "ended" || p.state === "done") return { text: p.ended ? `ended ${hhmm(p.ended)}` : "ended", className: "ended" };
   if (p.stale) return { text: `quiet ${Math.max(1, Math.round((Date.now() - Date.parse(p.lastCall)) / 60000))} min`, className: "quiet" };
   const doing = p.listening && p.slice !== ORCHESTRATOR ? "listening" : p.state;
-  return { text: `${doing} · since ${hhmm(p.joined)}`, className: p.state };
+  return { text: `${doing} · ${hhmm(p.joined)}`, className: p.state };
 }
 
 /** A token count in few characters: 950, 12K, 2.2M (the user asked for K over the full count). */
