@@ -154,7 +154,8 @@ test("the agent strip: the orchestrator is its first card; each card shows its c
   expect(cards.every((c) => c.getAttribute("data-component") === "AgentCard")).toBe(true);
   expect(cards[0].className).toMatch(/\borch\b/);
   const counter = (i: number) => cards[i].querySelector('[data-component="TokenCounter"]')!;
-  expect(counter(0).textContent).toMatch(/^120,345 tok · moved [12]s ago$/);
+  expect(counter(0).textContent).toMatch(/^120K tok · [12]s$/);
+  expect(counter(1).textContent).toMatch(/^10K tok · [78]s$/);
   expect(counter(0).getAttribute("data-state")).toBe("moving");
   expect(counter(1).getAttribute("data-state")).toBe("flat");
   expect(counter(1).className).toBe("counter flat");

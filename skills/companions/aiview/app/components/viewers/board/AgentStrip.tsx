@@ -14,6 +14,10 @@ function statusOf(p: SnapshotRunner): { text: string; className: string } {
   return { text: `${doing} · since ${hhmm(p.joined)}`, className: p.state };
 }
 
+/** A token count in few characters: 950, 12K, 2.2M (the user asked for K over the full count). */
+export const compactTokens = (n: number): string =>
+  n < 1000 ? String(n) : n < 1_000_000 ? `${Math.round(n / 1000)}K` : `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+
 /** The member's token counter (swarm's stall poller): the count and the seconds since it last moved,
  *  marked flat at the run's stall threshold; the reason when the board cannot read it. */
 function Counter({ p, now, stallMs }: { p: SnapshotRunner; now: number; stallMs: number }) {
@@ -29,7 +33,7 @@ function Counter({ p, now, stallMs }: { p: SnapshotRunner; now: number; stallMs:
   const flat = since !== null && since * 1000 >= stallMs;
   return (
     <span className={flat ? "counter flat" : "counter"} data-component="TokenCounter" data-state={flat ? "flat" : "moving"}>
-      {(l.tokens ?? 0).toLocaleString("en-US")} tok{since !== null && ` · moved ${since}s ago`}
+      {compactTokens(l.tokens ?? 0)} tok{since !== null && ` · ${since}s`}
     </span>
   );
 }
