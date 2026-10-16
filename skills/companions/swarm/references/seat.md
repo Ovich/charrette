@@ -75,7 +75,8 @@ gone, and nothing wakes it. How to wait is the line the CLI prints; read it and 
 ## Along the way
 
 - **One command per shell call**, never chained with `&&`, `;` or pipes into git: a worktree guard refuses what it cannot verify stays in your worktree.
-- **`$S doing "<text>" --as <group>/<seat>`** when you turn to another question.
+- **`$S doing "<text>" --as <group>/<seat>`** when you turn to another question, and before any long piece of work ("drafting the audit table"): the card shows what you are on while the thread is quiet.
+- **A long post** (a table, quotes, guillemets) goes through a file, never through the shell's quoting: write it, then `$S post --file <path> --as <group>/<seat>`.
 - **`$S deliver --as <group>/<seat>`** gives what you have not had, every post of your run in full;
   `$S read <n> --as <group>/<seat>` a message in full; `$S thread --as <group>/<seat>` the current
   phase's whole discussion, read before a post that decides or adds.

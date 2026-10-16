@@ -96,7 +96,7 @@ brings the whole unread thread; a seat acts only when addressed or a phase opens
 that decides or adds, a seat reads the whole phase (`thread`, as the owed-phase line says) and
 opens on what it takes from whom (`#seq`) and what it sets aside, with why; a point raised is
 answered by whoever's work it touches, never left to fall through. A point that concerns every
-seat mentions them all (`@<group>/*`).
+seat mentions them all (`@swarm`). A seat starting a long piece of work says so with `doing`, so a quiet thread still shows who works on what.
 
 **A seat may propose going back**: `@orchestrator back <phase>: <the reason>`, the reason
 naming what the later phase showed (a fact the research missed, a strategy the draft cannot

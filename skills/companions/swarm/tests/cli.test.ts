@@ -1142,3 +1142,15 @@ test("a member owing the open phase is told to do it before any wait: at join, a
   // the orchestrator never owes a phase
   assert.doesNotMatch(run("deliver", "--as", "idea/orchestrator").stdout, /is open and asks/);
 });
+
+test("post --file posts a long body read from a file, guillemets, tables and quotes intact", () => {
+  const id = openBrainstorm();
+  assert.equal(joinSeat(id, "architect").status, 0);
+  const body = "| # | phrase |\n|---|---|\n| 1 | « l'IA propose », \"quoted\" & `ticked` |\n@orchestrator";
+  const file = path.join(toolRoot, "post.md");
+  fs.writeFileSync(file, `${body}\n`);
+  const r = run("post", "--file", file, "--as", "idea/architect");
+  assert.equal(r.status, 0, r.stderr);
+  const read = run("read", seqOf(r.stdout));
+  assert.ok(read.stdout.includes(body), read.stdout);
+});

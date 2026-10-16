@@ -37,7 +37,7 @@ const USAGE = [
   "  subscribe   [--as <member>] <events>                            # prints your subscriptions after",
   "  unsubscribe [--as <member>] <events>",
   "  doing   [--as <member>] <text>",
-  "  post    [--as <member>] <body> [--about <path|decision id>]   # prints the seq",
+  "  post    [--as <member>] <body> | --file <path> [--about <path|decision id>]   # prints the seq; --file for a long body (tables, quotes), never through shell quoting",
   "  agree   [--as <member>] <terms> [--about <path|decision id>]  # prints the seq",
   "  endorse [--as <member>] <seq>                                   # backs an agreement; prints the endorsement's seq",
   "  read    <seq>",
@@ -633,7 +633,9 @@ ${USAGE}`);
     case "agree": {
       const p = caller(board);
       if (answeredClosed(board, p)) break;
-      const body = args.positional.join(" ") || fail(`${args.verb}: nothing to say`);
+      // --file: a long body (a table, quotes, guillemets) read from a file, never through the shell's quoting
+      const file = args.flag("--file");
+      const body = (file ? fs.readFileSync(file, "utf8").trim() : args.positional.join(" ")) || fail(`${args.verb}: nothing to say`);
       const m = board.post(p, body, {
         about: aboutArg(),
         kind: args.verb === "agree" ? "agreement" : "msg",
