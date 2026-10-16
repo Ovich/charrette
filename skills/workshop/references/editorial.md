@@ -31,7 +31,7 @@ replies; the final text. The board alone tells the whole run. **It is also the s
 
 | Phase | Who | May | May not | You, after |
 |---|---|---|---|---|
-| **1 research** | researcher | post one dossier: the reader, their context, the signals in what they wrote, every citable figure with its source | write the text | the dossier on the board |
+| **1 research** | researcher | post one dossier: the reader, their context, the signals in what they wrote, every citable figure with its source; then **the brief against the sources**: what the reader is really asking for, each demand with the strongest sourced proof and how strongly it answers, and where the text could be misread, with the framing that prevents it (gaps are background, never content) | write the text | the dossier on the board; the editor holds the text to the demands marked strong |
 | **2 strategy** | every seat, answering you | answer your questions: the hierarchy (editor), the voice and structure (writer), what the reader must believe (readers), what the sources allow and forbid (checker), the context to show (researcher) | propose wording | settle the strategy against the criteria, with **one thesis sentence** every paragraph must serve (the editor cuts what does not); post it, write it on the board |
 | **3 angles** (blind) | every seat | post one angle within the strategy: the opening, the proofs in order, the close, each proof tied to its source | read the others' angles first, write the text | nothing |
 | **4 pick** | — | — | — | pick an angle, or merge, against the strategy; the pick and its reason posted and written under *Angles* |
