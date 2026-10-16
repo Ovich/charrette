@@ -184,6 +184,7 @@ test("an open with no transcript warns for the orchestrator; a closed run's tick
   assert.equal(board.snapshot(REPO).runs[0].stallMs, 8000);
   counters.set("x.jsonl", 1);
   board.registerTranscript(run.id, "orchestrator", path.join(dir, "x.jsonl"));
+  board.join({ run: run.id, slice: "a", doing: "x", files: [] });
   const base = Date.now() + 60_000;
   counters.set("x.jsonl", 2);
   board.livenessTick(run.id, at(base, 0));
@@ -195,4 +196,21 @@ test("an open with no transcript warns for the orchestrator; a closed run's tick
   board.closeRun(run.id);
   assert.equal(board.livenessTick(run.id, at(base, 9)), false);
   assert.equal(board.livenessTick(999, at(base, 9)), false);
+});
+
+test("no stall before any seat has joined: the run is still being dispatched", () => {
+  const run = board.openRun({
+    repo: REPO,
+    kind: "brainstorm",
+    group: "boot",
+    title: "B",
+    transcript: path.join(dir, "o2.jsonl"),
+    seats: [{ id: "a", title: "A", blockers: [] }],
+  });
+  const before = board.snapshot(REPO).events.filter((e) => e.event === "stalled" && e.run === run.id).length;
+  const base = Date.now() + 120_000;
+  counters.set("o2.jsonl", 5);
+  board.livenessTick(run.id, at(base, 0));
+  board.livenessTick(run.id, at(base, 30));
+  assert.equal(board.snapshot(REPO).events.filter((e) => e.event === "stalled" && e.run === run.id).length, before);
 });

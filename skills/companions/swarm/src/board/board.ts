@@ -1372,6 +1372,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
         );
         // no readable counter: the stall check is blind, as the liveness warnings said
         if (!readable.length) return;
+        // before any member but the orchestrator has joined, the run is still being dispatched: no stall yet
+        if (!members.some((m) => m !== ORCHESTRATOR)) return;
         const last = readable.reduce((a, b) => (String(b.moved_at) > String(a.moved_at) ? b : a));
         const silence = at.getTime() - Date.parse(String(last.moved_at));
         const threshold = Number(r.stall_ms ?? STALL_MS_DEFAULT);

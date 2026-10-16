@@ -2073,6 +2073,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
           (t) => members.includes(String(t.member))
         );
         if (!readable.length) return;
+        if (!members.some((m) => m !== ORCHESTRATOR2)) return;
         const last = readable.reduce((a, b) => String(b.moved_at) > String(a.moved_at) ? b : a);
         const silence = at.getTime() - Date.parse(String(last.moved_at));
         const threshold = Number(r.stall_ms ?? STALL_MS_DEFAULT);

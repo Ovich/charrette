@@ -39,6 +39,8 @@ round), **Log** (each phase's posts verbatim, with their `#<seq>`). Swarm kind `
 | **8 read** | every seat but the writer and the impact analyst | per note, at most 5, on the whole text: the line quoted, the reaction as that seat, the change asked; a claim's note names what the source lacks; the editor's note on a work out of order, or a minor one given more room than a core one, is blocking | rewrite the text | the notes on the board, the round numbered; your rulings where notes conflict, the checker winning on truth over impact |
 | **9 revise** | writer | post the new text, then per note: taken, or declined with why | — | the text replaced; phases 8 and 9 again while rounds remain |
 
+**Every post that hands work on mentions whoever acts next** (`@writer`, `@checker`…): a seat is woken only by a mention, so a hand-off without one stops the chain.
+
 **Altitude**: the editor holds it in every phase; a sentence below the template's altitude (a component, a tool, a configuration where the reader is owed what and why) is blocking in polish, whole text and read, and is cut or lifted, never refined. Readers judge whether the text is credible at that altitude, never ask it to go lower.
 
 **Highlights only**: every sentence carries a strength the sources hold; what they do not hold is left unsaid, never conceded. No phase asks a seat for lessons, limits or gaps, which invites them, and a gap analysis given as evidence is background, never content. A concession found in reading is blocking.
