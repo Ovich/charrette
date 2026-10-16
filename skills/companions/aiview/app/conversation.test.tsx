@@ -215,7 +215,7 @@ test("the time is centred on the head's 18px line, a message's and an event's", 
   expect(ruleOf(css, ".board .event .head")).toContain("min-height: 18px");
 });
 
-test("a phase is a separator across the conversation, its name and text on the rule; neither a post nor an event line", () => {
+test("a phase is a line cut by its name, its text on hover; neither a post nor an event line", () => {
   const nm = PHASED.runs.find((r) => r.code === "NM")!;
   render(<Conversation items={conversation(PHASED, { run: nm.run, follow: null })} archived={null} fresh={new Set()} />);
   const sep = screen.getByRole("separator", { name: "Phase diverge: every name a run could carry, no judgment yet" });
@@ -225,6 +225,8 @@ test("a phase is a separator across the conversation, its name and text on the r
   expect(sep.querySelector(".said")?.textContent).toBe("every name a run could carry, no judgment yet");
   expect(sep.querySelector(".head, .time")).toBeNull();
   const css = readFileSync(join(import.meta.dirname, "components/viewers/board/board.css"), "utf8");
-  expect(css).toMatch(/\.board \.phase::before, \.board \.phase::after \{[^}]*border-top: 2px solid/);
-  expect(css).toMatch(/\.board \.phase \.label \{[^}]*text-align: center/);
+  expect(css).toMatch(/\.board \.phase::before, \.board \.phase::after \{[^}]*border-top: 1px solid/);
+  expect(css).toMatch(/\.board \.phase \.label \{[^}]*white-space: nowrap/);
+  expect(css).toMatch(/\.board \.phase \.said \{ display: none; \}/);
+  expect(sep.getAttribute("title")).toContain("diverge: every name a run could carry");
 });

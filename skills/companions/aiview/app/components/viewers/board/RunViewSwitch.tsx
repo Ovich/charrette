@@ -43,7 +43,7 @@ export function RunViewSwitch({
       {phase && (
         <span className="runphase" data-component="RunPhase" data-phase={phase.name} title={`The run's current phase: ${phase.name}`}>
           <span className="name">{phase.name}</span>
-          {phase.text && <span className="said">{phase.text}</span>}
+          {phase.text && <span className="said" title={phase.text}>{phase.text}</span>}
         </span>
       )}
       {view === "analytics" && json !== null && (

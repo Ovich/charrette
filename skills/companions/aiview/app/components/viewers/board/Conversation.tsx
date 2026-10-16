@@ -68,8 +68,8 @@ function BoardEventLine({ item, fresh }: { item: BoardEventItem; fresh: boolean 
   );
 }
 
-/** A phase the orchestrator opened (`swarm phase`): a rule across the conversation, the phase's name
- *  and its text centred on it; neither a post nor an event line. */
+/** A phase the orchestrator opened (`swarm phase`): a line cut in the middle by the phase's name, its text
+ *  on hover; neither a post nor an event line. */
 function PhaseSeparator({ item, fresh }: { item: PhaseItem; fresh: boolean }) {
   return (
     <li
@@ -79,7 +79,7 @@ function PhaseSeparator({ item, fresh }: { item: PhaseItem; fresh: boolean }) {
       data-phase={item.name}
       role="separator"
       aria-label={`Phase ${item.name}: ${item.text}`}
-      title={item.at}
+      title={item.text ? `${item.name}: ${item.text} (${item.at})` : item.at}
     >
       <span className="label">
         <span className="name">{item.name}</span>

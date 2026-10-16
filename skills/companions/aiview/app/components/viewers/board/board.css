@@ -178,13 +178,11 @@
 .board .event .head { display: flex; align-items: center; min-height: 18px; }
 .board .event .time { padding-top: 0; line-height: 18px; }
 .board .event .text { grid-column: 2; line-height: 1.5; overflow-wrap: anywhere; }
-/* a phase the orchestrator opened: a full-width rule across the conversation, its name and text centred on it,
-   heavier than any item so the talk reads in phases */
-.board .phase { display: flex; align-items: center; gap: 12px; margin: 18px 0 10px; font-size: 12.5px; color: var(--foreground); }
-.board .phase::before, .board .phase::after { content: ""; flex: 1 1 24px; border-top: 2px solid color-mix(in srgb, var(--accent) 60%, var(--border)); }
-.board .phase .label { flex: 0 1 auto; max-width: 75%; text-align: center; line-height: 1.5; overflow-wrap: anywhere; padding: 3px 12px; border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--border)); border-radius: 999px; background: color-mix(in srgb, var(--accent) 8%, var(--background)); }
-.board .phase .name { font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
-.board .phase .said::before { content: " · "; color: var(--faint-foreground); }
+/* a phase the orchestrator opened: a thin line cut in the middle by the phase's name; its text on hover */
+.board .phase { display: flex; align-items: center; gap: 10px; margin: 14px 0 8px; }
+.board .phase::before, .board .phase::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+.board .phase .label { flex: none; white-space: nowrap; font-weight: 600; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); }
+.board .phase .said { display: none; }
 .board .phase.new { animation: board-rise .35s ease-out; }
 .board .tip { cursor: help; text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; }
 .board #tipbox { position: fixed; z-index: 50; max-width: 300px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--foreground); color: var(--background); font-size: 12px; line-height: 1.45; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); pointer-events: none; }
@@ -349,9 +347,9 @@
 .board .runhead .seg button + button { border-left: 1px solid var(--border); }
 .board .runhead .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
 /* the run's current phase, after its line: the name as a phase separator writes it */
-.board .runhead .runphase { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; padding-left: 10px; border-left: 1px solid var(--border); overflow-wrap: anywhere; }
+.board .runhead .runphase { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; padding-left: 10px; border-left: 1px solid var(--border); }
 .board .runhead .runphase .name { flex: none; white-space: nowrap; font-weight: 600; color: var(--foreground); text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
-.board .runhead .runphase .said { min-width: 0; font-size: 12.5px; }
+.board .runhead .runphase .said { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
 .board .runhead .ghost { margin-left: auto; font-size: 12px; color: var(--accent); }
 .board .analytics .kpis.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 /* the across view's brainstorm row, under the plan row when both kinds are chosen (D46) */
