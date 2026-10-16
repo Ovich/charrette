@@ -14,7 +14,7 @@ let repo: string;
 
 // SWARM_ROOT = where the code would be; CHARRETTE_HOME = where the data goes.
 // The suite points both at one temp dir so a run leaves nothing in the real home.
-const env = () => ({ ...process.env, SWARM_ROOT: toolRoot, CHARRETTE_HOME: toolRoot });
+const env = () => ({ ...process.env, SWARM_ROOT: toolRoot, CHARRETTE_HOME: toolRoot, SWARM_NO_POLLER: "1" });
 
 const runIn = (cwd: string, ...argv: string[]) => spawnSync(process.execPath, [CLI, ...argv], { cwd, encoding: "utf8", env: env() });
 const run = (...argv: string[]) => runIn(repo, ...argv);
@@ -260,7 +260,7 @@ test("status --json lists each open run with its kind; the text names the kind (
   assert.equal(s.runs, 1);
   const nick = s.open[0]?.members[0]?.nick as string;
   assert.match(nick, /^[A-Z][a-z]+ [A-Z][a-z]+$/, "the orchestrator's funny name, given at open (D17)");
-  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", members: [{ name: "review-tool/orchestrator", nick, worktree: null }] }]);
+  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null }] }]);
   assert.match(run("status").stdout, new RegExp(`run ${id}  plan  review-tool  A plan`));
 });
 
@@ -787,7 +787,7 @@ test("join --on with an unknown event exits 1 listing the known ones; --on store
   const id = openBrainstorm();
   const bad = joinSeat(id, "architect", "--on", "agreed");
   assert.equal(bad.status, 1);
-  assert.match(bad.stderr, /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, quiet, back, opened, closed, urgent, flag/);
+  assert.match(bad.stderr, /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, quiet, back, opened, closed, urgent, phase, done, all-done, stalled, liveness, flag/);
   const ok = joinSeat(id, "architect", "--on", "agreement,any:merged");
   assert.equal(ok.status, 0, ok.stderr);
   const roster = run("roster");
@@ -878,4 +878,152 @@ test("roster --json and status --json give each member's worktree, null for a se
   const open = JSON.parse(run("status", "--json").stdout).open as { run: number; members: { name: string; worktree: string | null }[] }[];
   assert.ok(open.find((r) => r.run === Number(id))!.members.some((m) => m.name === "review-tool/S3" && m.worktree !== null));
   assert.ok(open.find((r) => r.run === seat)!.members.filter((m) => m.name.endsWith("/skeptic")).every((m) => m.worktree === null));
+});
+
+test("phase opens a phase: prints its seq, then the listener and the next phase to open, never an end; end is a name like any; a seat exits 1", () => {
+  const seats = path.join(toolRoot, "seats.json");
+  fs.writeFileSync(seats, SEATS);
+  const id = Number(run("open", "--kind", "brainstorm", "--group", "idea", "--title", "An idea", "--seats", seats).stdout.split("\n")[0]);
+  const first = JSON.parse(SEATS)[0].id as string;
+  assert.equal(run("join", "--run", String(id), "--seat", first, "--doing", "x").status, 0);
+  const r = run("phase", "diverge", "every", "idea", "--as", "idea/orchestrator");
+  assert.equal(r.status, 0, r.stderr);
+  const [seq, next] = r.stdout.trim().split("\n");
+  assert.match(seq, /^#\d+$/);
+  assert.match(next, /wait --mentions --as idea\/orchestrator.*open the next phase: .* phase <name> "<text>" --as idea\/orchestrator/);
+  assert.match(next, new RegExp(`close --run ${id}`));
+  assert.doesNotMatch(next, /end(s|ing)? (a|the|one) phase/);
+  const named = run("phase", "end", "the board is written", "--as", "idea/orchestrator");
+  assert.equal(named.status, 0, named.stderr);
+  assert.match(named.stdout, /phase end is open/);
+  const refused = run("phase", "x", "y", "--as", `idea/${first}`);
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /only the orchestrator opens a phase/);
+  const help = run("--help").stdout;
+  assert.match(help, /^ {2}phase {3}<name> <text> \[--as <member>\] +# opens phase <name>; the current phase ends with it/m);
+  assert.match(help, /^ {2}done {4}<phase> \[--as <member>\]/m);
+  assert.doesNotMatch(help, /phase end /);
+});
+
+test("done: a member's done is counted, roster and status show n/m done, the last done tells the orchestrator every member is done; the answer says wait", () => {
+  const seats = path.join(toolRoot, "seats.json");
+  fs.writeFileSync(seats, SEATS);
+  const id = Number(run("open", "--kind", "brainstorm", "--group", "idea", "--title", "An idea", "--seats", seats).stdout.split("\n")[0]);
+  const [a, b] = (JSON.parse(SEATS) as { id: string }[]).map((s) => s.id);
+  for (const s of [a, b]) assert.equal(run("join", "--run", String(id), "--seat", s, "--doing", "x").status, 0);
+  assert.equal(run("done", "diverge", "--as", `idea/${a}`).status, 1, "no phase open yet");
+  run("phase", "diverge", "every idea", "--as", "idea/orchestrator");
+  run("deliver", "--as", "idea/orchestrator");
+  const wrong = run("done", "converge", "--as", `idea/${a}`);
+  assert.equal(wrong.status, 1);
+  assert.match(wrong.stderr, /the current phase is diverge/);
+  const first = run("done", "diverge", "--as", `idea/${a}`);
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.stdout, /^done diverge: 1\/2 members done$/m);
+  assert.match(first.stdout, /wait for the next phase.* wait --mentions --as idea\//);
+  assert.match(run("roster").stdout, new RegExp(`^run ${id} {2}An idea {2}phase diverge: every idea {2}1/2 done$`, "m"));
+  assert.match(run("status").stdout, /phase diverge: every idea {2}1\/2 done/);
+  const told = run("deliver", "--as", "idea/orchestrator").stdout;
+  assert.match(told, /done diverge \(1\/2\)/);
+  assert.doesNotMatch(told, /all done/);
+  const last = JSON.parse(run("done", "diverge", "--as", `idea/${b}`, "--json").stdout);
+  assert.deepEqual([last.done, last.of, last.all], [2, 2, true]);
+  const all = run("deliver", "--as", "idea/orchestrator").stdout;
+  assert.match(all, /all done diverge: every member is done \(2\/2\)/);
+  assert.match(all, /open the next phase: .* phase <name> "<text>" --as idea\/orchestrator/);
+  assert.equal(JSON.parse(run("status", "--json").stdout).open[0].progress.done, 2);
+  assert.equal(run("done", "diverge", "--as", "idea/orchestrator").status, 1);
+});
+
+test("end on an ended member, or on a closed run, exits 0 and says nothing", () => {
+  const id = openRun();
+  assert.equal(run("join", "--run", String(id), "--slice", "S3", "--doing", "x").status, 0);
+  assert.equal(run("end", "--as", "review-tool/S3").status, 0);
+  const again = run("end", "--as", "review-tool/S3");
+  assert.deepEqual([again.status, again.stdout, again.stderr], [0, "", ""]);
+  assert.equal(run("join", "--run", String(id), "--slice", "S5", "--doing", "x").status, 0);
+  run("close", "--run", String(id));
+  const closed = run("end", "--as", "review-tool/S5");
+  assert.deepEqual([closed.status, closed.stdout, closed.stderr], [0, "", ""]);
+});
+
+test("transcripts: open --transcript, slice --transcript after dispatch, the seats file's; none or unreadable warns once on the thread", () => {
+  const good = path.join(toolRoot, "good.jsonl");
+  fs.writeFileSync(good, JSON.stringify({ type: "assistant", message: { usage: { input_tokens: 3, output_tokens: 4, cache_creation_input_tokens: 0, cache_read_input_tokens: 5 } } }) + "\n");
+  const seats = path.join(toolRoot, "seats.json");
+  fs.writeFileSync(seats, JSON.stringify([{ id: "a", title: "A", blockers: [], transcript: good }, { id: "b", title: "B", blockers: [] }]));
+  const opened = run("open", "--kind", "brainstorm", "--group", "idea", "--title", "I", "--seats", seats, "--transcript", good, "--stall-ms", "8000");
+  assert.equal(opened.status, 0, opened.stderr);
+  const id = Number(opened.stdout.split("\n")[0]);
+  assert.equal(run("join", "--run", String(id), "--seat", "a", "--doing", "x").status, 0);
+  assert.equal(run("join", "--run", String(id), "--seat", "b", "--doing", "x").status, 0);
+  const told = run("deliver", "--as", "idea/orchestrator").stdout;
+  assert.match(told, /liveness: no readable transcript for idea\/b, stall check blind for it/);
+  assert.doesNotMatch(told, /for idea\/(a|orchestrator)/);
+  const bad = path.join(toolRoot, "bad.txt");
+  fs.writeFileSync(bad, "not json\n");
+  const r = run("slice", "b", "--run", String(id), "--transcript", bad);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /b transcript not readable yet/);
+  run("slice", "b", "--run", String(id), "--transcript", bad);
+  const twice = run("deliver", "--as", "idea/orchestrator").stdout.match(/liveness: no readable transcript for idea\/b/g) ?? [];
+  assert.equal(twice.length, 1, "once per member and condition");
+  const ok = JSON.parse(run("slice", "b", "--run", String(id), "--transcript", good, "--json").stdout);
+  assert.deepEqual([ok.liveness.state, ok.liveness.tokens], ["ok", 12]);
+  assert.match(run("--help").stdout, /--transcript <path>/);
+});
+
+test("open starts the run's poller, its pid in the data home; close stops it", async () => {
+  const seats = path.join(toolRoot, "seats.json");
+  fs.writeFileSync(seats, SEATS);
+  const live = { ...env(), SWARM_NO_POLLER: "0" };
+  const opened = spawnSync(process.execPath, [CLI, "open", "--kind", "brainstorm", "--group", "idea", "--title", "I", "--seats", seats], { cwd: repo, encoding: "utf8", env: live });
+  const id = Number(opened.stdout.split("\n")[0]);
+  const pidFile = path.join(toolRoot, `swarm-poll-${id}.pid`);
+  for (let i = 0; i < 50 && !fs.existsSync(pidFile); i++) await new Promise((r) => setTimeout(r, 100));
+  const pid = Number(fs.readFileSync(pidFile, "utf8"));
+  const alive = (): boolean => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  assert.ok(alive());
+  spawnSync(process.execPath, [CLI, "close", "--run", String(id)], { cwd: repo, encoding: "utf8", env: live });
+  for (let i = 0; i < 50 && alive(); i++) await new Promise((r) => setTimeout(r, 100));
+  assert.ok(!alive(), "the poller stopped");
+  assert.ok(!fs.existsSync(pidFile));
+});
+
+test("on a plan run too: the current phase heads wait, deliver and read, follows the roster at join, and sits beside the title in roster and status", () => {
+  const id = openRun();
+  const s3 = "review-tool/S3";
+  assert.equal(run("join", "--run", String(id), "--slice", "S3", "--doing", "page").status, 0);
+  // before any phase: no header
+  run("post", "@S3 before", "--as", "review-tool/orchestrator");
+  assert.doesNotMatch(run("deliver", "--as", s3).stdout, /^phase /m);
+  assert.equal(JSON.parse(run("deliver", "--as", s3, "--json").stdout).phase, null);
+
+  const r = run("phase", "build", "the", "first", "wave", "--as", "review-tool/orchestrator");
+  assert.equal(r.status, 0, r.stderr);
+  const header = "phase build: the first wave";
+  const woken = run("wait", "--mentions", "--as", s3, "--timeout", "3000");
+  assert.equal(woken.stdout.split("\n")[0], header);
+  assert.match(woken.stdout, /phase build: the first wave/);
+
+  const posted = run("post", "@S3 go", "--as", "review-tool/orchestrator");
+  const delivered = run("deliver", "--as", s3).stdout.split("\n");
+  assert.equal(delivered[0], header);
+  assert.equal(run("read", seqOf(posted.stdout), "--as", s3).stdout.split("\n")[0], header);
+  assert.equal(JSON.parse(run("read", seqOf(posted.stdout), "--as", s3, "--json").stdout).phase, header);
+
+  const joined = run("join", "--run", String(id), "--slice", "S5", "--doing", "skill").stdout.split("\n");
+  const lastRoster = joined.map((l) => / run \d+ {2}doing: /.test(l)).lastIndexOf(true);
+  assert.equal(joined[lastRoster + 1], header);
+
+  assert.match(run("roster").stdout, new RegExp(`^run ${id} {2}A plan {2}phase build: the first wave {2}0/2 done$`, "m"));
+  assert.match(run("status").stdout, new RegExp(`run ${id} {2}plan {2}review-tool {2}A plan {2}phase build: the first wave {2}0/2 done`));
+  assert.deepEqual(JSON.parse(run("status", "--json").stdout).open[0].phase, { name: "build", text: "the first wave" });
 });

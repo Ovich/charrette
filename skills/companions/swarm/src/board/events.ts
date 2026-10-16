@@ -4,7 +4,7 @@
 import type { Message, Participant } from "./board.ts";
 import { profileOf } from "./kinds.ts";
 
-export type EventName = "agreement" | "endorsement" | "merged" | "joined" | "ended" | "stale" | "opened" | "closed" | "urgent" | "flag" | "quiet" | "back";
+export type EventName = "agreement" | "endorsement" | "merged" | "joined" | "ended" | "stale" | "opened" | "closed" | "urgent" | "flag" | "quiet" | "back" | "phase" | "done" | "all-done" | "stalled" | "liveness";
 /** `run`: the member's own run; `any`: every run of the project. */
 export type Scope = "run" | "any";
 export type Subscription = { event: EventName; scope: Scope };
@@ -13,6 +13,8 @@ export interface EventDef {
   name: EventName;
   /** always wakes, whatever the subscriptions (urgent) */
   always?: boolean;
+  /** posted by the board in a member's name, it reaches that member too (stalled, liveness) */
+  toAuthor?: boolean;
   /** the line a woken member runs next, or null; `cli` is the command prefix the CLI prints */
   next?(m: Message, me: Participant, cli: string): string | null;
 }
@@ -39,6 +41,37 @@ export const EVENTS: Record<EventName, EventDef> = {
   opened: { name: "opened" },
   closed: { name: "closed" },
   urgent: { name: "urgent", always: true },
+  // the orchestrator opens a phase (`phase <name> <text>`), the current one ending with it: a separator on the thread;
+  // it mentions `<group>/*`, so its own run's members wake and no other's, whatever the run's kind; a member
+  // runs `done <name>` when its part is in
+  phase: {
+    name: "phase",
+    next: (m, me, cli) => {
+      const name = m.meta && "phase" in m.meta ? m.meta.phase : null;
+      if (!name || me.slice === "orchestrator" || m.from === me.name) return null;
+      return `when your part of ${name} is posted: ${cli} done ${word(name)} --as ${word(me.name)}`;
+    },
+  },
+  // a member finished the current phase (`done <name>`); mentions the orchestrator
+  done: { name: "done" },
+  // every member of the run is done with the current phase: one event to the orchestrator
+  "all-done": {
+    name: "all-done",
+    next: (m, me, cli) =>
+      me.slice === "orchestrator" ? `open the next phase: ${cli} phase <name> "<text>" --as ${word(me.name)}; after the last, ${cli} close --run ${m.run}` : null,
+  },
+  // no readable token counter of the run moved for the run's stall threshold, posted again at each
+  // further threshold of silence; mentions `<group>/*`, the orchestrator included
+  stalled: {
+    name: "stalled",
+    toAuthor: true,
+    next: (_m, me, cli) =>
+      me.slice === "orchestrator"
+        ? `read the thread, then open the next phase (${cli} phase <name> "<text>" --as ${word(me.name)}) or address the member who owes a move (${cli} post "@<member> <what you need>" --as ${word(me.name)})`
+        : `if the current phase asks something of you and you have not done it, do it now; else keep waiting: ${cli} wait --mentions --as ${word(me.name)}`,
+  },
+  // a member's transcript cannot be read: the stall check is blind for it; mentions the orchestrator
+  liveness: { name: "liveness", toAuthor: true },
   // a write outside the writer's claim on a path another holds (D10); mentions: the holder, then the writer
   flag: {
     name: "flag",
@@ -87,7 +120,7 @@ export function mentions(m: Message, me: Participant): boolean {
 
 /** A message that ends `me`'s `wait --mentions`: a mention, an always event, or a subscribed event in its scope. */
 export function wakes(m: Message, me: Participant, subs: Subscription[]): boolean {
-  if (m.from === me.name) return false;
+  if (m.from === me.name && !(m.event && isEvent(m.event) && EVENTS[m.event].toAuthor)) return false;
   if (mentions(m, me)) return true;
   const e = eventOf(m);
   if (!e) return false;

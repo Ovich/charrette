@@ -12,6 +12,7 @@ import { statsOf, summarize, type Stats, type StatsScope } from "./stats.ts";
 import { type Kind, profileOf } from "./kinds.ts";
 import { type EventName, type Subscription, EVENTS, formatSubscriptions, mentions as mentionsMe, parseSubscriptions as parseOn, wakes } from "./events.ts";
 import { funnyName } from "./names.ts";
+import { READINGS_KEPT_MS, STALL_MS_DEFAULT, readTranscript, stallDue, type Reading, type TranscriptReader } from "./liveness.ts";
 
 export type RunId = number;
 export type { Kind } from "./kinds.ts";
@@ -22,7 +23,7 @@ export type { HeldMergeLock } from "./claims.ts";
 export type Conflicts = { files: string[] } | { unknown: "old-git" | "no-reflog" };
 export type { Stats, StatsScope, Totals, RunStats, MemberStats, PlanRunStats, SharedFile, FileAcrossRuns, Interval, Mark, QuestionStats, BrainstormRunStats } from "./stats.ts";
 /** A seat of a run (D22). `link`: the slice document's URL, opaque to the board (D44). */
-export type SeatSpec = { id: string; title: string; role?: string; blockers: string[]; link?: string | null; on?: string[] };
+export type SeatSpec = { id: string; title: string; role?: string; blockers: string[]; link?: string | null; on?: string[]; transcript?: string | null };
 /** Kept: the plan's own word (D41). */
 export type SliceSpec = SeatSpec;
 export type SliceState = "ready" | "running" | "done" | "blocked";
@@ -31,6 +32,14 @@ export type Declared = { path: string; interface: boolean }; // repository-relat
 export type MessageKind = "msg" | "agreement" | "endorsement" | "urgent" | "event";
 /** A file written outside its writer's claim while another runner holds it. */
 export type Flag = { path: string; holder: string; seq: number };
+
+/** The phase a run's orchestrator opened last (`phase <name> <text>`). */
+export type Phase = { name: string; text: string };
+/** How many of the run's members (the orchestrator apart) ran `done` for its current phase. */
+export type PhaseProgress = { phase: string; done: number; of: number };
+/** A member's token counter as the board last read it: `none`, no transcript registered; `unreadable`,
+ *  missing or in no known format; `ok`, read, `tokens` and `movedAt` its last reading. */
+export type Liveness = { state: "none" | "unreadable" | "ok"; tokens: number | null; movedAt: string | null };
 
 export interface Run {
   id: RunId;
@@ -43,6 +52,8 @@ export interface Run {
   link: string | null; // the plan document's URL, opaque (D44)
   state: "open" | "closed";
   slices: Slice[];
+  /** The current phase; null until the orchestrator opens one. */
+  phase: Phase | null;
 }
 
 export interface Participant {
@@ -99,8 +110,8 @@ export interface Message {
   /** On delivery only, to a holder of `about` when a runner that did not hold it posted about it:
    *  the agreement that answers it (D62). */
   answer?: string;
-  /** A merged event's recipients as data (D11); null elsewhere and on rows from before. */
-  meta?: MergedMeta | null;
+  /** A merged event's recipients, or a phase event's name, as data (D11); null elsewhere and on rows from before. */
+  meta?: MessageMeta | null;
   /** On post only: the refused claim this post settled (D7). */
   claimed?: { path: string; sharedWith: string[] };
 }
@@ -110,7 +121,15 @@ export interface Message {
 export type Delivery = { full: Message[]; lines: string[]; superseded?: true };
 
 /** What the page draws (D39). */
-export type RunSummary = { run: number; kind: Kind; plan: string; group: string; code: string; title: string; link: string | null; open: boolean; runners: number; done: number; of: number };
+export type RunSummary = {
+  run: number; kind: Kind; plan: string; group: string; code: string; title: string; link: string | null; open: boolean; runners: number; done: number; of: number;
+  /** The run's current phase, null until one is opened; absent from a reader before it. */
+  phase?: Phase | null;
+  /** The current phase's done count, null before the first phase. */
+  progress?: PhaseProgress | null;
+  /** The run's stall threshold: no token counter moved this long posts `stalled`. */
+  stallMs?: number;
+};
 export type RepoSummary = { repo: string; name: string; runs: RunSummary[] };
 export type RunnerState = "working" | "waiting" | "merging" | "watching" | "ended" | "done";
 export type SnapshotRunner = {
@@ -133,10 +152,16 @@ export type SnapshotRunner = {
   on: string[];
   /** Its last call to the board, else when it joined (D20: quiet n min). */
   lastCall: string;
+  /** Its token counter; absent from a reader before it. */
+  liveness?: Liveness;
 };
 /** What a merged event told, as data (D11): `rebase` holds or declared a changed file, `tell` is whom to tell of a resolved conflict,
  *  of a conflicted path only once the conflicts are known (D5). */
 export type MergedMeta = { rebase: string[]; tell: string[] };
+/** A phase event's name, as data: `phase <name> <text>` stores `<name>`. */
+export type PhaseMeta = { phase: string };
+/** What an event carries as data, by its event: merged or phase. */
+export type MessageMeta = MergedMeta | PhaseMeta;
 /** `event`, `mentions`, `meta`: absent on rows written before D11. */
 export type SnapshotEvent = {
   seq: number;
@@ -151,7 +176,7 @@ export type SnapshotEvent = {
   channel: RunId;
   event?: EventName | null;
   mentions?: string[];
-  meta?: MergedMeta | null;
+  meta?: MessageMeta | null;
 };
 export type QueueSlice = { slice: string; title: string; link: string | null; state: string; blockers: string[]; runner: string | null };
 /** A held file and every runner holding it, in claim order (D40): the FileMap's rows. */
@@ -173,7 +198,8 @@ export type BoardSnapshot = {
 
 export interface Board {
   /** `kind` defaults to plan; throws on an unknown kind. The group is stored as the plan (D44). */
-  openRun(input: { repo: string; kind?: Kind; group: string; title: string; link?: string | null; seats: SeatSpec[] }): Run;
+  /** `transcript`: the orchestrator's, registered at once; none posts a liveness warning. `stallMs`: the run's stall threshold, default 5000. */
+  openRun(input: { repo: string; kind?: Kind; group: string; title: string; link?: string | null; seats: SeatSpec[]; transcript?: string | null; stallMs?: number }): Run;
   /** `done` also releases the slice runner's claims and lock: the orchestrator's way to free a stale runner. */
   setSliceState(run: RunId, slice: string, state: SliceState): void;
   /** A seat added mid-run (D60): after the last, `ready`; refused on an id already in the run, an
@@ -181,6 +207,25 @@ export interface Board {
   addSlice(run: RunId, spec: SeatSpec): Slice;
   /** Also archives the run: read-only from then on, `run <n> is closed` (D19). Posts the `closed` event with the run, before it closes (D67). */
   closeRun(run: RunId): void;
+  /** The orchestrator opens phase `name` with `text`, the current one ending with it: a `phase` event in its run,
+   *  body `phase <name>: <text>`, mentioning `<group>/*` so every member of the run wakes; sets the run's
+   *  current phase and clears its done marks. Refused to anyone else and on a closed run, whatever the kind. */
+  phase(p: Participant, name: string, text: string): Message;
+  /** The run's current phase, as `phase` last set it; null until one is opened. Throws on an unknown run. */
+  currentPhase(run: RunId): Phase | null;
+  /** A member finished the current phase `name`: stored once per run, member and phase, a `done` event to the
+   *  orchestrator; when every member is done, one `all-done` event to it. Refused to the orchestrator, before any
+   *  phase and on a phase that is not the current one. `already`: it had run done for it before (no event). */
+  done(p: Participant, name: string): { progress: PhaseProgress; all: boolean; already: boolean; message: Message | null };
+  /** The current phase's done count; null before the first phase. */
+  phaseProgress(run: RunId): PhaseProgress | null;
+  /** Registers `member`'s transcript (a seat or slice id, or `orchestrator`) and reads it once: an unreadable
+   *  one posts the liveness warning. Refused on a closed run or an unknown member. */
+  registerTranscript(run: RunId, member: string, file: string): Liveness;
+  /** One tick of the run's poller: reads every live member's registered counter, stores the readings, warns
+   *  once of a counter that stops reading, and posts `stalled` at each whole stall threshold of silence of every
+   *  readable counter. `read` and `at` for tests. False when the run is closed or unknown: the poller stops. */
+  livenessTick(run: RunId, at?: Date, read?: TranscriptReader): boolean;
   /** Past the retention: closed runs (closed_at older), their seats, members not referenced by a
    *  kept message, their channels and deliveries; main messages older, agreements and the
    *  endorsements of kept agreements kept. Open runs never. The run's row stays, stamped `pruned_at`,
@@ -262,7 +307,12 @@ export interface Board {
   close(): void;
 }
 
+/** A phase's name: one word. */
+const PHASE_NAME = /^[\w.-]+$/;
+
 const SLICE_STATES = new Set<SliceState>(["ready", "running", "done", "blocked"]);
+/** The events a member receives though it is their author: the board posts them in its name. */
+const TO_AUTHOR = Object.values(EVENTS).filter((e) => e.toAuthor).map((e) => `'${e.name}'`).join(", ");
 const ORCHESTRATOR = "orchestrator";
 /** A watch event can be missed (a coalesced write, a platform quirk); the store is re-read
  *  this often regardless, so a missed event costs at most this much. */
@@ -296,7 +346,9 @@ export function messageLine(m: Message): string {
   return `#${m.seq} ${m.from}${kind}${about}: ${text}`;
 }
 
-export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
+/** `readTranscript`: how a transcript is read, injected by tests. */
+export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTranscript?: TranscriptReader } = {}): Promise<Board> {
+  const readCounter = opts.readTranscript ?? readTranscript;
   // node:sqlite prints an ExperimentalWarning on import; keep every other warning. Imported
   // here, not at module load, so a verb that never opens the store never pays for it.
   process.removeAllListeners("warning");
@@ -462,6 +514,18 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     -- board settings (D32): retention-days; the board's own last-upkeep (D16)
     CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
     -- the identities and hook_seen tables, left in stores from before D58, are no longer read or written
+    -- a member done with a phase, once per run, member and phase; a phase opened again clears its rows
+    CREATE TABLE IF NOT EXISTS phase_done (run INTEGER NOT NULL, participant INTEGER NOT NULL, phase TEXT NOT NULL, at TEXT NOT NULL,
+      PRIMARY KEY (run, participant, phase));
+    -- a member's transcript (member: its seat id, or orchestrator) and where its token counter stands
+    CREATE TABLE IF NOT EXISTS transcripts (run INTEGER NOT NULL, member TEXT NOT NULL, path TEXT NOT NULL, adapter TEXT,
+      offset INTEGER NOT NULL DEFAULT 0, tokens INTEGER NOT NULL DEFAULT 0, readable INTEGER NOT NULL DEFAULT 0,
+      read_at TEXT, moved_at TEXT, PRIMARY KEY (run, member));
+    -- the poller's readings, pruned past READINGS_KEPT_MS
+    CREATE TABLE IF NOT EXISTS token_readings (run INTEGER NOT NULL, member TEXT NOT NULL, t TEXT NOT NULL, tokens INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS token_readings_by_run ON token_readings (run, t);
+    -- a liveness warning posted, once per member and condition (none, unreadable); a good read clears unreadable
+    CREATE TABLE IF NOT EXISTS liveness_warned (run INTEGER NOT NULL, member TEXT NOT NULL, cond TEXT NOT NULL, PRIMARY KEY (run, member, cond));
   `);
   if (recordsAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(RECORDS_SINCE, new Date().toISOString());
   if (sharesAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(SHARES_SINCE, new Date().toISOString());
@@ -510,6 +574,12 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   upkeep("participants", "subs", "subs TEXT NOT NULL DEFAULT '[]'");
   // the seats file's `on`, JSON (D59)
   upkeep("slices", "on_events", "on_events TEXT");
+  // the run's current phase, set by `phase`: its name and its text; null until one is opened
+  upkeep("runs", "phase", "phase TEXT");
+  upkeep("runs", "phase_text", "phase_text TEXT");
+  // the run's stall threshold, and the stalled events posted since a counter last moved
+  upkeep("runs", "stall_ms", `stall_ms INTEGER NOT NULL DEFAULT ${STALL_MS_DEFAULT}`);
+  upkeep("runs", "stall_posts", "stall_posts INTEGER NOT NULL DEFAULT 0");
   db.exec("CREATE INDEX IF NOT EXISTS messages_channel ON messages (repo, run, seq)");
   // a store from before D40 keys a claim by path alone: rebuild it keyed by holder too
   const claimKey = (db.prepare("PRAGMA table_info(claims)").all() as { name: string; pk: number }[]).find((c) => c.name === "participant");
@@ -578,7 +648,10 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     return r;
   };
 
+  const phaseOf = (r: Row): Phase | null => (r.phase == null ? null : { name: String(r.phase), text: String(r.phase_text ?? "") });
+
   const toRun = (r: Row): Run => ({
+    phase: phaseOf(r),
     id: Number(r.id),
     repo: String(r.repo),
     kind: profileOf(String(r.kind ?? "plan")).kind,
@@ -643,7 +716,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     run: r.run == null ? author.run : Number(r.run),
     endorses: r.endorses == null ? null : Number(r.endorses),
     event: r.event == null || !Object.hasOwn(EVENTS, String(r.event)) ? null : (String(r.event) as EventName),
-    meta: r.meta == null ? null : (JSON.parse(String(r.meta)) as MergedMeta),
+    meta: r.meta == null ? null : (JSON.parse(String(r.meta)) as MessageMeta),
     };
   };
 
@@ -667,7 +740,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     about: string | null,
     kind: MessageKind,
     named?: string[],
-    extra: { endorses?: number; event?: EventName; meta?: MergedMeta } = {},
+    extra: { endorses?: number; event?: EventName; meta?: MessageMeta } = {},
   ): Message => {
     const mentions = named ?? (kind === "event" ? [] : parseMentions(body, p.plan, openPlans(p.repo), activeNames(p.repo)));
     // every item is stored with its author's run (plan D1, D13)
@@ -740,7 +813,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       const unseen = db
         .prepare(
           `SELECT m.* FROM messages m
-           WHERE m.repo = ? AND m.seq > ? AND m.author != ?
+           WHERE m.repo = ? AND m.seq > ? AND (m.author != ? OR m.event IN (${TO_AUTHOR}))
              AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.participant = ? AND d.seq = m.seq)
            ORDER BY m.seq`,
         )
@@ -809,6 +882,9 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       runners: open ? count(`SELECT COUNT(*) AS n FROM participants WHERE run = ? AND slice != '${ORCHESTRATOR}' AND ended_at IS NULL`) : 0,
       done: count("SELECT COUNT(*) AS n FROM slices WHERE run = ? AND state = 'done'"),
       of: count("SELECT COUNT(*) AS n FROM slices WHERE run = ?"),
+      phase: phaseOf(r),
+      progress: progressOf(id, r.phase == null ? null : String(r.phase)),
+      stallMs: Number(r.stall_ms ?? STALL_MS_DEFAULT),
     };
   };
   /** A repository is its common git dir; it is shown by its checkout's folder name. */
@@ -827,6 +903,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
 
   const insertSlice = (run: RunId, s: SeatSpec, ord: number): void => {
     if (s.on) parseOn(s.on); // an unknown event name is refused at open, not at join
+    // the seats file's transcript, registered unread: the seat is not dispatched yet; its join reads it
+    if (s.transcript) db.prepare("INSERT OR REPLACE INTO transcripts (run, member, path) VALUES (?, ?, ?)").run(run, s.id, path.resolve(s.transcript));
     db.prepare("INSERT INTO slices (run, id, title, blockers, link, ord, on_events) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
       run,
       s.id,
@@ -845,6 +923,66 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   };
   const sameSub = (a: Subscription, b: Subscription): boolean => a.event === b.event && a.scope === b.scope;
 
+  // ── liveness: token counters ───────────────────────────────────────────────────────
+  const orchestratorIn = (run: RunId): Participant =>
+    participantById(Number((db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run, ORCHESTRATOR) as Row).id));
+  /** The liveness warning, once per member and condition. */
+  const warnBlind = (run: RunId, member: string, cond: "none" | "unreadable"): void => {
+    if (Number(db.prepare("INSERT OR IGNORE INTO liveness_warned (run, member, cond) VALUES (?, ?, ?)").run(run, member, cond).changes) === 0) return;
+    const orch = orchestratorIn(run);
+    insertMessage(orch, `liveness: no readable transcript for ${orch.plan}/${member}, stall check blind for it`, null, "event", [orch.name], { event: EVENTS.liveness.name });
+  };
+  const livenessOf = (r: Row | undefined): Liveness =>
+    !r
+      ? { state: "none", tokens: null, movedAt: null }
+      : Number(r.readable) !== 1
+        ? { state: "unreadable", tokens: null, movedAt: null }
+        : { state: "ok", tokens: Number(r.tokens), movedAt: r.moved_at == null ? null : String(r.moved_at) };
+  const transcriptOf = (run: RunId, member: string): Row | undefined =>
+    db.prepare("SELECT * FROM transcripts WHERE run = ? AND member = ?").get(run, member) as Row | undefined;
+  /** Reads a member's counter once more: stores where it stands and the reading; warns when it does not read. */
+  const readCounterOnce = (run: RunId, member: string, at: Date, read: TranscriptReader): void => {
+    const row = transcriptOf(run, member);
+    if (!row) return warnBlind(run, member, "none");
+    const from: Reading | null = row.adapter == null ? null : { adapter: String(row.adapter), cursor: { offset: Number(row.offset), tokens: Number(row.tokens) } };
+    const got = read(String(row.path), from);
+    const iso = at.toISOString();
+    if (!got) {
+      if (Number(row.readable) === 1 || row.read_at == null) {
+        db.prepare("UPDATE transcripts SET readable = 0, read_at = ? WHERE run = ? AND member = ?").run(iso, run, member);
+        bump(String(runRow(run).repo));
+      }
+      return warnBlind(run, member, "unreadable");
+    }
+    const moved = row.moved_at == null || Number(row.readable) !== 1 || got.cursor.tokens !== Number(row.tokens);
+    db.prepare("UPDATE transcripts SET adapter = ?, offset = ?, tokens = ?, readable = 1, read_at = ?, moved_at = CASE WHEN ? THEN ? ELSE moved_at END WHERE run = ? AND member = ?").run(
+      got.adapter,
+      got.cursor.offset,
+      got.cursor.tokens,
+      iso,
+      moved ? 1 : 0,
+      iso,
+      run,
+      member,
+    );
+    db.prepare("INSERT INTO token_readings (run, member, t, tokens) VALUES (?, ?, ?, ?)").run(run, member, iso, got.cursor.tokens);
+    // read again: a later failure warns again
+    db.prepare("DELETE FROM liveness_warned WHERE run = ? AND member = ? AND cond = 'unreadable'").run(run, member);
+    if (moved) bump(String(runRow(run).repo));
+  };
+  /** The phase's done count: members done, of the members (the orchestrator apart) not ended without their done. */
+  const progressOf = (run: RunId, phase: string | null): PhaseProgress | null => {
+    if (phase == null) return null;
+    const rows = db
+      .prepare(
+        `SELECT p.ended_at, EXISTS (SELECT 1 FROM phase_done d WHERE d.run = p.run AND d.participant = p.id AND d.phase = ?) AS done
+         FROM participants p WHERE p.run = ? AND p.slice != '${ORCHESTRATOR}'`,
+      )
+      .all(phase, run) as Row[];
+    const counted = rows.filter((r) => Number(r.done) === 1 || r.ended_at == null);
+    return { phase, done: counted.filter((r) => Number(r.done) === 1).length, of: counted.length };
+  };
+
   /** The closed run's summary into run_stats (D20); summarize reads, this writes. */
   const storeRunStats = (run: RunId): void => {
     const body = summarize(db, run, STALE_MS);
@@ -853,11 +991,14 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   };
 
   const board: Board = {
-    openRun({ repo, kind = "plan", group, title, link, seats }) {
+    openRun({ repo, kind = "plan", group, title, link, seats, transcript, stallMs }) {
       const profile = profileOf(kind);
+      if (stallMs !== undefined && !(Number.isInteger(stallMs) && stallMs > 0)) throw new Error(`the stall threshold takes a positive whole number of ms, got ${stallMs}`);
       const id = transaction(() => {
         // the group is stored as the plan (D44)
-        const r = db.prepare("INSERT INTO runs (repo, kind, plan, title, link, opened_at) VALUES (?, ?, ?, ?, ?, ?)").run(repo, profile.kind, group, title, link ?? null, now());
+        const r = db
+          .prepare("INSERT INTO runs (repo, kind, plan, title, link, opened_at, stall_ms) VALUES (?, ?, ?, ?, ?, ?, ?)")
+          .run(repo, profile.kind, group, title, link ?? null, now(), stallMs ?? STALL_MS_DEFAULT);
         const run = Number(r.lastInsertRowid);
         seats.forEach((s, i) => insertSlice(run, s, i));
         // a funny name as a member gets at join (plan D17)
@@ -873,6 +1014,9 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         insertMessage(participantById(Number(orchestrator.lastInsertRowid)), `run ${run} opened: ${profile.kind} ${group}, ${title}`, null, "event", undefined, {
           event: EVENTS.opened.name,
         });
+        // the orchestrator joins at open: its counter registered, or the warning that the stall check is blind for it
+        if (transcript) db.prepare("INSERT OR REPLACE INTO transcripts (run, member, path) VALUES (?, ?, ?)").run(run, ORCHESTRATOR, path.resolve(transcript));
+        readCounterOnce(run, ORCHESTRATOR, new Date(), readCounter);
         bump(repo);
         return run;
       });
@@ -972,6 +1116,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           }
           db.prepare("DELETE FROM slices WHERE run = ?").run(run);
           db.prepare("DELETE FROM merges WHERE run = ?").run(run);
+          for (const table of ["phase_done", "transcripts", "token_readings", "liveness_warned"]) db.prepare(`DELETE FROM ${table} WHERE run = ?`).run(run);
           // the row stays, stamped: its id is never handed to a new run (D61)
           db.prepare("UPDATE runs SET pruned_at = ? WHERE id = ?").run(at.toISOString(), run);
         }
@@ -1079,6 +1224,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       const runner = participantById(id);
       claims.claimDeclared(runner, files);
       insertMessage(runner, `joined: ${doing}`, null, "event", undefined, { event: EVENTS.joined.name });
+      // its counter read once: none registered, or unreadable, is told on the thread
+      readCounterOnce(run, slice, new Date(), readCounter);
       return { runner, roster: board.roster(runner.repo) };
       });
     },
@@ -1139,6 +1286,99 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         db.prepare("UPDATE participants SET ended_at = ?, doing = CASE merged WHEN 1 THEN 'merged and ended' ELSE 'ended' END WHERE id = ?").run(now(), fresh.id);
         claims.releaseAll(fresh.id);
       });
+    },
+
+    phase(p, name, text) {
+      const fresh = live(p);
+      if (fresh.slice !== ORCHESTRATOR) throw new Error(`phase: only the orchestrator opens a phase; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR}`);
+      if (!PHASE_NAME.test(name)) throw new Error(`phase: a phase name is one word, got ${JSON.stringify(name)}`);
+      const said = text.trim();
+      if (!said) throw new Error(`phase ${name}: what does it ask?`);
+      if (runRow(fresh.run).state !== "open") throw new Error(`run ${fresh.run} is closed`);
+      return transaction(() => {
+        // the run's current phase, the header of every delivery from now on
+        db.prepare("UPDATE runs SET phase = ?, phase_text = ? WHERE id = ?").run(name, said, fresh.run);
+        // a phase opened again starts with no member done
+        db.prepare("DELETE FROM phase_done WHERE run = ? AND phase = ?").run(fresh.run, name);
+        return insertMessage(fresh, `phase ${name}: ${said}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.phase.name, meta: { phase: name } });
+      });
+    },
+
+    currentPhase(run) {
+      return phaseOf(runRow(run));
+    },
+
+    done(p, name) {
+      const fresh = live(p);
+      if (fresh.slice === ORCHESTRATOR) throw new Error("done: the orchestrator opens phases; a member runs done");
+      const current = phaseOf(runRow(fresh.run));
+      if (!current) throw new Error(`done ${name}: no phase is open in run ${fresh.run}`);
+      if (current.name !== name) throw new Error(`done ${name}: the current phase is ${current.name}`);
+      return transaction(() => {
+        const added = Number(db.prepare("INSERT OR IGNORE INTO phase_done (run, participant, phase, at) VALUES (?, ?, ?, ?)").run(fresh.run, fresh.id, name, now()).changes) > 0;
+        const progress = progressOf(fresh.run, name)!;
+        const all = progress.of > 0 && progress.done === progress.of;
+        if (!added) return { progress, all, already: true, message: null };
+        const orch = `${fresh.plan}/${ORCHESTRATOR}`;
+        const message = insertMessage(fresh, `done ${name} (${progress.done}/${progress.of})`, null, "event", [orch], { event: EVENTS.done.name, meta: { phase: name } });
+        if (all)
+          insertMessage(fresh, `all done ${name}: every member is done (${progress.done}/${progress.of}); open the next phase`, null, "event", [orch], {
+            event: EVENTS["all-done"].name,
+            meta: { phase: name },
+          });
+        return { progress, all, already: false, message };
+      });
+    },
+
+    phaseProgress(run) {
+      const r = runRow(run);
+      return progressOf(run, r.phase == null ? null : String(r.phase));
+    },
+
+    registerTranscript(run, member, file) {
+      const r = runRow(run);
+      if (r.state !== "open") throw new Error(`run ${run} is closed`);
+      if (member !== ORCHESTRATOR && !db.prepare("SELECT 1 FROM slices WHERE run = ? AND id = ?").get(run, member)) throw new Error(`unknown slice ${member} in run ${run}`);
+      return transaction(() => {
+        db.prepare("INSERT OR REPLACE INTO transcripts (run, member, path) VALUES (?, ?, ?)").run(run, member, path.resolve(file));
+        readCounterOnce(run, member, new Date(), readCounter);
+        bump(String(r.repo));
+        return livenessOf(transcriptOf(run, member));
+      });
+    },
+
+    livenessTick(run, at = new Date(), read = readCounter) {
+      const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run) as Row | undefined;
+      if (!r || r.state !== "open") return false;
+      transaction(() => {
+        const members = (db.prepare("SELECT slice FROM participants WHERE run = ? AND ended_at IS NULL").all(run) as Row[]).map((m) => String(m.slice));
+        for (const m of members) if (transcriptOf(run, m)) readCounterOnce(run, m, at, read);
+        db.prepare("DELETE FROM token_readings WHERE run = ? AND t < ?").run(run, new Date(at.getTime() - READINGS_KEPT_MS).toISOString());
+        const readable = (db.prepare("SELECT member, moved_at FROM transcripts WHERE run = ? AND readable = 1 AND moved_at IS NOT NULL").all(run) as Row[]).filter((t) =>
+          members.includes(String(t.member)),
+        );
+        // no readable counter: the stall check is blind, as the liveness warnings said
+        if (!readable.length) return;
+        const last = readable.reduce((a, b) => (String(b.moved_at) > String(a.moved_at) ? b : a));
+        const silence = at.getTime() - Date.parse(String(last.moved_at));
+        const threshold = Number(r.stall_ms ?? STALL_MS_DEFAULT);
+        const posted = Number(r.stall_posts ?? 0);
+        if (silence < threshold) {
+          if (posted) db.prepare("UPDATE runs SET stall_posts = 0 WHERE id = ?").run(run);
+          return;
+        }
+        if (!stallDue(silence, posted, threshold)) return;
+        const orch = orchestratorIn(run);
+        const secs = Math.floor(silence / 1000);
+        const progress = progressOf(run, r.phase == null ? null : String(r.phase));
+        const where = progress ? `phase ${progress.phase} ${progress.done}/${progress.of} done` : "no phase open";
+        insertMessage(orch, `stalled ${secs}s: no token counter moved; last active ${orch.plan}/${last.member} ${secs}s ago; ${where}`, null, "event", [`${orch.plan}/*`], {
+          event: EVENTS.stalled.name,
+        });
+        // the next one at the next whole threshold of silence
+        db.prepare("UPDATE runs SET stall_posts = ? WHERE id = ?").run(Math.floor(silence / threshold), run);
+      });
+      return true;
     },
 
     roster(repo) {
@@ -1359,6 +1599,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           listening: !ended && Number(r.listening) === 1,
           on: subsOf(r).map((x) => formatSubscriptions([x])),
           lastCall: String(r.last_call ?? r.joined_at),
+          liveness: livenessOf(transcriptOf(Number(r.run), slice)),
         };
       });
 
@@ -1482,6 +1723,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   board.unsubscribe = counted("unsubscribe", board.unsubscribe);
   board.end = counted("end", board.end);
   board.post = counted("post", board.post);
+  board.phase = counted("phase", board.phase);
+  board.done = counted("done", board.done);
   board.endorse = counted("endorse", board.endorse);
   board.deliver = counted("deliver", board.deliver);
   board.wait = counted("wait", board.wait);

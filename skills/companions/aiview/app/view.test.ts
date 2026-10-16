@@ -1,7 +1,8 @@
 // The board page's view model (plan D1, D7, D8, D13-D16, D18, D20), on snapshots built here.
 import { describe, expect, test } from "vitest";
 import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm/src/board/snapshot.ts";
-import { agents, archive, claimRows, conversation, feed, filters, flagAnswer, flagOf, mentionCtx, mergedRecipients, runTabs, type Item } from "./lib/board/view.ts";
+import { agents, archive, claimRows, conversation, feed, filters, flagAnswer, flagOf, mentionCtx, mergedRecipients, narrow, runTabs, type Item } from "./lib/board/view.ts";
+import { PHASE, PHASED } from "./board-fixtures.ts";
 
 const AT = "2026-10-14T10:00:00Z";
 const run = (id: number, group: string, code: string, open = true): RunSummary => ({
@@ -121,7 +122,7 @@ describe("conversation: what an item is (D8, D16)", () => {
       item(1, "alpha/S1", "merged abc: rebase your branch onto it.", { kind: "event", event: "merged" }),
     ];
     const items = conversation(board(RUNS, ROSTER, events), { run: null, follow: null });
-    expect(items.map((i) => (i.kind === "event" ? ["event", null, null] : [i.kind, i.tier, i.word]))).toEqual([
+    expect(items.map((i) => (i.kind === "event" || i.kind === "phase" ? [i.kind, null, null] : [i.kind, i.tier, i.word]))).toEqual([
       ["urgent", "act", "! urgent"],
       ["flag", "act", "⚑ flag · open"],
       ["quiet", "wait", "◷ quiet 12 min"],
@@ -129,7 +130,7 @@ describe("conversation: what an item is (D8, D16)", () => {
       ["message", "talk", null],
       ["event", null, null],
     ]);
-    expect(items.every((i) => i.tip !== null || (i.kind === "message"))).toBe(true);
+    expect(items.every((i) => i.kind === "phase" || i.tip !== null || i.kind === "message")).toBe(true);
   });
 
   test("a flag settled by an agreement about its path reads decided; an endorsed agreement says so", () => {
@@ -144,7 +145,7 @@ describe("conversation: what an item is (D8, D16)", () => {
   test("consecutive messages of one member join; another member between them breaks the run", () => {
     const events = [item(1, "alpha/S1", "one"), item(1, "alpha/S1", "two"), item(2, "beta/S2", "three"), item(1, "alpha/S1", "four")];
     const items = conversation(board(RUNS, ROSTER, events), { run: null, follow: null });
-    expect(items.map((i) => (i.kind === "event" ? null : i.joined))).toEqual([false, true, false, false]);
+    expect(items.map((i) => (i.kind === "event" || i.kind === "phase" ? null : i.joined))).toEqual([false, true, false, false]);
   });
 });
 
@@ -280,5 +281,34 @@ describe("a merged event's recipients", () => {
     };
     const ctx = mentionCtx(board([run(1, "p", "PP")]));
     expect(mergedRecipients(merged, [merged], ctx)).toEqual({ rebase: ["p/S2"], tell: ["p/S7"] });
+  });
+});
+
+describe("a phase separator (swarm phase)", () => {
+  const NM = PHASED.runs.find((r) => r.code === "NM")!;
+
+  test("a phase event is a phase item: its name from the meta, its text after the colon", () => {
+    const items = conversation(PHASED, { run: NM.run, follow: null });
+    const phase = items.find((i) => i.kind === "phase");
+    expect(phase).toMatchObject({ kind: "phase", seq: PHASE.seq, name: "diverge", text: "every name a run could carry, no judgment yet", from: "naming/orchestrator" });
+  });
+
+  test("a phase from a row with no meta reads its name from the body", () => {
+    const old = { ...PHASE, meta: null };
+    const items = conversation({ ...PHASED, events: [old] }, { run: NM.run, follow: null });
+    expect(items[0]).toMatchObject({ kind: "phase", name: "diverge" });
+  });
+
+  test("every kind chip and a file keep the separator", () => {
+    const items = conversation(PHASED, { run: NM.run, follow: null });
+    for (const kind of ["messages", "agreements", "flags"] as const) expect(narrow(items, { kind, file: null }).some((i) => i.kind === "phase"), kind).toBe(true);
+    expect(narrow(items, { kind: "all", file: "src/nowhere.ts" }).map((i) => i.kind)).toEqual(["phase"]);
+  });
+
+  test("following a member of the run keeps its separator; a member of another run does not see it", () => {
+    expect(conversation(PHASED, { run: null, follow: "naming/critic" }).some((i) => i.kind === "phase")).toBe(true);
+    const other = { ...PHASED, runs: [...PHASED.runs, run(9, "beta", "BE")], roster: [...PHASED.roster, member("beta", "S2", "Brave Badger")] };
+    expect(conversation(other, { run: null, follow: "beta/S2" }).some((i) => i.kind === "phase")).toBe(false);
+    expect(conversation(other, { run: 9, follow: null }).some((i) => i.kind === "phase")).toBe(false);
   });
 });

@@ -1,9 +1,9 @@
 // CLI dispatch — the agent-facing surface of the board. Human output is short lines an
 // agent reads; --json prints the same data as one object; errors go to stderr, exit 1.
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { openBoard, type Board, type Declared, type Delivery, type Flag, type Kind, type Message, type Participant, type RosterEntry, type RunStats, type SliceSpec, type SliceState } from "../board/board.ts";
+import { openBoard, type Board, type Declared, type Delivery, type Flag, type Kind, type Message, type Participant, type PhaseProgress, type RosterEntry, type RunStats, type SliceSpec, type SliceState } from "../board/board.ts";
 import { profileOf } from "../board/kinds.ts";
 import { EVENTS, eventOf, formatSubscriptions, parseSubscriptions, type Subscription } from "../board/events.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
@@ -22,11 +22,14 @@ const WAIT_UPKEEP_TICK_MS = 1000;
 
 const USAGE = [
   "usage: swarm <verb> [--json]        (swarm --help code: the claim and merge verbs)",
-  "  open    --kind plan|brainstorm --group <slug> --title <t> --seats <file.json> [--link <url>]   # opens a run, registers the project's board in aiview, prints the run id then the board's URL (orchestrator)",
+  "  open    --kind plan|brainstorm --group <slug> --title <t> --seats <file.json> [--link <url>] [--transcript <path>] [--stall-ms <ms>]   # opens a run, registers the project's board in aiview, starts its stall poller, prints the run id then the board's URL (orchestrator)",
+  "          # --transcript: your own transcript, its token counter read for the stall check; --stall-ms: no counter moved this long posts stalled, default 5000",
   "          # --plan <slug> --slices <file.json>: the same as --kind plan --group <slug> --seats <file.json>",
-  '          # the seats file: [{"id", "title", "role"?, "blockers": [...], "link"?: "<URL>", "on"?: ["agreement", …]}]',
-  "  slice   <id> --run <id> --state ready|running|done|blocked      # (orchestrator)",
+  '          # the seats file: [{"id", "title", "role"?, "blockers": [...], "link"?: "<URL>", "on"?: ["agreement", …], "transcript"?: "<path>"}]',
+  "  slice   <id> --run <id> [--state ready|running|done|blocked] [--transcript <path>]   # --transcript: the dispatched member's transcript, after dispatch (orchestrator)",
   "  slice   add <id> --run <id> --title <t> [--blockers a,b] [--link <url>] [--role <r>] [--on <events>]   # adds a slice or seat mid-run (orchestrator)",
+  "  phase   <name> <text> [--as <member>]                           # opens phase <name>; the current phase ends with it: a separator on the thread that wakes every member of the run (orchestrator)",
+  "  done    <phase> [--as <member>]                                 # your part of the current phase is in: tells the orchestrator; when every member is done, the board tells it",
   "  close   --run <id>                                              # (orchestrator)",
   '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # --slice <id> the same; prints the roster, then the command that starts your listener',
   "          # --on <events>: what wakes your wait --mentions besides mentions and urgent posts, e.g. agreement,any:merged; else the seat row's on, else the kind's defaults",
@@ -42,7 +45,7 @@ const USAGE = [
   "          # --mentions: only a mention of you, an urgent post or an event you subscribed to ends it; the rest stays for deliver",
   "  roster  [--repo <path>]",
   "  end     [--as <member>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
-  "  status                                                          # data home, open runs",
+  "  status                                                          # data home, open runs, each run's phase and its n/m done",
   "  config  retention [<days>]                                      # prints, or sets then prints, how many days closed runs and main's talk are kept",
   `events: ${Object.keys(EVENTS).join(", ")}; any:<event> for one posted in any run`,
   "a member is <group>/<seat>, the orchestrator <group>/orchestrator; without --as, the runner joined from this worktree",
@@ -177,6 +180,38 @@ const rosterLine = (r: RosterEntry): string => {
   return `${who}${r.stale ? " (stale)" : ""}  run ${r.run}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}${on}`;
 };
 
+/** The run's current phase as the header of what a member reads: `phase <name>: <text>`; null before the first phase. */
+const phaseHeader = (board: Board, run: number): string | null => {
+  const ph = board.currentPhase(run);
+  return ph ? `phase ${ph.name}: ${ph.text}` : null;
+};
+/** `phase <name>: <text>  <n>/<m> done` beside a run's title, or nothing before its first phase. */
+const phaseSuffix = (phase: { name: string; text: string } | null, progress: PhaseProgress | null): string =>
+  phase ? `  phase ${phase.name}: ${phase.text}${progress ? `  ${progress.done}/${progress.of} done` : ""}` : "";
+
+/** The run's stall poller: its pid file in the data home. */
+const pollerPidFile = (run: number): string => path.join(DATA_ROOT, `swarm-poll-${run}.pid`);
+/** Starts the run's poller, detached, no console window: it reads the token counters every second
+ *  and exits once its run is closed. SWARM_NO_POLLER=1 starts none (tests). */
+function startPoller(run: number): void {
+  if (process.env.SWARM_NO_POLLER === "1") return;
+  const child = spawn(process.execPath, [process.argv[1], "poll", "--run", String(run)], { detached: true, stdio: "ignore", windowsHide: true });
+  child.unref();
+}
+/** Stops the run's poller, when one runs; it would exit by itself at its next tick. */
+function stopPoller(run: number): void {
+  const file = pollerPidFile(run);
+  try {
+    const pid = Number(fs.readFileSync(file, "utf8").trim());
+    if (Number.isInteger(pid) && pid > 0 && pid !== process.pid) process.kill(pid);
+  } catch {}
+  try {
+    fs.rmSync(file, { force: true });
+  } catch {}
+}
+/** How often the poller reads the counters. */
+const POLL_MS = 1000;
+
 /** A delivery as the member reads it: each event followed by the line its registry row gives (D36, D59). */
 const withNext = (me: Participant, d: Delivery): Delivery & { full: (Message & { endorse?: string })[] } => ({
   ...d,
@@ -274,7 +309,7 @@ function readSlices(file: string): SliceSpec[] {
   }
   const list = Array.isArray(raw) ? raw : (raw as { slices?: unknown }).slices;
   if (!Array.isArray(list)) return fail(`${file}: expected an array of {id, title, blockers}`);
-  return list.map((s: { id?: unknown; title?: unknown; role?: unknown; blockers?: unknown; link?: unknown; on?: unknown }) => {
+  return list.map((s: { id?: unknown; title?: unknown; role?: unknown; blockers?: unknown; link?: unknown; on?: unknown; transcript?: unknown }) => {
     if (typeof s.id !== "string") fail(`${file}: a slice without an id`);
     return {
       id: String(s.id),
@@ -283,6 +318,7 @@ function readSlices(file: string): SliceSpec[] {
       blockers: Array.isArray(s.blockers) ? s.blockers.map(String) : [],
       link: typeof s.link === "string" && s.link ? s.link : null,
       ...(Array.isArray(s.on) ? { on: s.on.map(String) } : {}),
+      ...(typeof s.transcript === "string" && s.transcript ? { transcript: path.resolve(s.transcript) } : {}),
     };
   });
 }
@@ -368,7 +404,21 @@ async function main(board: Board): Promise<void> {
       const { kind, group } = openKindAndGroup();
       const plan = group;
       const seatsFile = args.flag("--seats") ?? args.flag("--slices") ?? fail(`open: --seats <file.json> is required (or --slices)\n${USAGE}`);
-      const run = board.openRun({ repo: repoOf(process.cwd()), kind, group, title: need("--title"), link: args.flag("--link") ?? null, seats: readSlices(seatsFile) });
+      const rawStall = args.flag("--stall-ms");
+      const stallMs = rawStall === undefined ? undefined : Number(rawStall);
+      if (stallMs !== undefined && !(Number.isInteger(stallMs) && stallMs > 0)) fail(`--stall-ms takes a positive whole number of ms, got ${rawStall}`);
+      const transcript = args.flag("--transcript");
+      const run = board.openRun({
+        repo: repoOf(process.cwd()),
+        kind,
+        group,
+        title: need("--title"),
+        link: args.flag("--link") ?? null,
+        seats: readSlices(seatsFile),
+        ...(transcript ? { transcript: path.resolve(transcript) } : {}),
+        ...(stallMs !== undefined ? { stallMs } : {}),
+      });
+      startPoller(run.id);
       // the person watches the project's board in aiview, pinned first (plan D17, D30, D39)
       const doc = registerBoardDocument({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run.repo });
       if (!doc.registered) {
@@ -400,15 +450,76 @@ async function main(board: Board): Promise<void> {
       }
       const id = args.positional[0] ?? fail(`slice: which slice?\n${USAGE}`);
       const run = runArg();
-      const state = need("--state") as SliceState;
-      board.setSliceState(run, id, state);
-      emit({ run, slice: id, state }, `${id} ${state}`);
+      const transcript = args.flag("--transcript");
+      const state = (transcript === undefined ? need("--state") : args.flag("--state")) as SliceState | undefined;
+      if (state !== undefined) board.setSliceState(run, id, state);
+      // the dispatched member's transcript: its token counter, read for the stall check
+      const liveness = transcript !== undefined ? board.registerTranscript(run, id, path.resolve(transcript)) : undefined;
+      const said = [state !== undefined ? `${id} ${state}` : null, liveness ? `${id} transcript ${liveness.state === "ok" ? `read, ${liveness.tokens} tokens` : "not readable yet: the board warned on the thread"}` : null];
+      emit({ run, slice: id, ...(state !== undefined ? { state } : {}), ...(liveness ? { liveness } : {}) }, said.filter(Boolean).join("\n"));
       break;
     }
     case "close": {
       const run = runArg();
       board.closeRun(run);
+      stopPoller(run);
       emit({ run, state: "closed" }, `run ${run} closed`);
+      break;
+    }
+    case "phase": {
+      const p = caller(board);
+      const [name, ...said] = args.positional;
+      if (!name) fail(`phase: which phase?
+${USAGE}`);
+      const text = said.join(" ") || fail(`phase ${name}: what does it ask?`);
+      const m = board.phase(p, name, text);
+      // the orchestrator's next step (rule 10): its listener hears each member's done; the board says when all are in
+      const cli = self().join(" ");
+      const next = `phase ${name} is open; listen for each member's done in the background: ${cli} wait --mentions --as ${shellWord(p.name)}. When the board says every member is done, open the next phase: ${cli} phase <name> "<text>" --as ${shellWord(p.name)}; after the last, ${cli} close --run ${m.run}`;
+      emit({ seq: m.seq, run: m.run, phase: name, next }, () => {
+        console.log(seqLine(m));
+        console.log(next);
+      });
+      break;
+    }
+    case "done": {
+      const p = caller(board);
+      const name = args.positional[0] ?? fail(`done: which phase?\n${USAGE}`);
+      const r = board.done(p, name);
+      // the member's next step (rule 10): wait for the next phase
+      const next = `wait for the next phase, in the foreground: ${self().join(" ")} wait --mentions --as ${shellWord(p.name)}`;
+      emit({ runner: p.name, phase: name, done: r.progress.done, of: r.progress.of, all: r.all, already: r.already, next }, () => {
+        console.log(`${r.already ? "already done" : "done"} ${name}: ${r.progress.done}/${r.progress.of} members done${r.all ? "; the orchestrator is told every member is done" : ""}`);
+        console.log(next);
+      });
+      break;
+    }
+    case "poll": {
+      // the run's stall poller, started detached by open: not a member's verb, so not in the usage
+      const run = runArg();
+      const pidFile = pollerPidFile(run);
+      fs.mkdirSync(path.dirname(pidFile), { recursive: true });
+      fs.writeFileSync(pidFile, String(process.pid));
+      const mine = (): boolean => {
+        try {
+          return fs.readFileSync(pidFile, "utf8").trim() === String(process.pid);
+        } catch {
+          return false;
+        }
+      };
+      for (;;) {
+        // its run closed, its pid file taken or gone, or the store gone: it stops
+        if (!mine() || !fs.existsSync(SQLITE_PATH)) break;
+        let open = true;
+        try {
+          open = board.livenessTick(run);
+        } catch (e) {
+          console.error(`swarm poll: ${(e as Error).message}`);
+        }
+        if (!open) break;
+        await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+      }
+      if (mine()) fs.rmSync(pidFile, { force: true });
       break;
     }
     case "join": {
@@ -428,9 +539,12 @@ async function main(board: Board): Promise<void> {
       const commands = shared ? seatCommands(runner.name) : null;
       // a seat posts what it compares as a table, what flows as mermaid: low-effort seats do what the board prints (D2)
       const drawing = profileOf(runner.kind).member === "seat" ? SEAT_POSTS_DRAW : null;
-      emit({ runner: runner.name, nick: runner.nick, roster, ...(shared ? { as: runner.name, commands } : {}), ...(drawing ? { drawing } : {}), next }, () => {
+      // the run's current phase after the roster: a late or restarted member starts in it
+      const phase = phaseHeader(board, runner.run);
+      emit({ runner: runner.name, nick: runner.nick, roster, phase, ...(shared ? { as: runner.name, commands } : {}), ...(drawing ? { drawing } : {}), next }, () => {
         console.log(`you are ${runner.name}, ${runner.nick}: @${runner.slice} or @${runner.nick.replace(/\s+/g, "")} mentions you`);
         for (const r of roster) console.log(rosterLine(r));
+        if (phase) console.log(phase);
         if (as) console.log(as);
         for (const c of commands ?? []) console.log(c);
         if (drawing) console.log(drawing);
@@ -491,13 +605,23 @@ async function main(board: Board): Promise<void> {
         if (!(e instanceof CliError)) throw e;
       }
       const m = board.read(seq, by);
-      emit(m, fullText(m));
+      // the phase the message's run is in, first (the caller's run when one is known)
+      const phase = phaseHeader(board, by?.run ?? m.run);
+      emit({ ...m, phase }, () => {
+        if (phase) console.log(phase);
+        console.log(fullText(m));
+      });
       break;
     }
     case "deliver": {
       const me = caller(board);
       const d = withNext(me, board.deliver(me));
-      emit(d, () => printDelivery(d));
+      // the run's phase heads every delivery that carries something
+      const phase = d.full.length || d.lines.length ? phaseHeader(board, me.run) : null;
+      emit({ phase, ...d }, () => {
+        if (phase) console.log(phase);
+        printDelivery(d);
+      });
       break;
     }
     case "wait": {
@@ -524,7 +648,10 @@ async function main(board: Board): Promise<void> {
       if (raw !== undefined) again.push("--timeout", raw);
       if (asJson) again.push("--json");
       const next = `answer on the thread if needed, then start this listener again, in the background while you work, in the foreground when you are waiting: ${again.join(" ")}`;
-      emit({ next, ...d }, () => {
+      // the run's phase first, so a member always knows which phase it answers in
+      const phase = phaseHeader(board, p.run);
+      emit({ phase, next, ...d }, () => {
+        if (phase) console.log(phase);
         console.log(next);
         printDelivery(d);
       });
@@ -533,8 +660,17 @@ async function main(board: Board): Promise<void> {
     case "roster": {
       const repo = repoOf(path.resolve(args.flag("--repo") ?? process.cwd()));
       const roster = board.roster(repo);
-      emit({ repo, roster }, () => {
-        for (const r of roster) console.log(rosterLine(r));
+      // each run's title and phase above its members
+      const runs = new Map(board.runs().filter((r) => r.repo === repo).map((r) => [r.id, r]));
+      const progress = new Map([...runs.keys()].map((id) => [id, board.phaseProgress(id)]));
+      emit({ repo, roster, runs: [...runs.values()].map((r) => ({ run: r.id, title: r.title, phase: r.phase, progress: progress.get(r.id) ?? null })) }, () => {
+        let shown: number | null = null;
+        for (const r of roster) {
+          const run = runs.get(r.run);
+          if (run && r.run !== shown) console.log(`run ${run.id}  ${run.title}${phaseSuffix(run.phase, progress.get(run.id) ?? null)}`);
+          shown = r.run;
+          console.log(rosterLine(r));
+        }
       });
       break;
     }
@@ -600,6 +736,8 @@ async function main(board: Board): Promise<void> {
     }
     case "end": {
       const p = caller(board);
+      // a member already ended, or its run closed: nothing to do, nothing to say
+      if (p.ended || board.runs().every((r) => r.id !== p.run)) break;
       // what the runner wrote without claiming it, once, before its claims go (D58)
       const reconciled = p.worktree ? changedIn(p.worktree) : [];
       const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
@@ -644,13 +782,13 @@ async function main(board: Board): Promise<void> {
       const runs = board.runs();
       // each member's worktree, null for a seat or an orchestrator (D64)
       const membersOf = (r: (typeof runs)[number]) => board.roster(r.repo).filter((m) => m.run === r.id).map((m) => ({ name: m.name, nick: m.nick, worktree: m.worktree }));
-      const open = runs.map((r) => ({ run: r.id, kind: r.kind, group: r.plan, title: r.title, members: membersOf(r) }));
+      const open = runs.map((r) => ({ run: r.id, kind: r.kind, group: r.plan, title: r.title, phase: r.phase, progress: board.phaseProgress(r.id), members: membersOf(r) }));
       emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, runs: runs.length, open }, () => {
         console.log(`home    ${DATA_ROOT}`);
         console.log(`sqlite  ${SQLITE_PATH}`);
         if (!runs.length) console.log("no open run");
         for (const r of runs) {
-          console.log(`run ${r.id}  ${r.kind}  ${r.plan}  ${r.title}  ${r.repo}`);
+          console.log(`run ${r.id}  ${r.kind}  ${r.plan}  ${r.title}${phaseSuffix(r.phase, board.phaseProgress(r.id))}  ${r.repo}`);
           for (const s of r.slices) console.log(`  ${s.id} ${s.state}  ${s.title}${s.blockers.length ? `  blocked by ${s.blockers.join(", ")}` : ""}`);
         }
       });

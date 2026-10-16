@@ -178,6 +178,14 @@
 .board .event .head { display: flex; align-items: center; min-height: 18px; }
 .board .event .time { padding-top: 0; line-height: 18px; }
 .board .event .text { grid-column: 2; line-height: 1.5; overflow-wrap: anywhere; }
+/* a phase the orchestrator opened: a full-width rule across the conversation, its name and text centred on it,
+   heavier than any item so the talk reads in phases */
+.board .phase { display: flex; align-items: center; gap: 12px; margin: 18px 0 10px; font-size: 12.5px; color: var(--foreground); }
+.board .phase::before, .board .phase::after { content: ""; flex: 1 1 24px; border-top: 2px solid color-mix(in srgb, var(--accent) 60%, var(--border)); }
+.board .phase .label { flex: 0 1 auto; max-width: 75%; text-align: center; line-height: 1.5; overflow-wrap: anywhere; padding: 3px 12px; border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--border)); border-radius: 999px; background: color-mix(in srgb, var(--accent) 8%, var(--background)); }
+.board .phase .name { font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.board .phase .said::before { content: " · "; color: var(--faint-foreground); }
+.board .phase.new { animation: board-rise .35s ease-out; }
 .board .tip { cursor: help; text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; }
 .board #tipbox { position: fixed; z-index: 50; max-width: 300px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--foreground); color: var(--background); font-size: 12px; line-height: 1.45; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); pointer-events: none; }
 .board #tipbox[hidden] { display: none; }
@@ -191,11 +199,16 @@
 /* SL7: the agent strip (D7, D20) and the claims row; the page a column: tabs, strip, conversation, claims */
 /* the cards wrap onto as many rows as they need, never a horizontal scroll */
 /* two rows at most, the rest scrolled to: rows of one height so the cap is exact */
-.board .agent-strip { --row: 77px; flex: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); grid-auto-rows: var(--row); gap: 10px; padding: 12px 2px; max-height: calc(2 * var(--row) + 10px + 24px); overflow-y: auto; }
+/* five cards a row, the orchestrator one of them: the person's decision; the rest wrap below */
+.board .agent-strip { --row: 104px; flex: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: var(--row); gap: 10px; padding: 12px 2px; max-height: calc(2 * var(--row) + 10px + 24px); overflow-y: auto; }
 .board .agent-strip .card { min-width: 0; }
 .board .agent-strip.following .card[aria-pressed="false"] { opacity: .45; }
 .board .agent-strip .card.ended, .board .agent-strip .card.done { opacity: .55; }
 .board .agent-strip .doing { min-height: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* the member's token counter: flat at the run's stall threshold marked amber, unreadable faint */
+.board .card .counter { display: block; margin-top: 3px; font: 11px ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace; color: var(--faint-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board .card .counter.flat { color: var(--amber); font-weight: 600; }
+.board .card .counter.blind { font-style: italic; }
 .board .state.quiet { color: var(--amber); }
 .board .state.quiet i { background: var(--amber); }
 .board .claims-row { flex: none; border-top: 1px solid var(--border); padding: 6px 0 0; }
@@ -335,6 +348,10 @@
 .board .runhead .seg button { padding: 4px 11px; font-size: 12.5px; color: var(--muted-foreground); }
 .board .runhead .seg button + button { border-left: 1px solid var(--border); }
 .board .runhead .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+/* the run's current phase, after its line: the name as a phase separator writes it */
+.board .runhead .runphase { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; padding-left: 10px; border-left: 1px solid var(--border); overflow-wrap: anywhere; }
+.board .runhead .runphase .name { font-weight: 600; color: var(--foreground); text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.board .runhead .runphase .said { font-size: 12.5px; }
 .board .runhead .ghost { margin-left: auto; font-size: 12px; color: var(--accent); }
 .board .analytics .kpis.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 /* the across view's brainstorm row, under the plan row when both kinds are chosen (D46) */

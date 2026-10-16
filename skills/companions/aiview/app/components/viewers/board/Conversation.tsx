@@ -3,8 +3,9 @@ import { hhmm, type Item } from "../../../lib/board/view.ts";
 import { RichText, RunnerName } from "./chips.tsx";
 import { PostBody } from "./PostBody.tsx";
 
-type Said = Exclude<Item, { kind: "event" }>;
+type Said = Exclude<Item, { kind: "event" | "phase" }>;
 type BoardEventItem = Extract<Item, { kind: "event" }>;
+type PhaseItem = Extract<Item, { kind: "phase" }>;
 
 /** A word that explains itself (D9): dotted-underlined, focusable, its tip read by `TipLayer`. */
 function TipWord({ word, tip, className }: { word: string; tip: string | null; className?: string }) {
@@ -67,6 +68,27 @@ function BoardEventLine({ item, fresh }: { item: BoardEventItem; fresh: boolean 
   );
 }
 
+/** A phase the orchestrator opened (`swarm phase`): a rule across the conversation, the phase's name
+ *  and its text centred on it; neither a post nor an event line. */
+function PhaseSeparator({ item, fresh }: { item: PhaseItem; fresh: boolean }) {
+  return (
+    <li
+      id={`seq-${item.seq}`}
+      className={fresh ? "phase new" : "phase"}
+      data-component="PhaseSeparator"
+      data-phase={item.name}
+      role="separator"
+      aria-label={`Phase ${item.name}: ${item.text}`}
+      title={item.at}
+    >
+      <span className="label">
+        <span className="name">{item.name}</span>
+        {item.text && <span className="said">{item.text}</span>}
+      </span>
+    </li>
+  );
+}
+
 /** The one conversation (D8): every item on one grammar, the few kinds that ask something told
  *  apart by edge, weight and word; a closed run's archived line first. Reads from the bottom. */
 export function Conversation({
@@ -99,7 +121,13 @@ export function Conversation({
         )}
         {items.length ? (
           items.map((i) =>
-            i.kind === "event" ? <BoardEventLine key={i.seq} item={i} fresh={fresh.has(i.seq)} /> : <SaidItem key={i.seq} item={i} fresh={fresh.has(i.seq)} seqs={seqs} />,
+            i.kind === "phase" ? (
+              <PhaseSeparator key={i.seq} item={i} fresh={fresh.has(i.seq)} />
+            ) : i.kind === "event" ? (
+              <BoardEventLine key={i.seq} item={i} fresh={fresh.has(i.seq)} />
+            ) : (
+              <SaidItem key={i.seq} item={i} fresh={fresh.has(i.seq)} seqs={seqs} />
+            ),
           )
         ) : (
           <li className="none">No item yet.</li>

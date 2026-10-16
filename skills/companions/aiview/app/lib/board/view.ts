@@ -139,7 +139,7 @@ export function flagAnswer(flag: SnapshotEvent, events: SnapshotEvent[]): FlagAn
  *  told of a resolved conflict (`@<them> I resolved <file>`), before its next merge. */
 export function mergedRecipients(e: SnapshotEvent, events: SnapshotEvent[], ctx: MentionCtx): { rebase: string[]; tell: string[] } {
   // stored with the event (D11); parsed from the thread only on a row from before
-  if (e.meta) return { rebase: [...e.meta.rebase], tell: [...e.meta.tell] };
+  if (e.meta && "rebase" in e.meta) return { rebase: [...e.meta.rebase], tell: [...e.meta.tell] };
   const plan = splitRunner(e.from).plan;
   const holdersLine = e.body.split(/\r?\n/).find((l) => l.includes("you hold or declared a file it changed")) ?? "";
   const rebase = [...new Set(parseMentions(holdersLine, plan, ctx.groups, ctx.names))];
@@ -183,7 +183,8 @@ export function filters(events: SnapshotEvent[]): Filter[] {
 /** The feed: scoped events through the filter, then through the runner followed. */
 export function feed(events: SnapshotEvent[], filter: string, runner: string | null, ctx: MentionCtx): SnapshotEvent[] {
   const f = filters(events).find((x) => x.id === filter) ?? filters(events)[0];
-  return events.filter(f.test).filter((e) => involves(e, runner, ctx));
+  // a phase separator stays whatever the filter: it says where the talk is
+  return events.filter((e) => isPhase(e) || f.test(e)).filter((e) => involves(e, runner, ctx) || (isPhase(e) && !!runner && splitRunner(runner).plan === splitRunner(e.from).plan));
 }
 
 
@@ -203,6 +204,18 @@ export function eventLine(body: string): { word: string | null; strong: boolean;
   return { word: null, strong: false, rest: flat };
 }
 
+// ── a phase separator ───────────────────────────────────────────────────────────────
+
+/** A `phase` event: the orchestrator opened a phase, the current one ending with it. */
+export const isPhase = (e: SnapshotEvent): boolean => e.kind === "event" && e.event === "phase";
+
+/** "phase diverge: every idea" → its name, from the stored meta else the body, and its text. */
+export function phaseOf(e: SnapshotEvent): { name: string; text: string } {
+  const m = /^phase\s+(\S+?):\s*([\s\S]*)$/.exec(e.body);
+  const stored = e.meta && "phase" in e.meta ? e.meta.phase : null;
+  return { name: stored ?? m?.[1] ?? "", text: (m?.[2] ?? e.body).trim() };
+}
+
 // ── the one conversation (D1, D8, D13-D16) ──────────────────────────────────────────
 
 /** A brainstorm run's count, "3 seats": its slice rows are seats, never slices to merge. The tab, the archive and a
@@ -215,11 +228,13 @@ export type RunTab = { run: RunId; code: string; title: string; kind: Kind; stat
 export type ArchivedRun = RunTab & { closed: string; outcome: string | null; orchestrator: string };
 /** What the conversation shows: one run (null = All), or the member followed. */
 export type Pick = { run: RunId | null; follow: string | null };
-export type ItemKind = "message" | "flag" | "urgent" | "held" | "question" | "quiet" | "agreement" | "settled";
+export type ItemKind = "message" | "flag" | "urgent" | "held" | "question" | "quiet" | "agreement" | "settled" | "stalled" | "liveness";
 export type Tier = "act" | "wait" | "decided" | "talk";
 export type Item =
   | { kind: ItemKind; tier: Tier; seq: number; at: string; run: RunId; from: string; word: string | null; tip: string | null; text: string; joined: boolean; state: string | null; about: string | null }
-  | { kind: "event"; seq: number; at: string; run: RunId; from: string; text: string; tip: string | null; about: string | null };
+  | { kind: "event"; seq: number; at: string; run: RunId; from: string; text: string; tip: string | null; about: string | null }
+  /** The orchestrator opened phase `name` (`swarm phase`), the current one ending with it: a separator across the conversation. */
+  | { kind: "phase"; seq: number; at: string; run: RunId; from: string; name: string; text: string; about: null };
 
 /** Every tip, verbatim from the mockup (D9). */
 export const TIPS = {
@@ -236,6 +251,8 @@ export const TIPS = {
   closed: "Closed: the run is over; its conversation is in the archive (☰).",
   joined: "Joined: a member arrived on the board and took its slice or seat.",
   ended: "Ended: the member left the board and its claims were released.",
+  stalled: "Stalled: no member's token counter moved for the run's stall threshold. Every member is told: the orchestrator opens the next phase or asks the member who owes a move.",
+  liveness: "Liveness: the board cannot read this member's transcript, so the stall check cannot see whether it works.",
 } as const;
 
 /** A board event's tip, by its word or its stored name. */
@@ -343,11 +360,15 @@ function itemOf(snap: BoardSnapshot, e: SnapshotEvent, run: RunSummary, ctx: Men
     joined: false,
     state,
   });
+  if (isPhase(e)) return { ...base, kind: "phase", about: null, ...phaseOf(e) };
   if (flagOf(e)) {
     const answer = flagAnswer(e, snap.events);
     if (answer.state === "settled") return said("settled", "decided", `⚑ flag settled by #${answer.seq}`, TIPS.settled, "settled");
     return said("flag", "act", "⚑ flag · open", TIPS.flag, answer.state);
   }
+  // the stall poller's events, told apart from the board's plain lines (`swarm` liveness)
+  if (e.kind === "event" && e.event === "stalled") return said("stalled", "act", "◷ stalled", TIPS.stalled);
+  if (e.kind === "event" && e.event === "liveness") return said("liveness", "wait", "liveness · blind", TIPS.liveness);
   if (isQuiet(e)) {
     const minutes = /(\d+)\s*min/.exec(e.body)?.[1];
     return said("quiet", "wait", minutes ? `◷ quiet ${minutes} min` : "◷ quiet", TIPS.quiet, quietAnswered(e, snap.events) ? "back" : null);
@@ -390,7 +411,8 @@ export function conversation(snap: BoardSnapshot, pick: Pick): Item[] {
     const run = runOf(snap, e);
     if (!run) continue;
     if (pick.follow) {
-      if (!involves(e, pick.follow, ctx)) continue;
+      // a phase separator of the followed member's run stays: it mentions every member of it
+      if (!involves(e, pick.follow, ctx) && !(isPhase(e) && run.group === splitRunner(pick.follow).plan)) continue;
     } else if (picked) {
       if (run.run !== picked.run && !namesPicked(e)) continue;
     } else if (!run.open) continue;
@@ -423,10 +445,10 @@ function kindTest(items: Item[], kind: KindFilter): (i: Item) => boolean {
   return () => true;
 }
 
-/** The items through the kind, then the file. */
+/** The items through the kind, then the file; a phase separator always stays, it says where the talk is. */
 export function narrow(items: Item[], n: Narrow): Item[] {
   const byKind = kindTest(items, n.kind);
-  return items.filter((i) => byKind(i) && (n.file == null || i.about === n.file));
+  return items.filter((i) => i.kind === "phase" || (byKind(i) && (n.file == null || i.about === n.file)));
 }
 
 /** What each kind chip counts: Flags its flags alone, not their answers. */

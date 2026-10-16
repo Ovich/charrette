@@ -14,7 +14,7 @@ Every skill is one folder under `skills/`, opening on a `SKILL.md`; supporting f
 sit beside it, situational ones under `references/`. `project/` holds what a project
 has once and keeps, `verify/` its verification skill and the validation with the person, `workbench/` the pages worked on
 with the person during development and the project skills that feed them; the loop's phases group the rest,
-`architecture/`, `ui/`, `plan/`, `execute/`, `review/`; `interview/` and `whiteboard-defense/` sit at the root;
+`architecture/`, `ui/`, `plan/`, `execute/`, `review/`; `interview/`, `workshop/` and `whiteboard-defense/` sit at the root;
 `companions/` holds the two tools, shipped as versioned bundles so an install never builds:
 aiview (`skills/companions/aiview/`), a CLI, the one server and the one UI, drawing the
 documents and the board; and swarm (`skills/companions/swarm/`, the board a swarm-mode plan
@@ -43,7 +43,7 @@ file the person was looking for. Refresh the cache with
 
 3. **MUST write a description as the trigger and nothing else: what activates the skill, what it produces, what it excludes.** Method, mechanics and instructions to a loaded agent belong in the body, and the body carries no "when to use" section of its own. The router reads only the description; the agent reads the body only after.
 
-4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute/execute-plan/references/tracker.md`; diagram discipline is `skills/architecture/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/companions/aiview/`; the board protocol is `skills/companions/swarm/`; the orchestrator's charter, dispatch, briefs, roles and watching are `skills/orchestrate/`.
+4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute/execute-plan/references/tracker.md`; diagram discipline is `skills/architecture/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/companions/aiview/`; the board protocol is `skills/companions/swarm/`; a seat swarm's phases are `skills/workshop/`; the orchestrator's charter, dispatch, briefs, roles and watching are `skills/orchestrate/`.
 
 8. **MUST write a skill, its examples included, only in terms every project has, never a file, module or name from the project the change came from.** A skill loads in every project; a foreign name reads as a fact about the current codebase, and the agent looks for it. Abstract the case to the rule it taught, and the counterweight it needed.
 

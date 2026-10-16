@@ -23,7 +23,8 @@ export interface SseHub {
   close(): void;
 }
 
-export function createSseHub(heartbeatMs = HEARTBEAT_MS): SseHub {
+/** `hello`: what the first frame carries besides its type, read at each connection (the served build). */
+export function createSseHub(heartbeatMs = HEARTBEAT_MS, hello: () => Record<string, unknown> = () => ({})): SseHub {
   const clients = new Set<ServerResponse>();
 
   const drop = (res: ServerResponse): void => {
@@ -56,7 +57,7 @@ export function createSseHub(heartbeatMs = HEARTBEAT_MS): SseHub {
       clients.add(res);
       res.on("close", () => clients.delete(res));
       res.on("error", () => drop(res));
-      send(res, { type: "hello" });
+      send(res, { type: "hello", ...hello() });
     },
     // The set is copied: a write that fails drops its client from it.
     broadcast(event) {

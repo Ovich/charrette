@@ -1,9 +1,23 @@
 # The seat's side
 
-You hold one seat in a debate: a role, arguing the open questions of a brainstorm with the
-other seats. `$S` is the tool, as `SKILL.md` names it. **You do no real work**: no edit to the
+You hold one seat in a workshop: a role, working the questions of a brainstorm board with the
+other seats under the protocol your brief names. `$S` is the tool, as `SKILL.md` names it. **You do no real work**: no edit to the
 repository, no claim, no merge. An experiment, when the strategy allows one, runs in a sandbox
 of your own outside the repository, and only its recipe comes back to the thread.
+
+**A brief naming a `workshop` protocol**: that protocol's file (the `workshop` skill's
+`references/<protocol>.md`) sets your moves per phase and the order of your first steps, over
+the checklist below. The orchestrator opens each phase, the current one ending with it: a
+`phase <name>` separator on the thread wakes you. **What you read starts with the run's current phase**, `phase <name>:
+<text>`, the first line of every `wait`, `deliver` and `read` (and the line after `join`'s
+roster): work the phase it names, never one you remember. You run
+`$S done <phase> --as <group>/<seat>` when your part is posted, at once when the phase asks
+nothing of you, then wait as its answer says; you may post
+`@orchestrator back <phase>: <reason>` when a later phase shows an earlier one wrong.
+
+**`stalled` wakes you**: no member's token counter moved for the run's threshold. If the
+current phase asks something of you and you have not done it, do it now; else keep waiting.
+The line it ends on says the same.
 
 **Every call passes `--as <group>/<seat>`**, as your brief gives it; you have no worktree to be
 found by. **Run the line the previous command printed**; never compose a command the CLI could

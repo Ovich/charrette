@@ -3,11 +3,15 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import net from "node:net";
 import type { AddressInfo } from "node:net";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { createSseHub, type SseHub } from "../src/server/sse.ts";
+import { servedBuild } from "../src/server/index.ts";
 
 /** A hub on its own server, with a heartbeat fast enough for a test. */
-const serve = async (heartbeatMs: number): Promise<{ hub: SseHub; base: string; stop: () => Promise<void> }> => {
-  const hub = createSseHub(heartbeatMs);
+const serve = async (heartbeatMs: number, hello?: () => Record<string, unknown>): Promise<{ hub: SseHub; base: string; stop: () => Promise<void> }> => {
+  const hub = createSseHub(heartbeatMs, hello);
   const server = http.createServer((_req, res) => hub.add(res));
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -75,4 +79,24 @@ test("close() stops the heartbeat and lets go of every client", async () => {
   hub.close();
   assert.equal(hub.size(), 0);
   await stop();
+});
+
+test("the hello names the build dist/ serves, read at each connection: a tab of another build reloads", async () => {
+  const dist = fs.mkdtempSync(path.join(os.tmpdir(), "aiview-build-"));
+  try {
+    assert.equal(servedBuild(dist), null);
+    fs.writeFileSync(path.join(dist, "index.html"), '<script type="module" crossorigin src="/assets/index-Bgbrqk2o.js"></script>');
+    assert.equal(servedBuild(dist), "index-Bgbrqk2o.js");
+    const { base, stop } = await serve(60_000, () => ({ build: servedBuild(dist) }));
+    try {
+      assert.deepEqual(JSON.parse((await frames(await fetch(`${base}/events`), 1))[0]!), { type: "hello", build: "index-Bgbrqk2o.js" });
+      // rebuilt while the server runs: the next connection hears the new one
+      fs.writeFileSync(path.join(dist, "index.html"), '<script type="module" src="/assets/index-NEW.js"></script>');
+      assert.deepEqual(JSON.parse((await frames(await fetch(`${base}/events`), 1))[0]!), { type: "hello", build: "index-NEW.js" });
+    } finally {
+      await stop();
+    }
+  } finally {
+    fs.rmSync(dist, { recursive: true, force: true });
+  }
 });
