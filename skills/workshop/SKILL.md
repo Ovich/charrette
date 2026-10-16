@@ -91,6 +91,13 @@ nothing of it; the board tells you when every seat is done. You open the next ph
 when its share of the budget is spent, a seat missing then skipped and the board saying so. A
 `stalled` event means act now: the thread has gone still, and its line says your step.
 
+**Every post is every seat's.** The board delivers each post to every seat in full, and a wake
+brings the whole unread thread; a seat acts only when addressed or a phase opens. Before a post
+that decides or adds, a seat reads the whole phase (`thread`, as the owed-phase line says) and
+opens on what it takes from whom (`#seq`) and what it sets aside, with why; a point raised is
+answered by whoever's work it touches, never left to fall through. A point that concerns every
+seat mentions them all (`@<group>/*`).
+
 **A seat may propose going back**: `@orchestrator back <phase>: <the reason>`, the reason
 naming what the later phase showed (a fact the research missed, a strategy the draft cannot
 hold). You decide, on the criteria: reopen the phase with `$S phase <name> "again: <the reason>"`

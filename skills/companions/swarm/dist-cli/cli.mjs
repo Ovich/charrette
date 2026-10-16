@@ -89,8 +89,8 @@ function unmatchedMentions(body, senderPlan, plans, names) {
 // src/board/kinds.ts
 var run = (...events) => events.map((event) => ({ event, scope: "run" }));
 var PROFILES = {
-  plan: { kind: "plan", claims: true, mergeLock: true, worktree: true, member: "runner", defaults: { member: [], orchestrator: run("merged", "ended", "stale") } },
-  brainstorm: { kind: "brainstorm", claims: false, mergeLock: false, worktree: false, member: "seat", defaults: { member: [], orchestrator: run("agreement", "endorsement", "ended", "stale") } }
+  plan: { kind: "plan", claims: true, mergeLock: true, worktree: true, member: "runner", wholeThread: false, defaults: { member: [], orchestrator: run("merged", "ended", "stale") } },
+  brainstorm: { kind: "brainstorm", claims: false, mergeLock: false, worktree: false, member: "seat", wholeThread: true, defaults: { member: [], orchestrator: run("agreement", "endorsement", "ended", "stale") } }
 };
 function profileOf(kind) {
   const profile = PROFILES[kind];
@@ -1610,6 +1610,8 @@ async function openBoard(dbPath = SQLITE_PATH, opts = {}) {
   const deliverTo = (p, fromWait, mentionsOnly = false) => {
     const me = participantById(p.id);
     const named = (m) => mentions(m, me) || (m.kind === "agreement" || m.kind === "endorsement") && m.about != null && claims.holds(me, m.about);
+    const whole = profileOf(me.kind).wholeThread;
+    const ownPost = (m) => whole && m.run === me.run && m.kind !== "event";
     const messages = transaction(() => {
       const unseen = db.prepare(
         `SELECT m.* FROM messages m
@@ -1619,7 +1621,7 @@ async function openBoard(dbPath = SQLITE_PATH, opts = {}) {
       ).all(me.repo, Number(db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id).since_seq), me.id, me.id);
       const woken = (r) => named(toMessage(r)) || wakes(toMessage(r), me, me.subscriptions);
       const heard = unseen.filter((r) => toMessage(r).run === me.run || woken(r));
-      const rows = mentionsOnly ? heard.filter(woken) : heard;
+      const rows = !mentionsOnly ? heard : !heard.some(woken) || !whole ? heard.filter(woken) : heard.filter((r) => woken(r) || ownPost(toMessage(r)));
       const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
       for (const r of rows) mark.run(me.id, Number(r.seq));
       const at = now();
@@ -1640,7 +1642,7 @@ async function openBoard(dbPath = SQLITE_PATH, opts = {}) {
         return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}` } : m;
       });
     });
-    const full = (m) => named(m) || mentionsOnly && wakes(m, me, me.subscriptions);
+    const full = (m) => named(m) || mentionsOnly && wakes(m, me, me.subscriptions) || ownPost(m);
     return {
       full: messages.filter(full),
       lines: messages.filter((m) => !full(m)).map(messageLine)
@@ -2125,6 +2127,15 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       const author = participantById(Number(r.author));
       const about = r.about == null ? null : String(r.about);
       return insertMessage(fresh, `endorses #${seq}`, about, "endorsement", [author.name], { endorses: seq });
+    },
+    thread(p, name) {
+      const fresh = participantById(p.id);
+      const phase = name ?? phaseOf(runRow(fresh.run))?.name;
+      if (!phase) return [];
+      const opened = db.prepare("SELECT MAX(seq) AS s FROM messages WHERE run = ? AND event = ? AND json_extract(meta, '$.phase') = ?").get(fresh.run, EVENTS.phase.name, phase);
+      if (opened.s == null) throw new Error(`thread: phase ${phase} was never opened in run ${fresh.run}`);
+      const next = db.prepare("SELECT MIN(seq) AS s FROM messages WHERE run = ? AND event = ? AND seq > ?").get(fresh.run, EVENTS.phase.name, Number(opened.s));
+      return db.prepare("SELECT * FROM messages WHERE run = ? AND seq > ? AND seq < ? AND kind != 'event' ORDER BY seq").all(fresh.run, Number(opened.s), next.s == null ? Number.MAX_SAFE_INTEGER : Number(next.s)).map(toMessage);
     },
     read(seq) {
       const r = db.prepare("SELECT * FROM messages WHERE seq = ?").get(seq);
@@ -2631,10 +2642,11 @@ var USAGE = [
   "  agree   [--as <member>] <terms> [--about <path|decision id>]  # prints the seq",
   "  endorse [--as <member>] <seq>                                   # backs an agreement; prints the endorsement's seq",
   "  read    <seq>",
-  "  deliver [--as <member>]                                         # what you have not had: mentions in full, the rest one line",
+  "  thread  [--as <member>] [<phase>]                               # every post of a phase in full (the current one by default): read it before you decide or add",
+  "  deliver [--as <member>]                                         # what you have not had: mentions in full, the rest one line (a seat's run: every post in full)",
   "  wait    [--as <member>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end; a newer wait supersedes it",
   "          # once your run is closed, wait, deliver, read, roster --as, post, agree, endorse, doing and done answer: run <id> closed: run end \u2026",
-  "          # --mentions: only a mention of you, an urgent post or an event you subscribed to ends it; the rest stays for deliver",
+  "          # --mentions: only a mention of you, an urgent post or an event you subscribed to ends it; the rest stays for deliver (a seat's run: the wake brings every unread post)",
   "  roster  [--repo <path>] [--as <member>]",
   "  end     [--as <member>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
   "  status                                                          # data home, open runs, each run's phase and its n/m done",
@@ -2792,9 +2804,11 @@ var self = () => ["node", shellWord(process.argv[1].replace(/\\/g, "/"))];
 var listensInForeground = (p) => p.slice !== "orchestrator" && profileOf(p.kind).member === "seat";
 var waitCommand = (name) => [...self(), "wait", "--mentions", "--as", shellWord(name)].join(" ");
 var listenNow = (p, afterPhase = false) => listensInForeground(p) ? `${afterPhase ? "only then wait" : "wait now"}, in the foreground (never a background listener: a seat that ends its turn is gone): ${waitCommand(p.name)}` : `start your listener now, in the background (your harness's background task): ${waitCommand(p.name)}`;
-var owedLine = (board, p) => {
+var owedLine = (board, p, thread = true) => {
   const ph = board.owedPhase(p);
-  return ph ? `phase ${ph.name} is open and asks: ${ph.text}. Do your part now, then: ${[...self(), "done", shellWord(ph.name), "--as", shellWord(p.name)].join(" ")}` : null;
+  if (!ph) return null;
+  const read = thread && profileOf(p.kind).wholeThread ? `Read the whole phase first: ${[...self(), "thread", "--as", shellWord(p.name)].join(" ")}. ` : "";
+  return `phase ${ph.name} is open and asks: ${ph.text}. ${read}Do your part now, then: ${[...self(), "done", shellWord(ph.name), "--as", shellWord(p.name)].join(" ")}`;
 };
 var nextStep = (board, p) => {
   const owed = owedLine(board, p);
@@ -3150,6 +3164,21 @@ ${USAGE}`);
       emit({ ...m, phase, ...owes ? { next: owes } : {} }, () => {
         if (phase) console.log(phase);
         console.log(fullText(m));
+        if (owes) console.log(owes);
+      });
+      break;
+    }
+    case "thread": {
+      const me = caller(board);
+      if (answeredClosed(board, me)) break;
+      const name = args.positional[0];
+      const posts = board.thread(me, name);
+      const phase = phaseHeader(board, me.run);
+      const owes = owedLine(board, me, false);
+      emit({ phase, posts, ...owes ? { next: owes } : {} }, () => {
+        if (phase) console.log(phase);
+        if (!posts.length) console.log(`no post yet in phase ${name ?? board.currentPhase(me.run)?.name ?? "-"}`);
+        for (const m of posts) console.log(fullText(m));
         if (owes) console.log(owes);
       });
       break;

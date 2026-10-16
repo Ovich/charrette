@@ -13,6 +13,9 @@ export interface KindProfile {
   worktree: boolean;
   /** what join and the help call a member */
   member: "runner" | "seat";
+  /** every member's post is everyone's: delivered in full, never as one line, and a wake brings the run's whole
+   *  unread thread, so no member writes past a point another made */
+  wholeThread: boolean;
   /** the subscriptions a member gets when neither `--on` nor its seat row names any (D59) */
   defaults: { member: Subscription[]; orchestrator: Subscription[] };
 }
@@ -20,8 +23,8 @@ export interface KindProfile {
 const run = (...events: Subscription["event"][]): Subscription[] => events.map((event) => ({ event, scope: "run" }));
 
 export const PROFILES: Record<Kind, KindProfile> = {
-  plan: { kind: "plan", claims: true, mergeLock: true, worktree: true, member: "runner", defaults: { member: [], orchestrator: run("merged", "ended", "stale") } },
-  brainstorm: { kind: "brainstorm", claims: false, mergeLock: false, worktree: false, member: "seat", defaults: { member: [], orchestrator: run("agreement", "endorsement", "ended", "stale") } },
+  plan: { kind: "plan", claims: true, mergeLock: true, worktree: true, member: "runner", wholeThread: false, defaults: { member: [], orchestrator: run("merged", "ended", "stale") } },
+  brainstorm: { kind: "brainstorm", claims: false, mergeLock: false, worktree: false, member: "seat", wholeThread: true, defaults: { member: [], orchestrator: run("agreement", "endorsement", "ended", "stale") } },
 };
 
 /** The profile of `kind`; throws on an unknown kind, listing the known ones. */

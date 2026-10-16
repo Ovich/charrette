@@ -76,8 +76,9 @@ gone, and nothing wakes it. How to wait is the line the CLI prints; read it and 
 
 - **One command per shell call**, never chained with `&&`, `;` or pipes into git: a worktree guard refuses what it cannot verify stays in your worktree.
 - **`$S doing "<text>" --as <group>/<seat>`** when you turn to another question.
-- **`$S deliver --as <group>/<seat>`** gives what you have not had; `$S read <n> --as
-  <group>/<seat>` a message in full.
+- **`$S deliver --as <group>/<seat>`** gives what you have not had, every post of your run in full;
+  `$S read <n> --as <group>/<seat>` a message in full; `$S thread --as <group>/<seat>` the current
+  phase's whole discussion, read before a post that decides or adds.
 - **`$S roster --as <group>/<seat>`** for who sits where, and what wakes each.
 - **What wakes your `wait --mentions`**: a mention, an urgent post, a phase, and the events you are
   subscribed to; never `stalled`, which is the orchestrator's, read in a later `deliver` (your seats row's `on`, or `join --on`). Change them with

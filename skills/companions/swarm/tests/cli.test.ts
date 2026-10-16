@@ -1116,7 +1116,7 @@ test("a member owing the open phase is told to do it before any wait: at join, a
   assert.match(early.stdout.trimEnd().split("\n").at(-1)!, /^wait now, in the foreground .* wait --mentions --as idea\/architect$/);
 
   run("phase", "ping", "say", "hi", "--as", "idea/orchestrator");
-  const owed = /^phase ping is open and asks: say hi\. Do your part now, then: node \S+ done ping --as idea\/skeptic$/m;
+  const owed = /^phase ping is open and asks: say hi\. Read the whole phase first: node \S+ thread --as idea\/skeptic\. Do your part now, then: node \S+ done ping --as idea\/skeptic$/m;
   // a late join: the do-it step, then only then the wait
   const late = joinSeat(id, "skeptic");
   assert.equal(late.status, 0, late.stderr);
@@ -1130,7 +1130,7 @@ test("a member owing the open phase is told to do it before any wait: at join, a
   assert.match(run("deliver", "--as", "idea/skeptic").stdout, owed);
   // a member woken by the phase event is told to do it before it waits again
   const woken = run("wait", "--mentions", "--as", "idea/architect", "--timeout", "3000");
-  assert.match(woken.stdout, /^phase ping is open and asks: say hi\. Do your part now, then: node \S+ done ping --as idea\/architect$/m);
+  assert.match(woken.stdout, /^phase ping is open and asks: say hi\. Read the whole phase first: node \S+ thread --as idea\/architect\. Do your part now, then: node \S+ done ping --as idea\/architect$/m);
   assert.match(woken.stdout, /^only then wait again, in the foreground: .* wait --mentions --as idea\/architect/m);
 
   // after done: the wait step, nothing owed

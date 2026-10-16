@@ -41,10 +41,11 @@ const USAGE = [
   "  agree   [--as <member>] <terms> [--about <path|decision id>]  # prints the seq",
   "  endorse [--as <member>] <seq>                                   # backs an agreement; prints the endorsement's seq",
   "  read    <seq>",
-  "  deliver [--as <member>]                                         # what you have not had: mentions in full, the rest one line",
+  "  thread  [--as <member>] [<phase>]                               # every post of a phase in full (the current one by default): read it before you decide or add",
+  "  deliver [--as <member>]                                         # what you have not had: mentions in full, the rest one line (a seat's run: every post in full)",
   "  wait    [--as <member>] [--timeout <ms>] [--mentions]           # blocks until a message for you, then says how to re-arm; nothing on timeout or end; a newer wait supersedes it",
   "          # once your run is closed, wait, deliver, read, roster --as, post, agree, endorse, doing and done answer: run <id> closed: run end …",
-  "          # --mentions: only a mention of you, an urgent post or an event you subscribed to ends it; the rest stays for deliver",
+  "          # --mentions: only a mention of you, an urgent post or an event you subscribed to ends it; the rest stays for deliver (a seat's run: the wake brings every unread post)",
   "  roster  [--repo <path>] [--as <member>]",
   "  end     [--as <member>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
   "  status                                                          # data home, open runs, each run's phase and its n/m done",
@@ -268,9 +269,12 @@ const listenNow = (p: Pick<Participant, "name" | "slice" | "kind">, afterPhase =
 
 /** The step a member owing the run's open phase takes before any wait: a member that joined, or woke,
  *  after the phase event passed does its part now, never sleeps through it; null when it owes none. */
-const owedLine = (board: Board, p: Participant): string | null => {
+const owedLine = (board: Board, p: Participant, thread = true): string | null => {
   const ph = board.owedPhase(p);
-  return ph ? `phase ${ph.name} is open and asks: ${ph.text}. Do your part now, then: ${[...self(), "done", shellWord(ph.name), "--as", shellWord(p.name)].join(" ")}` : null;
+  if (!ph) return null;
+  // in a whole-thread run the part starts from the phase's whole discussion, never from the last post alone
+  const read = thread && profileOf(p.kind).wholeThread ? `Read the whole phase first: ${[...self(), "thread", "--as", shellWord(p.name)].join(" ")}. ` : "";
+  return `phase ${ph.name} is open and asks: ${ph.text}. ${read}Do your part now, then: ${[...self(), "done", shellWord(ph.name), "--as", shellWord(p.name)].join(" ")}`;
 };
 /** A member's next step where it would be told to listen: the owed phase first, when it owes one. */
 const nextStep = (board: Board, p: Participant): string => {
@@ -673,6 +677,21 @@ ${USAGE}`);
       emit({ ...m, phase, ...(owes ? { next: owes } : {}) }, () => {
         if (phase) console.log(phase);
         console.log(fullText(m));
+        if (owes) console.log(owes);
+      });
+      break;
+    }
+    case "thread": {
+      const me = caller(board);
+      if (answeredClosed(board, me)) break;
+      const name = args.positional[0];
+      const posts = board.thread(me, name);
+      const phase = phaseHeader(board, me.run);
+      const owes = owedLine(board, me, false);
+      emit({ phase, posts, ...(owes ? { next: owes } : {}) }, () => {
+        if (phase) console.log(phase);
+        if (!posts.length) console.log(`no post yet in phase ${name ?? board.currentPhase(me.run)?.name ?? "-"}`);
+        for (const m of posts) console.log(fullText(m));
         if (owes) console.log(owes);
       });
       break;

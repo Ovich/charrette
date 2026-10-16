@@ -271,6 +271,9 @@ export interface Board {
   endorse(p: Participant, seq: number): Message;
   /** `by`: the runner reading, when known, counted as a call of its own (D66). */
   read(seq: number, by?: Participant): Message;
+  /** Every post of `p`'s run since its phase `name` was last opened (its current phase when omitted), events left
+   *  out: the whole discussion a member reads before it decides or adds to it. Empty before the first phase. */
+  thread(p: Participant, name?: string): Message[];
   deliver(p: Participant): Delivery; // own run's items + what wakes p from any run (plan D2); undelivered since last time; marks them delivered; stamps the last call
   /** The first delivery, or empty on timeout or once `p` has ended (D49). `mentionsOnly`: only a
    *  message that mentions `p`, is urgent, or is an event `p` subscribed to (D59) ends it, and only those are marked delivered; the rest
@@ -814,6 +817,9 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
     const named = (m: Message): boolean =>
       mentionsMe(m, me) ||
       ((m.kind === "agreement" || m.kind === "endorsement") && m.about != null && claims.holds(me, m.about));
+    const whole = profileOf(me.kind).wholeThread;
+    // a post of the caller's own run, not an event, in a whole-thread run: everyone's in full
+    const ownPost = (m: Message): boolean => whole && m.run === me.run && m.kind !== "event";
     const messages = transaction(() => {
       const unseen = db
         .prepare(
@@ -827,7 +833,12 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
       const woken = (r: Row): boolean => named(toMessage(r)) || wakes(toMessage(r), me, me.subscriptions);
       // of its own run, everything; of another run, only what wakes the caller (plan D2)
       const heard = unseen.filter((r) => toMessage(r).run === me.run || woken(r));
-      const rows = mentionsOnly ? heard.filter(woken) : heard;
+      // a wake in a whole-thread run brings every unread post of the run with it, never the waking one alone
+      const rows = !mentionsOnly
+        ? heard
+        : !heard.some(woken) || !whole
+          ? heard.filter(woken)
+          : heard.filter((r) => woken(r) || ownPost(toMessage(r)));
       const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
       for (const r of rows) mark.run(me.id, Number(r.seq));
       // a delivery is a call to the board: the runner's last call (D31)
@@ -852,8 +863,9 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
         return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}` } : m;
       });
     });
-    // a wait --mentions gives what woke it in full; deliver, mentions in full and the rest one line
-    const full = (m: Message): boolean => named(m) || (mentionsOnly && wakes(m, me, me.subscriptions));
+    // a wait --mentions gives what woke it in full; deliver, mentions in full and the rest one line; a whole-thread
+    // run gives its members' posts in full too
+    const full = (m: Message): boolean => named(m) || (mentionsOnly && wakes(m, me, me.subscriptions)) || ownPost(m);
     return {
       full: messages.filter(full),
       lines: messages.filter((m) => !full(m)).map(messageLine),
@@ -1434,6 +1446,23 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
       const author = participantById(Number(r.author));
       const about = r.about == null ? null : String(r.about);
       return insertMessage(fresh, `endorses #${seq}`, about, "endorsement", [author.name], { endorses: seq });
+    },
+
+    thread(p, name) {
+      const fresh = participantById(p.id);
+      const phase = name ?? phaseOf(runRow(fresh.run))?.name;
+      if (!phase) return [];
+      // the phase event that opened it last: the thread runs from it to the next phase event, or to now
+      const opened = db
+        .prepare("SELECT MAX(seq) AS s FROM messages WHERE run = ? AND event = ? AND json_extract(meta, '$.phase') = ?")
+        .get(fresh.run, EVENTS.phase.name, phase) as Row;
+      if (opened.s == null) throw new Error(`thread: phase ${phase} was never opened in run ${fresh.run}`);
+      const next = db.prepare("SELECT MIN(seq) AS s FROM messages WHERE run = ? AND event = ? AND seq > ?").get(fresh.run, EVENTS.phase.name, Number(opened.s)) as Row;
+      return (
+        db
+          .prepare("SELECT * FROM messages WHERE run = ? AND seq > ? AND seq < ? AND kind != 'event' ORDER BY seq")
+          .all(fresh.run, Number(opened.s), next.s == null ? Number.MAX_SAFE_INTEGER : Number(next.s)) as Row[]
+      ).map(toMessage);
     },
 
     read(seq) {
