@@ -8,7 +8,7 @@ the **template**, the document the seats work on (its skeleton: sections or para
 each must do, length, tone, and its **altitude**: the level of detail the reader is owed), and the **manifests**, one per seat (a part every seat reads, a part
 for that seat alone: its role, rules, reader persona, evidence). With no template given, the strategist's brief settles the skeleton, length, tone and altitude.
 
-**Board**: the text's own document through the `aiview` skill, `YYYY-MM-DD-<topic>.report.md`,
+**Board**: the text's own document through the `aiview` skill, a new one for every run (its template and how a phase is written in: `references/editorial-documents.md`), `YYYY-MM-DD-<topic>.report.md`,
 its sections in the order of the phases. **Every phase's work is written into it as the phase
 closes**, in full, never as a pointer to the thread: the judge's table; the brief, the answers
 and the settled brief; every candidate, every vote and the count; the draft; each polish iteration's table,
@@ -62,7 +62,7 @@ The seats start fresh and know only what they are given; you are the one seat th
 person's intent from the first question to the delivered text. You never write the text,
 propose a candidate or vote; everything else that keeps the run true to the person is yours.
 
-**Before the run, with the person** (the run itself never waits on them):
+**Before the run, with the person** (the run itself never waits on them). The interview, the feedback, the manifests and the board each have their template, and how each is created, kept and filled, in `references/editorial-documents.md`: read it before writing any of them.
 
 - **Interview them** (the `interview` skill), the judge's way: their ask split into its demands
   and judged against the evidence; each gap worked with one open question at a time, never
