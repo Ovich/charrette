@@ -108,7 +108,7 @@ rule, never written up.
 
 **You never end your turn while the run is open.** Listen in the background, as `phase`'s
 answer prints (`wait --mentions --as <group>/orchestrator`): every `done`, `all-done` and
-`stalled` reaches you, joins and posts do not; read them with `deliver` when a phase closes.
+`stalled` reaches you, joins and posts do not; read them with `deliver` when a phase closes, or as they land when the protocol has you steer them (editorial).
 `stalled` reaches you alone, never a seat.
 
 **The person, in chat, may still interrupt**: relay to a seat (`post "@<seat> …"`), stop the

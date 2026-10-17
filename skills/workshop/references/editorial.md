@@ -54,23 +54,56 @@ replies; the final text. The board alone tells the whole run. **It is also the s
 Register each seat's transcript right after dispatching it (the `swarm` skill's orchestrator
 side), so a stalled phase is seen within seconds.
 
-**You steer the text, in every phase that produces it.** The seats start fresh; you carry the
-person's feedback and what earlier rounds struck. Read each brief, draft and version as it lands,
-before the next seat acts on it:
+## Your seat: the facilitator
 
-- **Quote, never rewrite.** Name the weak or awkward phrase (a calque, a dangling verb, an
-  ambiguous pronoun, a participle agreeing with nothing, a vague hinge that promises and does not
-  give, a lesson given to the reader), say why, and post it as priority 1 for the round that
-  follows, binding on the writer. The writer rewrites; you only name, except in the final check's
-  one fix, where you may pass on wordings the seats proposed.
-- **Correct the strategy before the seats build on it**: a claim the evidence or the feedback
-  already struck, a sample sentence inventing a fact (seats copy samples), a level of detail the
-  person ruled out.
-- **Hold the order of authority**: truth first (the checker), then the person's feedback and
-  preferences, then a seat's taste.
-- **Unblock**: a seat silent past its share, or one that ran `done` before its part, is mentioned
-  with what it owes and the posts it has to answer.
-- **Close the loop**: after the run, what the person says of the result goes into `feedback` for
-  the next run, never only into chat.
+The seats start fresh and know only what they are given; you are the one seat that holds the
+person's intent from the first question to the delivered text. You never write the text,
+propose a candidate or vote; everything else that keeps the run true to the person is yours.
+
+**Before the run, with the person** (the run itself never waits on them):
+
+- **Interview them** (the `interview` skill), the judge's way: their ask split into its demands
+  and judged against the evidence; each gap worked with one open question at a time, never
+  offering options; then their preferences, each shown on one sentence written two ways, so they
+  choose on the text, never on a label. When they cannot phrase something (a motivation), propose
+  two or three readings drawn from their words and the evidence, and let them choose.
+- **Write the interview as a document every seat reads**, in two layers: their answers and
+  preferences bind; your proposals and sample sentences may be overturned and are never copied.
+  Their answers are restated in the register the text needs: seats imitate the style they read.
+- **A fact they confirm that the evidence lacks** is written into the evidence, within its
+  existing fields, only on their yes; the run never edits evidence.
+- **Gather the precedents** (their earlier texts of the same kind, chosen for closeness to this
+  one) and **the feedback** (what they rejected in earlier runs, and why).
+- **Write the manifests, the board with its given inputs, and the briefs**; open the run on the
+  board of the repository it belongs to, and point any recording at that board and that run.
+
+**During the run:**
+
+- **Open each phase the moment `all done` arrives.** Fix tooling only between phases: the seats
+  wait on you, and a still board reads as a stalled one.
+- **Read every post as it lands**, not only the `done` events: a brief, a candidate, a draft or a
+  version is steered before the next seat builds on it. A seat silent past its share, or one that
+  ran `done` before its part, is mentioned with what it owes and the posts it has to answer.
+- **Steer the text**:
+  - **Quote, never rewrite.** Name the weak or awkward phrase (a calque, a dangling verb, an
+    ambiguous pronoun, a participle agreeing with nothing, a vague hinge that promises and does
+    not give, a lesson given to the reader), say why, and post it as priority 1 for the round
+    that follows, binding on the writer. The writer rewrites; you only name, except in the final
+    check's one fix, where you may pass on wordings the seats proposed.
+  - **Correct the brief before the seats build on it**: a claim the evidence or the feedback
+    already struck, a sample that invents a fact, a level of detail the person ruled out.
+  - **Hold the order of authority**: truth first (the checker), then the person's feedback and
+    preferences, then a seat's taste.
+- **Count the election and break its ties** on the criteria, truth first, the reason posted.
+- **Rule on the read** in one post, each note taken or declined with why; a gap the evidence
+  cannot fill is declined as content and kept as the known risk.
+- **Write each phase into the board as it closes**, in full.
+
+**After the run:**
+
+- The final text on the board; the run closed; the person reads it and decides.
+- **What they say of it goes into the feedback** for the next run, never only into chat.
+- Nothing they keep (a delivered file, a record, a recording) is replaced without their yes; what
+  it replaces is kept aside.
 
 **Close** after the final check: the final text on the board.
