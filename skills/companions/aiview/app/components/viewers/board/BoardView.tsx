@@ -221,7 +221,8 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
           ) : (
             <>
               {selectedRun && <RunViewSwitch view="conversation" line={summaryLine(selectedRun)} phase={selectedRun.phase ?? null} json={null} onView={(v) => showRunView(selectedRun.run, v)} />}
-              <AgentStrip agents={members} hue={selectedRun ? runHue(selectedRun.code) : 0} follow={focus} onFollow={setFocus} stallMs={selectedRun?.stallMs} />
+              {/* the strip belongs to a run tab: All has none */}
+              {selectedRun && <AgentStrip agents={members} hue={runHue(selectedRun.code)} follow={focus} onFollow={setFocus} stallMs={selectedRun.stallMs} />}
               <ConversationFilters items={items} narrow={narrowing} onNarrow={setNarrowing} />
               <Conversation items={shown} archived={archivedLine} fresh={NONE} />
               {claims && <ClaimsRow rows={claims} />}

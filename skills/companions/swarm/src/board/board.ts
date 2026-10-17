@@ -133,6 +133,8 @@ export type RunSummary = {
 export type RepoSummary = { repo: string; name: string; runs: RunSummary[] };
 export type RunnerState = "working" | "waiting" | "merging" | "watching" | "ended" | "done";
 export type SnapshotRunner = {
+  /** The run the member sat in: a group can hold several runs, its members are told apart by this; absent from a reader before it. */
+  run?: number;
   runner: string;
   nick: string;
   plan: string;
@@ -264,6 +266,10 @@ export interface Board {
    *  "merged and ended" when it merged since it joined, else "ended" (D66). */
   end(p: Participant): void;
   roster(repo: string): RosterEntry[];
+  /** Members of the repository's open runs who have ended, as `<plan>/<slice>`: a mention of one reaches nobody. */
+  endedMembers(repo: string): string[];
+  /** The repository-relative paths `p` holds a claim on now. */
+  heldBy(p: Participant): string[];
 
   /** Stored with the author's run, always (plan D1, D13). */
   post(p: Participant, body: string, opts?: { about?: string; kind?: MessageKind }): Message;
@@ -1410,6 +1416,15 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
       return true;
     },
 
+    endedMembers(repo) {
+      const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NOT NULL`).all(repo) as Row[];
+      return [...new Set(rows.map((r) => `${r.plan}/${r.slice}`))];
+    },
+
+    heldBy(p) {
+      return (db.prepare("SELECT path FROM claims WHERE participant = ?").all(p.id) as Row[]).map((r) => String(r.path));
+    },
+
     roster(repo) {
       const rows = db
         .prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL ORDER BY r.id, p.id`)
@@ -1630,6 +1645,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
                   ? "waiting"
                   : "working";
         return {
+          run: Number(r.run),
           runner: `${r.plan}/${slice}`,
           nick: nickOf(r),
           plan: String(r.plan),

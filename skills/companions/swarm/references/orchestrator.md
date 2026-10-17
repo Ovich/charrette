@@ -53,7 +53,7 @@ except `open`, `slice`, `close` and `status`.
 **The `orchestrate` skill dispatches.** For a kind without worktree, no `isolation`, and each
 brief carries `--as <group>/<seat>` and the join line, whose answer tells the seat how it
 waits: in the foreground, never with a background listener; a seat runs on the plugin's
-`seat-runner` agent, as the `workshop` skill says.
+`seat-runner` agent, as the `swarmstorm` skill says.
 
 **After each dispatch, register the member's transcript**: `$S slice <id> --run <run>
 --transcript <path>`, the dispatched agent's own transcript (step 4 of the open). Its answer
@@ -89,13 +89,15 @@ says whether the board reads it.
 - **Answer what is asked of you**, on the thread. Two runners' agreement is theirs to make; an
   agreement that changes a decision the plan took is recorded in the plan.
 - **A brainstorm's events**: an agreement and its endorsement, an escalation, a new question,
-  handled as the `workshop` skill's protocol says.
+  handled as the `swarmstorm` skill's protocol says.
 - **Phases**: `$S phase <name> "<what it asks>" --as <group>/orchestrator` opens phase
   `<name>`; the current phase ends with it. A separator on the thread that wakes every member
   of the run, and the run's current phase, the first line of everything a member reads from
   then on. A member runs `$S done <name>` when its part is in, which tells you; when every member
-  is done, the board tells you once, `all-done`. Each answer prints the step to run next. When
-  to open which phase is the protocol's (the `workshop` skill).
+  is done, the board tells you once, `all-done`. Each answer prints the step to run next. Phases
+  belong to every kind of run: when to open which is a swarmstorm's protocol (the `swarmstorm`
+  skill), or, for a plan, the phases its *Mandate* names (the `orchestrate-plan` skill); a plan
+  that names none runs without.
 - **`$S roster`** shows each run's title, current phase and its `<n>/<m> done`, then each runner, its doing and its files; `(stale)` after ten minutes
   without a call to the board.
 

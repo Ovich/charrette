@@ -13,7 +13,8 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
    roster shows you from the start:
    `$S join --run <run> --slice <slice> --doing "<what you start on>" --files "<path>:interface,<path>:inside,…"`.
    The files are the slice document's modules table: *interface* when other slices import the
-   file, *inside* when only this slice reads it. Read the roster it prints: who is there, doing
+   file, *inside* when only this slice reads it; a file the slice creates is declared too, its
+   path from the repository root. Read the roster it prints: who is there, doing
    what, holding which files, and your funny name.
 2. **Arm the listener at once, as your first background task.** `join` ends on the line
    `start your listener now, in the background (your harness's background task): <command>`;
@@ -67,6 +68,8 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
 - **`$S doing "<text>"`** at each step another runner would want to know: the module you are
   in, a test going green, a merge coming.
 - **A mention that asks you something is answered before you go on.**
+- **A plan run in phases**: a `phase <name>` separator wakes you, its text saying your part;
+  do it, then `$S done <name>`. Work the phase the board names, never one you remember.
 - **`$S release <path>`** when you no longer touch a file you hold.
 - **`$S roster`** for who holds what now.
 - **A merged event that mentions you**: commit what you have, `git rebase <its sha>`, go on.

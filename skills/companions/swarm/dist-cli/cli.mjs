@@ -2096,6 +2096,13 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       });
       return true;
     },
+    endedMembers(repo) {
+      const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NOT NULL`).all(repo);
+      return [...new Set(rows.map((r) => `${r.plan}/${r.slice}`))];
+    },
+    heldBy(p) {
+      return db.prepare("SELECT path FROM claims WHERE participant = ?").all(p.id).map((r) => String(r.path));
+    },
     roster(repo) {
       const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL ORDER BY r.id, p.id`).all(repo);
       const cutoff = Date.now() - STALE_MS;
@@ -2263,6 +2270,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
         const ended = r.ended_at != null;
         const state = orchestrator ? runOpen.get(Number(r.run)) ? "watching" : "done" : s?.state === "done" ? "done" : ended ? "ended" : lockHolder === id ? "merging" : Number(r.waiting) === 1 ? "waiting" : "working";
         return {
+          run: Number(r.run),
           runner: `${r.plan}/${slice}`,
           nick: nickOf(r),
           plan: String(r.plan),
@@ -2554,7 +2562,7 @@ function unclaimedLines(paths) {
   for (const p of paths) {
     const folder = folderOf(p);
     const inFolder = byFolder.get(folder);
-    if (inFolder.length <= COLLAPSE_OVER) lines.push(`reconciled ${p}`);
+    if (inFolder.length <= COLLAPSE_OVER) lines.push(`reconciled ${p}: written without a claim`);
     else if (!told.has(folder)) {
       told.add(folder);
       lines.push(`${inFolder.length} files under ${folder}/ written unclaimed`);
@@ -2633,7 +2641,7 @@ var USAGE = [
   "  phase   <name> <text> [--as <member>]                           # opens phase <name>; the current phase ends with it: a separator on the thread that wakes every member of the run (orchestrator)",
   "  done    <phase> [--as <member>]                                 # your part of the current phase is in: tells the orchestrator; when every member is done, the board tells it",
   "  close   --run <id>                                              # (orchestrator)",
-  '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,\u2026"]   # --slice <id> the same; prints the roster, then how you listen: a seat waits in the foreground, a slice runner listens in the background',
+  '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,\u2026"]   # --slice <id> the same; a file not there yet is one you create, declared from the repository root; prints the roster, then how you listen: a seat waits in the foreground, a slice runner listens in the background',
   "          # --on <events>: what wakes your wait --mentions besides mentions and urgent posts, e.g. agreement,any:merged; else the seat row's on, else the kind's defaults",
   "  subscribe   [--as <member>] <events>                            # prints your subscriptions after",
   "  unsubscribe [--as <member>] <events>",
@@ -2734,8 +2742,8 @@ function branchChangedIn(worktree, onto) {
   const committed = r.stdout.split("\0").filter(Boolean);
   return [.../* @__PURE__ */ new Set([...committed, ...changedIn(worktree)])];
 }
-var printReconciled = (reconciled, flags) => {
-  for (const line of unclaimedLines(reconciled)) console.log(line);
+var printReconciled = (unclaimed, flags) => {
+  for (const line of unclaimedLines(unclaimed)) console.log(line);
   for (const f of flags) console.log(`#${f.seq} flagged: you wrote ${f.path} outside your claim; ${f.holder} holds it. Settle it with @${f.holder} on the thread.`);
 };
 var toolRoot = () => process.env.SWARM_ROOT ?? path4.dirname(path4.resolve(process.argv[1]));
@@ -2828,7 +2836,10 @@ var unmatchedLines = (board, p, body) => {
   const plans = [...new Set(roster.map((r) => r.plan))];
   const names = new Map(runners.map((r) => [nameHandle(r.nick), r.name]));
   const nickOf = new Map(runners.map((r) => [r.name, r.nick.replace(/\s+/g, "")]));
+  const ended = new Set(board.endedMembers(p.repo));
   return unmatchedMentions(body, p.plan, plans, names).map(({ name, closest }) => {
+    const member = name.includes("/") ? name : `${p.plan}/${name}`;
+    if (ended.has(member)) return `@${name} has ended: the post stays on the thread, but they will not read it`;
     const guesses = closest.map((c) => nickOf.has(c) ? `@${c} or @${nickOf.get(c)}` : `@${c}`);
     return `@${name} matched nobody on the board${guesses.length ? `: did you mean ${guesses.join(", ")}?` : ""}`;
   });
@@ -2864,7 +2875,14 @@ function aboutArg() {
 function parseFile(spec) {
   const m = spec.match(/^(.*):(interface|inside)$/);
   const d = m ? { path: m[1], interface: m[2] === "interface" } : { path: spec, interface: false };
-  return { ...d, path: repoRelative(resolveClaimPath(d.path)) };
+  return { ...d, path: repoRelative(declaredPath(d.path)) };
+}
+function declaredPath(file) {
+  if (path4.isAbsolute(file)) return file;
+  const here = path4.resolve(file);
+  if (fs4.existsSync(here)) return here;
+  const root = worktreeOf(process.cwd());
+  return root ? path4.resolve(root, file) : here;
 }
 function readSlices(file) {
   let raw;
@@ -3276,11 +3294,13 @@ ${rearm}` : rearm;
       const p = caller(board);
       const onto = need("--onto");
       const reconciled = p.worktree ? branchChangedIn(p.worktree, onto) : [];
+      const held = new Set(board.heldBy(p));
+      const unclaimed = reconciled.filter((f) => !held.has(f));
       const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
       const reflogMark = p.worktree ? headReflogLength(p.worktree) ?? void 0 : void 0;
       const r = board.lockMerge(p, onto, reflogMark);
       emit({ runner: p.name, ...r, reconciled, flags }, () => {
-        printReconciled(reconciled, flags);
+        printReconciled(unclaimed, flags);
         console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait --mentions for its merged event`);
       });
       break;
@@ -3292,8 +3312,9 @@ ${rearm}` : rearm;
       const lock = board.heldMergeLock(p);
       const conflicts = p.worktree && lock && lock.reflogMark !== null ? conflictsOf(p.worktree, lock.onto ?? "", lock.reflogMark) : void 0;
       const sharers = board.merged(p, sha, files.map((f) => path4.resolve(f)), conflicts);
+      const ended = new Set(board.endedMembers(p.repo));
       const tell = sharers.map(
-        (o) => `if you resolved a conflict in ${o.path}, tell them: swarm post "@${o.runner} I resolved ${o.path}: <how>" --about ${o.path}`
+        (o) => ended.has(o.runner) ? `if you resolved a conflict in ${o.path}: ${o.runner} has ended, so say how in your report` : `if you resolved a conflict in ${o.path}, tell them: swarm post "@${o.runner} I resolved ${o.path}: <how>" --about ${o.path}`
       );
       emit({ runner: p.name, sha, files, tell }, () => {
         console.log(`merged ${sha}: lock released`);
@@ -3305,10 +3326,12 @@ ${rearm}` : rearm;
       const p = caller(board);
       if (p.ended || board.runs().every((r) => r.id !== p.run)) break;
       const reconciled = p.worktree ? changedIn(p.worktree) : [];
+      const held = new Set(board.heldBy(p));
+      const unclaimed = reconciled.filter((f) => !held.has(f));
       const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
       board.end(p);
       emit({ runner: p.name, ended: true, reconciled, flags }, () => {
-        printReconciled(reconciled, flags);
+        printReconciled(unclaimed, flags);
         console.log(`${p.name} ended`);
       });
       break;

@@ -227,7 +227,7 @@ test("the claims row is collapsed, counting files and those shared", () => {
   show([APP], null, [SHARED]);
   const toggle = screen.getByRole("button", { name: /Claims/ });
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
-  expect(toggle.textContent).toContain(`${SHARED.files.length} files · 1 shared by two runs`);
+  expect(toggle.textContent).toContain(`${SHARED.files.length} files · 1 shared`);
   expect(screen.queryByText("src/shared.ts")).toBeNull();
 });
 

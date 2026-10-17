@@ -72,7 +72,8 @@ export function orderRoster(roster: SnapshotRunner[]): SnapshotRunner[] {
 }
 
 /** A run's members: the roster entries of its group. */
-const membersOf = (snap: BoardSnapshot, run: RunSummary): SnapshotRunner[] => snap.roster.filter((r) => r.plan === run.group);
+// by run, never by group: runs of one group would otherwise show each other's members
+const membersOf = (snap: BoardSnapshot, run: RunSummary): SnapshotRunner[] => snap.roster.filter((r) => (r.run === undefined ? r.plan === run.group : r.run === run.run));
 
 // ── following a runner ──────────────────────────────────────────────────────────────
 
@@ -488,6 +489,8 @@ export function agents(snap: BoardSnapshot, run: RunId): SnapshotRunner[] {
 export function claimRows(snap: BoardSnapshot, run: RunId | null): { path: string; holders: string[]; shared: boolean }[] {
   const r = run == null ? null : snap.runs.find((x) => x.run === run);
   if (run != null && !r) return [];
-  const inRun = (holder: string): boolean => !r || splitRunner(holder).plan === r.group;
+  // by the run's members, as the strip: another run of the same group holds nothing here
+  const members = r ? new Set(membersOf(snap, r).map((m) => m.runner)) : null;
+  const inRun = (holder: string): boolean => !members || members.has(holder);
   return snap.files.filter((f) => f.holders.some(inRun)).map((f) => ({ path: f.path, holders: f.holders, shared: f.holders.length > 1 }));
 }

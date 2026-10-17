@@ -32,7 +32,7 @@ const USAGE = [
   "  phase   <name> <text> [--as <member>]                           # opens phase <name>; the current phase ends with it: a separator on the thread that wakes every member of the run (orchestrator)",
   "  done    <phase> [--as <member>]                                 # your part of the current phase is in: tells the orchestrator; when every member is done, the board tells it",
   "  close   --run <id>                                              # (orchestrator)",
-  '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # --slice <id> the same; prints the roster, then how you listen: a seat waits in the foreground, a slice runner listens in the background',
+  '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # --slice <id> the same; a file not there yet is one you create, declared from the repository root; prints the roster, then how you listen: a seat waits in the foreground, a slice runner listens in the background',
   "          # --on <events>: what wakes your wait --mentions besides mentions and urgent posts, e.g. agreement,any:merged; else the seat row's on, else the kind's defaults",
   "  subscribe   [--as <member>] <events>                            # prints your subscriptions after",
   "  unsubscribe [--as <member>] <events>",
@@ -163,8 +163,8 @@ function branchChangedIn(worktree: string, onto: string): string[] {
 }
 
 /** The reconcile's lines: each file, then each flag on the thread (D58, D59). */
-const printReconciled = (reconciled: string[], flags: Flag[]): void => {
-  for (const line of unclaimedLines(reconciled)) console.log(line);
+const printReconciled = (unclaimed: string[], flags: Flag[]): void => {
+  for (const line of unclaimedLines(unclaimed)) console.log(line);
   for (const f of flags) console.log(`#${f.seq} flagged: you wrote ${f.path} outside your claim; ${f.holder} holds it. Settle it with @${f.holder} on the thread.`);
 };
 
@@ -303,7 +303,10 @@ const unmatchedLines = (board: Board, p: Participant, body: string): string[] =>
   const plans = [...new Set(roster.map((r) => r.plan))];
   const names = new Map(runners.map((r) => [nameHandle(r.nick), r.name]));
   const nickOf = new Map(runners.map((r) => [r.name, r.nick.replace(/\s+/g, "")]));
+  const ended = new Set(board.endedMembers(p.repo));
   return unmatchedMentions(body, p.plan, plans, names).map(({ name, closest }) => {
+    const member = name.includes("/") ? name : `${p.plan}/${name}`;
+    if (ended.has(member)) return `@${name} has ended: the post stays on the thread, but they will not read it`;
     const guesses = closest.map((c) => (nickOf.has(c) ? `@${c} or @${nickOf.get(c)}` : `@${c}`));
     return `@${name} matched nobody on the board${guesses.length ? `: did you mean ${guesses.join(", ")}?` : ""}`;
   });
@@ -345,11 +348,20 @@ function aboutArg(): string | undefined {
   return repoRelative(resolveClaimPath(about));
 }
 
-/** `<path>`, `<path>:inside` or `<path>:interface`, the path resolved (D6). */
+/** `<path>`, `<path>:inside` or `<path>:interface`, the path resolved (D6); a file not there yet is one the
+ *  slice creates, declared from the repository root. */
 function parseFile(spec: string): Declared {
   const m = spec.match(/^(.*):(interface|inside)$/);
   const d = m ? { path: m[1], interface: m[2] === "interface" } : { path: spec, interface: false };
-  return { ...d, path: repoRelative(resolveClaimPath(d.path)) };
+  return { ...d, path: repoRelative(declaredPath(d.path)) };
+}
+
+function declaredPath(file: string): string {
+  if (path.isAbsolute(file)) return file;
+  const here = path.resolve(file);
+  if (fs.existsSync(here)) return here;
+  const root = worktreeOf(process.cwd());
+  return root ? path.resolve(root, file) : here;
 }
 
 function readSlices(file: string): SliceSpec[] {
@@ -811,12 +823,15 @@ ${rearm}` : rearm;
       const onto = need("--onto");
       // what the branch wrote without a claim, committed or not, before the lock; a flag informs, never blocks
       const reconciled = p.worktree ? branchChangedIn(p.worktree, onto) : [];
+      // what it held before the reconcile claims the rest: only those written without a claim are told
+      const held = new Set(board.heldBy(p));
+      const unclaimed = reconciled.filter((f) => !held.has(f));
       const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
       // where the worktree's HEAD reflog stands: merged replays only a rebase past it (D36)
       const reflogMark = p.worktree ? (headReflogLength(p.worktree) ?? undefined) : undefined;
       const r = board.lockMerge(p, onto, reflogMark);
       emit({ runner: p.name, ...r, reconciled, flags }, () => {
-        printReconciled(reconciled, flags);
+        printReconciled(unclaimed, flags);
         console.log(r.granted ? "granted: merge, then swarm merged <sha> --files <path>..." : `held by ${r.holder}: swarm wait --mentions for its merged event`);
       });
       break;
@@ -830,8 +845,11 @@ ${rearm}` : rearm;
       const conflicts = p.worktree && lock && lock.reflogMark !== null ? conflictsOf(p.worktree, lock.onto ?? "", lock.reflogMark) : undefined;
       const sharers = board.merged(p, sha, files.map((f) => path.resolve(f)), conflicts);
       // the post after a resolved conflict, prompted by the command just run (D63)
-      const tell = sharers.map(
-        (o) => `if you resolved a conflict in ${o.path}, tell them: swarm post "@${o.runner} I resolved ${o.path}: <how>" --about ${o.path}`,
+      const ended = new Set(board.endedMembers(p.repo));
+      const tell = sharers.map((o) =>
+        ended.has(o.runner)
+          ? `if you resolved a conflict in ${o.path}: ${o.runner} has ended, so say how in your report`
+          : `if you resolved a conflict in ${o.path}, tell them: swarm post "@${o.runner} I resolved ${o.path}: <how>" --about ${o.path}`,
       );
       emit({ runner: p.name, sha, files, tell }, () => {
         console.log(`merged ${sha}: lock released`);
@@ -845,10 +863,13 @@ ${rearm}` : rearm;
       if (p.ended || board.runs().every((r) => r.id !== p.run)) break;
       // what the runner wrote without claiming it, once, before its claims go (D58)
       const reconciled = p.worktree ? changedIn(p.worktree) : [];
+      // what it held before the reconcile claims the rest: only those written without a claim are told
+      const held = new Set(board.heldBy(p));
+      const unclaimed = reconciled.filter((f) => !held.has(f));
       const flags = reconciled.length ? board.reconcileWrites(p, reconciled) : [];
       board.end(p);
       emit({ runner: p.name, ended: true, reconciled, flags }, () => {
-        printReconciled(reconciled, flags);
+        printReconciled(unclaimed, flags);
         console.log(`${p.name} ended`);
       });
       break;

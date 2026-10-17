@@ -186,6 +186,17 @@ describe("agents (D7, D20)", () => {
     expect(agents(board(RUNS, ROSTER), 3).map((m) => m.runner)).toEqual(["gamma/orchestrator"]);
     expect(agents(board(RUNS, ROSTER), 9)).toEqual([]);
   });
+
+  test("two runs of one group: each shows its own members, never the other's ended ones", () => {
+    const runs = [run(5, "same", "SA", false), run(6, "same", "SA")];
+    const roster = [
+      { ...member("same", "orchestrator", "Old Owl", "done"), run: 5 },
+      { ...member("same", "judge", "Old Hare", "ended"), run: 5 },
+      { ...member("same", "orchestrator", "New Owl", "watching"), run: 6 },
+    ];
+    expect(agents(board(runs, roster), 6).map((m) => m.nick)).toEqual(["New Owl"]);
+    expect(agents(board(runs, roster), 5).map((m) => m.nick)).toEqual(["Old Owl", "Old Hare"]);
+  });
 });
 
 describe("claimRows (D7)", () => {
@@ -201,6 +212,20 @@ describe("claimRows (D7)", () => {
     ]);
     expect(claimRows(snap, 1).map((r) => r.path)).toEqual(["a.ts"]);
     expect(claimRows(snap, 99)).toEqual([]);
+  });
+
+  test("two runs of one group: a run's tab shows only what its own members hold", () => {
+    const runs = [run(5, "same", "SA"), run(6, "same", "SA")];
+    const roster = [
+      { ...member("same", "S1", "Old Owl", "working"), run: 5 },
+      { ...member("same", "S2", "New Owl", "working"), run: 6 },
+    ];
+    const held = [
+      { path: "old.ts", holders: ["same/S1"], interface: false },
+      { path: "new.ts", holders: ["same/S2"], interface: false },
+    ];
+    expect(claimRows(board(runs, roster, [], held), 6).map((r) => r.path)).toEqual(["new.ts"]);
+    expect(claimRows(board(runs, roster, [], held), 5).map((r) => r.path)).toEqual(["old.ts"]);
   });
 });
 

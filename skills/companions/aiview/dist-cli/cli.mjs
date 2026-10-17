@@ -11061,6 +11061,13 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
       });
       return true;
     },
+    endedMembers(repo) {
+      const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NOT NULL`).all(repo);
+      return [...new Set(rows.map((r) => `${r.plan}/${r.slice}`))];
+    },
+    heldBy(p) {
+      return db.prepare("SELECT path FROM claims WHERE participant = ?").all(p.id).map((r) => String(r.path));
+    },
     roster(repo) {
       const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL ORDER BY r.id, p.id`).all(repo);
       const cutoff = Date.now() - STALE_MS;
@@ -11228,6 +11235,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
         const ended = r.ended_at != null;
         const state = orchestrator ? runOpen.get(Number(r.run)) ? "watching" : "done" : s?.state === "done" ? "done" : ended ? "ended" : lockHolder === id ? "merging" : Number(r.waiting) === 1 ? "waiting" : "working";
         return {
+          run: Number(r.run),
           runner: `${r.plan}/${slice}`,
           nick: nickOf(r),
           plan: String(r.plan),

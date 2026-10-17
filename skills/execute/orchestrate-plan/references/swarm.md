@@ -36,6 +36,15 @@ everything said on the board. This file says what changes in this skill's own du
 - **Remove its worktree** from the main checkout once the tick stands, as in classic mode.
 - **Leave the plan's branch checked out nowhere** while the run is open (detach the main checkout): a runner fast-forwards it from its own worktree, and git refuses to move a branch checked out elsewhere. Re-run each check in a detached worktree of its own.
 
+## Phases
+
+**A plan may run in phases**, as a swarmstorm does: the plan's *Mandate* names them, each with
+what it asks of the runners (build, then review each other's merge, then verify), and the plan's
+slices are cut for them. Open each with the `swarm` skill's `phase`, its text saying every
+runner's part; a runner runs `done <phase>` when its part is in, and the next phase opens on
+`all-done`. A plan whose *Mandate* names no phases runs without: slices start as their blockers
+are done.
+
 ## The close
 
 **Close the run on the board once every slice is done**, before the plan's close.
