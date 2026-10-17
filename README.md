@@ -12,7 +12,7 @@ Agent skills that settle what gets built before code is written. They sharpen th
 
 Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Charrette brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
 
-Twenty-three skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
+Twenty-four skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
 
 ## The loop
 
@@ -127,7 +127,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | Skill | Use case | Example ask |
 |---|---|---|
 | [interview](skills/interview/SKILL.md) | A design object has decisions nobody has resolved, or you want to be questioned about one until it is understood the same way | *"Interview me about this plan."* Decisions walked in dependency order, the codebase read before you are asked, a recommendation on every question. Every claim about a tool or a practice is researched from its sources; very small proofs of concept with the libraries, when you say yes to them. |
-| [swarmstorm](skills/swarmstorm/SKILL.md) | A swarm of role seats should work a topic for you, under a protocol you approve | *"Run a swarmstorm brainstorm on onboarding."* Seats post ideas blind, build on them, pre-mortem the options; debate the questions to decisions, a skeptic endorsing; or draft a text and read it as its readers would, a cover letter among its templates. Each run has its record; a topic keeps one dossier across its runs. |
+| [swarmstorm](skills/swarmstorm/SKILL.md) | A swarm of role seats should work a topic for you, under a protocol you approve | *"Run a swarmstorm brainstorm on onboarding."* The agent recommends a protocol from what you want done, or a custom one, and you adjust its phases, its seats and each role. Seats post ideas blind, build on them, pre-mortem the options; debate the questions to decisions, a skeptic endorsing; or draft a text and read it as its readers would, a cover letter among its templates. Each run has its record; a topic keeps one dossier across its runs. |
 | [whiteboard-defense](skills/whiteboard-defense/SKILL.md) | A system has shipped and you want to be able to explain and defend it to anyone who pulls you aside | *"Whiteboard me on the sync engine."* Hard questions on the system and on its stack, one at a time, open-book: you go read, come back, get pushed. A defense report with the gaps, the reading that closes them, the decisions an agent made without you, and the architecture leads the questions turned up. |
 
 ### Architecture
@@ -159,7 +159,8 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | Skill | Use case | Example ask |
 |---|---|---|
 | [execute-plan](skills/execute/execute-plan/SKILL.md) | An approved plan is ready, or was left mid-way by an earlier session | *"Execute the rate-limiting plan."* Keeps the tracker and the plan's decisions; the orchestration itself is orchestrate-plan's. Pauses only for your decisions, your checks, or an action that does not undo. Refuses a plan with no tracker. |
-| [orchestrate-plan](skills/execute/orchestrate-plan/SKILL.md) | Loads with execute-plan, whenever a plan runs | Settles the mandate, sends each slice to a fresh agent with a brief that carries the testing prompt, checks every few minutes that the run is healthy, re-runs each slice's check itself, and has a subagent do each merge and each verification pass. Pull requests open as drafts and are marked ready only at the merge. |
+| [orchestrate](skills/orchestrate/SKILL.md) | Loads whenever an agent runs other agents, a plan or a swarmstorm | Settles the charter with you, dispatches each member with its brief and role, watches them and steers a drift. |
+| [orchestrate-plan](skills/execute/orchestrate-plan/SKILL.md) | Loads with execute-plan, whenever a plan runs | Settles the mandate, sends each slice to a fresh agent with a brief that carries the testing prompt, checks every few minutes that the run is healthy, re-runs each slice's check itself, and has a subagent do each merge and each verification pass. Pull requests open as drafts and are marked ready only at the merge. In swarm mode, every ready slice runs at once on the swarm board: the runners claim their files, settle a shared one on the thread and merge under the board's lock, in phases when the mandate names them. |
 | [execute-slice](skills/execute/execute-slice/SKILL.md) | One slice document is handed to an agent to carry out | *"Do slice 2."* Stops on what the document cannot carry, shapes the code around the slice (the dependency graph shows the neighbourhood), then does the slice, naming everything for its purpose, and returns the branch and the run as evidence. |
 
 ### Verify
@@ -182,19 +183,20 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | [pr-review](skills/review/pr-review/SKILL.md) | A pull request needs an informed merge decision | *"Run pr-review on PR #142."* Five layers, each its own subagent, dispatched where the diff gives them material. Two documents: the analysis, and a report with what changed (drawn), a verdict per layer, what you must decide, and a comment to post as-is. |
 | [recurring-review-findings](skills/review/recurring-review-findings/SKILL.md) | The same remark keeps coming back in the pull request reviews | *"What do my reviews keep catching, and how do we stop catching it?"* The comment history read, grouped into findings by the person's words, each tried against a ladder: impossible by design, a lint or type rule, a test in CI, a convention, a sentence in the skill that produced the code. A report with the artefact drafted per finding, applied on a yes. |
 
-### The companion app
+### The companion tools
 
 | Skill | Use case | Example ask |
 |---|---|---|
 | [aiview](skills/companions/aiview/SKILL.md) | A viewer at `localhost:4321` and an index, driven by the agent from a CLI. Called by the other skills; directly, to show a document or query the index | *"Open docs/notes/cache-idea.md in aiview, tagged payments."* |
+| [swarm](skills/companions/swarm/SKILL.md) | The board agents running together share, for a plan in swarm mode or a swarmstorm: who is there, what each holds, their thread, drawn by aiview a tab per run. Called by the orchestrators and their members; directly, to read how the runs went | *"How did the swarm runs go this week?"* |
 
-`write-diagrams`, `interview`, the tracker protocol in `write-plan` and the companion app are the shared layer the others delegate to. `roadmap` sits above the loop: it names the next slot, and a board, a plan or a run finishing tells it to redraw. House rules in `AGENTS.md` win over general principles wherever the two disagree.
+`write-diagrams`, `interview`, `orchestrate`, the tracker protocol in `write-plan` and the companion tools are the shared layer the others delegate to. `roadmap` sits above the loop: it names the next slot, and a board, a plan or a run finishing tells it to redraw. House rules in `AGENTS.md` win over general principles wherever the two disagree.
 
 ## Where things live
 
 | Root | Holds | Versioned |
 |---|---|---|
-| The checkout, or the plugin cache | `skills/<group>/<name>/SKILL.md`, one folder per skill under its group: the loop's phases `architecture`, `ui`, `plan`, `execute`, `review`, `project` for what a project has once and keeps, `verify` for its verification skill and the validation with the person, `workbench` for the pages worked on during development; `interview` and `whiteboard-defense` at the root; supporting files alongside. `companions` for the two tools: `skills/companions/aiview/`, a CLI, the one server and the one UI, drawing the documents and the swarm board; `skills/companions/swarm/`, a CLI and a store, its board drawn by aiview | Yes, rebuildable |
+| The checkout, or the plugin cache | `skills/<group>/<name>/SKILL.md`, one folder per skill under its group: the loop's phases `architecture`, `ui`, `plan`, `execute`, `review`, `project` for what a project has once and keeps, `verify` for its verification skill and the validation with the person, `workbench` for the pages worked on during development; `interview`, `orchestrate`, `swarmstorm` and `whiteboard-defense` at the root; supporting files alongside. `companions` for the two tools: `skills/companions/aiview/`, a CLI, the one server and the one UI, drawing the documents and the swarm board; `skills/companions/swarm/`, a CLI and a store, its board drawn by aiview | Yes, rebuildable |
 | The data home, `$CHARRETTE_HOME` or `charrette_appdata` in your OS home directory | `docs/<project>/*.md, *.html, *.pdf`, among them the project's roadmap and its foundation reference, and `aiview.sqlite`, the index and the active project | Never in a project repo. May be its own git repo, to sync between machines |
 | Your project repository | `AGENTS.md`, grown by write-conventions. README and architecture docs, written by technical-writing | Yes, by you |
 
