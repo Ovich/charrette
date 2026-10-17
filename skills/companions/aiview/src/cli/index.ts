@@ -26,6 +26,7 @@ import { collectionVersion } from "../core/collectionversion.ts";
 import { parseArgs } from "./args.ts";
 import { disciplineWarnings } from "../mermaid/discipline.ts";
 import { check as trackerCheck, findTracker, sync as trackerSync } from "../core/tracker.ts";
+import { check as planCheck, readApproval } from "../core/plan.ts";
 
 /** Line endings, named rather than written inline: a plan on Windows is CRLF and the
  *  tracker parser works in LF, so the file is normalised in and restored out. */
@@ -58,6 +59,7 @@ const USAGE = [
   "  mermaid-check <file|#id>                 # parse every mermaid block; warn on a missing caption or an unlabeled fork; exit 1 if one fails",
   "  tracker check <file|#id>                 # a plan's tracker judged against itself; exit 1 if anything disagrees",
   "  tracker sync <file|#id>                  # rewrite the class lines from the glyphs, the one place a step's state is written twice",
+  "  plan check <file|#id>                    # a plan's approval against its decisions: warns on agent defaults never confirmed; always exit 0",
   "  init                                     # create the data home; report where everything lives",
 ].join("\n");
 
@@ -848,6 +850,41 @@ function cmdTracker(): void {
   if (findings.length) process.exit(1);
 }
 
+function cmdPlan(): void {
+  const ref = args.positional[0] === "check" ? args.positional[1] : args.positional[0];
+  if (!ref) {
+    console.error("usage: aiview plan check <file|#id>");
+    process.exit(1);
+  }
+  const abs = resolveRef(ref)?.abs_path ?? path.resolve(ref);
+  if (!fs.existsSync(abs)) {
+    console.error(`no such file: ${abs}`);
+    process.exit(1);
+  }
+  const plan = readApproval(fs.readFileSync(abs, "utf8").split(CRLF).join(LF));
+  const findings = planCheck(plan);
+  emit(
+    {
+      file: path.basename(abs),
+      approved: plan.approved,
+      decisions: plan.decisions.length,
+      defaults: plan.defaults.map((d) => ({ id: d.id, kind: d.kind, line: d.line })),
+      confirmed: plan.confirmed ?? null,
+      findings,
+    },
+    () => {
+      for (const f of findings) console.log(`warn  line ${f.line}  ${f.text}`);
+      const state = plan.approved ? "approved" : "not approved";
+      const tail = !plan.defaults.length
+        ? "no agent defaults"
+        : plan.approved
+          ? `${plan.defaults.length} agent default(s), ${findings.length ? "not all confirmed" : "all confirmed"}`
+          : `${plan.defaults.length} agent default(s) to list at approval: ${plan.defaults.map((d) => d.id).join(", ")}`;
+      console.log(`${findings.length ? "warn" : "ok"}  ${state}, ${plan.decisions.length} decisions, ${tail}`);
+    },
+  );
+}
+
 switch (args.verb) {
   case "pending":
     cmdPending();
@@ -875,6 +912,9 @@ switch (args.verb) {
     break;
   case "tracker":
     cmdTracker();
+    break;
+  case "plan":
+    cmdPlan();
     break;
   case "add":
     cmdAdd();

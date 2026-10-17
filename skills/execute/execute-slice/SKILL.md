@@ -20,7 +20,7 @@ Each is a report, never an improvisation.
 ## The work, in order
 
 1. **Shape the ground.** Before writing the slice, look at the code it lands in and ask what would make it fit: a module to split or merge, a responsibility in the wrong place, a duplicate to fold, dead code, a name that misleads. See who depends on what with the `dependency-graph` skill's script on the modules the slice touches (`--focus`, one or two hops), without `--out`: the graph is for you, not a document. On a stack the script cannot parse, read the imports. Refactor that neighbourhood so the slice slots in cleanly, behaviour unchanged, in its own commits ahead of the slice's. Stay in the neighbourhood the slice touches; a rework that would change a decision is a stop.
-2. **Do the slice.** The acceptance criteria and nothing beyond them. Tick each criterion in the slice document as its evidence lands; the document is yours to edit, the plan is not.
+2. **Do the slice.** The acceptance criteria and nothing beyond them. Tick each criterion in the slice document as its evidence lands; the document is yours to edit, the plan is not. A comment citing a decision names its plan: `<topic>#D<n>`.
 3. **Name for purpose.** Every identifier you add or touch (module, file, function, type, variable) says what it is for, readable at the call site without opening its body. No generic names (`data`, `handle`, `utils`, `manager`, `info`), no names left from what the code used to do. Rename what step 1 surfaced, in its commits.
 
 Commit small, push as the brief's pull request line says, and open the draft it names on the first commit.

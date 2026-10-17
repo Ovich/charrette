@@ -17,6 +17,7 @@ description: "Use when reviewing a pull request, branch or diff in any language,
 
 - **The diff and the search base are the same revision.** Check out the PR's head, or say that the blast radius was not repo-verified: a search against a tree without the PR cites `file:line` confidently wrong.
 - **Read the repo's conventions before dispatch**: `AGENTS.md`, `CLAUDE.md`, architecture docs, `write-conventions` where it applies. A broken house rule is a finding; unusual but unruled is a decision point.
+- **The diff adds or changes a decision citation** (`<topic>#D<n>`, or a bare `D<n>` in code): run the `write-plan` skill's `scripts/decisions.mjs` on the PR's head, with the project's plan folder and `--code` the repository. A finding it prints is a finding of the review.
 
 ## The five layers
 

@@ -14,7 +14,7 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 ## Before writing
 
 - **The plan**, open through the `aiview` skill: the slice, its check, its `👤` mark, the decisions that name it. The mockup too, when the slice has a face.
-- **A decision the plan does not carry is a finding for the plan**, never one taken here.
+- **A decision the plan does not carry is a finding for the plan**, never one taken here. The plan's decisions are quoted by their short id, `D3`: the slice is its plan's.
 
 ## Modules
 
