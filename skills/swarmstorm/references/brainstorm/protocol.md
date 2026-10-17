@@ -14,7 +14,7 @@ builder, an operator, an outsider), no skeptic: judgment has its own phase. `on`
 | **3 pre-mortem** | per option: "it failed a year on; why", each cause naming its source, as the evidence allows | propose new options | write the options and their causes on the board |
 | **4 rank** | — | — | rank the options per question against the criteria, the reason per rank, written on the board |
 
-**Phase 1 is blind**: the brief's order is join, post the ideas, then start the listener. The
+**Phase 1 is blind**: the brief's order is join, post the ideas, then read the thread. The
 board cannot hide the thread; a seat that read it first says so on the thread before its `done`.
 
 **The debate log** holds, per question, the ideas by theme with their `#<seq>`, then the
@@ -28,5 +28,3 @@ options and their causes verbatim.
 | build | `Read the thread; combine, extend, flip ideas, each post naming the #seq it builds on; no criticism; then done build.` |
 | pre-mortem | `Options <table #seq>. Per option: it failed a year on; why, each cause with its source; no new options; then done pre-mortem.` |
 | rank | `Nothing asked of the seats: done rank now.` |
-
-**Templates**: none yet.

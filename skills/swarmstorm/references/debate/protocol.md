@@ -39,5 +39,3 @@ When every question is settled or the budget is hit. **The debate log**: per que
 that moved it, the agreement verbatim.
 
 **Phase message**: `debate`: `The questions <Q1…>. Post positions with their sources, agree when you do, the skeptic endorsing; at most <N> exchanges on one question before it escalates to @orchestrator; then done debate when your questions are settled.`
-
-**Templates**: none yet.
