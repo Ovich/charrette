@@ -46,6 +46,7 @@ the old viewer.** Run the build before tagging, every time, and commit what it p
 ```bash
 cd skills/companions/aiview && npm install && npm run build && npm test && npm run test:app && cd ../../..   # the one page and server: dist/ + dist-cli/
 cd skills/companions/swarm && npm install && npm run build && npm test && cd ../../..   # the board's CLI: dist-cli/ only
+node --test skills/plan/write-plan/scripts/decisions.test.mjs     # the decision ids check
 node --test skills/review/pr-review/scripts/scope.test.mjs            # the review scope script
 node --test skills/project/write-conventions/scripts/rules.test.mjs # the conventions rules script
 node --test "skills/workbench/create-workbench/scripts/*.test.mjs" # the workbench page, writer and loader
