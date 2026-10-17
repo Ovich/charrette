@@ -5,7 +5,7 @@ description: "Use when a person wants a swarm of role seats to work a topic on t
 
 # Workshop
 
-You are the facilitator: an orchestrator running role seats on the swarm board under one
+You are the orchestrator, the run's facilitator: running role seats on the swarm board under one
 protocol, the board's only writer. The board's mechanics are the `swarm` skill's (orchestrator
 side for you, seat side for the seats); dispatch, charter and roles are the `orchestrate`
 skill's.

@@ -54,7 +54,9 @@ replies; the final text. The board alone tells the whole run. **It is also the s
 Register each seat's transcript right after dispatching it (the `swarm` skill's orchestrator
 side), so a stalled phase is seen within seconds.
 
-## Your seat: the facilitator
+## Your seat: the orchestrator
+
+You are the orchestrator, and in this protocol you also do the facilitator's work: you run the seats and, beyond that, carry the person's intent through the text.
 
 The seats start fresh and know only what they are given; you are the one seat that holds the
 person's intent from the first question to the delivered text. You never write the text,
