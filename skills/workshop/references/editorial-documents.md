@@ -211,3 +211,65 @@ the `done` and hand-off lines; headings inside a post demoted to bold so the boa
 the phases'. An event (a join, a `done`, a stall) is never written in. The orchestrator's own
 posts (a correction, the count, the rulings) go in under `### Orchestrator`. When a phase reopens,
 its new round is a new section (`## 7. Read, round 2`), the earlier one kept.
+
+## The briefs
+
+One per seat, sent at dispatch on the `seat-runner` agent, the effort the seats row recommends.
+The `workshop` skill's brief, completed for this protocol; `<parts>` comes from the seat's
+lines below.
+
+```markdown
+Take seat `<seat>` in run `<run>`, protocol `editorial` of the `workshop` skill, with the
+`swarm` skill, seat side. `$S` = `<the swarm tool's command>`.
+
+**Join**: `$S join --run <run> --seat <seat> --doing reading --as <group>/<seat>`. **You**:
+`--as <group>/<seat>` on every call.
+
+**Manifests**: `<path>`, sections `All seats` and `<seat>` only. **Interview**: `<path>`.
+**Feedback**: `<path>`. **Board**: `<path>`: read it at the start of every phase.
+
+**Your parts**: <parts>.
+
+**How the run works**: the orchestrator opens each phase; every message starts with the phase
+and what it asks. Before a post that decides or adds, read the whole phase with
+`$S thread --as <group>/<seat>` and open on what you take from whom (#seq) and what you set
+aside, with why. Before long work, `$S doing "<what>"`. Every post through a file: write it to
+`<folder>/<seat>-<n>.md`, then `$S post --file <that path> --as <group>/<seat>`; those are the
+only files you write. Do what the phase asks of you (when it asks nothing, do nothing), then
+`$S done <phase>`. Follow exactly the next step each answer prints. Everyone is `@swarm`. A post
+failing twice goes to `@orchestrator` at once.
+
+One command per shell call. Never end your turn while the run is open; when the board says the
+run is closed, run the end command it gives and return a short summary.
+```
+
+**The parts, per seat** (a phase that asks a seat nothing is `<phase> (nothing: done at once)`):
+
+| seat | parts |
+|---|---|
+| judge | research (the table and the brief's input, ending `@swarm`) · strategy (answer the brief, ending `@strategist`) · propose · vote · read (at most 5 notes: does the text answer the ask's core) · final (at most 3 notes or `clean`) |
+| strategist | research (read the interview and the judge first, light) · strategy (the brief, ending `@swarm`; after every seat answered, the settled brief, each point taken or declined; **only then** `done strategy`) · propose · vote · polish (when a fact is missing: what the interview or the evidence holds) · read (is the brief kept) · final |
+| writer | strategy (the voice and form it would write in) · propose · vote · draft (a ledger of the points raised, taken or declined, then the whole text from the winners and the brief) · polish (the whole next version, ending `@auditor`) · revise (the whole text, then per note) · final (one fix, only if a blocking note is addressed to it) |
+| auditor | strategy (what the reader must see, what to leave out) · propose · vote · polish (drives: the table, ending `@checker`; ends polish) · read · final |
+| checker | strategy (what the evidence allows and forbids, the claims likeliest to outrun it) · propose · vote (vetoes first) · polish (strikes and the strongest held wording, ending `@writer`) · read · final |
+| reader | strategy (as the reader: what it must believe, what makes it stop) · vote (as the reader, counts double) · read (only the latest whole text: notes and the verdict) · final (only the latest text) |
+
+Every seat's brief says what it never reads: a reader never reads the evidence, the interview or
+the board's analysis, only its own reader's document and what the thread gives it; the writer
+never reads an earlier version of this text as input.
+
+## The phase messages
+
+What `phase <name> "<text>"` says, so each seat knows its part from the message alone:
+
+| phase | text |
+|---|---|
+| research | `judge: read the board, the manifests (All seats and judge) and the interview; post the table as it now stands, then for the brief: what the ask is really about, the strongest met demands, the misreadings and their framing; ending @swarm, then done research. Every other seat: read the manifests and the interview now, then done research.` |
+| strategy | `The brief. strategist: post the whole brief, with the slots and the elected ones, ending @swarm. Every other seat, once it is posted: read the whole phase, answer from your role, ending @strategist, then done strategy. strategist: once all have answered, the settled brief, each point taken or declined, ending @swarm, and only then done strategy.` |
+| propose | `The election, step 1. Settled brief #<seq> (elected: <slots>). Every seat but the readers: one post, at most one candidate per elected slot, labelled, <from the precedents, the source named | written fresh>, within the slot's limit; ending @swarm, then done propose. Readers: done propose now.` |
+| vote | `The election, step 2. Candidates: <seat #seq (letter)…>. checker: your vetoes first. Every seat: per slot, approve as many as fit, one line of why each, never your own, also on natural language and pull; ending @orchestrator, then done vote. Readers: as the reader; your approvals count double.` |
+| draft | `writer: the whole text from the settled brief #<seq> and the winners <…> fused into one voice, the other slots to the brief; a ledger first; ending @orchestrator, then done draft. Every other seat: done draft now.` |
+| polish | `On the whole text (#<seq>) and the orchestrator's notes. auditor drives, at most <n> rounds: one table over every sentence, the notes first; end @checker. checker strikes and proposes, ending @writer. writer posts the whole next version, ending @auditor. auditor ends polish: done polish, then @swarm polish is over; writer and checker then done. Every other seat: done polish now.` |
+| read | `Round <n> on the whole text (#<seq>). Every seat but the writer: at most 5 notes from your role, ending @orchestrator; readers: only that text, notes and the verdict. Then done read. writer: done read now.` |
+| revise | `writer: the read and the orchestrator's rulings (#<seq>); the whole new text, revised as a whole, then per note taken or declined; ending @orchestrator, then done revise. Every other seat: done revise now.` |
+| final | `Final check on #<seq>. Every seat but the writer: only what still breaks a rule, a source or natural language, at most 3 notes, or clean; readers: the verdict. Then done final. writer: one fix only if a blocking note comes to you; done final now.` |
