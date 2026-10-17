@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { BoardSnapshot } from "../../swarm/src/board/snapshot.ts";
 import type { BoardState } from "./hooks/useBoard.ts";
-import { ALL_CLOSED, APP, CLOSED, LIVE, NICKS, OTHER, REPOS, SITE } from "./board-fixtures.ts";
+import { ALL_CLOSED, APP, BRAINSTORM, CLOSED, LIVE, NICKS, OTHER, PHASED, REPOS, SITE } from "./board-fixtures.ts";
 
 const source = vi.hoisted(() => ({
   calls: [] as { repo: string | null; run: number | null }[],
@@ -227,7 +227,7 @@ test("the claims row is collapsed, counting files and those shared", () => {
   show([APP], null, [SHARED]);
   const toggle = screen.getByRole("button", { name: /Claims/ });
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
-  expect(toggle.textContent).toContain(`${SHARED.files.length} files · 1 shared by two runs`);
+  expect(toggle.textContent).toContain(`${SHARED.files.length} files · 1 shared`);
   expect(screen.queryByText("src/shared.ts")).toBeNull();
 });
 
@@ -332,4 +332,16 @@ test("the person's pick wins: a board that changes later does not move the tab",
   source.boards = { [OTHER]: { ...SITE, events: [...SITE.events] } };
   rerender(<BoardView repos={[OTHER]} run={null} />);
   expect(pressed()?.textContent).toBe("All");
+});
+
+test("the run's head shows its current phase, name and text; a run with no phase yet shows none", () => {
+  show([APP], BRAINSTORM.run, [PHASED]);
+  const phase = document.querySelector('[data-component="RunPhase"]')!;
+  expect(phase.getAttribute("data-phase")).toBe("diverge");
+  expect(phase.querySelector(".name")?.textContent).toBe("diverge");
+  expect(phase.querySelector(".said")?.textContent).toBe("every name a run could carry, no judgment yet");
+  cleanup();
+  show([APP], BRAINSTORM.run, [LIVE]);
+  expect(document.querySelector('[data-component="RunViewSwitch"]')).not.toBeNull();
+  expect(document.querySelector('[data-component="RunPhase"]')).toBeNull();
 });

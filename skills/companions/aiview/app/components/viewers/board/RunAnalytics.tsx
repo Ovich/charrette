@@ -24,7 +24,7 @@ export function RunAnalytics({
   const state = error ? "error" : stats === null ? "loading" : (run?.kind ?? "loading");
   return (
     <>
-      <RunViewSwitch view="analytics" line={run && stats ? runLine(run, stats.totals) : summaryLine(summary)} json={body} onView={onView} />
+      <RunViewSwitch view="analytics" line={run && stats ? runLine(run, stats.totals) : summaryLine(summary)} phase={summary.phase ?? null} json={body} onView={onView} />
       <section className="analytics" data-component="RunAnalytics" data-state={state}>
         {error ? (
           <p className="notice">{error}</p>

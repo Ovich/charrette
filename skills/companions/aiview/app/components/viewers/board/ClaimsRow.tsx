@@ -1,5 +1,5 @@
 // The files held, one row at the bottom of the page (D7): collapsed by default, its count and
-// how many are shared by two runs; opened, one file per line with its holders, a shared one
+// how many are shared by two runners or more; opened, one file per line with its holders, a shared one
 // ending on a faint "shared". A viewer's opening it is remembered in their browser.
 import { useState } from "react";
 import { RunnerName } from "./chips.tsx";
@@ -37,7 +37,7 @@ export function ClaimsRow({ rows }: { rows: ClaimRow[] }) {
         <span aria-hidden="true">{expanded ? "▾" : "▸"}</span> Claims{" "}
         <span className="n">
           {rows.length} {rows.length === 1 ? "file" : "files"}
-          {shared > 0 && <> · {shared} shared by two runs</>}
+          {shared > 0 && <> · {shared} shared</>}
         </span>
       </button>
       {expanded && (

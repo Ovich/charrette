@@ -2,6 +2,7 @@
 // `board-changed` of the snapshot's repository; `hello` and `ping` keep the connection state.
 import { useEffect, useState } from "react";
 import type { BoardSnapshot, RepoSummary } from "../../../swarm/src/board/snapshot.ts";
+import { reloadOnNewBuild } from "../lib/build.ts";
 
 export type Connection = "live" | "reconnecting";
 
@@ -44,7 +45,8 @@ export function useBoard({ repo, run }: { repo: string | null; run: number | nul
     es.onopen = () => setConnection("live");
     es.onerror = () => setConnection("reconnecting");
     es.onmessage = (m) => {
-      const ev = JSON.parse(m.data) as { type: string; repo?: string };
+      const ev = JSON.parse(m.data) as { type: string; repo?: string; build?: string };
+      if (ev.type === "hello") reloadOnNewBuild(ev.build);
       if (ev.type === "hello" || ev.type === "ping") setConnection("live");
       if (ev.type === "board-changed" && (shownRepo === null || ev.repo === shownRepo)) load();
     };

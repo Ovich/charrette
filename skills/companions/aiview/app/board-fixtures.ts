@@ -183,6 +183,20 @@ export const BRAINSTORM_ONLY: BoardSnapshot = {
   files: [],
 };
 
+/** The brainstorm in its phases: the orchestrator opened `diverge` (`swarm phase`), a separator in the
+ *  thread mentioning every member of its run, its name stored in the meta. */
+export const PHASE: SnapshotEvent = {
+  ...ev("14:03", "event", `${NM}/orchestrator`, "phase diverge: every name a run could carry, no judgment yet"),
+  event: "phase",
+  mentions: [`${NM}/*`],
+  meta: { phase: "diverge" },
+};
+export const PHASED: BoardSnapshot = {
+  ...BRAINSTORM_ONLY,
+  runs: BRAINSTORM_ONLY.runs.map((r) => (r.run === BRAINSTORM.run ? { ...r, phase: { name: "diverge", text: "every name a run could carry, no judgment yet" } } : r)),
+  events: [...BRAINSTORM_ONLY.events, PHASE].sort((a, b) => a.at.localeCompare(b.at) || a.seq - b.seq),
+};
+
 /** The same repository once every run has closed: the page opens on the newest closed run. */
 export const ALL_CLOSED: BoardSnapshot = { ...LIVE, runs: CLOSED, roster: [], queues: {}, files: [], lock: null };
 

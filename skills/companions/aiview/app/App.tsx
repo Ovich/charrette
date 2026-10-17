@@ -10,12 +10,14 @@ import { PendingCards } from "./components/docs/PendingCards.tsx";
 import { MockupFrame } from "./components/viewers/MockupFrame.tsx";
 import { PdfFrame } from "./components/viewers/PdfFrame.tsx";
 import { BoardView, boardReposOf } from "./components/viewers/board/BoardView.tsx";
+import { readRunInHash } from "./lib/board/analytics.ts";
 
 /** A swarm document: the board of the repositories its file names, drawn here, or why it cannot be. */
 export function SwarmDocumentView({ content }: { content: string }) {
   const repos = boardReposOf(content);
   if (repos === null) return <p className="text-muted-foreground">This board names no repository.</p>;
-  return <BoardView key={repos.join("\n")} repos={repos} run={null} />;
+  // a link naming a run (`#doc=<id>&run=<n>`) opens that run's tab, never the latest one
+  return <BoardView key={repos.join("\n")} repos={repos} run={readRunInHash(location.hash)} />;
 }
 
 /** The hash is the pointer: the document, and what the agent is pointing at in it. */

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchDocuments, type DocumentWithState } from "../lib/api.ts";
 import type { Pointer } from "../../src/core/pointer.ts";
+import { reloadOnNewBuild } from "../lib/build.ts";
 
 export type ConnectionState = "connecting" | "live" | "reconnecting";
 
@@ -82,7 +83,8 @@ export function useDocuments(): DocumentsState {
       es.onerror = () => setConnection("reconnecting");
       es.onmessage = (e) => {
         lastSeen = Date.now();
-        const ev = JSON.parse(e.data) as { type: string; id?: number; slug?: string; components?: string[]; variant?: string };
+        const ev = JSON.parse(e.data) as { type: string; id?: number; slug?: string; components?: string[]; variant?: string; build?: string };
+        if (ev.type === "hello") reloadOnNewBuild(ev.build);
         if (ev.type === "hello" || ev.type === "ping") setConnection("live");
         if (ev.type === "changed") {
           reload();

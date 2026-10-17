@@ -16,7 +16,7 @@ let repo: string;
 let wtA: string;
 let wtB: string;
 
-const env = () => ({ ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home });
+const env = () => ({ ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home, SWARM_NO_POLLER: "1" });
 const swarm = (cwd: string, ...argv: string[]) => spawnSync(process.execPath, [CLI, ...argv], { cwd, encoding: "utf8", env: env() });
 const cli = (cwd: string, ...argv: string[]): string => {
   const r = swarm(cwd, ...argv);
@@ -180,7 +180,7 @@ test("end lists what it reconciled, then the end", () => {
   fs.writeFileSync(path.join(wtB, "src", "new.ts"), "export const x = 1;\n");
   fs.writeFileSync(path.join(wtB, "src", "a.ts"), "// S3's\n");
   const out = cli(wtB, "end").split("\n");
-  assert.deepEqual(out.filter((l) => l.startsWith("reconciled ")).sort(), ["reconciled src/a.ts", "reconciled src/new.ts"]);
+  assert.deepEqual(out.filter((l) => l.startsWith("reconciled ")).sort(), ["reconciled src/a.ts: written without a claim", "reconciled src/new.ts: written without a claim"]);
   assert.ok(out.some((l) => /^#\d+ flagged: you wrote src\/a\.ts outside your claim; review-tool\/S3 holds it/.test(l)), out.join("\n"));
   assert.ok(out.includes("review-tool/S5 ended"));
 });
@@ -195,7 +195,7 @@ test("merge-lock reconciles the branch's commits against --onto: a never-claimed
   fs.writeFileSync(path.join(wtB, "src", "new.ts"), "export const x = 1;\n");
   commit(wtB, "new");
   const out = cli(wtB, "merge-lock", "--onto", "main").split("\n");
-  assert.deepEqual(out.filter((l) => l.startsWith("reconciled ")), ["reconciled src/new.ts"]);
+  assert.deepEqual(out.filter((l) => l.startsWith("reconciled ")), ["reconciled src/new.ts: written without a claim"]);
   assert.ok(out.some((l) => l.startsWith("granted: ")), out.join("\n"));
   // claimed: another runner is now held on it
   assert.equal(swarm(wtA, "claim", "src/new.ts", "--new").status, 3);
@@ -358,4 +358,39 @@ test("the merged event names the branch from merge-lock --onto and stores whom i
   } finally {
     board.close();
   }
+});
+
+test("join declares a file the slice will create: claimed from the repository root, another runner held on it", () => {
+  const slices = path.join(home, "slices.json");
+  fs.writeFileSync(slices, SLICES);
+  const id = cli(repo, "open", "--plan", "review-tool", "--title", "T", "--slices", slices).split("\n")[0].trim();
+  cli(path.join(wtA, "src"), "join", "--run", id, "--slice", "S3", "--doing", "the page", "--files", "src/fresh.ts:interface");
+  cli(wtB, "join", "--run", id, "--slice", "S5", "--doing", "the skill");
+  assert.equal(swarm(wtB, "claim", "src/fresh.ts", "--new").status, 3);
+});
+
+test("merge-lock tells nothing of a file written under a claim", () => {
+  running();
+  cli(wtB, "claim", "src/mine.ts", "--new");
+  fs.writeFileSync(path.join(wtB, "src", "mine.ts"), "export const y = 1;\n");
+  commit(wtB, "mine");
+  const out = cli(wtB, "merge-lock", "--onto", "main").split("\n");
+  assert.deepEqual(out.filter((l) => l.startsWith("reconciled ")), []);
+  assert.ok(out.some((l) => l.startsWith("granted: ")), out.join("\n"));
+});
+
+test("a mention of a member who has ended says so", () => {
+  running();
+  cli(wtB, "end");
+  const out = cli(wtA, "post", "@review-tool/S5 I resolved it");
+  assert.match(out, /^@review-tool\/S5 has ended: the post stays on the thread, but they will not read it$/m);
+});
+
+test("a plan runs in phases: the orchestrator opens one, each runner's done counts, all-done told", () => {
+  running();
+  cli(repo, "phase", "build", "every runner: your slice, then done build", "--as", "review-tool/orchestrator");
+  cli(wtA, "done", "build");
+  cli(wtB, "done", "build");
+  const told = cli(repo, "deliver", "--as", "review-tool/orchestrator");
+  assert.match(told, /all.done/i, told);
 });

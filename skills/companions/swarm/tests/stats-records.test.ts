@@ -141,7 +141,7 @@ test("`close` exits 0 with its usual output when the summary fails, and the run 
   await recordsBeginAt(file, new Date(Date.now() - DAY).toISOString());
   const home = path.dirname(file);
   const close = (run: RunId) =>
-    spawnSync(process.execPath, [CLI, "close", "--run", String(run)], { cwd: home, encoding: "utf8", env: { ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home } });
+    spawnSync(process.execPath, [CLI, "close", "--run", String(run)], { cwd: home, encoding: "utf8", env: { ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home, SWARM_NO_POLLER: "1" } });
   const mergedRun = (group: string): RunId => {
     const { run, m: [a] } = planRun(board, group, ["S1"]);
     board.lockMerge(a, "main");

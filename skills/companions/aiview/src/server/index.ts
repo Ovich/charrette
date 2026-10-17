@@ -60,6 +60,15 @@ const MIME: Record<string, string> = {
   ".ico": "image/x-icon",
 };
 
+/** The entry bundle dist/index.html loads now (`index-<hash>.js`); null with no build. */
+export function servedBuild(distDir: string): string | null {
+  try {
+    return /assets\/(index-[\w-]+\.js)/.exec(fs.readFileSync(path.join(distDir, "index.html"), "utf8"))?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function openBrowser(url: string): void {
   const [c, args] =
     process.platform === "win32"
@@ -78,7 +87,11 @@ export function startServer(
   index: Index,
   { port, open, startDoc, toolRoot = TOOL_ROOT, writeState = true, heartbeatMs, boardDbPath }: ServeOptions,
 ): http.Server {
-  const sse = createSseHub(heartbeatMs);
+  // the hello names the build dist/ serves now: a tab drawn by an older build reloads (app/lib/build.ts)
+  const sse = createSseHub(heartbeatMs, () => {
+    const build = servedBuild(path.join(toolRoot, "dist"));
+    return build ? { build } : {};
+  });
   const board = mountBoard(sse, { dbPath: boardDbPath });
   const version = collectionVersion(toolRoot);
   const watcher = new DocWatcher((dir, name) =>

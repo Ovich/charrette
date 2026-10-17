@@ -1,4 +1,4 @@
-// The lines `end` and `merge-lock` print for writes reconciled outside a claim (D72): more than
+// The lines `end` and `merge-lock` print for files written without a claim (D72): more than
 // COLLAPSE_OVER paths in one folder print as one line; the store's flags are untouched.
 export const COLLAPSE_OVER = 20;
 
@@ -12,7 +12,7 @@ export function unclaimedLines(paths: string[]): string[] {
   for (const p of paths) {
     const folder = folderOf(p);
     const inFolder = byFolder.get(folder)!;
-    if (inFolder.length <= COLLAPSE_OVER) lines.push(`reconciled ${p}`);
+    if (inFolder.length <= COLLAPSE_OVER) lines.push(`reconciled ${p}: written without a claim`);
     else if (!told.has(folder)) {
       told.add(folder);
       lines.push(`${inFolder.length} files under ${folder}/ written unclaimed`);

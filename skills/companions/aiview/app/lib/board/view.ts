@@ -72,7 +72,8 @@ export function orderRoster(roster: SnapshotRunner[]): SnapshotRunner[] {
 }
 
 /** A run's members: the roster entries of its group. */
-const membersOf = (snap: BoardSnapshot, run: RunSummary): SnapshotRunner[] => snap.roster.filter((r) => r.plan === run.group);
+// by run, never by group: runs of one group would otherwise show each other's members
+const membersOf = (snap: BoardSnapshot, run: RunSummary): SnapshotRunner[] => snap.roster.filter((r) => (r.run === undefined ? r.plan === run.group : r.run === run.run));
 
 // ── following a runner ──────────────────────────────────────────────────────────────
 
@@ -139,7 +140,7 @@ export function flagAnswer(flag: SnapshotEvent, events: SnapshotEvent[]): FlagAn
  *  told of a resolved conflict (`@<them> I resolved <file>`), before its next merge. */
 export function mergedRecipients(e: SnapshotEvent, events: SnapshotEvent[], ctx: MentionCtx): { rebase: string[]; tell: string[] } {
   // stored with the event (D11); parsed from the thread only on a row from before
-  if (e.meta) return { rebase: [...e.meta.rebase], tell: [...e.meta.tell] };
+  if (e.meta && "rebase" in e.meta) return { rebase: [...e.meta.rebase], tell: [...e.meta.tell] };
   const plan = splitRunner(e.from).plan;
   const holdersLine = e.body.split(/\r?\n/).find((l) => l.includes("you hold or declared a file it changed")) ?? "";
   const rebase = [...new Set(parseMentions(holdersLine, plan, ctx.groups, ctx.names))];
@@ -183,7 +184,8 @@ export function filters(events: SnapshotEvent[]): Filter[] {
 /** The feed: scoped events through the filter, then through the runner followed. */
 export function feed(events: SnapshotEvent[], filter: string, runner: string | null, ctx: MentionCtx): SnapshotEvent[] {
   const f = filters(events).find((x) => x.id === filter) ?? filters(events)[0];
-  return events.filter(f.test).filter((e) => involves(e, runner, ctx));
+  // a phase separator stays whatever the filter: it says where the talk is
+  return events.filter((e) => isPhase(e) || f.test(e)).filter((e) => involves(e, runner, ctx) || (isPhase(e) && !!runner && splitRunner(runner).plan === splitRunner(e.from).plan));
 }
 
 
@@ -203,6 +205,18 @@ export function eventLine(body: string): { word: string | null; strong: boolean;
   return { word: null, strong: false, rest: flat };
 }
 
+// ── a phase separator ───────────────────────────────────────────────────────────────
+
+/** A `phase` event: the orchestrator opened a phase, the current one ending with it. */
+export const isPhase = (e: SnapshotEvent): boolean => e.kind === "event" && e.event === "phase";
+
+/** "phase diverge: every idea" → its name, from the stored meta else the body, and its text. */
+export function phaseOf(e: SnapshotEvent): { name: string; text: string } {
+  const m = /^phase\s+(\S+?):\s*([\s\S]*)$/.exec(e.body);
+  const stored = e.meta && "phase" in e.meta ? e.meta.phase : null;
+  return { name: stored ?? m?.[1] ?? "", text: (m?.[2] ?? e.body).trim() };
+}
+
 // ── the one conversation (D1, D8, D13-D16) ──────────────────────────────────────────
 
 /** A brainstorm run's count, "3 seats": its slice rows are seats, never slices to merge. The tab, the archive and a
@@ -215,11 +229,13 @@ export type RunTab = { run: RunId; code: string; title: string; kind: Kind; stat
 export type ArchivedRun = RunTab & { closed: string; outcome: string | null; orchestrator: string };
 /** What the conversation shows: one run (null = All), or the member followed. */
 export type Pick = { run: RunId | null; follow: string | null };
-export type ItemKind = "message" | "flag" | "urgent" | "held" | "question" | "quiet" | "agreement" | "settled";
+export type ItemKind = "message" | "flag" | "urgent" | "held" | "question" | "quiet" | "agreement" | "settled" | "stalled" | "liveness";
 export type Tier = "act" | "wait" | "decided" | "talk";
 export type Item =
   | { kind: ItemKind; tier: Tier; seq: number; at: string; run: RunId; from: string; word: string | null; tip: string | null; text: string; joined: boolean; state: string | null; about: string | null }
-  | { kind: "event"; seq: number; at: string; run: RunId; from: string; text: string; tip: string | null; about: string | null };
+  | { kind: "event"; seq: number; at: string; run: RunId; from: string; text: string; tip: string | null; about: string | null }
+  /** The orchestrator opened phase `name` (`swarm phase`), the current one ending with it: a separator across the conversation. */
+  | { kind: "phase"; seq: number; at: string; run: RunId; from: string; name: string; text: string; about: null };
 
 /** Every tip, verbatim from the mockup (D9). */
 export const TIPS = {
@@ -236,6 +252,8 @@ export const TIPS = {
   closed: "Closed: the run is over; its conversation is in the archive (☰).",
   joined: "Joined: a member arrived on the board and took its slice or seat.",
   ended: "Ended: the member left the board and its claims were released.",
+  stalled: "Idle: no member's token counter has moved for this long. The orchestrator is told: it opens the next phase or asks the member who owes a move. The row keeps only the latest count and leaves once anything happens.",
+  liveness: "Liveness: the board cannot read this member's transcript, so the stall check cannot see whether it works.",
 } as const;
 
 /** A board event's tip, by its word or its stored name. */
@@ -330,6 +348,14 @@ function heldFileOf(snap: BoardSnapshot, e: SnapshotEvent, ctx: MentionCtx): { p
 
 const QUESTION = /^@orchestrator new question:/;
 
+/** The stall poller's line as the audience reads it: `idle 35s · last active recruiter · phase polish 3/6 done`. */
+function idleText(body: string): string {
+  const secs = /^stalled (\d+)s/.exec(body)?.[1];
+  const who = /last active (?:[\w.-]+\/)?([\w.-]+)/.exec(body)?.[1];
+  const phase = /(phase .+ done|no phase open)\s*$/.exec(body)?.[1];
+  return [secs ? `idle ${secs}s` : "idle", who ? `last active ${who}` : null, phase].filter(Boolean).join(" · ");
+}
+
 /** One event as an item: its tier, word, tip and state, read from the thread (D8, D9, D16). */
 function itemOf(snap: BoardSnapshot, e: SnapshotEvent, run: RunSummary, ctx: MentionCtx): Item {
   const base = { seq: e.seq, at: e.at, run: run.run, from: e.from, about: e.about ?? null };
@@ -343,11 +369,15 @@ function itemOf(snap: BoardSnapshot, e: SnapshotEvent, run: RunSummary, ctx: Men
     joined: false,
     state,
   });
+  if (isPhase(e)) return { ...base, kind: "phase", about: null, ...phaseOf(e) };
   if (flagOf(e)) {
     const answer = flagAnswer(e, snap.events);
     if (answer.state === "settled") return said("settled", "decided", `⚑ flag settled by #${answer.seq}`, TIPS.settled, "settled");
     return said("flag", "act", "⚑ flag · open", TIPS.flag, answer.state);
   }
+  // the stall poller's events, told apart from the board's plain lines (`swarm` liveness)
+  if (e.kind === "event" && e.event === "stalled") return { ...said("stalled", "wait", "◷ idle", TIPS.stalled), text: idleText(e.body) };
+  if (e.kind === "event" && e.event === "liveness") return said("liveness", "wait", "liveness · blind", TIPS.liveness);
   if (isQuiet(e)) {
     const minutes = /(\d+)\s*min/.exec(e.body)?.[1];
     return said("quiet", "wait", minutes ? `◷ quiet ${minutes} min` : "◷ quiet", TIPS.quiet, quietAnswered(e, snap.events) ? "back" : null);
@@ -390,7 +420,8 @@ export function conversation(snap: BoardSnapshot, pick: Pick): Item[] {
     const run = runOf(snap, e);
     if (!run) continue;
     if (pick.follow) {
-      if (!involves(e, pick.follow, ctx)) continue;
+      // a phase separator of the followed member's run stays: it mentions every member of it
+      if (!involves(e, pick.follow, ctx) && !(isPhase(e) && run.group === splitRunner(pick.follow).plan)) continue;
     } else if (picked) {
       if (run.run !== picked.run && !namesPicked(e)) continue;
     } else if (!run.open) continue;
@@ -399,7 +430,10 @@ export function conversation(snap: BoardSnapshot, pick: Pick): Item[] {
     const joins = item.kind === "message" && prev?.kind === "message" && prev.from === item.from;
     items.push(joins ? { ...item, joined: true } : item);
   }
-  return items;
+  // a stall is the orchestrator's alarm, not the conversation: only the live one shows, as one row, the
+  // latest; a stall anything came after has passed and leaves the thread clean
+  const last = items[items.length - 1];
+  return items.filter((i) => i.kind !== "stalled" || i === last);
 }
 
 // ── the conversation's filters (SL11) ───────────────────────────────────────────────
@@ -423,10 +457,10 @@ function kindTest(items: Item[], kind: KindFilter): (i: Item) => boolean {
   return () => true;
 }
 
-/** The items through the kind, then the file. */
+/** The items through the kind, then the file; a phase separator always stays, it says where the talk is. */
 export function narrow(items: Item[], n: Narrow): Item[] {
   const byKind = kindTest(items, n.kind);
-  return items.filter((i) => byKind(i) && (n.file == null || i.about === n.file));
+  return items.filter((i) => i.kind === "phase" || (byKind(i) && (n.file == null || i.about === n.file)));
 }
 
 /** What each kind chip counts: Flags its flags alone, not their answers. */
@@ -455,6 +489,8 @@ export function agents(snap: BoardSnapshot, run: RunId): SnapshotRunner[] {
 export function claimRows(snap: BoardSnapshot, run: RunId | null): { path: string; holders: string[]; shared: boolean }[] {
   const r = run == null ? null : snap.runs.find((x) => x.run === run);
   if (run != null && !r) return [];
-  const inRun = (holder: string): boolean => !r || splitRunner(holder).plan === r.group;
+  // by the run's members, as the strip: another run of the same group holds nothing here
+  const members = r ? new Set(membersOf(snap, r).map((m) => m.runner)) : null;
+  const inRun = (holder: string): boolean => !members || members.has(holder);
   return snap.files.filter((f) => f.holders.some(inRun)).map((f) => ({ path: f.path, holders: f.holders, shared: f.holders.length > 1 }));
 }

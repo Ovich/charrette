@@ -31,6 +31,7 @@ const SNAP: BoardSnapshot = {
     post("alpha/S2", "a word on b", { about: "src/b.ts" }),
     post("alpha/S1", "a call in a", { about: "lib/a.ts" }),
     post("alpha/S2", "S1 the top of a", { kind: "agreement", about: "lib/a.ts" }),
+    post("alpha/orchestrator", "phase build: the slices", { kind: "event", event: "phase", mentions: ["alpha/*"], meta: { phase: "build" } }),
     post("alpha/S1", "plain talk"),
     post("alpha/S1", "merged abc: rebase your branch onto it.", { kind: "event", event: "merged" }),
   ],
@@ -123,4 +124,14 @@ test("Escape, × and a click outside close the File menu", () => {
   fireEvent.click(chip(/File ▾/));
   fireEvent.mouseDown(document.body);
   expect(isOpen()).toBe(false);
+});
+
+test("a phase separator stays under every kind chip and a file", () => {
+  render(<Harness />);
+  const separator = () => screen.queryByRole("separator", { name: "Phase build: the slices" });
+  expect(separator()).not.toBeNull();
+  for (const name of [/^Messages/, /^Agreements/, /^Flags/]) {
+    fireEvent.click(chip(name));
+    expect(separator(), String(name)).not.toBeNull();
+  }
 });

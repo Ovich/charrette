@@ -8,10 +8,10 @@ const many = (folder: string, n: number): string[] => Array.from({ length: n }, 
 test("a folder of more than 20 unclaimed writes prints as one line; the rest one line each, in order", () => {
   const paths = ["src/a.ts", ...many("dist/assets", 21), "dist/index.html", "README.md"];
   assert.deepEqual(unclaimedLines(paths), [
-    "reconciled src/a.ts",
+    "reconciled src/a.ts: written without a claim",
     "21 files under dist/assets/ written unclaimed",
-    "reconciled dist/index.html",
-    "reconciled README.md",
+    "reconciled dist/index.html: written without a claim",
+    "reconciled README.md: written without a claim",
   ]);
 });
 

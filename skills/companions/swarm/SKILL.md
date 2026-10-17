@@ -1,13 +1,13 @@
 ---
 name: swarm
-description: "Use when agents run together on the project's swarm board: a plan in swarm mode or an auto brainstorm, as its orchestrator, a slice runner or a seat whose brief names a run, or when a run on the board has to be opened, read, interrupted or closed, or how the runs went has to be read from outside them. Produces nothing but the run's state on the board, or its figures. Not for a classic run, and not for documents (aiview)."
+description: "Use when agents run together on the project's swarm board: a plan in swarm mode or a swarmstorm, as its orchestrator, a slice runner or a seat whose brief names a run, or when a run on the board has to be opened, read, interrupted or closed, or how the runs went has to be read from outside them. Produces nothing but the run's state on the board, or its figures. Not for a classic run, and not for documents (aiview)."
 ---
 
 # swarm: the board
 
 **The board is where agents running together on one project see each other and settle what
 they share.** A run is one piece of work on it, of a kind: a plan in swarm mode, its slices
-each run in a worktree of its own, or an auto brainstorm, its seats debating without touching
+each run in a worktree of its own, or a swarmstorm, its seats talking without touching
 the repository. The board says who is there, doing what, and carries their talk. It knows the
 work only as the orchestrator tells it, and nothing of aiview.
 
@@ -61,8 +61,9 @@ verbs and their answers are the runner side's, `references/runner.md`.
 **A listener is how you hear the board while you work**: a `$S wait --mentions` kept running as
 a background task. It ends on a message that mentions you or an urgent post, your harness tells
 you, you read it, act, and start it again. **When you are waiting, the same command runs in the
-foreground**: an agent that ends its turn is not woken by its listener. Your side says when to
-start it; `references/setup.md` says which harnesses notify on a background task's end.
+foreground**: an agent that ends its turn is not woken by its listener. A seat only ever
+waits in the foreground; the orchestrator listens in the background. The CLI's answers print
+the command and how to run it: read them; `references/setup.md` says which harnesses notify on a background task's end.
 
 **`$S deliver`** gives what you have not had: mentions in full, anything else as one line
 `#<n> …`; `$S read <n>` gives the full text.
@@ -82,8 +83,8 @@ installed.
 
 - **A slice runner whose brief names a run**: read `references/runner.md` before the first edit.
 - **A seat whose brief names a run**: read `references/seat.md` before the first call.
-- **The orchestrator of a run** (a plan whose mandate says `mode: swarm`, or an auto
-  brainstorm): read `references/orchestrator.md` before opening it, and the `orchestrate` skill
+- **The orchestrator of a run** (a plan whose mandate says `mode: swarm`, or a
+  swarmstorm): read `references/orchestrator.md` before opening it, and the `orchestrate` skill
   for dispatch.
 - **An outside reader of how the runs went**, from the project and never a member: `$S stats
   --json` gives every run's figures and the scope's totals, with the run ids, members and seqs

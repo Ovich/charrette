@@ -8,6 +8,7 @@ import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from ".
 import { conversation, TIPS } from "./lib/board/view.ts";
 import { Conversation } from "./components/viewers/board/Conversation.tsx";
 import { TipLayer } from "./components/viewers/board/Tip.tsx";
+import { PHASED } from "./board-fixtures.ts";
 
 // jsdom cannot lay mermaid out: it is mocked, its render resolving an svg
 vi.mock("mermaid", () => ({
@@ -178,10 +179,11 @@ test("a post's diagram box and code box are drawn by board.css's rules, inside t
   expect(css).toContain("@media (prefers-color-scheme: dark) { .board .post-md .shiki-box span { color: var(--shiki-dark); } }");
 }, 20_000);
 
-test("the agent strip wraps its cards onto rows of 77px, padded 12px above and below, two rows at most, then scrolled", () => {
+test("the agent strip: five cards a row (the person's decision), rows of 77px, padded 12px above and below, two rows at most, then scrolled", () => {
   const strip = ruleOf(boardCss(), ".board .agent-strip");
   expect(strip).toContain("--row: 77px");
-  expect(strip).toContain("grid-template-columns: repeat(auto-fill, minmax(236px, 1fr))");
+  expect(strip).toContain("grid-template-columns: repeat(5, minmax(0, 1fr))");
+  expect(boardCss()).toMatch(/five cards a row, the orchestrator one of them: the person's decision/);
   expect(strip).toContain("grid-auto-rows: var(--row)");
   expect(strip).toContain("padding: 12px 2px");
   expect(strip).toContain("max-height: calc(2 * var(--row) + 10px + 24px)");
@@ -211,4 +213,20 @@ test("the time is centred on the head's 18px line, a message's and an event's", 
   expect(ruleOf(css, ".board .item .time")).toContain("padding-top: 0; line-height: 18px");
   expect(ruleOf(css, ".board .event .time")).toContain("padding-top: 0; line-height: 18px");
   expect(ruleOf(css, ".board .event .head")).toContain("min-height: 18px");
+});
+
+test("a phase is a line cut by its name, its text on hover; neither a post nor an event line", () => {
+  const nm = PHASED.runs.find((r) => r.code === "NM")!;
+  render(<Conversation items={conversation(PHASED, { run: nm.run, follow: null })} archived={null} fresh={new Set()} />);
+  const sep = screen.getByRole("separator", { name: "Phase diverge: every name a run could carry, no judgment yet" });
+  expect(sep.getAttribute("data-component")).toBe("PhaseSeparator");
+  expect(sep.className).toBe("phase");
+  expect(sep.querySelector(".name")?.textContent).toBe("diverge");
+  expect(sep.querySelector(".said")?.textContent).toBe("every name a run could carry, no judgment yet");
+  expect(sep.querySelector(".head, .time")).toBeNull();
+  const css = readFileSync(join(import.meta.dirname, "components/viewers/board/board.css"), "utf8");
+  expect(css).toMatch(/\.board \.phase::before, \.board \.phase::after \{[^}]*border-top: 1px solid/);
+  expect(css).toMatch(/\.board \.phase \.label \{[^}]*white-space: nowrap/);
+  expect(css).toMatch(/\.board \.phase \.said \{ display: none; \}/);
+  expect(sep.getAttribute("title")).toContain("diverge: every name a run could carry");
 });

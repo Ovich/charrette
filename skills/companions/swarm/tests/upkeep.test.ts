@@ -21,7 +21,7 @@ let file: string;
 let repo: string;
 
 // SWARM_ROOT and CHARRETTE_HOME both in the temp dir: nothing reaches the real data home
-const env = () => ({ ...process.env, SWARM_ROOT: dir, CHARRETTE_HOME: dir });
+const env = () => ({ ...process.env, SWARM_ROOT: dir, CHARRETTE_HOME: dir, SWARM_NO_POLLER: "1" });
 const cli = (...argv: string[]) => spawnSync(process.execPath, [CLI, ...argv], { cwd: repo, encoding: "utf8", env: env() });
 const ago = (ms: number): string => new Date(Date.now() - ms).toISOString();
 
@@ -132,6 +132,8 @@ test("a pending wait posts the stale event of an all-silent run", async () => {
   const waiting = openRunCli("alpha");
   assert.equal(cli("join", "--run", String(waiting), "--slice", "S3", "--doing", "x").status, 0);
   const silent = openRunCli("beta");
+  // what the run already holds for it (the liveness warning of its join) taken first: the wait stays pending
+  cli("deliver", "--as", "alpha/S3");
   const child = spawn(process.execPath, [CLI, "wait", "--as", "alpha/S3", "--timeout", "8000"], { cwd: repo, env: env() });
   const exited = new Promise<number | null>((resolve) => child.on("exit", resolve));
   try {
