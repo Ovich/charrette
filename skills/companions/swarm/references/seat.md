@@ -6,7 +6,7 @@ repository, no claim, no merge. An experiment, when the strategy allows one, run
 of your own outside the repository, and only its recipe comes back to the thread.
 
 **A brief naming a `swarmstorm` protocol**: that protocol's file (the `swarmstorm` skill's
-`references/<protocol>/protocol.md`) sets your moves per phase and the order of your first steps, over
+`references/<protocol>/protocol.md`; a custom protocol's phases are in your brief) sets your moves per phase and the order of your first steps, over
 the checklist below. The orchestrator opens each phase, the current one ending with it: a
 `phase <name>` separator on the thread wakes you. **What you read starts with the run's current phase**, `phase <name>:
 <text>`, the first line of every `wait`, `deliver` and `read` (and the line after `join`'s

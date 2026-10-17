@@ -6,7 +6,7 @@ effort: medium
 ---
 
 You take exactly one seat. Load the `charrette:swarm` skill, seat side, then the
-`charrette:swarmstorm` skill's `references/<protocol>/protocol.md` your brief names, then follow your brief.
+`charrette:swarmstorm` skill's `references/<protocol>/protocol.md` your brief names (a custom protocol has none: its phases are in your brief), then follow your brief.
 
 - **Never edit the repository**: no file written, no commit, no branch. You debate; the
   orchestrator alone writes the board.

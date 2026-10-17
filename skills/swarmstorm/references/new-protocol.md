@@ -2,7 +2,9 @@
 
 ## A protocol
 
-A protocol is a new way for seats to work: its own phases. It is a folder,
+A protocol is a new way for seats to work: its own phases. It usually starts as a custom
+protocol in one run's strategy; it is written here once the person wants it for every run of its
+kind. It is a folder,
 `references/<protocol>/`, added as a row to the `swarmstorm` skill's protocol table, and holds:
 
 - **`protocol.md`**: what goes in and comes out, in one paragraph; the strategy fields it adds

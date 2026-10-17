@@ -1,6 +1,6 @@
 ---
 name: swarmstorm
-description: "Use when a person wants a swarm of role seats to work a topic on the swarm board under a chosen protocol: a brainstorm (ideas before any judgment), a debate (questions argued to decisions, a skeptic endorsing) or an editorial (one text drafted, read by seats standing for its readers, revised; a cover letter among its templates), or a seat's brief names a swarmstorm protocol. Produces the run's record in aiview, written by the orchestrator alone. Not for one person thinking aloud with the agent (brainstorm, interview) and not for a plan's slices (execute-plan)."
+description: "Use when a person wants a swarm of role seats to work a topic on the swarm board under a chosen protocol: a brainstorm (ideas before any judgment), a debate (questions argued to decisions, a skeptic endorsing) or an editorial (one text drafted, read by seats standing for its readers, revised; a cover letter among its templates), or a custom protocol recommended for the person's intent, or a seat's brief names a swarmstorm protocol. Produces the run's record in aiview, written by the orchestrator alone. Not for one person thinking aloud with the agent (brainstorm, interview) and not for a plan's slices (execute-plan)."
 ---
 
 # Swarmstorm
@@ -21,8 +21,14 @@ posts) names the person or waits on one.
 
 ## Protocols and templates
 
-**The protocol decides the phases, the moves allowed in each, the default seats and what comes
-out.** Read its `protocol.md` before the strategy:
+**Protocols, templates and seats are defaults, never a form to fill.** Read what the person
+wants done, and why, then recommend the protocol that fits, or its template when one matches,
+with the reason; when none fits, recommend a **custom protocol**: its phases, each phase's moves
+and who acts, and what comes out, drawn on the closest protocol below. The recommendation is
+then adjusted with the person in the strategy (*1*): the phases added, dropped or reordered, the
+seats added or removed, each role's prompt rewritten. **The protocol decides the phases, the
+moves allowed in each, the default seats and what comes out.** Read its `protocol.md` before
+the strategy:
 
 | Protocol | When | File |
 |---|---|---|
@@ -34,8 +40,9 @@ out.** Read its `protocol.md` before the strategy:
 kind of work (the output's skeleton, the seats renamed, given personas or added, the election,
 the interview's questions, the evidence it expects), never its phases. A protocol lists its
 templates in its `protocol.md`; when the ask matches one, run the template; else the protocol's
-defaults, the strategy filling what a template would. **A person who wants a new protocol or a
-new template**: read `references/new-protocol.md` before writing either.
+defaults, the strategy filling what a template would. **A custom protocol run once lives in the
+dossier's strategy; a person who wants it, or a new template, kept for every run of its kind**:
+read `references/new-protocol.md` before writing either.
 
 ## 0. Before the run, with the person
 
@@ -59,13 +66,18 @@ existing fields, only on their yes; the run never edits evidence.
 
 The strategy is the dossier's `field: value` table, written and approved as the `orchestrate`
 skill's `references/charter.md` says; push-back settled one decision at a time through the
-`interview` skill. The protocol adds its fields; a template fills them.
+`interview` skill. The protocol adds its fields; a template fills them. **Every field is the
+person's to change**, before the run or between runs: the strategy is where the protocol, the
+phases, the seats and each role are adjusted, never the skill's files. A change for one run is
+written in the dossier only; one the person wants for every run of its kind becomes a template,
+or a protocol (`references/new-protocol.md`), on their yes.
 
 | Field | Content | Recommended |
 |---|---|---|
-| protocol | one of the table above, and the template if any | from the ask |
+| protocol | one of the table above, its template if any, or `custom` | from what the person wants done |
+| phases | the protocol's phases as this run runs them: each with its moves, who acts and the message that opens it; for `custom`, written here in full, in the shape of a `protocol.md`'s phase table | the protocol's, adjusted with the person |
 | questions | what the seats work, one row each | from the ask, 1 to 3 |
-| seats | one row each: seat id, role prompt in full (the `orchestrate` skill's `references/roles.md`), effort, `on` | the protocol's or template's |
+| seats | one row each: seat id, role prompt in full (the `orchestrate` skill's `references/roles.md`), effort, `on`; seats added, removed or rewritten for this run | the protocol's or template's, adjusted with the person |
 | evidence | a set, for all or per seat, below | `codebase, documents` |
 | criteria | what you choose by when the protocol has you choose: what a good result is, what is ruled out | from the ask |
 | budget | wall time, shared across the phases; a phase's share spent ends it, the run closes with what stands | 30 minutes |
@@ -108,7 +120,9 @@ Take seat `<seat id>` in run `<run id>`, protocol `<protocol>` of the `swarmstor
 
 **Evidence**: <the strategy's evidence for this seat>. **Dossier**: `<path>`, the sections <the ones this seat reads>. **Record**: `<path>`: read it at the start of every phase.
 
-**Your parts**: <per phase, from the protocol; a phase that asks you nothing: `done` at once>.
+**Your parts**: <per phase, from the strategy's phases; a phase that asks you nothing: `done` at once>.
+
+**The phases** (a custom protocol only): <the strategy's phase table, in full>.
 
 **Posts**: write each to `<folder>/<seat>-<n>.md`, then `$S post --file <that path> --as <group>/<seat id>`; those are the only files you write. A post failing twice goes to `@orchestrator` at once, never retried in silence.
 
