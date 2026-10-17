@@ -7,7 +7,7 @@ out, and the header says which. A small change's section is a sentence.
 ```markdown
 # <topic>, plan
 
-> **Status**: draft | approved: <who>, <date>, in their words; defaults confirmed: <ids>
+> **Status**: draft | approved: <who>, <date>, in their words; defaults confirmed: <ids | all>
 > **Delivers**: the increment, in one sentence, and what is accepted as proof of it
 > **Hard rule**: what must not change, when there is one
 > **Read against**: `<branch>` at `<sha>`; every `file:line` cited holds there
@@ -46,7 +46,7 @@ What breaks, and what the person sees.
 The recipes the experiments handed back.
 
 ## 8. Decisions
-| id | Kind | Decision | Status | Source | Slice |
+| id | Decision | Depends on | Status | Source | Kind | Slice |
 The row core of the `interview` skill's `references/decisions.md`, ids and citations included,
 plus `Kind` and `Slice`. Kinds: purpose, module (with
 its state, as write-slice names them), architecture, contract, clarification. Open
