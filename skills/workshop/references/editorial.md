@@ -27,6 +27,7 @@ replies; the final text. The board alone tells the whole run. **It is also the s
 | evidence | adds `given`: the files and links handed over with the ask (a brief, a draft, a spec), read and cited, never edited | `given, web` |
 | criteria | what the text must achieve and what is ruled out | from the ask |
 | election | the slots elected (the parts that make the impression), the rest written by the writer; and where the candidates come from: `precedents`, earlier texts of the same kind the person provides, the source of wording and framing only, never of facts; or `generated`, written by each seat from the strategy | the opening, the turning point and the close; `precedents` whenever the person has earlier texts, else `generated` |
+| feedback | the person's reactions to earlier versions of this text or of earlier runs: what they rejected and why, the wordings and claims struck, the preferences they set; read by every seat and by you, kept apart from the evidence | from the person's earlier runs, updated after each |
 | iterations | polish iterations on the whole text, at most | 2 |
 | rounds | read-and-revise rounds on the whole text | 1 |
 
@@ -52,5 +53,24 @@ replies; the final text. The board alone tells the whole run. **It is also the s
 *Who* when its part is posted, every other seat at once: the board tells you when all are in. **Open the next phase only after `all done`**, even when the phase asked nothing of most seats.
 Register each seat's transcript right after dispatching it (the `swarm` skill's orchestrator
 side), so a stalled phase is seen within seconds.
+
+**You steer the text, in every phase that produces it.** The seats start fresh; you carry the
+person's feedback and what earlier rounds struck. Read each brief, draft and version as it lands,
+before the next seat acts on it:
+
+- **Quote, never rewrite.** Name the weak or awkward phrase (a calque, a dangling verb, an
+  ambiguous pronoun, a participle agreeing with nothing, a vague hinge that promises and does not
+  give, a lesson given to the reader), say why, and post it as priority 1 for the round that
+  follows, binding on the writer. The writer rewrites; you only name, except in the final check's
+  one fix, where you may pass on wordings the seats proposed.
+- **Correct the strategy before the seats build on it**: a claim the evidence or the feedback
+  already struck, a sample sentence inventing a fact (seats copy samples), a level of detail the
+  person ruled out.
+- **Hold the order of authority**: truth first (the checker), then the person's feedback and
+  preferences, then a seat's taste.
+- **Unblock**: a seat silent past its share, or one that ran `done` before its part, is mentioned
+  with what it owes and the posts it has to answer.
+- **Close the loop**: after the run, what the person says of the result goes into `feedback` for
+  the next run, never only into chat.
 
 **Close** after the final check: the final text on the board.
