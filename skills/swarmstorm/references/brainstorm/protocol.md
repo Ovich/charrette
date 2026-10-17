@@ -3,7 +3,7 @@
 Ideas first, judgment last, in separate phases. Out: per question, 3 to 5 options, each with
 its pre-mortem, ranked against the criteria.
 
-**Board**: the `brainstorm` skill's board, its sections as that skill orders them. Swarm kind
+**Record**: the `brainstorm` skill's board (`documents.md`), its sections as that skill orders them. Swarm kind
 `brainstorm`. **Seats**: 3 to 4, roles chosen for different angles on the topic (a user, a
 builder, an operator, an outsider), no skeptic: judgment has its own phase. `on` none.
 
@@ -19,3 +19,14 @@ board cannot hide the thread; a seat that read it first says so on the thread be
 
 **The debate log** holds, per question, the ideas by theme with their `#<seq>`, then the
 options and their causes verbatim.
+
+**Phase messages**:
+
+| phase | text |
+|---|---|
+| ideas | `Blind: post your ideas before reading the thread, one line each, the odd ones included, --about Q<n>; then done ideas.` |
+| build | `Read the thread; combine, extend, flip ideas, each post naming the #seq it builds on; no criticism; then done build.` |
+| pre-mortem | `Options <table #seq>. Per option: it failed a year on; why, each cause with its source; no new options; then done pre-mortem.` |
+| rank | `Nothing asked of the seats: done rank now.` |
+
+**Templates**: none yet.

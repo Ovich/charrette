@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: "Use when an agent orchestrates other agents on a piece of work, of any kind (a plan, a workshop): settling the charter, dispatching each member with its brief and role, watching them and steering a drift. Not for the duties one kind adds (orchestrate-plan for a plan, workshop for a seat swarm), and not for the board they talk on (swarm)."
+description: "Use when an agent orchestrates other agents on a piece of work, of any kind (a plan, a swarmstorm): settling the charter, dispatching each member with its brief and role, watching them and steering a drift. Not for the duties one kind adds (orchestrate-plan for a plan, swarmstorm for a seat swarm), and not for the board they talk on (swarm)."
 ---
 
 # Orchestrate

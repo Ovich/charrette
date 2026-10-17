@@ -3,7 +3,7 @@
 Seats argue the open questions to decisions, each agreement endorsed by a skeptic. Out: per
 question, a decision with its sources, or both sides written and the row left open.
 
-**Board**: the `brainstorm` skill's board, its sections as that skill orders them; the questions
+**Record**: the `brainstorm` skill's board (`documents.md`), its sections as that skill orders them; the questions
 are its decisions rows, status open, ordered as a tree. Swarm kind `brainstorm`.
 
 **Strategy, beyond the shared fields:**
@@ -37,3 +37,7 @@ is there.
 
 When every question is settled or the budget is hit. **The debate log**: per question, the posts
 that moved it, the agreement verbatim.
+
+**Phase message**: `debate`: `The questions <Q1…>. Post positions with their sources, agree when you do, the skeptic endorsing; at most <N> exchanges on one question before it escalates to @orchestrator; then done debate when your questions are settled.`
+
+**Templates**: none yet.

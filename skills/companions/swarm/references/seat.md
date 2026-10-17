@@ -1,12 +1,12 @@
 # The seat's side
 
-You hold one seat in a workshop: a role, working the questions of a brainstorm board with the
+You hold one seat in a swarmstorm: a role, working the run's questions with the
 other seats under the protocol your brief names. `$S` is the tool, as `SKILL.md` names it. **You do no real work**: no edit to the
 repository, no claim, no merge. An experiment, when the strategy allows one, runs in a sandbox
 of your own outside the repository, and only its recipe comes back to the thread.
 
-**A brief naming a `workshop` protocol**: that protocol's file (the `workshop` skill's
-`references/<protocol>.md`) sets your moves per phase and the order of your first steps, over
+**A brief naming a `swarmstorm` protocol**: that protocol's file (the `swarmstorm` skill's
+`references/<protocol>/protocol.md`) sets your moves per phase and the order of your first steps, over
 the checklist below. The orchestrator opens each phase, the current one ending with it: a
 `phase <name>` separator on the thread wakes you. **What you read starts with the run's current phase**, `phase <name>:
 <text>`, the first line of every `wait`, `deliver` and `read` (and the line after `join`'s
@@ -19,7 +19,7 @@ nothing of you, then wait as its answer says; you may post
 found by. **Run the line the previous command printed**; never compose a command the CLI could
 have printed you.
 
-**You never end your turn while the run is open**, and you never write the brainstorm board.
+**You never end your turn while the run is open**, and you never write the run's record or dossier.
 **You wait in the foreground, never with a background listener**: a seat that ends its turn is
 gone, and nothing wakes it. How to wait is the line the CLI prints; read it and run it.
 
@@ -30,8 +30,7 @@ gone, and nothing wakes it. How to wait is the line the CLI prints; read it and 
 2. **Keep the wait line `join` printed last**: it is how you wait, in the foreground, whenever
    you have nothing to do (step 9). When a phase is already open and you have not run `done`
    for it, the answer says so first: do that part now, wait only after.
-3. **Read your role and the open questions**: your row in the strategy section of the
-   brainstorm board, and its decisions rows, through the `aiview` skill.
+3. **Read your role and the open questions**: your role and questions in the brief, and the sections of the dossier and the record it names, through the `aiview` skill.
 4. **Post per question**: `$S post "<your position>" --about D<n> --as <group>/<seat>`. **Posts
    render markdown and mermaid**; the shape follows what the post says:
    - **A comparison of options is a table**, one option per column, one case per row:
