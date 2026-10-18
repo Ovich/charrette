@@ -9103,6 +9103,16 @@ var init_events = __esm({
           return `when your part of ${name} is posted: ${cli} done ${word(name)} --as ${word(me.name)}`;
         }
       },
+      // the orchestrator pauses its run (`pause [text]`): mentions `<group>/*`, every member stops and waits for the resume
+      pause: {
+        name: "pause",
+        next: (m, me, cli) => me.slice === "orchestrator" || m.from === me.name ? null : `stop where you are: start nothing new, claim and merge nothing; wait in the foreground for the resume: ${cli} wait --mentions --as ${word(me.name)}`
+      },
+      // the orchestrator lifts the pause (`resume [text]`), its message in the body: every member continues
+      resume: {
+        name: "resume",
+        next: (m, me) => me.slice === "orchestrator" || m.from === me.name ? null : "the run resumed: continue where you stopped, as the resume's message says"
+      },
       // a member finished the current phase (`done <name>`); mentions the orchestrator
       done: { name: "done" },
       // every member of the run is done with the current phase: one event to the orchestrator
@@ -10409,6 +10419,8 @@ async function openBoard(dbPath = SQLITE_PATH2, opts = {}) {
   upkeep("slices", "on_events", "on_events TEXT");
   upkeep("runs", "phase", "phase TEXT");
   upkeep("runs", "phase_text", "phase_text TEXT");
+  upkeep("runs", "paused", "paused TEXT");
+  upkeep("runs", "resumed_at", "resumed_at TEXT");
   upkeep("runs", "stall_ms", `stall_ms INTEGER NOT NULL DEFAULT ${STALL_MS_DEFAULT}`);
   upkeep("runs", "stall_posts", "stall_posts INTEGER NOT NULL DEFAULT 0");
   db.exec("CREATE INDEX IF NOT EXISTS messages_channel ON messages (repo, run, seq)");
@@ -10471,6 +10483,7 @@ async function openBoard(dbPath = SQLITE_PATH2, opts = {}) {
   const phaseOf = (r) => r.phase == null ? null : { name: String(r.phase), text: String(r.phase_text ?? "") };
   const toRun = (r) => ({
     phase: phaseOf(r),
+    paused: r.paused == null ? null : String(r.paused),
     id: Number(r.id),
     repo: String(r.repo),
     kind: profileOf(String(r.kind ?? "plan")).kind,
@@ -10859,7 +10872,7 @@ async function openBoard(dbPath = SQLITE_PATH2, opts = {}) {
     flagStale(at = /* @__PURE__ */ new Date()) {
       const silentBefore = at.getTime() - STALE_MS;
       return transaction(() => {
-        const quiet = db.prepare("SELECT p.id, p.last_call, p.joined_at FROM participants p JOIN runs r ON r.id = p.run WHERE r.state = 'open' AND p.slice = ? AND p.ended_at IS NULL AND p.quiet_flagged = 0").all(ORCHESTRATOR2);
+        const quiet = db.prepare("SELECT p.id, p.last_call, p.joined_at FROM participants p JOIN runs r ON r.id = p.run WHERE r.state = 'open' AND r.paused IS NULL AND p.slice = ? AND p.ended_at IS NULL AND p.quiet_flagged = 0").all(ORCHESTRATOR2);
         for (const o of quiet) {
           const silentSince = Date.parse(String(o.last_call ?? o.joined_at));
           if (silentSince >= silentBefore) continue;
@@ -10868,7 +10881,7 @@ async function openBoard(dbPath = SQLITE_PATH2, opts = {}) {
           db.prepare("UPDATE participants SET quiet_flagged = 1 WHERE id = ?").run(Number(o.id));
         }
         const flagged = [];
-        for (const r of db.prepare("SELECT id, plan FROM runs WHERE state = 'open' AND stale_flagged = 0 ORDER BY id").all()) {
+        for (const r of db.prepare("SELECT id, plan FROM runs WHERE state = 'open' AND paused IS NULL AND stale_flagged = 0 ORDER BY id").all()) {
           const id = Number(r.id);
           const members = db.prepare("SELECT id, slice, last_call, joined_at FROM participants WHERE run = ? AND ended_at IS NULL").all(id);
           if (!members.length || members.some((m) => Date.parse(String(m.last_call ?? m.joined_at)) >= silentBefore)) continue;
@@ -10984,6 +10997,34 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
     currentPhase(run2) {
       return phaseOf(runRow(run2));
     },
+    pause(p, text = "") {
+      const fresh = live(p);
+      if (fresh.slice !== ORCHESTRATOR2) throw new Error(`pause: only the orchestrator pauses its run; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR2}`);
+      const r = runRow(fresh.run);
+      if (r.state !== "open") throw new Error(`run ${fresh.run} is closed`);
+      if (r.paused != null) throw new Error(`run ${fresh.run} is already paused`);
+      const said = text.trim();
+      return transaction(() => {
+        db.prepare("UPDATE runs SET paused = ? WHERE id = ?").run(said, fresh.run);
+        return insertMessage(fresh, `pause: stop where you are and wait for the resume${said ? `: ${said}` : ""}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.pause.name });
+      });
+    },
+    resume(p, text = "") {
+      const fresh = live(p);
+      if (fresh.slice !== ORCHESTRATOR2) throw new Error(`resume: only the orchestrator resumes its run; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR2}`);
+      const r = runRow(fresh.run);
+      if (r.state !== "open") throw new Error(`run ${fresh.run} is closed`);
+      if (r.paused == null) throw new Error(`run ${fresh.run} is not paused`);
+      const said = text.trim();
+      return transaction(() => {
+        db.prepare("UPDATE runs SET paused = NULL, resumed_at = ?, stall_posts = 0 WHERE id = ?").run(now2(), fresh.run);
+        return insertMessage(fresh, `resume: continue${said ? `: ${said}` : ""}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.resume.name });
+      });
+    },
+    pausedOf(run2) {
+      const r = runRow(run2);
+      return r.paused == null ? null : String(r.paused);
+    },
     done(p, name) {
       const fresh = live(p);
       if (fresh.slice === ORCHESTRATOR2) throw new Error("done: the orchestrator opens phases; a member runs done");
@@ -11041,8 +11082,10 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
         );
         if (!readable.length) return;
         if (!members.some((m) => m !== ORCHESTRATOR2)) return;
+        if (r.paused != null) return;
         const last = readable.reduce((a, b) => String(b.moved_at) > String(a.moved_at) ? b : a);
-        const silence = at.getTime() - Date.parse(String(last.moved_at));
+        const since = Math.max(Date.parse(String(last.moved_at)), r.resumed_at == null ? 0 : Date.parse(String(r.resumed_at)));
+        const silence = at.getTime() - since;
         const threshold = Number(r.stall_ms ?? STALL_MS_DEFAULT);
         const posted = Number(r.stall_posts ?? 0);
         if (silence < threshold) {
@@ -11351,6 +11394,8 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
   board.end = counted("end", board.end);
   board.post = counted("post", board.post);
   board.phase = counted("phase", board.phase);
+  board.pause = counted("pause", board.pause);
+  board.resume = counted("resume", board.resume);
   board.done = counted("done", board.done);
   board.endorse = counted("endorse", board.endorse);
   board.deliver = counted("deliver", board.deliver);

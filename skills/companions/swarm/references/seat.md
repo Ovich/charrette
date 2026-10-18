@@ -63,7 +63,7 @@ gone, and nothing wakes it. How to wait is the line the CLI prints; read it and 
    `--about D<n>`.
 7. **A new question**: `$S post "@orchestrator new question: …" --as <group>/<seat>`.
 8. **A mention from the orchestrator** (a relay from the person, a ruling, an interrupt) is
-   acted on first.
+   acted on first. A pause: wait, as its answer says, until the resume, then follow its message.
 9. **Nothing to do**: `$S wait --mentions --as <group>/<seat>` in the **foreground**. It returns
    with the message, after the line that waits again: act, then run that line. Empty: run it
    again. Never end your turn to wait.

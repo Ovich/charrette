@@ -103,7 +103,12 @@ says whether the board reads it.
 
 ## Interrupt
 
-**News waits for a runner's long call to end.** When it cannot wait:
+**To stop the whole run**, `$S pause "<why>" --as <group>/orchestrator`: every member is told to
+stop and wait, claim and merge-lock are refused, and no stall, quiet or stale alert fires.
+`$S resume "<what changed, what to do>" --as <group>/orchestrator` lets them go on, the message
+in their wake. The answers print the next step.
+
+**News for one member waits for its long call to end.** When it cannot wait:
 
 1. **`$S post --as <plan>/orchestrator "@<slice> <the message>"`**, so the thread has it.
 2. **Stop the runner** (`TaskStop`), **then resume it with the same message** (`SendMessage`).

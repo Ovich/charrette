@@ -129,6 +129,16 @@ var EVENTS = {
       return `when your part of ${name} is posted: ${cli} done ${word(name)} --as ${word(me.name)}`;
     }
   },
+  // the orchestrator pauses its run (`pause [text]`): mentions `<group>/*`, every member stops and waits for the resume
+  pause: {
+    name: "pause",
+    next: (m, me, cli) => me.slice === "orchestrator" || m.from === me.name ? null : `stop where you are: start nothing new, claim and merge nothing; wait in the foreground for the resume: ${cli} wait --mentions --as ${word(me.name)}`
+  },
+  // the orchestrator lifts the pause (`resume [text]`), its message in the body: every member continues
+  resume: {
+    name: "resume",
+    next: (m, me) => me.slice === "orchestrator" || m.from === me.name ? null : "the run resumed: continue where you stopped, as the resume's message says"
+  },
   // a member finished the current phase (`done <name>`); mentions the orchestrator
   done: { name: "done" },
   // every member of the run is done with the current phase: one event to the orchestrator
@@ -1444,6 +1454,8 @@ async function openBoard(dbPath = SQLITE_PATH, opts = {}) {
   upkeep("slices", "on_events", "on_events TEXT");
   upkeep("runs", "phase", "phase TEXT");
   upkeep("runs", "phase_text", "phase_text TEXT");
+  upkeep("runs", "paused", "paused TEXT");
+  upkeep("runs", "resumed_at", "resumed_at TEXT");
   upkeep("runs", "stall_ms", `stall_ms INTEGER NOT NULL DEFAULT ${STALL_MS_DEFAULT}`);
   upkeep("runs", "stall_posts", "stall_posts INTEGER NOT NULL DEFAULT 0");
   db.exec("CREATE INDEX IF NOT EXISTS messages_channel ON messages (repo, run, seq)");
@@ -1506,6 +1518,7 @@ async function openBoard(dbPath = SQLITE_PATH, opts = {}) {
   const phaseOf = (r) => r.phase == null ? null : { name: String(r.phase), text: String(r.phase_text ?? "") };
   const toRun = (r) => ({
     phase: phaseOf(r),
+    paused: r.paused == null ? null : String(r.paused),
     id: Number(r.id),
     repo: String(r.repo),
     kind: profileOf(String(r.kind ?? "plan")).kind,
@@ -1894,7 +1907,7 @@ async function openBoard(dbPath = SQLITE_PATH, opts = {}) {
     flagStale(at = /* @__PURE__ */ new Date()) {
       const silentBefore = at.getTime() - STALE_MS;
       return transaction(() => {
-        const quiet = db.prepare("SELECT p.id, p.last_call, p.joined_at FROM participants p JOIN runs r ON r.id = p.run WHERE r.state = 'open' AND p.slice = ? AND p.ended_at IS NULL AND p.quiet_flagged = 0").all(ORCHESTRATOR2);
+        const quiet = db.prepare("SELECT p.id, p.last_call, p.joined_at FROM participants p JOIN runs r ON r.id = p.run WHERE r.state = 'open' AND r.paused IS NULL AND p.slice = ? AND p.ended_at IS NULL AND p.quiet_flagged = 0").all(ORCHESTRATOR2);
         for (const o of quiet) {
           const silentSince = Date.parse(String(o.last_call ?? o.joined_at));
           if (silentSince >= silentBefore) continue;
@@ -1903,7 +1916,7 @@ async function openBoard(dbPath = SQLITE_PATH, opts = {}) {
           db.prepare("UPDATE participants SET quiet_flagged = 1 WHERE id = ?").run(Number(o.id));
         }
         const flagged = [];
-        for (const r of db.prepare("SELECT id, plan FROM runs WHERE state = 'open' AND stale_flagged = 0 ORDER BY id").all()) {
+        for (const r of db.prepare("SELECT id, plan FROM runs WHERE state = 'open' AND paused IS NULL AND stale_flagged = 0 ORDER BY id").all()) {
           const id = Number(r.id);
           const members = db.prepare("SELECT id, slice, last_call, joined_at FROM participants WHERE run = ? AND ended_at IS NULL").all(id);
           if (!members.length || members.some((m) => Date.parse(String(m.last_call ?? m.joined_at)) >= silentBefore)) continue;
@@ -2019,6 +2032,34 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
     currentPhase(run2) {
       return phaseOf(runRow(run2));
     },
+    pause(p, text = "") {
+      const fresh = live(p);
+      if (fresh.slice !== ORCHESTRATOR2) throw new Error(`pause: only the orchestrator pauses its run; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR2}`);
+      const r = runRow(fresh.run);
+      if (r.state !== "open") throw new Error(`run ${fresh.run} is closed`);
+      if (r.paused != null) throw new Error(`run ${fresh.run} is already paused`);
+      const said = text.trim();
+      return transaction(() => {
+        db.prepare("UPDATE runs SET paused = ? WHERE id = ?").run(said, fresh.run);
+        return insertMessage(fresh, `pause: stop where you are and wait for the resume${said ? `: ${said}` : ""}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.pause.name });
+      });
+    },
+    resume(p, text = "") {
+      const fresh = live(p);
+      if (fresh.slice !== ORCHESTRATOR2) throw new Error(`resume: only the orchestrator resumes its run; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR2}`);
+      const r = runRow(fresh.run);
+      if (r.state !== "open") throw new Error(`run ${fresh.run} is closed`);
+      if (r.paused == null) throw new Error(`run ${fresh.run} is not paused`);
+      const said = text.trim();
+      return transaction(() => {
+        db.prepare("UPDATE runs SET paused = NULL, resumed_at = ?, stall_posts = 0 WHERE id = ?").run(now(), fresh.run);
+        return insertMessage(fresh, `resume: continue${said ? `: ${said}` : ""}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.resume.name });
+      });
+    },
+    pausedOf(run2) {
+      const r = runRow(run2);
+      return r.paused == null ? null : String(r.paused);
+    },
     done(p, name) {
       const fresh = live(p);
       if (fresh.slice === ORCHESTRATOR2) throw new Error("done: the orchestrator opens phases; a member runs done");
@@ -2076,8 +2117,10 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
         );
         if (!readable.length) return;
         if (!members.some((m) => m !== ORCHESTRATOR2)) return;
+        if (r.paused != null) return;
         const last = readable.reduce((a, b) => String(b.moved_at) > String(a.moved_at) ? b : a);
-        const silence = at.getTime() - Date.parse(String(last.moved_at));
+        const since = Math.max(Date.parse(String(last.moved_at)), r.resumed_at == null ? 0 : Date.parse(String(r.resumed_at)));
+        const silence = at.getTime() - since;
         const threshold = Number(r.stall_ms ?? STALL_MS_DEFAULT);
         const posted = Number(r.stall_posts ?? 0);
         if (silence < threshold) {
@@ -2386,6 +2429,8 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
   board.end = counted("end", board.end);
   board.post = counted("post", board.post);
   board.phase = counted("phase", board.phase);
+  board.pause = counted("pause", board.pause);
+  board.resume = counted("resume", board.resume);
   board.done = counted("done", board.done);
   board.endorse = counted("endorse", board.endorse);
   board.deliver = counted("deliver", board.deliver);
@@ -2639,6 +2684,8 @@ var USAGE = [
   "  slice   <id> --run <id> [--state ready|running|done|blocked] [--transcript <path>]   # --transcript: the dispatched member's transcript, after dispatch (orchestrator)",
   "  slice   add <id> --run <id> --title <t> [--blockers a,b] [--link <url>] [--role <r>] [--on <events>]   # adds a slice or seat mid-run (orchestrator)",
   "  phase   <name> <text> [--as <member>]                           # opens phase <name>; the current phase ends with it: a separator on the thread that wakes every member of the run (orchestrator)",
+  "  pause   [<text>] [--as <member>]                               # every member stops where it is and waits; claim and merge-lock refused, no stall, quiet or stale alert until resume (orchestrator)",
+  "  resume  [<message>] [--as <member>]                             # lifts the pause; every member wakes on the message and continues (orchestrator)",
   "  done    <phase> [--as <member>]                                 # your part of the current phase is in: tells the orchestrator; when every member is done, the board tells it",
   "  close   --run <id>                                              # (orchestrator)",
   '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,\u2026"]   # --slice <id> the same; a file not there yet is one you create, declared from the repository root; prints the roster, then how you listen: a seat waits in the foreground, a slice runner listens in the background',
@@ -2770,7 +2817,9 @@ var rosterLine = (r) => {
 };
 var phaseHeader = (board, run2) => {
   const ph = board.currentPhase(run2);
-  return ph ? `phase ${ph.name}: ${ph.text}` : null;
+  const paused = board.runs().find((r) => r.id === run2)?.paused;
+  const head = ph ? `phase ${ph.name}: ${ph.text}` : null;
+  return paused == null ? head : [head, `PAUSED${paused ? `: ${paused}` : ""}`].filter(Boolean).join("  ");
 };
 var phaseSuffix = (phase, progress) => phase ? `  phase ${phase.name}: ${phase.text}${progress ? `  ${progress.done}/${progress.of} done` : ""}` : "";
 var pollerPidFile = (run2) => path4.join(DATA_ROOT, `swarm-poll-${run2}.pid`);
@@ -2813,12 +2862,29 @@ var listensInForeground = (p) => p.slice !== "orchestrator" && profileOf(p.kind)
 var waitCommand = (name) => [...self(), "wait", "--mentions", "--as", shellWord(name)].join(" ");
 var listenNow = (p, afterPhase = false) => listensInForeground(p) ? `${afterPhase ? "only then wait" : "wait now"}, in the foreground (never a background listener: a seat that ends its turn is gone): ${waitCommand(p.name)}` : `start your listener now, in the background (your harness's background task): ${waitCommand(p.name)}`;
 var owedLine = (board, p, thread = true) => {
+  const paused = pausedLine(board, p);
+  if (paused) return paused;
   const ph = board.owedPhase(p);
   if (!ph) return null;
   const read = thread && profileOf(p.kind).wholeThread ? `Read the whole phase first: ${[...self(), "thread", "--as", shellWord(p.name)].join(" ")}. ` : "";
   return `phase ${ph.name} is open and asks: ${ph.text}. ${read}Do your part now, then: ${[...self(), "done", shellWord(ph.name), "--as", shellWord(p.name)].join(" ")}`;
 };
+var pausedLine = (board, p) => {
+  if (p.slice === "orchestrator" || p.ended) return null;
+  const run2 = board.runs().find((r) => r.id === p.run);
+  if (!run2 || run2.paused == null) return null;
+  return `run ${p.run} is paused${run2.paused ? `: ${run2.paused}` : ""}. Stop where you are: start nothing new, claim and merge nothing; wait in the foreground for the resume: ${waitCommand(p.name)}`;
+};
+var refusedPaused = (board, p, verb) => {
+  const line = pausedLine(board, p);
+  if (!line) return false;
+  process.exitCode = 4;
+  emit({ run: p.run, paused: true, refused: verb, next: line }, `${verb} refused: ${line}`);
+  return true;
+};
 var nextStep = (board, p) => {
+  const paused = pausedLine(board, p);
+  if (paused) return paused;
   const owed = owedLine(board, p);
   return owed ? `${owed}
 ${listenNow(p, true)}` : listenNow(p);
@@ -3057,6 +3123,19 @@ ${USAGE}`);
       });
       break;
     }
+    case "pause":
+    case "resume": {
+      const p = caller(board);
+      const text = args.positional.join(" ");
+      const m = args.verb === "pause" ? board.pause(p, text) : board.resume(p, text);
+      const cli = self().join(" ");
+      const next = args.verb === "pause" ? `every member of run ${m.run} is told to stop and wait; no stall, quiet or stale alert until the resume. Resume, with a message if they need one: ${cli} resume "<message>" --as ${shellWord(p.name)}` : `run ${m.run} resumed; listen again in the background: ${cli} wait --mentions --as ${shellWord(p.name)}`;
+      emit({ seq: m.seq, run: m.run, paused: args.verb === "pause", next }, () => {
+        console.log(seqLine(m));
+        console.log(next);
+      });
+      break;
+    }
     case "done": {
       const p = caller(board);
       if (answeredClosed(board, p)) break;
@@ -3239,9 +3318,10 @@ ${USAGE}`);
       if (raw !== void 0) again.push("--timeout", raw);
       if (asJson) again.push("--json");
       const owes = owedLine(board, p);
-      const rearm = listensInForeground(p) ? owes ? `${owes}
+      const pausedNow = pausedLine(board, p);
+      const rearm = pausedNow ? pausedNow : listensInForeground(p) ? owes ? `${owes}
 only then wait again, in the foreground: ${again.join(" ")}` : `answer on the thread if needed, then wait again, in the foreground: ${again.join(" ")}` : p.slice === "orchestrator" ? `act on it, then start this listener again, in the background: ${again.join(" ")}` : `answer on the thread if needed, then start this listener again, in the background while you work, in the foreground when you are waiting: ${again.join(" ")}`;
-      const next = owes && !listensInForeground(p) ? `${owes}
+      const next = owes && !pausedNow && !listensInForeground(p) ? `${owes}
 ${rearm}` : rearm;
       const phase = phaseHeader(board, p.run);
       emit({ phase, next, ...d }, () => {
@@ -3270,6 +3350,7 @@ ${rearm}` : rearm;
     }
     case "claim": {
       const p = caller(board);
+      if (refusedPaused(board, p, "claim")) break;
       const file = args.positional[0] ?? fail("claim: which path?");
       const abs = resolveClaimPath(file);
       const rel = repoRelative(abs);
@@ -3292,6 +3373,7 @@ ${rearm}` : rearm;
     }
     case "merge-lock": {
       const p = caller(board);
+      if (refusedPaused(board, p, "merge-lock")) break;
       const onto = need("--onto");
       const reconciled = p.worktree ? branchChangedIn(p.worktree, onto) : [];
       const held = new Set(board.heldBy(p));

@@ -30,6 +30,8 @@ const USAGE = [
   "  slice   <id> --run <id> [--state ready|running|done|blocked] [--transcript <path>]   # --transcript: the dispatched member's transcript, after dispatch (orchestrator)",
   "  slice   add <id> --run <id> --title <t> [--blockers a,b] [--link <url>] [--role <r>] [--on <events>]   # adds a slice or seat mid-run (orchestrator)",
   "  phase   <name> <text> [--as <member>]                           # opens phase <name>; the current phase ends with it: a separator on the thread that wakes every member of the run (orchestrator)",
+  "  pause   [<text>] [--as <member>]                               # every member stops where it is and waits; claim and merge-lock refused, no stall, quiet or stale alert until resume (orchestrator)",
+  "  resume  [<message>] [--as <member>]                             # lifts the pause; every member wakes on the message and continues (orchestrator)",
   "  done    <phase> [--as <member>]                                 # your part of the current phase is in: tells the orchestrator; when every member is done, the board tells it",
   "  close   --run <id>                                              # (orchestrator)",
   '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # --slice <id> the same; a file not there yet is one you create, declared from the repository root; prints the roster, then how you listen: a seat waits in the foreground, a slice runner listens in the background',
@@ -200,7 +202,9 @@ const rosterLine = (r: RosterEntry): string => {
 /** The run's current phase as the header of what a member reads: `phase <name>: <text>`; null before the first phase. */
 const phaseHeader = (board: Board, run: number): string | null => {
   const ph = board.currentPhase(run);
-  return ph ? `phase ${ph.name}: ${ph.text}` : null;
+  const paused = board.runs().find((r) => r.id === run)?.paused;
+  const head = ph ? `phase ${ph.name}: ${ph.text}` : null;
+  return paused == null ? head : [head, `PAUSED${paused ? `: ${paused}` : ""}`].filter(Boolean).join("  ");
 };
 /** `phase <name>: <text>  <n>/<m> done` beside a run's title, or nothing before its first phase. */
 const phaseSuffix = (phase: { name: string; text: string } | null, progress: PhaseProgress | null): string =>
@@ -270,14 +274,34 @@ const listenNow = (p: Pick<Participant, "name" | "slice" | "kind">, afterPhase =
 /** The step a member owing the run's open phase takes before any wait: a member that joined, or woke,
  *  after the phase event passed does its part now, never sleeps through it; null when it owes none. */
 const owedLine = (board: Board, p: Participant, thread = true): string | null => {
+  const paused = pausedLine(board, p);
+  if (paused) return paused;
   const ph = board.owedPhase(p);
   if (!ph) return null;
   // in a whole-thread run the part starts from the phase's whole discussion, never from the last post alone
   const read = thread && profileOf(p.kind).wholeThread ? `Read the whole phase first: ${[...self(), "thread", "--as", shellWord(p.name)].join(" ")}. ` : "";
   return `phase ${ph.name} is open and asks: ${ph.text}. ${read}Do your part now, then: ${[...self(), "done", shellWord(ph.name), "--as", shellWord(p.name)].join(" ")}`;
 };
-/** A member's next step where it would be told to listen: the owed phase first, when it owes one. */
+/** A member's one step while its run is paused: stop and wait in the foreground for the resume; null when the
+ *  run is not paused, for the orchestrator and for an ended member. */
+const pausedLine = (board: Board, p: Participant): string | null => {
+  if (p.slice === "orchestrator" || p.ended) return null;
+  const run = board.runs().find((r) => r.id === p.run);
+  if (!run || run.paused == null) return null;
+  return `run ${p.run} is paused${run.paused ? `: ${run.paused}` : ""}. Stop where you are: start nothing new, claim and merge nothing; wait in the foreground for the resume: ${waitCommand(p.name)}`;
+};
+/** True, having printed the paused line with exit 4, when `p`'s run is paused: the verb does nothing. */
+const refusedPaused = (board: Board, p: Participant, verb: string): boolean => {
+  const line = pausedLine(board, p);
+  if (!line) return false;
+  process.exitCode = 4;
+  emit({ run: p.run, paused: true, refused: verb, next: line }, `${verb} refused: ${line}`);
+  return true;
+};
+/** A member's next step where it would be told to listen: the pause first, then the owed phase. */
 const nextStep = (board: Board, p: Participant): string => {
+  const paused = pausedLine(board, p);
+  if (paused) return paused;
   const owed = owedLine(board, p);
   return owed ? `${owed}
 ${listenNow(p, true)}` : listenNow(p);
@@ -554,6 +578,22 @@ ${USAGE}`);
       });
       break;
     }
+    case "pause":
+    case "resume": {
+      const p = caller(board);
+      const text = args.positional.join(" ");
+      const m = args.verb === "pause" ? board.pause(p, text) : board.resume(p, text);
+      const cli = self().join(" ");
+      const next =
+        args.verb === "pause"
+          ? `every member of run ${m.run} is told to stop and wait; no stall, quiet or stale alert until the resume. Resume, with a message if they need one: ${cli} resume "<message>" --as ${shellWord(p.name)}`
+          : `run ${m.run} resumed; listen again in the background: ${cli} wait --mentions --as ${shellWord(p.name)}`;
+      emit({ seq: m.seq, run: m.run, paused: args.verb === "pause", next }, () => {
+        console.log(seqLine(m));
+        console.log(next);
+      });
+      break;
+    }
     case "done": {
       const p = caller(board);
       if (answeredClosed(board, p)) break;
@@ -753,7 +793,10 @@ ${USAGE}`);
       if (asJson) again.push("--json");
       // a member owing the open phase does it before it waits again
       const owes = owedLine(board, p);
-      const rearm = listensInForeground(p)
+      const pausedNow = pausedLine(board, p);
+      const rearm = pausedNow
+        ? pausedNow
+        : listensInForeground(p)
         ? owes
           ? `${owes}
 only then wait again, in the foreground: ${again.join(" ")}`
@@ -761,7 +804,7 @@ only then wait again, in the foreground: ${again.join(" ")}`
         : p.slice === "orchestrator"
           ? `act on it, then start this listener again, in the background: ${again.join(" ")}`
           : `answer on the thread if needed, then start this listener again, in the background while you work, in the foreground when you are waiting: ${again.join(" ")}`;
-      const next = owes && !listensInForeground(p) ? `${owes}
+      const next = owes && !pausedNow && !listensInForeground(p) ? `${owes}
 ${rearm}` : rearm;
       // the run's phase first, so a member always knows which phase it answers in
       const phase = phaseHeader(board, p.run);
@@ -793,6 +836,7 @@ ${rearm}` : rearm;
     }
     case "claim": {
       const p = caller(board);
+      if (refusedPaused(board, p, "claim")) break;
       const file = args.positional[0] ?? fail("claim: which path?");
       const abs = resolveClaimPath(file);
       const rel = repoRelative(abs);
@@ -819,6 +863,7 @@ ${rearm}` : rearm;
     }
     case "merge-lock": {
       const p = caller(board);
+      if (refusedPaused(board, p, "merge-lock")) break;
       // the branch merged into: a worktree does not say which branch it left, so the runner names it (D59)
       const onto = need("--onto");
       // what the branch wrote without a claim, committed or not, before the lock; a flag informs, never blocks

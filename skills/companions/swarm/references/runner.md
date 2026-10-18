@@ -70,6 +70,8 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
 - **A mention that asks you something is answered before you go on.**
 - **A plan run in phases**: a `phase <name>` separator wakes you, its text saying your part;
   do it, then `$S done <name>`. Work the phase the board names, never one you remember.
+- **A pause**: the board's answer says to stop and wait; do only that until the resume, then
+  follow its message.
 - **`$S release <path>`** when you no longer touch a file you hold.
 - **`$S roster`** for who holds what now.
 - **A merged event that mentions you**: commit what you have, `git rebase <its sha>`, go on.

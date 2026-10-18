@@ -124,7 +124,7 @@ One command per shell call. Never end your turn while the run is open; when the 
 - **A move the phase does not allow** is answered on the thread with the phase's rule.
 - **Order of authority** in every ruling: truth (the evidence), then the person's preferences
   and feedback, then what the protocol ranks next, then a seat's taste.
-- **The person may interrupt in chat**: relay to a seat, stop the run, or change a criterion.
+- **The person may interrupt in chat**: relay to a seat, pause the run (the `swarm` skill's `pause`, then `resume` with what changed), stop it, or change a criterion.
 
 ## Close and after
 

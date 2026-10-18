@@ -4,7 +4,7 @@
 import type { Message, Participant } from "./board.ts";
 import { profileOf } from "./kinds.ts";
 
-export type EventName = "agreement" | "endorsement" | "merged" | "joined" | "ended" | "stale" | "opened" | "closed" | "urgent" | "flag" | "quiet" | "back" | "phase" | "done" | "all-done" | "stalled" | "liveness";
+export type EventName = "agreement" | "endorsement" | "merged" | "joined" | "ended" | "stale" | "opened" | "closed" | "urgent" | "flag" | "quiet" | "back" | "phase" | "pause" | "resume" | "done" | "all-done" | "stalled" | "liveness";
 /** `run`: the member's own run; `any`: every run of the project. */
 export type Scope = "run" | "any";
 export type Subscription = { event: EventName; scope: Scope };
@@ -51,6 +51,19 @@ export const EVENTS: Record<EventName, EventDef> = {
       if (!name || me.slice === "orchestrator" || m.from === me.name) return null;
       return `when your part of ${name} is posted: ${cli} done ${word(name)} --as ${word(me.name)}`;
     },
+  },
+  // the orchestrator pauses its run (`pause [text]`): mentions `<group>/*`, every member stops and waits for the resume
+  pause: {
+    name: "pause",
+    next: (m, me, cli) =>
+      me.slice === "orchestrator" || m.from === me.name
+        ? null
+        : `stop where you are: start nothing new, claim and merge nothing; wait in the foreground for the resume: ${cli} wait --mentions --as ${word(me.name)}`,
+  },
+  // the orchestrator lifts the pause (`resume [text]`), its message in the body: every member continues
+  resume: {
+    name: "resume",
+    next: (m, me) => (me.slice === "orchestrator" || m.from === me.name ? null : "the run resumed: continue where you stopped, as the resume's message says"),
   },
   // a member finished the current phase (`done <name>`); mentions the orchestrator
   done: { name: "done" },

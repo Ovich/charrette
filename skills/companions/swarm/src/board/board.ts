@@ -54,6 +54,8 @@ export interface Run {
   slices: Slice[];
   /** The current phase; null until the orchestrator opens one. */
   phase: Phase | null;
+  /** Set by `pause`, the orchestrator's reason ("" when it gave none); null when the run is not paused. */
+  paused: string | null;
 }
 
 export interface Participant {
@@ -215,6 +217,15 @@ export interface Board {
   phase(p: Participant, name: string, text: string): Message;
   /** The run's current phase, as `phase` last set it; null until one is opened. Throws on an unknown run. */
   currentPhase(run: RunId): Phase | null;
+  /** The orchestrator pauses its run: every member is told to stop and wait, a `pause` event mentioning
+   *  `<group>/*`; claim and merge-lock are refused until `resume`. Refused to anyone else, on a closed run and
+   *  on a run already paused. */
+  pause(p: Participant, text?: string): Message;
+  /** The orchestrator lifts the pause: a `resume` event mentioning `<group>/*`, its body the message when given.
+   *  Refused to anyone else, on a closed run and on a run not paused. */
+  resume(p: Participant, text?: string): Message;
+  /** The run's pause reason ("" when none was given), null when it is not paused. Throws on an unknown run. */
+  pausedOf(run: RunId): string | null;
   /** A member finished the current phase `name`: stored once per run, member and phase, a `done` event to the
    *  orchestrator; when every member is done, one `all-done` event to it. Refused to the orchestrator, before any
    *  phase and on a phase that is not the current one. `already`: it had run done for it before (no event). */
@@ -591,6 +602,10 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
   // the run's current phase, set by `phase`: its name and its text; null until one is opened
   upkeep("runs", "phase", "phase TEXT");
   upkeep("runs", "phase_text", "phase_text TEXT");
+  // set by pause, the orchestrator's reason; null when the run is not paused
+  upkeep("runs", "paused", "paused TEXT");
+  // when resume last lifted a pause: the stall check counts silence from it, never through the pause
+  upkeep("runs", "resumed_at", "resumed_at TEXT");
   // the run's stall threshold, and the stalled events posted since a counter last moved
   upkeep("runs", "stall_ms", `stall_ms INTEGER NOT NULL DEFAULT ${STALL_MS_DEFAULT}`);
   upkeep("runs", "stall_posts", "stall_posts INTEGER NOT NULL DEFAULT 0");
@@ -666,6 +681,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
 
   const toRun = (r: Row): Run => ({
     phase: phaseOf(r),
+    paused: r.paused == null ? null : String(r.paused),
     id: Number(r.id),
     repo: String(r.repo),
     kind: profileOf(String(r.kind ?? "plan")).kind,
@@ -1181,7 +1197,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
       return transaction(() => {
         // an orchestrator silent STALE_MS: one quiet event in its run, until it calls again (D15)
         const quiet = db
-          .prepare("SELECT p.id, p.last_call, p.joined_at FROM participants p JOIN runs r ON r.id = p.run WHERE r.state = 'open' AND p.slice = ? AND p.ended_at IS NULL AND p.quiet_flagged = 0")
+          .prepare("SELECT p.id, p.last_call, p.joined_at FROM participants p JOIN runs r ON r.id = p.run WHERE r.state = 'open' AND r.paused IS NULL AND p.slice = ? AND p.ended_at IS NULL AND p.quiet_flagged = 0")
           .all(ORCHESTRATOR) as Row[];
         for (const o of quiet) {
           const silentSince = Date.parse(String(o.last_call ?? o.joined_at));
@@ -1191,7 +1207,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
           db.prepare("UPDATE participants SET quiet_flagged = 1 WHERE id = ?").run(Number(o.id));
         }
         const flagged: RunId[] = [];
-        for (const r of db.prepare("SELECT id, plan FROM runs WHERE state = 'open' AND stale_flagged = 0 ORDER BY id").all() as Row[]) {
+        for (const r of db.prepare("SELECT id, plan FROM runs WHERE state = 'open' AND paused IS NULL AND stale_flagged = 0 ORDER BY id").all() as Row[]) {
           const id = Number(r.id);
           const members = db.prepare("SELECT id, slice, last_call, joined_at FROM participants WHERE run = ? AND ended_at IS NULL").all(id) as Row[];
           if (!members.length || members.some((m) => Date.parse(String(m.last_call ?? m.joined_at)) >= silentBefore)) continue;
@@ -1331,6 +1347,37 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
       return phaseOf(runRow(run));
     },
 
+    pause(p, text = "") {
+      const fresh = live(p);
+      if (fresh.slice !== ORCHESTRATOR) throw new Error(`pause: only the orchestrator pauses its run; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR}`);
+      const r = runRow(fresh.run);
+      if (r.state !== "open") throw new Error(`run ${fresh.run} is closed`);
+      if (r.paused != null) throw new Error(`run ${fresh.run} is already paused`);
+      const said = text.trim();
+      return transaction(() => {
+        db.prepare("UPDATE runs SET paused = ? WHERE id = ?").run(said, fresh.run);
+        return insertMessage(fresh, `pause: stop where you are and wait for the resume${said ? `: ${said}` : ""}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.pause.name });
+      });
+    },
+
+    resume(p, text = "") {
+      const fresh = live(p);
+      if (fresh.slice !== ORCHESTRATOR) throw new Error(`resume: only the orchestrator resumes its run; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR}`);
+      const r = runRow(fresh.run);
+      if (r.state !== "open") throw new Error(`run ${fresh.run} is closed`);
+      if (r.paused == null) throw new Error(`run ${fresh.run} is not paused`);
+      const said = text.trim();
+      return transaction(() => {
+        db.prepare("UPDATE runs SET paused = NULL, resumed_at = ?, stall_posts = 0 WHERE id = ?").run(now(), fresh.run);
+        return insertMessage(fresh, `resume: continue${said ? `: ${said}` : ""}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.resume.name });
+      });
+    },
+
+    pausedOf(run) {
+      const r = runRow(run);
+      return r.paused == null ? null : String(r.paused);
+    },
+
     done(p, name) {
       const fresh = live(p);
       if (fresh.slice === ORCHESTRATOR) throw new Error("done: the orchestrator opens phases; a member runs done");
@@ -1394,8 +1441,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
         if (!readable.length) return;
         // before any member but the orchestrator has joined, the run is still being dispatched: no stall yet
         if (!members.some((m) => m !== ORCHESTRATOR)) return;
+        // a paused run is idle by order: no stall while paused
+        if (r.paused != null) return;
         const last = readable.reduce((a, b) => (String(b.moved_at) > String(a.moved_at) ? b : a));
-        const silence = at.getTime() - Date.parse(String(last.moved_at));
+        const since = Math.max(Date.parse(String(last.moved_at)), r.resumed_at == null ? 0 : Date.parse(String(r.resumed_at)));
+        const silence = at.getTime() - since;
         const threshold = Number(r.stall_ms ?? STALL_MS_DEFAULT);
         const posted = Number(r.stall_posts ?? 0);
         if (silence < threshold) {
@@ -1786,6 +1836,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
   board.end = counted("end", board.end);
   board.post = counted("post", board.post);
   board.phase = counted("phase", board.phase);
+  board.pause = counted("pause", board.pause);
+  board.resume = counted("resume", board.resume);
   board.done = counted("done", board.done);
   board.endorse = counted("endorse", board.endorse);
   board.deliver = counted("deliver", board.deliver);
