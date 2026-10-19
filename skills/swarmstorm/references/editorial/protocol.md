@@ -16,7 +16,7 @@ Out: the final text, its rounds kept in the record.
 
 | Template | When | File |
 |---|---|---|
-| cover-letter | a cover letter for a job posting, from the candidate's evidence and earlier letters | `templates/cover-letter.md` |
+| — | none in the plugin: a project keeps its own as a `swarmstorm-<name>` skill | — |
 
 ## Strategy fields
 

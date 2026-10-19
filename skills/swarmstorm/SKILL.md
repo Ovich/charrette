@@ -1,6 +1,6 @@
 ---
 name: swarmstorm
-description: "Use when a person wants a swarm of role seats to work a topic on the swarm board under a chosen protocol: a brainstorm (ideas before any judgment), a debate (questions argued to decisions, a skeptic endorsing) or an editorial (one text drafted, read by seats standing for its readers, revised; a cover letter among its templates), or a custom protocol recommended for the person's intent, or a seat's brief names a swarmstorm protocol. Produces the run's record in aiview, written by the orchestrator alone. Not for one person thinking aloud with the agent (brainstorm, interview) and not for a plan's slices (execute-plan)."
+description: "Use when a person wants a swarm of role seats to work a topic on the swarm board under a chosen protocol: a brainstorm (ideas before any judgment), a debate (questions argued to decisions, a skeptic endorsing) or an editorial (one text drafted, read by seats standing for its readers, revised), a protocol or template the project keeps as a `swarmstorm-<name>` skill, or a custom protocol recommended for the person's intent, or a seat's brief names a swarmstorm protocol. Produces the run's record in aiview, written by the orchestrator alone. Not for one person thinking aloud with the agent (brainstorm, interview) and not for a plan's slices (execute-plan)."
 ---
 
 # Swarmstorm
@@ -22,6 +22,9 @@ dispatch, charter and roles are the `orchestrate` skill's.
   moves and who acts, what comes out) built on the closest one.
 - **Protocols, templates and seats are defaults**: the person adjusts the phases, the seats and
   each role in the strategy.
+- **The project's own come first**: its `swarmstorm-<name>` skills in its local skills folder
+  (`.claude/skills/` when it has no other), each a protocol or a template over one below. Read
+  the one that fits before the strategy.
 - **Read the protocol's `protocol.md` before the strategy**:
 
 | Protocol | When | File |
@@ -32,8 +35,13 @@ dispatch, charter and roles are the `orchestrate` skill's.
 
 - **A template is one use of a protocol, kept to run again**: its inputs filled for a kind of
   work, never its phases. The protocol lists its templates.
-- **A change for one run lives in the dossier**; one the person wants for every run of its kind
-  becomes a template or a protocol on their yes: read `references/new-protocol.md` first.
+- **A change for one run lives in the dossier.** A custom protocol, or a protocol filled for a
+  kind of work that recurs, can be kept as the project's `swarmstorm-<name>` skill. **When the
+  strategy is settled, explain it in a few lines**: the setup (phases, seats, interview, output)
+  saved in this project's skills, so the next run of this kind starts from it instead of being
+  set up again; it lives in the project, never in the plugin; it is made with them through a
+  short interview, shown whole and written only on their yes. Then they choose `keep`: no,
+  after this run (offered once the result is judged) or now; never written without their yes.
 
 ## Before the run
 
@@ -63,6 +71,7 @@ template fills them.
 | evidence | below, for all or per seat | `codebase, documents` |
 | criteria | what a good result is, what is ruled out | from the ask |
 | budget | wall time across the phases; a phase's share spent ends it | 30 minutes |
+| keep | keep this setup as the project's `swarmstorm-<name>` skill: `no`, `after` (offered at close, once the result is judged) or `now` (written before the run) | `after` for a custom protocol or a recurring kind of work, else `no` |
 
 **Evidence**, what a seat may read; a claim names its source (`file:line`, `#<doc id>`, URL and
 date, or a recipe):
@@ -88,7 +97,7 @@ date, or a recipe):
 - **The brief**:
 
 ```markdown
-Take seat `<seat id>` in run `<run id>`, protocol `<protocol>` of the `swarmstorm` skill, with the `swarm` skill, seat side. `$S` = `<the swarm tool's command>`.
+Take seat `<seat id>` in run `<run id>`, protocol `<protocol>` of the `swarmstorm` skill<, its file `<the project protocol's SKILL.md, absolute path>`>, with the `swarm` skill, seat side. `$S` = `<the swarm tool's command>`.
 
 **Join**: `<the exact join command, --as included>`. **You**: `--as <group>/<seat id>` on every call.
 
@@ -110,9 +119,12 @@ One command per shell call. Never end your turn while the run is open; when the 
 - **You open every phase** with `phase`, its message saying each seat's part, so a seat knows it
   from the message alone.
 - **Open the next phase the moment `all-done` arrives**, or when its budget share is spent, a
-  seat missing then skipped. Fix tooling only between phases.
-- **Listen until the close**: `wait --mentions` as `phase` prints, or `wait` alone when the
-  protocol has you steer every post.
+  seat missing then skipped: the phase first, then the record while the seats work. Notes for
+  the next phase go in its message, never in a post the seats wait on. Fix tooling only between
+  phases.
+- **Listen until the close**, always in the background: `wait --mentions` as `phase` prints, or
+  `wait` alone when the protocol has you steer every post; re-armed after every wake, never a
+  foreground loop.
 - **A seat silent past its share, or `done` before its part**, is mentioned with what it owes.
 - **Write each phase into the record as it closes**, in full: each post in thread order under
   `### <Seat>`, minus what only served the thread (mentions, `#seq`, `done` and hand-off lines),
@@ -132,5 +144,8 @@ One command per shell call. Never end your turn while the run is open; when the 
   then decides on it through the `interview` skill, their answers written in the record.
 - **What they say of the result goes into the dossier's feedback**, in their reason's words,
   dated.
+- **`keep` is `after`, or the run showed a setup worth reusing**: offer the project skill once;
+  `no` ends it. On a yes, or on `now` before the run, or whenever the person asks for one,
+  create it with them: read `references/new-protocol.md` first.
 - **Nothing they keep is replaced without their yes**: a delivered file, a record, a recording;
   what it replaces is kept aside.
