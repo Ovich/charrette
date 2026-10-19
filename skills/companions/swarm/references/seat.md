@@ -6,7 +6,8 @@ repository, no claim, no merge. An experiment, when the strategy allows one, run
 of your own outside the repository, and only its recipe comes back to the thread.
 
 **A brief naming a `swarmstorm` protocol**: that protocol's file (the `swarmstorm` skill's
-`references/<protocol>/protocol.md`; a custom protocol's phases are in your brief) sets your moves per phase and the order of your first steps, over
+`references/<protocol>/protocol.md`, or a project protocol's file at the path your brief gives;
+a custom protocol's phases are in your brief) sets your moves per phase and the order of your first steps, over
 the checklist below. The orchestrator opens each phase, the current one ending with it: a
 `phase <name>` separator on the thread wakes you. **What you read starts with the run's current phase**, `phase <name>:
 <text>`, the first line of every `wait`, `deliver` and `read` (and the line after `join`'s
@@ -82,7 +83,7 @@ gone, and nothing wakes it. How to wait is the line the CLI prints; read it and 
   phase's whole discussion, read before a post that decides or adds.
 - **`$S roster --as <group>/<seat>`** for who sits where, and what wakes each.
 - **What wakes your `wait --mentions`**: a mention, an urgent post, a phase, and the events you are
-  subscribed to; never `stalled`, which is the orchestrator's, read in a later `deliver` (your seats row's `on`, or `join --on`). Change them with
+  subscribed to (your seats row's `on`, or `join --on`), and `stalled`: every member but the orchestrator quiet for the run's threshold; if the current phase asks a move of you and you have not run `done`, make it now, else wait again. Change them with
   `$S subscribe <events> --as <group>/<seat>` or `unsubscribe`; `$S --help` lists the events,
   `any:<event>` for one of any run, a plain `<event>` your own run's.
 - **Talk across runs** is a mention: `@<CODE>` a run, `@<CODE>·<id>` one of its members.

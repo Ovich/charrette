@@ -24,7 +24,7 @@ const WAIT_UPKEEP_TICK_MS = 1000;
 const USAGE = [
   "usage: swarm <verb> [--json]        (swarm --help code: the claim and merge verbs)",
   "  open    --kind plan|brainstorm --group <slug> --title <t> --seats <file.json> [--link <url>] [--transcript <path>] [--stall-ms <ms>]   # opens a run, registers the project's board in aiview, starts its stall poller, prints the run id then the board's URL (orchestrator)",
-  "          # --transcript: your own transcript, its token counter read for the stall check; --stall-ms: no counter moved this long posts stalled, default 5000",
+  "          # --transcript: your own transcript, its token counter read for the stall check; --stall-ms: no counter moved this long posts stalled, default 60000",
   "          # --plan <slug> --slices <file.json>: the same as --kind plan --group <slug> --seats <file.json>",
   '          # the seats file: [{"id", "title", "role"?, "blockers": [...], "link"?: "<URL>", "on"?: ["agreement", …], "transcript"?: "<path>"}]',
   "  slice   <id> --run <id> [--state ready|running|done|blocked] [--transcript <path>]   # --transcript: the dispatched member's transcript, after dispatch (orchestrator)",

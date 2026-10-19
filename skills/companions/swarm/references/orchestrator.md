@@ -37,7 +37,8 @@ except `open`, `slice`, `close` and `status`.
 3. **Liveness is read from token counters**: `open` starts the run's stall poller, which reads
    every registered transcript each second; `close` stops it. `--transcript` is your own
    session's transcript file; a seats row may carry its member's as `transcript`.
-   `--stall-ms <ms>` sets the run's threshold, default 5000. A member with no readable
+   `--stall-ms <ms>` sets the run's threshold, default 60000: a member composing a long post
+   moves no counter for a minute or more. A member with no readable
    transcript is named on the thread by a `liveness` event: the stall check is blind for it.
    `open` and `slice --transcript` print a `liveness` line at once, naming the path, when the
    file is missing, empty or unparseable: register the right one again.
@@ -74,13 +75,18 @@ says whether the board reads it.
 - **Listen in the background from the open**: `$S wait --mentions --as <group>/orchestrator`,
   started with the harness's background-task feature; you are not a subagent, its end reaches
   you. The answers of `phase` and of your `wait` print this step: read them. Your subscriptions (a runner's `merged`
-  and `ended`, `stale`), every `done`, `stalled` and `liveness` event and every mention of
-  you wake it. When it ends, read its output, act, and start again the command its first line
-  names; empty, start it again. `close` makes it return.
-- **`stalled` means act now**: no token counter of the run moved for the threshold, and it is
-  posted again at each further threshold until one moves (`stalled 5s`, `10s`, `15s`…). It
-  wakes you alone: the seats read it only in a later `deliver`, so their reading it does not
-  reset the silence. The line it ends on is your step.
+  and `ended`, `stale`), every `done`, `idle`, `stalled` and `liveness` event and every mention
+  of you wake it. When it ends, read its output, act, and start it again at once, in the
+  background. **Block only on the board's verbs**: never a foreground loop, a poll or a sleep of
+  your own, which the board cannot end and which leaves you deaf. Empty, start it again. `close`
+  makes it return.
+- **`stalled` is the board unblocking the swarm**: every member but you quiet for the run's
+  threshold (default 60 s; your own waiting never counts) posts `stalled`, again at each further
+  threshold until a member moves. It releases every waiting verb of the run, yours and every
+  member's: whoever owes a move makes it, the others wait again. Every board action is a verb, so
+  nothing stays blocked past the threshold. On `stalled`, drop whatever you were waiting on and
+  act: open the phase, or mention the member who owes a move. The line it ends on is your step.
+- **`idle` every 15 s while every member sits in a board `wait`** (15, 30, 45 s) wakes you alone: the swarm waits on you. Never while a member works. Open the phase if all are done, else wait again.
 - **A `merged` event is a slice to check**: re-run its check on the branch it merged into then,
   not when the runner's report arrives; the report adds what it found.
 - **`$S deliver --as <plan>/orchestrator`** between other work: what was said since, mentions of

@@ -93,8 +93,8 @@ test("a paused run raises no stalled, quiet or stale alert; after resume the sil
   board.flagStale(new Date(Date.now() + 60 * 60_000));
   assert.equal(alerts().length, 0);
   board.resume(orchestrator);
-  board.livenessTick(run.id, new Date(Date.now() + 3000));
+  board.livenessTick(run.id, new Date(Date.now() + 30_000));
   assert.equal(alerts().length, 0, "silence counts from the resume");
-  board.livenessTick(run.id, new Date(Date.now() + 6000));
+  board.livenessTick(run.id, new Date(Date.now() + 61_000));
   assert.deepEqual(alerts().map((e) => e.event), ["stalled"]);
 });

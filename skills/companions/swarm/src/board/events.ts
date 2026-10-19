@@ -4,7 +4,7 @@
 import type { Message, Participant } from "./board.ts";
 import { profileOf } from "./kinds.ts";
 
-export type EventName = "agreement" | "endorsement" | "merged" | "joined" | "ended" | "stale" | "opened" | "closed" | "urgent" | "flag" | "quiet" | "back" | "phase" | "pause" | "resume" | "done" | "all-done" | "stalled" | "liveness";
+export type EventName = "agreement" | "endorsement" | "merged" | "joined" | "ended" | "stale" | "opened" | "closed" | "urgent" | "flag" | "quiet" | "back" | "phase" | "pause" | "resume" | "done" | "all-done" | "idle" | "stalled" | "liveness";
 /** `run`: the member's own run; `any`: every run of the project. */
 export type Scope = "run" | "any";
 export type Subscription = { event: EventName; scope: Scope };
@@ -73,16 +73,24 @@ export const EVENTS: Record<EventName, EventDef> = {
     next: (m, me, cli) =>
       me.slice === "orchestrator" ? `open the next phase: ${cli} phase <name> "<text>" --as ${word(me.name)}; after the last, ${cli} close --run ${m.run}` : null,
   },
-  // no readable token counter of the run moved for the run's stall threshold, posted again at each
-  // further threshold of silence; mentions the orchestrator alone: a seat woken by it would move its
-  // counter and feed the next one; the members read it in a later deliver
+  // every member but the orchestrator inside a board wait: at each whole IDLE_MS while it holds, below the
+  // stall threshold; wakes the orchestrator alone
+  idle: {
+    name: "idle",
+    toAuthor: true,
+    next: (_m, me, cli) =>
+      me.slice === "orchestrator" ? `the swarm is quiet: open the next phase if all are done (${cli} phase <name> "<text>" --as ${word(me.name)}), else wait again; stalled releases every wait at the threshold` : null,
+  },
+  // no readable token counter of a member other than the orchestrator moved for the run's stall threshold, posted again at each
+  // further threshold of silence; releases every waiting member of the run: whoever owes a move makes
+  // it, the others wait again
   stalled: {
     name: "stalled",
     toAuthor: true,
     next: (_m, me, cli) =>
       me.slice === "orchestrator"
         ? `read the thread, then open the next phase (${cli} phase <name> "<text>" --as ${word(me.name)}) or address the member who owes a move (${cli} post "@<member> <what you need>" --as ${word(me.name)})`
-        : null,
+        : `the run is quiet: if the current phase asks a move of you and you have not run done, make it now; else wait again (${cli} wait --mentions --as ${word(me.name)})`,
   },
   // a member's transcript cannot be read: the stall check is blind for it; mentions the orchestrator
   liveness: { name: "liveness", toAuthor: true },

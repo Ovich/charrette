@@ -83,10 +83,13 @@ export const readTranscript: TranscriptReader = (file, from) => {
 };
 
 /** The stall rule: silent `silenceMs` (no readable counter moved), `posted` stalled events since the
- *  last move; a new one is due at every whole `thresholdMs` of silence (5 s, 10 s, 15 s…). */
+ *  last move; a new one is due at every whole `thresholdMs` of silence (60 s, 120 s, 180 s…). */
 export const stallDue = (silenceMs: number, posted: number, thresholdMs: number): boolean => silenceMs >= (posted + 1) * thresholdMs;
 
+/** Every member but the orchestrator inside a board wait: an `idle` to the orchestrator at each whole
+ *  IDLE_MS while it holds, below the stall threshold (15, 30, 45 s). */
+export const IDLE_MS = 15000;
 /** The default stall threshold of a run, in ms. */
-export const STALL_MS_DEFAULT = 5000;
+export const STALL_MS_DEFAULT = 60000;
 /** Readings older than this are pruned. */
 export const READINGS_KEPT_MS = 10 * 60 * 1000;

@@ -72,6 +72,7 @@ const setup = () => {
     kind: "brainstorm",
     group: "idea",
     title: "I",
+    stallMs: 5000,
     transcript: path.join(dir, "o.jsonl"),
     seats: [
       { id: "a", title: "A", blockers: [], transcript: path.join(dir, "a.jsonl") },
@@ -87,7 +88,7 @@ const stalls = () => board.snapshot(REPO).events.filter((e) => e.event === "stal
 const warnings = () => board.snapshot(REPO).events.filter((e) => e.event === "liveness");
 const at = (base: number, s: number): Date => new Date(base + s * 1000);
 
-test("the stall rule: moves → nothing; flat 5 s → stalled; flat 10 s → a second; a move re-arms it; the orchestrator alone is mentioned", () => {
+test("the stall rule: moves → nothing; flat 5 s → stalled; flat 10 s → a second; a move re-arms it; every member is mentioned, the orchestrator first", () => {
   const { run, a, b, orchestrator } = setup();
   const base = Date.now() + 60_000;
   counters.set("o.jsonl", 2).set("a.jsonl", 2);
@@ -102,36 +103,35 @@ test("the stall rule: moves → nothing; flat 5 s → stalled; flat 10 s → a s
   assert.equal(stalls().length, 1);
   const first = stalls()[0];
   assert.equal(first.body, "stalled 5s: no token counter moved; last active idea/a 5s ago; no phase open");
-  assert.deepEqual(first.mentions, ["idea/orchestrator"]);
+  assert.deepEqual(first.mentions, ["idea/orchestrator", "idea/a", "idea/b"]);
   board.livenessTick(run.id, at(base, 7));
   board.livenessTick(run.id, at(base, 10));
   assert.equal(stalls().length, 1);
   board.livenessTick(run.id, at(base, 11));
   assert.equal(stalls().length, 2);
   assert.match(stalls()[1].body, /^stalled 10s:/);
-  // a move re-arms: the next silence counts from it
+  // the orchestrator's moves are not the swarm's: no re-arm
   counters.set("o.jsonl", 9);
+  board.livenessTick(run.id, at(base, 11.5));
+  assert.equal(stalls().length, 2);
+  // a member's move re-arms: the next silence counts from it
+  counters.set("a.jsonl", 9);
   board.livenessTick(run.id, at(base, 12));
   board.livenessTick(run.id, at(base, 16));
   assert.equal(stalls().length, 2);
   board.phase(orchestrator, "diverge", "every idea");
   board.livenessTick(run.id, at(base, 17));
   assert.equal(stalls().length, 3);
-  assert.equal(stalls()[2].body, "stalled 5s: no token counter moved; last active idea/orchestrator 5s ago; phase diverge 0/2 done");
-  // the orchestrator has it in full, told its next step; a seat sees it only as a line of a later deliver
-  assert.ok(board.deliver(orchestrator).full.some((m) => m.event === "stalled"));
-  for (const p of [a, b]) {
-    const d = board.deliver(p);
-    assert.ok(!d.full.some((m) => m.event === "stalled"), p.name);
-    assert.ok(d.lines.some((l) => /stalled/.test(l)), p.name);
-  }
+  assert.equal(stalls()[2].body, "stalled 5s: no token counter moved; last active idea/a 5s ago; phase diverge 0/2 done");
+  // every member has it in full, each told its next step
+  for (const p of [orchestrator, a, b]) assert.ok(board.deliver(p).full.some((m) => m.event === "stalled"), p.name);
   const m = board.read(stalls()[2].seq);
   assert.match(EVENTS.stalled.next!(m, orchestrator, "swarm")!, /^read the thread, then open the next phase .* or address the member who owes a move/);
-  assert.equal(EVENTS.stalled.next!(m, a, "swarm"), null);
+  assert.match(EVENTS.stalled.next!(m, a, "swarm")!, /^the run is quiet: if the current phase asks a move of you/);
   assert.ok(!EVENTS.stalled.always);
 });
 
-test("stalled wakes the orchestrator's wait --mentions, never a seat's; its repeats count up while nothing moves", async () => {
+test("stalled releases every member's wait --mentions, seats included; its repeats count up while nothing moves", async () => {
   const { run, a, orchestrator } = setup();
   const base = Date.now() + 60_000;
   counters.set("o.jsonl", 2).set("a.jsonl", 2);
@@ -139,11 +139,11 @@ test("stalled wakes the orchestrator's wait --mentions, never a seat's; its repe
   // what was already for them (b's liveness warning, the joins) is had first
   board.deliver(a);
   board.deliver(orchestrator);
-  const seat = board.wait(a, { mentionsOnly: true, timeoutMs: 400 });
+  const seat = board.wait(a, { mentionsOnly: true, timeoutMs: 2000 });
   const orch = board.wait(orchestrator, { mentionsOnly: true, timeoutMs: 2000 });
   for (const s of [5, 10, 15, 20]) board.livenessTick(run.id, at(base, s));
   const [heardSeat, heardOrch] = await Promise.all([seat, orch]);
-  assert.deepEqual(heardSeat.full, [], "a seat is not woken by stalled");
+  assert.ok(heardSeat.full.some((m) => m.event === "stalled"), "a seat is released by stalled");
   assert.ok(heardOrch.full.some((m) => m.event === "stalled"));
   assert.deepEqual(
     stalls().map((e) => e.body.split(":")[0]),
@@ -173,9 +173,9 @@ test("liveness warnings: no transcript at join, and a counter that stops reading
   counters.set("a.jsonl", null);
   board.livenessTick(run.id, at(base, 3));
   assert.equal(warnings().length, 3);
-  // only readable counters count: the orchestrator's has been flat since 0
+  // only the members' readable counters count, never the orchestrator's: none left, the check is blind
   board.livenessTick(run.id, at(base, 5));
-  assert.match(stalls()[0]?.body ?? "", /^stalled 5s: .* last active idea\/orchestrator/);
+  assert.equal(stalls().length, 0);
 });
 
 test("an open with no transcript warns for the orchestrator; a closed run's tick stops the poller; the threshold is the run's", () => {
@@ -185,8 +185,10 @@ test("an open with no transcript warns for the orchestrator; a closed run's tick
   counters.set("x.jsonl", 1);
   board.registerTranscript(run.id, "orchestrator", path.join(dir, "x.jsonl"));
   board.join({ run: run.id, slice: "a", doing: "x", files: [] });
+  counters.set("y.jsonl", 1);
+  board.registerTranscript(run.id, "a", path.join(dir, "y.jsonl"));
   const base = Date.now() + 60_000;
-  counters.set("x.jsonl", 2);
+  counters.set("y.jsonl", 2);
   board.livenessTick(run.id, at(base, 0));
   board.livenessTick(run.id, at(base, 5));
   assert.equal(stalls().length, 0, "8 s, not 5");
@@ -213,4 +215,41 @@ test("no stall before any seat has joined: the run is still being dispatched", (
   board.livenessTick(run.id, at(base, 0));
   board.livenessTick(run.id, at(base, 30));
   assert.equal(board.snapshot(REPO).events.filter((e) => e.event === "stalled" && e.run === run.id).length, before);
+});
+
+test("idle every 15 s while every member sits in a board wait, to the orchestrator alone; never while one works; at 60 s silence stalled releases every wait", async () => {
+  counters.set("io.jsonl", 1).set("ia.jsonl", 1);
+  const run = board.openRun({
+    repo: REPO,
+    kind: "brainstorm",
+    group: "quiet",
+    title: "Q",
+    transcript: path.join(dir, "io.jsonl"),
+    seats: [{ id: "a", title: "A", blockers: [], transcript: path.join(dir, "ia.jsonl") }],
+  });
+  const a = board.join({ run: run.id, slice: "a", doing: "x", files: [] }).runner;
+  board.deliver(a);
+  const base = Date.now() + 60_000;
+  const runEvents = (name: string) => board.snapshot(REPO).events.filter((e) => e.event === name && (e.mentions ?? []).includes("quiet/orchestrator"));
+  counters.set("io.jsonl", 2).set("ia.jsonl", 2);
+  // a works (no wait): no idle however long, short of the stall
+  for (const s of [0, 15, 30, 45]) board.livenessTick(run.id, at(base, s));
+  assert.equal(runEvents("idle").length, 0, "a member at work is never idle");
+  // a waits: idle at 15, 30, 45 s of waiting
+  const waiting = board.wait(a, { mentionsOnly: true, timeoutMs: 3000 });
+  counters.set("ia.jsonl", 3);
+  for (const s of [46, 50, 60]) board.livenessTick(run.id, at(base, s));
+  assert.equal(runEvents("idle").length, 0);
+  board.livenessTick(run.id, at(base, 61));
+  assert.deepEqual(runEvents("idle").map((e) => e.body.split(":")[0]), ["idle 15s"]);
+  for (const s of [75, 76, 90]) board.livenessTick(run.id, at(base, s));
+  assert.deepEqual(runEvents("idle").map((e) => e.body.split(":")[0]), ["idle 15s", "idle 30s"]);
+  board.livenessTick(run.id, at(base, 91));
+  assert.deepEqual(runEvents("idle").map((e) => e.body.split(":")[0]), ["idle 15s", "idle 30s", "idle 45s"]);
+  // 60 s with no member's counter moving: stalled releases a's wait
+  board.livenessTick(run.id, at(base, 106));
+  assert.ok(runEvents("stalled").length >= 1);
+  const d = await waiting;
+  assert.ok(d.full.some((m) => m.event === "stalled"), "a's wait is released");
+  board.closeRun(run.id);
 });

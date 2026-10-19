@@ -12,7 +12,7 @@ import { statsOf, summarize, type Stats, type StatsScope } from "./stats.ts";
 import { type Kind, profileOf } from "./kinds.ts";
 import { type EventName, type Subscription, EVENTS, formatSubscriptions, mentions as mentionsMe, parseSubscriptions as parseOn, wakes } from "./events.ts";
 import { funnyName } from "./names.ts";
-import { READINGS_KEPT_MS, STALL_MS_DEFAULT, readTranscript, stallDue, type Reading, type TranscriptReader } from "./liveness.ts";
+import { IDLE_MS, READINGS_KEPT_MS, STALL_MS_DEFAULT, readTranscript, stallDue, type Reading, type TranscriptReader } from "./liveness.ts";
 
 export type RunId = number;
 export type { Kind } from "./kinds.ts";
@@ -202,7 +202,7 @@ export type BoardSnapshot = {
 
 export interface Board {
   /** `kind` defaults to plan; throws on an unknown kind. The group is stored as the plan (D44). */
-  /** `transcript`: the orchestrator's, registered at once; none posts a liveness warning. `stallMs`: the run's stall threshold, default 5000. */
+  /** `transcript`: the orchestrator's, registered at once; none posts a liveness warning. `stallMs`: the run's stall threshold, default 60000. */
   openRun(input: { repo: string; kind?: Kind; group: string; title: string; link?: string | null; seats: SeatSpec[]; transcript?: string | null; stallMs?: number }): Run;
   /** `done` also releases the slice runner's claims and lock: the orchestrator's way to free a stale runner. */
   setSliceState(run: RunId, slice: string, state: SliceState): void;
@@ -963,6 +963,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
   const sameSub = (a: Subscription, b: Subscription): boolean => a.event === b.event && a.scope === b.scope;
 
   // ── liveness: token counters ───────────────────────────────────────────────────────
+  /** Since when every member of a run (the orchestrator aside) has been inside a board wait, and the idles posted since. */
+  const idleSince = new Map<RunId, { since: number; posts: number }>();
   const orchestratorIn = (run: RunId): Participant =>
     participantById(Number((db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run, ORCHESTRATOR) as Row).id));
   /** The liveness warning, once per member and condition. */
@@ -1434,9 +1436,33 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
         const members = (db.prepare("SELECT slice FROM participants WHERE run = ? AND ended_at IS NULL").all(run) as Row[]).map((m) => String(m.slice));
         for (const m of members) if (transcriptOf(run, m)) readCounterOnce(run, m, at, read);
         db.prepare("DELETE FROM token_readings WHERE run = ? AND t < ?").run(run, new Date(at.getTime() - READINGS_KEPT_MS).toISOString());
-        const readable = (db.prepare("SELECT member, moved_at FROM transcripts WHERE run = ? AND readable = 1 AND moved_at IS NOT NULL").all(run) as Row[]).filter((t) =>
-          members.includes(String(t.member)),
+        // the orchestrator waiting is its job: only the other members' counters measure the swarm's silence
+        const readable = (db.prepare("SELECT member, moved_at FROM transcripts WHERE run = ? AND readable = 1 AND moved_at IS NOT NULL").all(run) as Row[]).filter(
+          (t) => members.includes(String(t.member)) && String(t.member) !== ORCHESTRATOR,
         );
+        // idle: every member but the orchestrator sits inside a board wait, so the swarm waits on the
+        // orchestrator. Told at every whole IDLE_MS while it holds (15, 30, 45 s), below the stall threshold
+        const others = members.filter((m) => m !== ORCHESTRATOR);
+        const allWaiting =
+          r.paused == null &&
+          others.length > 0 &&
+          others.every((m) => {
+            const w = db.prepare("SELECT waiting, listening FROM participants WHERE run = ? AND slice = ? AND ended_at IS NULL").get(run, m) as Row | undefined;
+            return !!w && (Number(w.waiting) === 1 || Number(w.listening) === 1);
+          });
+        if (!allWaiting) idleSince.delete(run);
+        else {
+          const state = idleSince.get(run) ?? { since: at.getTime(), posts: 0 };
+          idleSince.set(run, state);
+          const held = at.getTime() - state.since;
+          if (held < Number(r.stall_ms ?? STALL_MS_DEFAULT) && held >= (state.posts + 1) * IDLE_MS) {
+            state.posts = Math.floor(held / IDLE_MS);
+            const orch = orchestratorIn(run);
+            const progress = progressOf(run, r.phase == null ? null : String(r.phase));
+            const where = progress ? `phase ${progress.phase} ${progress.done}/${progress.of} done` : "no phase open";
+            insertMessage(orch, `idle ${Math.floor(held / 1000)}s: every member is waiting; ${where}`, null, "event", [orch.name], { event: EVENTS.idle.name });
+          }
+        }
         // no readable counter: the stall check is blind, as the liveness warnings said
         if (!readable.length) return;
         // before any member but the orchestrator has joined, the run is still being dispatched: no stall yet
@@ -1457,7 +1483,9 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
         const secs = Math.floor(silence / 1000);
         const progress = progressOf(run, r.phase == null ? null : String(r.phase));
         const where = progress ? `phase ${progress.phase} ${progress.done}/${progress.of} done` : "no phase open";
-        insertMessage(orch, `stalled ${secs}s: no token counter moved; last active ${orch.plan}/${last.member} ${secs}s ago; ${where}`, null, "event", [orch.name], {
+        // every waiting member is released: each checks whether it owes a move, the orchestrator first
+        const everyone = [orch.name, ...members.filter((m) => m !== ORCHESTRATOR).map((m) => `${orch.plan}/${m}`)];
+        insertMessage(orch, `stalled ${secs}s: no token counter moved; last active ${orch.plan}/${last.member} ${secs}s ago; ${where}`, null, "event", everyone, {
           event: EVENTS.stalled.name,
         });
         // the next one at the next whole threshold of silence

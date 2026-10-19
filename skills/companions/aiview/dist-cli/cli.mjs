@@ -9120,13 +9120,20 @@ var init_events = __esm({
         name: "all-done",
         next: (m, me, cli) => me.slice === "orchestrator" ? `open the next phase: ${cli} phase <name> "<text>" --as ${word(me.name)}; after the last, ${cli} close --run ${m.run}` : null
       },
-      // no readable token counter of the run moved for the run's stall threshold, posted again at each
-      // further threshold of silence; mentions the orchestrator alone: a seat woken by it would move its
-      // counter and feed the next one; the members read it in a later deliver
+      // every member but the orchestrator inside a board wait: at each whole IDLE_MS while it holds, below the
+      // stall threshold; wakes the orchestrator alone
+      idle: {
+        name: "idle",
+        toAuthor: true,
+        next: (_m, me, cli) => me.slice === "orchestrator" ? `the swarm is quiet: open the next phase if all are done (${cli} phase <name> "<text>" --as ${word(me.name)}), else wait again; stalled releases every wait at the threshold` : null
+      },
+      // no readable token counter of a member other than the orchestrator moved for the run's stall threshold, posted again at each
+      // further threshold of silence; releases every waiting member of the run: whoever owes a move makes
+      // it, the others wait again
       stalled: {
         name: "stalled",
         toAuthor: true,
-        next: (_m, me, cli) => me.slice === "orchestrator" ? `read the thread, then open the next phase (${cli} phase <name> "<text>" --as ${word(me.name)}) or address the member who owes a move (${cli} post "@<member> <what you need>" --as ${word(me.name)})` : null
+        next: (_m, me, cli) => me.slice === "orchestrator" ? `read the thread, then open the next phase (${cli} phase <name> "<text>" --as ${word(me.name)}) or address the member who owes a move (${cli} post "@<member> <what you need>" --as ${word(me.name)})` : `the run is quiet: if the current phase asks a move of you and you have not run done, make it now; else wait again (${cli} wait --mentions --as ${word(me.name)})`
       },
       // a member's transcript cannot be read: the stall check is blind for it; mentions the orchestrator
       liveness: { name: "liveness", toAuthor: true },
@@ -10129,7 +10136,7 @@ var init_names = __esm({
 
 // ../swarm/src/board/liveness.ts
 import fs7 from "node:fs";
-var claudeCodeJsonl, ADAPTERS, readTranscript, stallDue, STALL_MS_DEFAULT, READINGS_KEPT_MS;
+var claudeCodeJsonl, ADAPTERS, readTranscript, stallDue, IDLE_MS, STALL_MS_DEFAULT, READINGS_KEPT_MS;
 var init_liveness = __esm({
   "../swarm/src/board/liveness.ts"() {
     "use strict";
@@ -10191,7 +10198,8 @@ var init_liveness = __esm({
       return null;
     };
     stallDue = (silenceMs, posted, thresholdMs) => silenceMs >= (posted + 1) * thresholdMs;
-    STALL_MS_DEFAULT = 5e3;
+    IDLE_MS = 15e3;
+    STALL_MS_DEFAULT = 6e4;
     READINGS_KEPT_MS = 10 * 60 * 1e3;
   }
 });
@@ -10680,6 +10688,7 @@ async function openBoard(dbPath = SQLITE_PATH2, opts = {}) {
     return subs;
   };
   const sameSub = (a, b) => a.event === b.event && a.scope === b.scope;
+  const idleSince = /* @__PURE__ */ new Map();
   const orchestratorIn = (run2) => participantById(Number(db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, ORCHESTRATOR2).id));
   const warnBlind = (run2, member, cond) => {
     if (Number(db.prepare("INSERT OR IGNORE INTO liveness_warned (run, member, cond) VALUES (?, ?, ?)").run(run2, member, cond).changes) === 0) return;
@@ -11078,8 +11087,26 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
         for (const m of members) if (transcriptOf(run2, m)) readCounterOnce(run2, m, at, read2);
         db.prepare("DELETE FROM token_readings WHERE run = ? AND t < ?").run(run2, new Date(at.getTime() - READINGS_KEPT_MS).toISOString());
         const readable = db.prepare("SELECT member, moved_at FROM transcripts WHERE run = ? AND readable = 1 AND moved_at IS NOT NULL").all(run2).filter(
-          (t) => members.includes(String(t.member))
+          (t) => members.includes(String(t.member)) && String(t.member) !== ORCHESTRATOR2
         );
+        const others = members.filter((m) => m !== ORCHESTRATOR2);
+        const allWaiting = r.paused == null && others.length > 0 && others.every((m) => {
+          const w = db.prepare("SELECT waiting, listening FROM participants WHERE run = ? AND slice = ? AND ended_at IS NULL").get(run2, m);
+          return !!w && (Number(w.waiting) === 1 || Number(w.listening) === 1);
+        });
+        if (!allWaiting) idleSince.delete(run2);
+        else {
+          const state = idleSince.get(run2) ?? { since: at.getTime(), posts: 0 };
+          idleSince.set(run2, state);
+          const held = at.getTime() - state.since;
+          if (held < Number(r.stall_ms ?? STALL_MS_DEFAULT) && held >= (state.posts + 1) * IDLE_MS) {
+            state.posts = Math.floor(held / IDLE_MS);
+            const orch2 = orchestratorIn(run2);
+            const progress2 = progressOf(run2, r.phase == null ? null : String(r.phase));
+            const where2 = progress2 ? `phase ${progress2.phase} ${progress2.done}/${progress2.of} done` : "no phase open";
+            insertMessage(orch2, `idle ${Math.floor(held / 1e3)}s: every member is waiting; ${where2}`, null, "event", [orch2.name], { event: EVENTS.idle.name });
+          }
+        }
         if (!readable.length) return;
         if (!members.some((m) => m !== ORCHESTRATOR2)) return;
         if (r.paused != null) return;
@@ -11097,7 +11124,8 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
         const secs = Math.floor(silence / 1e3);
         const progress = progressOf(run2, r.phase == null ? null : String(r.phase));
         const where = progress ? `phase ${progress.phase} ${progress.done}/${progress.of} done` : "no phase open";
-        insertMessage(orch, `stalled ${secs}s: no token counter moved; last active ${orch.plan}/${last.member} ${secs}s ago; ${where}`, null, "event", [orch.name], {
+        const everyone = [orch.name, ...members.filter((m) => m !== ORCHESTRATOR2).map((m) => `${orch.plan}/${m}`)];
+        insertMessage(orch, `stalled ${secs}s: no token counter moved; last active ${orch.plan}/${last.member} ${secs}s ago; ${where}`, null, "event", everyone, {
           event: EVENTS.stalled.name
         });
         db.prepare("UPDATE runs SET stall_posts = ? WHERE id = ?").run(Math.floor(silence / threshold), run2);
