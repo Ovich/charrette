@@ -11055,6 +11055,11 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
         return { progress, all, already: false, message };
       });
     },
+    lastActivity(run2) {
+      const r = runRow(run2);
+      const row = db.prepare("SELECT MAX(COALESCE(p.last_call, p.joined_at)) AS calls, (SELECT MAX(m.at) FROM messages m JOIN participants q ON q.id = m.author WHERE q.run = ?) AS posts FROM participants p WHERE p.run = ?").get(run2, run2);
+      return [String(r.opened_at), row?.calls, row?.posts].filter((v) => typeof v === "string").sort().at(-1);
+    },
     phaseProgress(run2) {
       const r = runRow(run2);
       return progressOf(run2, r.phase == null ? null : String(r.phase));

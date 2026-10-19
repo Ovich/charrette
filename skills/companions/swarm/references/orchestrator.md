@@ -128,6 +128,8 @@ runner, which joins the same slice.
 
 ## Close
 
-**`$S close --run <run>`** once every slice is done, or the brainstorm concluded; it archives
-the run's posts. A member's pending `wait`, and any call it makes after, answers with the
+**`$S close --run <run>`** once every slice the agents carry is done (one left to the person
+never holds it open), or the brainstorm concluded; it archives the run's posts. **Before ending
+your session, close** the run you opened unless it is still being worked: one left open stays an
+active tab. `$S status` flags a run idle a day with its close command; ask the person, then close. A member's pending `wait`, and any call it makes after, answers with the
 `end` command to run and the summary to return.

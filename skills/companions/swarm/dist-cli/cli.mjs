@@ -2090,6 +2090,11 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
         return { progress, all, already: false, message };
       });
     },
+    lastActivity(run2) {
+      const r = runRow(run2);
+      const row = db.prepare("SELECT MAX(COALESCE(p.last_call, p.joined_at)) AS calls, (SELECT MAX(m.at) FROM messages m JOIN participants q ON q.id = m.author WHERE q.run = ?) AS posts FROM participants p WHERE p.run = ?").get(run2, run2);
+      return [String(r.opened_at), row?.calls, row?.posts].filter((v) => typeof v === "string").sort().at(-1);
+    },
     phaseProgress(run2) {
       const r = runRow(run2);
       return progressOf(run2, r.phase == null ? null : String(r.phase));
@@ -2703,6 +2708,7 @@ function conflictsOf(worktree, onto, reflogMark) {
 var args = parseArgs(process.argv.slice(2));
 var asJson = args.has("--json");
 var WAIT_UPKEEP_TICK_MS = 1e3;
+var FORGOTTEN_MS = 24 * 60 * 60 * 1e3;
 var USAGE = [
   "usage: swarm <verb> [--json]        (swarm --help code: the claim and merge verbs)",
   "  open    --kind plan|brainstorm --group <slug> --title <t> --seats <file.json> [--link <url>] [--transcript <path>] [--stall-ms <ms>]   # opens a run, registers the project's board in aiview, starts its stall poller, prints the run id then the board's URL (orchestrator)",
@@ -2732,7 +2738,7 @@ var USAGE = [
   "          # --mentions: only a mention of you, an urgent post or an event you subscribed to ends it; the rest stays for deliver (a seat's run: the wake brings every unread post)",
   "  roster  [--repo <path>] [--as <member>]",
   "  end     [--as <member>]                                         # claims or flags what you wrote unclaimed, then releases your claims and the lock",
-  "  status                                                          # data home, open runs, each run's phase and its n/m done",
+  "  status                                                          # data home, open runs, each run's phase and its n/m done; a run idle a day is flagged with its close command",
   "  config  retention [<days>]                                      # prints, or sets then prints, how many days closed runs and main's talk are kept",
   `events: ${Object.keys(EVENTS).join(", ")}; any:<event> for one posted in any run`,
   "a member is <group>/<seat>, the orchestrator <group>/orchestrator; without --as, the runner joined from this worktree"
@@ -3478,7 +3484,9 @@ ${rearm}` : rearm;
     case "status": {
       const runs = board.runs();
       const membersOf = (r) => board.roster(r.repo).filter((m) => m.run === r.id).map((m) => ({ name: m.name, nick: m.nick, worktree: m.worktree }));
-      const open = runs.map((r) => ({ run: r.id, kind: r.kind, group: r.plan, title: r.title, phase: r.phase, progress: board.phaseProgress(r.id), members: membersOf(r) }));
+      const idleMs = (r) => Date.now() - Date.parse(board.lastActivity(r.id));
+      const cli = self().join(" ");
+      const open = runs.map((r) => ({ run: r.id, kind: r.kind, group: r.plan, title: r.title, phase: r.phase, progress: board.phaseProgress(r.id), members: membersOf(r), lastActivity: board.lastActivity(r.id), forgotten: idleMs(r) >= FORGOTTEN_MS }));
       emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, runs: runs.length, open }, () => {
         console.log(`home    ${DATA_ROOT}`);
         console.log(`sqlite  ${SQLITE_PATH}`);
@@ -3486,6 +3494,9 @@ ${rearm}` : rearm;
         for (const r of runs) {
           console.log(`run ${r.id}  ${r.kind}  ${r.plan}  ${r.title}${phaseSuffix(r.phase, board.phaseProgress(r.id))}  ${r.repo}`);
           for (const s of r.slices) console.log(`  ${s.id} ${s.state}  ${s.title}${s.blockers.length ? `  blocked by ${s.blockers.join(", ")}` : ""}`);
+          const idle = idleMs(r);
+          if (idle >= FORGOTTEN_MS)
+            console.log(`  no activity for ${Math.floor(idle / 864e5)} d: likely left open; ask the person, then archive it: ${cli} close --run ${r.id}`);
         }
       });
       break;

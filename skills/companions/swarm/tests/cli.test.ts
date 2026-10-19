@@ -1,4 +1,5 @@
 import { test, beforeEach, afterEach } from "node:test";
+import { DatabaseSync } from "node:sqlite";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -260,7 +261,7 @@ test("status --json lists each open run with its kind; the text names the kind (
   assert.equal(s.runs, 1);
   const nick = s.open[0]?.members[0]?.nick as string;
   assert.match(nick, /^[A-Z][a-z]+ [A-Z][a-z]+$/, "the orchestrator's funny name, given at open (D17)");
-  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null }] }]);
+  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null }], lastActivity: s.open[0].lastActivity, forgotten: false }]);
   assert.match(run("status").stdout, new RegExp(`run ${id}  plan  review-tool  A plan`));
 });
 
@@ -571,6 +572,23 @@ test("status has no server: the data home, the store and the open runs", () => {
   assert.match(text, new RegExp(`^run ${id} `, "m"));
   assert.doesNotMatch(text, /^page /m);
   assert.doesNotMatch(text, /serve|localhost/);
+});
+
+test("status flags a run idle a day with its close command, never a fresh one", () => {
+  const id = openRun();
+  const fresh = JSON.parse(run("status", "--json").stdout).open.find((o: { run: number }) => o.run === id);
+  assert.equal(fresh.forgotten, false);
+  assert.ok(fresh.lastActivity);
+  assert.doesNotMatch(run("status").stdout, /no activity for/);
+  const old = new Date(Date.now() - 2 * 86400000).toISOString();
+  const db = new DatabaseSync(path.join(toolRoot, "swarm.sqlite"));
+  db.prepare("UPDATE runs SET opened_at = ? WHERE id = ?").run(old, id);
+  db.prepare("UPDATE participants SET joined_at = ?, last_call = NULL WHERE run = ?").run(old, id);
+  db.prepare("UPDATE messages SET at = ? WHERE author IN (SELECT id FROM participants WHERE run = ?)").run(old, id);
+  db.close();
+  const stale = JSON.parse(run("status", "--json").stdout).open.find((o: { run: number }) => o.run === id);
+  assert.equal(stale.forgotten, true);
+  assert.match(run("status").stdout, new RegExp(`no activity for 2 d: .*close --run ${id}`));
 });
 
 // The retention setting (D32): read, set, refuse; prune uses what was set.

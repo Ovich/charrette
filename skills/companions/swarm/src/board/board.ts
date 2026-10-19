@@ -232,6 +232,8 @@ export interface Board {
   done(p: Participant, name: string): { progress: PhaseProgress; all: boolean; already: boolean; message: Message | null };
   /** The current phase's done count; null before the first phase. */
   phaseProgress(run: RunId): PhaseProgress | null;
+  /** The run's last activity, ISO: its open, a member's join or call, a message by one of its members. Throws on an unknown run. */
+  lastActivity(run: RunId): string;
   /** The run's current phase when `p` owes it: a member (not the orchestrator), not ended, that has not run
    *  `done` for it; null otherwise, and before the first phase. */
   owedPhase(p: Participant): Phase | null;
@@ -1400,6 +1402,14 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
           });
         return { progress, all, already: false, message };
       });
+    },
+
+    lastActivity(run) {
+      const r = runRow(run);
+      const row = db
+        .prepare("SELECT MAX(COALESCE(p.last_call, p.joined_at)) AS calls, (SELECT MAX(m.at) FROM messages m JOIN participants q ON q.id = m.author WHERE q.run = ?) AS posts FROM participants p WHERE p.run = ?")
+        .get(run, run) as Row | undefined;
+      return [String(r.opened_at), row?.calls, row?.posts].filter((v): v is string => typeof v === "string").sort().at(-1)!;
     },
 
     phaseProgress(run) {

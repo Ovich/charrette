@@ -47,4 +47,6 @@ are done.
 
 ## The close
 
-**Close the run on the board once every slice is done**, before the plan's close.
+**Close the run on the board once every slice the agents carry is done**, before the plan's
+close. A slice the person does (a walk, a trial) is not on the board's work: it stays open in the
+plan's tracker and never holds the run open. A run left open stays an active tab.
