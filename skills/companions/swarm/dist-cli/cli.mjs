@@ -2394,10 +2394,18 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
         }));
       }
       const flags = db.prepare("SELECT f.path, p.slice, r.plan FROM flags f JOIN participants p ON p.id = f.participant JOIN runs r ON r.id = p.run WHERE f.repo = ? ORDER BY f.rowid").all(repo).map((f) => ({ path: String(f.path), runner: `${f.plan}/${f.slice}` }));
+      const lockHistory = db.prepare("SELECT t.asked_at, t.granted_at, t.merged_at, t.refused, p.slice, r.plan FROM lock_requests t JOIN participants p ON p.id = t.participant JOIN runs r ON r.id = p.run WHERE t.repo = ? ORDER BY t.asked_at DESC, t.rowid DESC LIMIT 50").all(repo).map((t) => ({
+        runner: `${t.plan}/${t.slice}`,
+        askedAt: String(t.asked_at),
+        grantedAt: t.granted_at == null ? null : String(t.granted_at),
+        mergedAt: t.merged_at == null ? null : String(t.merged_at),
+        refused: Number(t.refused)
+      }));
       return {
         repo,
         name: repoName(repo),
         runs: runRows.map(runSummary),
+        lockHistory,
         lock: lockHolder !== null ? { holder: participantById(lockHolder).name, since: String(lockRow.at) } : null,
         roster,
         events,
