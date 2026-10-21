@@ -52,7 +52,7 @@ test("the tab row: All, then each open run with its code, title and slices done/
   expect(names[1]).toBe("All");
   // the run tabs, then the Analytics pill drawn beside the merge lock at the row's end (SL4)
   // a brainstorm's slice rows are seats, never slices to merge: never "0/1"
-  expect(names.slice(2)).toEqual(["RTSessions with refresh tokens2/7", "ALAudit log0/3", "NMNaming the kinds1 seat", "Analytics"]);
+  expect(names.slice(2)).toEqual(["RTSessions with refresh tokens2/7", "ALAudit log0/3", "NMNaming the kinds1 seat", "Analytics", "merge lock free"]);
   for (const r of CLOSED) expect(tabs().queryByText(r.title)).toBeNull();
   expect(pressed()?.textContent).toBe("All");
 });
@@ -267,7 +267,7 @@ test("under a closed run, no claims row", () => {
 test("the merge lock sits at the tab row's end, free or held, with its tip on hover and focus (D22)", () => {
   show([APP], null, [{ ...LIVE, lock: { holder: "refresh-tokens/S4", since: LIVE.events[0].at } }]);
   const lock = tabs().getByText("merge lock").closest('[data-component="MergeLock"]') as HTMLElement;
-  expect(lock.getAttribute("tabindex")).toBe("0");
+  expect(lock.tagName).toBe("BUTTON");
   expect(lock.dataset.tip).toMatch(/^Merge lock: one member merges at a time, across every run\./);
   expect(within(lock).getByText("S4")).toBeTruthy();
   fireEvent.focusIn(lock);
@@ -275,6 +275,23 @@ test("the merge lock sits at the tab row's end, free or held, with its tip on ho
   cleanup();
   show([APP], null);
   expect(screen.getByText("merge lock free")).toBeTruthy();
+});
+
+test("clicking the merge lock opens its history, newest first; Escape closes it", () => {
+  const at = LIVE.events[0].at;
+  const lockHistory = [
+    { runner: "refresh-tokens/S4", askedAt: at, grantedAt: at, mergedAt: null, refused: 0 },
+    { runner: "refresh-tokens/S2", askedAt: at, grantedAt: at, mergedAt: at, refused: 2 },
+  ];
+  show([APP], null, [{ ...LIVE, lockHistory }]);
+  fireEvent.click(tabs().getByText("merge lock free").closest("button")!);
+  const dialog = screen.getByRole("dialog", { name: "Merge lock history" });
+  const rows = dialog.querySelectorAll("tbody tr");
+  expect(rows.length).toBe(2);
+  expect(rows[0].className).toBe("holding");
+  expect(rows[1].className).toBe("merged");
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.queryByRole("dialog", { name: "Merge lock history" })).toBeNull();
 });
 
 // ── RepoList ─────────────────────────────────────────────────────────────────────

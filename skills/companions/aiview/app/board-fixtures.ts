@@ -137,6 +137,7 @@ export const LIVE: BoardSnapshot = {
   name: "charrette-app",
   runs: [...CLOSED, ...RUNS, BRAINSTORM],
   lock: null,
+  lockHistory: [],
   roster: [
     runner(`${RT}/S3`, "The Session interface carries the refresh token", "Adding refreshToken to Session, then its two readers", "working", [["src/auth/session.ts", true], ["src/auth/session.test.ts"]], "14:02", 31),
     runner(`${RT}/orchestrator`, "", "7 slices prepared, 5 dispatched; S6 and S7 wait for their blockers", "watching", [], "14:00", 0),
@@ -207,6 +208,7 @@ export const SITE: BoardSnapshot = {
   name: "charrette-site",
   runs: [{ run: 7, kind: "plan", plan: "landing", group: "landing", code: "LA", title: "The landing page", link: null, open: true, runners: 1, done: 0, of: 2 }],
   lock: null,
+  lockHistory: [],
   roster: [runner("landing/S1", "The hero", "Writing the hero", "working", [["site/hero.tsx"]], "14:03", 4)],
   events: [named("14:03", "landing/orchestrator", "opened", "run 7 opened: plan landing, The landing page")],
   queues: {},

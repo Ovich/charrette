@@ -31,6 +31,7 @@ export function RunTabs({
   archived,
   pick,
   lock,
+  lockHistory,
   menuOpen,
   onMenu,
   onPick,
@@ -41,6 +42,7 @@ export function RunTabs({
   archived: RunTab | null;
   pick: RunId | null;
   lock: BoardSnapshot["lock"];
+  lockHistory: BoardSnapshot["lockHistory"];
   menuOpen: boolean;
   onMenu: (open: boolean) => void;
   onPick: (run: RunId | null) => void;
@@ -84,7 +86,7 @@ export function RunTabs({
       )}
       <span className="lockwrap">
         <AnalyticsButton pressed={analytics} onPress={onAnalytics} />
-        <MergeLock lock={lock} />
+        <MergeLock lock={lock} history={lockHistory} />
       </span>
     </nav>
   );

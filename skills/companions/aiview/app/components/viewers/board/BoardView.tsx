@@ -202,6 +202,7 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
             archived={archived}
             pick={picked}
             lock={snapshot.lock}
+            lockHistory={snapshot.lockHistory ?? []}
             menuOpen={menuOpen}
             onMenu={setMenuOpen}
             onPick={pickRun}

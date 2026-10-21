@@ -6,7 +6,7 @@
 import type { BoardSnapshot, RepoSummary } from "./board.ts";
 import type { Stats, StatsScope } from "./stats.ts";
 
-export type { BoardSnapshot, Liveness, Phase, PhaseProgress, RepoSummary, RunSummary, SnapshotRunner, SnapshotEvent } from "./board.ts";
+export type { BoardSnapshot, LockTurn, Liveness, Phase, PhaseProgress, RepoSummary, RunSummary, SnapshotRunner, SnapshotEvent } from "./board.ts";
 // The pure helpers the board page needs, so the page too reaches swarm through this door (D18).
 export { planCode, nameHandle, parseMentions } from "./mentions.ts";
 export type { Kind } from "./kinds.ts";

@@ -188,11 +188,14 @@ export type SnapshotFile = { path: string; holders: string[]; interface: boolean
 /** The edit goes through; `notice` names the other holders the first time only, per runner and path. */
 export type EditAllowed = { allowed: true; sharedWith: { runner: string; doing: string }[]; notice: string | null };
 export type EditHeld = { allowed: false; refusal: string };
+export type LockTurn = { runner: string; askedAt: string; grantedAt: string | null; mergedAt: string | null; refused: number };
 export type BoardSnapshot = {
   repo: string;
   name: string;
   runs: RunSummary[];
   lock: { holder: string; since: string } | null;
+  /** The repository's merge-lock turns, newest first (at most 50): asked, granted, merged, refusals counted. */
+  lockHistory: LockTurn[];
   roster: SnapshotRunner[];
   events: SnapshotEvent[];
   queues: Record<string, QueueSlice[]>;
@@ -1792,10 +1795,21 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
         db.prepare("SELECT f.path, p.slice, r.plan FROM flags f JOIN participants p ON p.id = f.participant JOIN runs r ON r.id = p.run WHERE f.repo = ? ORDER BY f.rowid").all(repo) as Row[]
       ).map((f) => ({ path: String(f.path), runner: `${f.plan}/${f.slice}` }));
 
+      const lockHistory = (
+        db.prepare("SELECT t.asked_at, t.granted_at, t.merged_at, t.refused, p.slice, r.plan FROM lock_requests t JOIN participants p ON p.id = t.participant JOIN runs r ON r.id = p.run WHERE t.repo = ? ORDER BY t.asked_at DESC, t.rowid DESC LIMIT 50").all(repo) as Row[]
+      ).map((t) => ({
+        runner: `${t.plan}/${t.slice}`,
+        askedAt: String(t.asked_at),
+        grantedAt: t.granted_at == null ? null : String(t.granted_at),
+        mergedAt: t.merged_at == null ? null : String(t.merged_at),
+        refused: Number(t.refused),
+      }));
+
       return {
         repo,
         name: repoName(repo),
         runs: runRows.map(runSummary),
+        lockHistory,
         lock: lockHolder !== null ? { holder: participantById(lockHolder).name, since: String(lockRow!.at) } : null,
         roster,
         events,
