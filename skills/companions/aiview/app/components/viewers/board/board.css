@@ -216,11 +216,16 @@
 .board .agent-strip .card.ended, .board .agent-strip .card.done { opacity: .55; }
 .board .agent-strip .doing { min-height: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 /* the member's token counter: flat at the run's stall threshold marked amber, unreadable faint */
-.board .card .counter { display: block; margin-top: 3px; font: 11px ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace; color: var(--faint-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.board .card .counter.flat { color: var(--amber); font-weight: 600; }
-.board .card .counter.blind { font-style: italic; }
 .board .state.quiet { color: var(--amber); }
 .board .state.quiet i { background: var(--amber); }
+/* the member's activity (swarm-relay#D9): busy a solid dot, gone faded and struck but kept, the open or last tool beneath */
+.board .state.busy { color: var(--foreground); }
+.board .state.busy i { background: var(--foreground); }
+.board .state.gone { color: var(--faint-foreground); text-decoration: line-through; }
+.board .state.gone i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint-foreground); }
+.board .agent-strip .card.gone { opacity: .55; box-shadow: none; background: var(--surface); }
+.board .agent-strip .card:has(.activity) .doing { -webkit-line-clamp: 1; }
+.board .card .activity { display: block; margin-top: 2px; font: 11px ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .board .claims-row { flex: none; border-top: 1px solid var(--border); padding: 6px 0 0; }
 .board .claims-row[data-expanded="true"] { max-height: 30vh; overflow-y: auto; }
 .board .claims-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted-foreground); padding: 4px 0; }

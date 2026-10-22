@@ -219,6 +219,45 @@ test("a card followed narrows the conversation to its member; clicked again, rel
   expect(convo().getByText(/return the new token/)).toBeTruthy();
 });
 
+// ── the member's activity (swarm-relay S24, D9, D20) ─────────────────────────────
+
+const ACTIVE = LIVE.roster.find((r) => r.runner.startsWith("refresh-tokens/") && r.slice !== "orchestrator" && r.state !== "ended" && r.state !== "done")!;
+const withActivity = (liveness: object | undefined) => ({ ...LIVE, roster: LIVE.roster.map((r) => (r.runner === ACTIVE.runner ? { ...r, liveness } : r)) }) as BoardSnapshot;
+const activeCard = () => within(strip()!).getAllByRole("button").find((c) => c.textContent?.includes(ACTIVE.nick))!;
+const minutesAgo = (m: number) => Date.now() - m * 60000;
+
+test.each([
+  ["working", { state: "working", doing: "Edit", since: null }, /^working$/, "last: Edit"],
+  ["busy", { state: "busy", doing: "browser_click /jobs", since: minutesAgo(3) }, /^busy · 3 min$/, "browser_click /jobs"],
+  ["waiting", { state: "waiting", doing: "swarm wait", since: null }, /^waiting$/, "last: swarm wait"],
+  ["quiet", { state: "quiet", doing: "Bash", since: minutesAgo(12), reason: "no call since 12 min" }, /^quiet · 12 min$/, "last: Bash · no call since 12 min"],
+  ["gone", { state: "gone", doing: "Read", since: null }, /^gone$/, "last: Read"],
+])("a %s member shows its own label and its tool beside it", (state, liveness, label, tool) => {
+  show([APP], 1, [withActivity({ tokens: null, movedAt: null, ...liveness })]);
+  const card = activeCard();
+  const status = card.querySelector(".state")!;
+  expect(status.className).toBe(`state ${state}`);
+  expect(status.textContent).toMatch(label);
+  const line = card.querySelector('[data-component="MemberActivity"]')!;
+  expect(line.getAttribute("data-state")).toBe(state);
+  expect(line.textContent).toBe(tool);
+});
+
+test("a gone member stays in the roster, its card marked gone", () => {
+  show([APP], 1, [withActivity({ state: "gone", doing: null, since: null, tokens: null, movedAt: null })]);
+  const card = activeCard();
+  expect(card).toBeTruthy();
+  expect(card.classList.contains("gone")).toBe(true);
+});
+
+test("a member with no activity state renders as before it", () => {
+  show([APP], 1, [withActivity(undefined)]);
+  const card = activeCard();
+  expect(card.querySelector('[data-component="MemberActivity"]')).toBeNull();
+  expect(card.classList.contains("gone")).toBe(false);
+  expect(card.querySelector(".state")!.className).not.toMatch(/\b(busy|gone)\b/);
+});
+
 // ── ClaimsRow ────────────────────────────────────────────────────────────────────
 
 const SHARED: BoardSnapshot = { ...LIVE, files: [...LIVE.files, { path: "src/shared.ts", holders: ["refresh-tokens/S3", "audit-log/S1"], interface: true }] };
