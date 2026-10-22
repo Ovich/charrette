@@ -1,6 +1,7 @@
 // The board's upkeep without a server (companions-merge D16): prune then flagStale, at most every
 // five minutes, from any verb and from a pending wait; the last upkeep's time kept in the store.
 import { test, beforeEach, afterEach } from "node:test";
+import { stopServerOf } from "./fixtures/server.ts";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -34,6 +35,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopServerOf(dir);
   fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 });
 

@@ -1,6 +1,7 @@
 // Claims by the CLI (D58): `swarm claim` before an edit, and `swarm end` reconciling what the
 // runner wrote without one. Two runners of one run, each in a worktree of its own.
 import { test, beforeEach, afterEach } from "node:test";
+import { stopServerOf } from "./fixtures/server.ts";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -73,6 +74,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopServerOf(home);
   for (let i = 0; ; i++) {
     try {
       fs.rmSync(home, { recursive: true, force: true });

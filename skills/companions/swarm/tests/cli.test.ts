@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openBoard } from "../src/board/board.ts";
+import { stopServerOf } from "./fixtures/server.ts";
 
 const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "cli", "index.ts");
 
@@ -53,6 +54,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopServerOf(toolRoot);
   // Windows may briefly hold handles of a just-ended child; a leaked temp dir
   // must not fail the suite.
   for (let i = 0; ; i++) {

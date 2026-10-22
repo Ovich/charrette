@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stopServerOf } from "./server.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.resolve(HERE, "..", "..", "src", "cli", "index.ts");
@@ -84,6 +85,7 @@ export function makeRepo(prefix = "swarm-merge-"): Repo {
   git(repo, "worktree", "add", "-q", "-b", "b", wtB);
 
   const cleanup = (): void => {
+    stopServerOf(home);
     for (let i = 0; ; i++) {
       try {
         fs.rmSync(home, { recursive: true, force: true });
