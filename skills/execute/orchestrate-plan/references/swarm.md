@@ -43,11 +43,12 @@ phases, seats and roles are the plan's *Mandate*; the cut is the `write-plan` sk
 
 ## The validator's phase
 
-**When the mandate's `validator:` is on**, it is dispatched once, at the run's open, with the
+**When the mandate's `verify:` is on**, it is dispatched once, at the run's open, with the
 first phase's seats: one board row, `validator`, its role from the *Mandate* verbatim in its
 brief, in a detached worktree; it merges nothing and lies dormant on the board. A building
 phase's text says the validator's part is none, so it marks itself done at once and waits.
-**Its phase is yours to announce**: open it with `phase`, its text the validator's task, and
+**Its phase is yours to announce**: open it with `phase`, its text what to validate (the feature
+the phase before built, the stories or screens to walk, from the plan's goal for it), and
 mention it, `@validator your turn: validate <branch> at <sha>`; no other seat is dispatched in it.
 A validator that ended (its context spent) is replaced by a fresh one in the same row. Answer it on the board when it talks
 to you; when it asks for a seat, dispatch one into a fix slice (`slice add`). **Its verdict decides

@@ -36,13 +36,18 @@ tracker and when the slice documents are written.
 
 ## The validator
 
-**Opt in, the mandate's `validator:` field.** One seat for the whole run, dormant on the board
-from the run's open, following the thread, until the orchestrator tells it its phase has come:
-after each building phase or once at the end, as the mandate says. It takes the merged result and
-proves it works by any means it has: the project's `verify-<app>` skill when the person picks it,
-or the role the person describes (run the workbench, drive the app in the browser, test it however
-it can). It may talk on the board to whoever it needs, and asks the orchestrator for a seat when
-something must be answered or fixed. **Its verdict feeds the orchestrator's next cut**: what
+**Opt in, the mandate's `verify:` field, the same as in classic.** One seat for the whole run,
+dormant on the board from the run's open, following the thread, until the orchestrator tells it
+its phase has come: after each building phase or once at the end, as the mandate says. It runs
+the project's `verify-<app>` skill on the merged result, scoped by the orchestrator to what was
+done since the last validation, plus what the person added to watch. It may talk on the board to whoever it needs, and asks the orchestrator for a seat when
+something must be answered or fixed.
+**With a validator, the run alternates**: a building phase, every seat working, until a
+feature can be checked; then the validation phase, the validator alone, the building seats
+ended with their slices. **A building phase before a validation phase ends on a feature the
+validator can check end to end**, never a layer (the api without its screen), and its goal
+names that feature. **The validation phase's goal says what to validate**: the feature, the
+stories or screens to walk, what counts as a blocker. **Its verdict feeds the orchestrator's next cut**: what
 the next phase is and its slices, a fix slice, or a pause for the person.
 
 ## The slices
@@ -112,10 +117,10 @@ flowchart TB
 
 ## The mandate
 
-**`mode: swarm` is the first field, then `phases:`, `seats:` and `validator:`**, each proposed
+**`mode: swarm` is the first field, then `phases:`, `seats:` and `verify:`**, each proposed
 by you from the work and settled with the person, as the `orchestrate-plan` skill's
 `references/mandate.md` asks them; first in the line under the tracker:
-`mandate: mode swarm · seats 4 · phases 3 · validator at the end · run through · …`.
+`mandate: mode swarm · seats 4 · phases 3 · verify at the end · run through · …`.
 The *Mandate* section holds the phase table (each phase, what it waits on, its goal, every
-seat's role and area), and the validator's role in the person's words. The other
+seat's role and area), and what the person added for the validator to watch, in their words. The other
 fields are asked as for any plan.

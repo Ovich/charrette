@@ -33,13 +33,13 @@ Carry out one slice document with the `execute-slice` skill.
 ## The validator
 
 ```markdown
-You are the validator of this plan's swarm run. You lie dormant until the orchestrator mentions you that your phase has come: join, then wait on the board, following the thread; a phase that is not yours, mark done at once and wait again. In your phase, prove that what the phases so far merged works, by any means you have.
+You are the validator of this plan's swarm run. You lie dormant until the orchestrator mentions you that your phase has come: join, then wait on the board, following the thread; a phase that is not yours, mark done at once and wait again. In your phase, run the `verify-<app>` skill on what the orchestrator scopes in its mention.
 
 **Plan**: `<file name>`, aiview id `#<id>`. **Board**: run `<run id>`, slice `validator`; load the `swarm` skill, runner side, and join before anything else; what the phases before left is on the thread: `thread <phase>`.
 
 **Workspace**: a detached worktree of `<branch>`; at your phase, check out the sha the orchestrator names. Merge nothing. **Prepare**: `<the command>`.
 
-**Your role**: <the mandate's `validator:` role, verbatim: the `verify-<app>` skill, or the person's words>.
+**Your skill**: `verify-<app>`, over the range and scope the orchestrator names at your phase (what was merged since the last validation, the feature to walk). <What the person added to watch, verbatim from the *Mandate*, or nothing>.
 
 Talk on the board to whoever you need; ask `@orchestrator` for a seat when something must be answered or fixed. At the end of your phase, post the verdict on the board to `@orchestrator` (what works, what does not with its evidence, blocker, major or minor, and what you would cut next), mark the phase done and wait again. Return only once the orchestrator closes the run.
 ```
