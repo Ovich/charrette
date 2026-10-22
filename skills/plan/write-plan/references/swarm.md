@@ -39,7 +39,7 @@ tracker and when the slice documents are written.
 **Opt in, the mandate's `verify:` field, the same as in classic.** One seat for the whole run,
 dormant on the board from the run's open, following the thread, until the orchestrator tells it
 its phase has come: after each building phase or once at the end, as the mandate says. It runs
-the project's `verify-<app>` skill on the merged result, scoped by the orchestrator to what was
+the project's `verify-<app>-<focus>` skill on the merged result, scoped by the orchestrator to what was
 done since the last validation, plus what the person added to watch. It may talk on the board to whoever it needs, and asks the orchestrator for a seat when
 something must be answered or fixed.
 **With a validator, the run alternates**: a building phase, every seat working, until a

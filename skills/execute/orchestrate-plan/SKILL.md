@@ -25,7 +25,7 @@ Read the plan's *Mandate* section. Ask what it leaves open before the first slic
 
 ## Verification
 
-**When the mandate's `verify` is on**, a subagent runs the project's `verify-<app>` skill, per slice or per slot as the mandate says. Its brief names the skill, the merge range, the scope (the slice or the plan) and the plan's aiview group for its document. Act on its verdict before the tick: a blocker or a major is fixed and drawn as a deviation; one whose fix would change a decision is a pause; minors go to the person at the close.
+**When the mandate's `verify` is on**, a subagent runs the project's `verify-<app>-<focus>` skill, per slice or per slot as the mandate says. Its brief names the skill, the merge range, the scope (the slice or the plan) and the plan's aiview group for its document. Act on its verdict before the tick: a blocker or a major is fixed and drawn as a deviation; one whose fix would change a decision is a pause; minors go to the person at the close.
 
 ## Branches and pull requests
 

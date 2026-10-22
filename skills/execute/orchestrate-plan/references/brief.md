@@ -39,7 +39,7 @@ You are the validator of this plan's swarm run. You lie dormant until the orches
 
 **Workspace**: a detached worktree of `<branch>`; at your phase, check out the sha the orchestrator names. Merge nothing. **Prepare**: `<the command>`.
 
-**Your skill**: `verify-<app>`, over the range and scope the orchestrator names at your phase (what was merged since the last validation, the feature to walk). <What the person added to watch, verbatim from the *Mandate*, or nothing>.
+**Your skill**: `verify-<app>-<focus>`, over the range, scope and inputs the orchestrator names at your phase (what was merged since the last validation, the feature to walk); judge that scope only. <What the person added to watch, verbatim from the *Mandate*, or nothing>.
 
 Talk on the board to whoever you need; ask `@orchestrator` for a seat when something must be answered or fixed. At the end of your phase, post the verdict on the board to `@orchestrator` (what works, what does not with its evidence, blocker, major or minor, and what you would cut next), mark the phase done and wait again. Return only once the orchestrator closes the run.
 ```
@@ -55,5 +55,5 @@ Merge `<slice branch>` into `<target branch>` in `<checkout>`, then run `<the ch
 ## A verification
 
 ```markdown
-Run the `verify-<app>` skill over `<base sha>..<head sha>`, scope `<the slice | the plan>`, its document in aiview group `<group>`. Return the verdict with each finding's severity.
+Run the `verify-<app>-<focus>` skill over `<base sha>..<head sha>`, scope `<what was delivered: the slice | the plan | the parts>`, inputs `<those that differ from the skill's defaults, or none>`; judge that scope only, its document in aiview group `<group>`. Return the verdict with each finding's severity.
 ```

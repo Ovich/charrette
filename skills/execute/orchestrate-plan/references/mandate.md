@@ -34,9 +34,10 @@ message, each proposed from the work with its reason:
   normal plan, 2–3 small, 5–6 large.
 - **`verify:`** opt in, as in classic (the field below), asked here because it shapes the
   phases: `after each phase`, `at the end`, or `off`. On, a validator seat runs the project's
-  `verify-<app>` skill alone in its own phases, scoped at each by you to what the phases before
-  merged; the next phase is cut from its verdict. No `verify-<app>` skill: offer to create it
-  (yes runs `verification-skill-create` before the first phase); no is `verify: off`. What the
+  `verify-<app>-<focus>` skill alone in its own phases, scoped at each by you to what the phases before
+  merged; the next phase is cut from its verdict. No `verify-<app>-<focus>` skill: offer to create it
+  (yes runs `verification-skill-create` before the first phase); no is `verify: off`. With several verifiers, ask which one
+  each validation phase runs. What the
   person adds to watch is written into the *Mandate* in their words. Any other special seat (a
   reviewer of every merge) is asked the same way.
 
@@ -73,7 +74,7 @@ the brief: `references/tests.md`.
 3. **none**: no tests written in this plan.
 
 **`verify:`** `each slice | slot done | off`, the same field as in swarm, asked here in
-classic. Look for a `verify-<app>` skill in the project's local skill folder. It exists: ask
+classic. Look for a `verify-<app>-<focus>` skill in the project's local skill folder; several: ask which one runs. One exists: ask
 "Verify after each slice (recommended), or once the slot is done?". It does not: ask whether to
 create one; yes runs `verification-skill-create` before the first slice, then the first
 question; no is `verify: off`. On, a check subagent runs the skill after each merge, scoped by

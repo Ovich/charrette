@@ -5,7 +5,7 @@ description: "Use when the person and the agent go over what was just delivered 
 
 # Validate a delivery
 
-**No `verify-<app>` skill in the project's local skills: do not start.** Say so and propose generating it first through the `verification-skill-create` skill.
+**No `verify-<app>-<focus>` skill in the project's local skills: do not start.** Say so and propose generating it first through the `verification-skill-create` skill.
 
 **Run the project's verify process with the person guiding it.** The verify skill's steps, on the delivery's branch at its head, taken together one part at a time. The person decides where to go next and what holds; the agent drives the app and proposes.
 
