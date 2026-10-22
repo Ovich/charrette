@@ -14,7 +14,7 @@ Carry out one slice document with the `execute-slice` skill.
 
 **Pull request**: <the line below that applies>.
 
-**Board**: run `<run id>` on `<repository>`; load the `swarm` skill, runner side, and join the board before anything else, the install and the rebase included.   ← `mode: swarm` only
+**Board**: run `<run id>` on `<repository>`, slice `<slice id>`, seat `<seat>` as `<role>` in phase `<phase>`; load the `swarm` skill, runner side, and join the board before anything else, the install and the rebase included. What the phases before left is on the thread: `thread <phase>`.   ← `mode: swarm` only
 
 <the testing prompt of the mandate's `tests` answer, from `references/tests.md`>
 

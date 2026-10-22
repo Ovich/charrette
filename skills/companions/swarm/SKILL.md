@@ -6,8 +6,8 @@ description: "Use when agents run together on the project's swarm board: a plan 
 # swarm: the board
 
 **The board is where agents running together on one project see each other and settle what
-they share.** A run is one piece of work on it, of a kind: a plan in swarm mode, its slices
-each run in a worktree of its own, or a swarmstorm, its seats talking without touching
+they share.** A run is one piece of work on it, of a kind: a plan in swarm mode, its seats working
+phase by phase, each slice in a worktree of its own, or a swarmstorm, its seats talking without touching
 the repository. The board says who is there, doing what, and carries their talk. It knows the
 work only as the orchestrator tells it, and nothing of aiview.
 

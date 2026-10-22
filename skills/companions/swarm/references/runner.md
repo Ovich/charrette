@@ -68,8 +68,9 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
 - **`$S doing "<text>"`** at each step another runner would want to know: the module you are
   in, a test going green, a merge coming.
 - **A mention that asks you something is answered before you go on.**
-- **A plan run in phases**: a `phase <name>` separator wakes you, its text saying your part;
-  do it, then `$S done <name>`. Work the phase the board names, never one you remember.
+- **The phase**: the board's current phase heads what you read, its text saying every seat's
+  role; your brief names yours. Your slice is your part: `$S done <name>` once it is merged,
+  then `$S end`. Work the phase the board names, never one you remember.
 - **A pause**: the board's answer says to stop and wait; do only that until the resume, then
   follow its message.
 - **`$S release <path>`** when you no longer touch a file you hold.

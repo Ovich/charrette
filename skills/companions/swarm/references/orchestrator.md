@@ -6,12 +6,12 @@ except `open`, `slice`, `close` and `status`.
 
 ## Open the run
 
-1. **The seats file**, one entry per member the run will have.
-   - **A plan**: every slice, with the aiview URL of its slice document as `link`:
+1. **The seats file**, one entry per member the run will have.   - **A plan**: the first phase's slices, each with its seat and role as `role` and the aiview
+     URL of its slice document as `link`; a later phase's are added at its open (*Slice states*):
 
      ```json
-     [{ "id": "S1", "title": "<the slice's title>", "blockers": [], "link": "<slice document URL>" },
-      { "id": "S2", "title": "<…>", "blockers": ["S1"], "link": "<…>" }]
+     [{ "id": "P1.S1", "title": "<the slice's title>", "role": "dev1 · builder", "link": "<slice document URL>" },
+      { "id": "P1.S2", "title": "<…>", "role": "dev2 · builder", "link": "<…>" }]
      ```
 
    - **A brainstorm**: every seat, with its `role` and the brainstorm board's URL as `link`;
@@ -64,7 +64,7 @@ says whether the board reads it.
 
 - **`$S slice <id> --run <run> --state running`** at its dispatch; `done` once its tick stands;
   `blocked` when it waits on a person.
-- **A runner ends with its slice.** The next slice gets a fresh runner.
+- **A runner ends with its slice.** The seat's slice in the next phase gets a fresh runner.
 - **A slice or seat added mid-run**: `$S slice add <id> --run <run> --title "<title>"
   [--blockers a,b] [--link <url>] [--role <role>] [--on <events>]`. It lands after the last,
   `ready`; an id already in the run, an unknown blocker or a closed run is refused. Then
@@ -102,8 +102,9 @@ says whether the board reads it.
   then on. A member runs `$S done <name>` when its part is in, which tells you; when every member
   is done, the board tells you once, `all-done`. Each answer prints the step to run next. Phases
   belong to every kind of run: when to open which is a swarmstorm's protocol (the `swarmstorm`
-  skill), or, for a plan, the phases its *Mandate* names (the `orchestrate-plan` skill); a plan
-  that names none runs without.
+  skill), or, for a plan, the phases its *Mandate* names (the `orchestrate-plan` skill). Only
+  members still in the run count toward `all-done`: a runner that ended with its slice does not,
+  so a phase dispatching one special seat waits on it alone.
 - **`$S roster`** shows each run's title, current phase and its `<n>/<m> done`, then each runner, its doing and its files; `(stale)` after ten minutes
   without a call to the board.
 
