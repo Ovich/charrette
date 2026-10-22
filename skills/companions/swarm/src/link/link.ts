@@ -8,10 +8,12 @@ import os from "node:os";
 import path from "node:path";
 import { bundleVersion, decode, encode, serverStateFile, type Call, type Frame, type ServerState } from "../wire.ts";
 
+import type { Binding } from "./transcripts.ts";
+
 type RunId = number;
 
-/** What started the link, kept for phase 2's transcript search. */
-export type Binding = { verb: "join"; run: RunId; seat: string } | { verb: "open"; group: string };
+/** What started the link, kept for phase 2's transcript search (declared by transcripts.ts). */
+export type { Binding };
 
 /** The link's clocks; tests shorten them. */
 export type LinkTiming = {
