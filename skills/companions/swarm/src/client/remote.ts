@@ -152,10 +152,18 @@ function lineFrames(sock: net.Socket, onFrame: (f: Frame) => void): void {
   });
 }
 
-type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void };
+type Pending = { call: Frame; resolve: (v: unknown) => void; reject: (e: Error) => void };
+type Calls = {
+  call: (method: RpcMethod, args: unknown[]) => Promise<unknown>;
+  settle: (f: Frame) => void;
+  fail: (why: string) => void;
+  /** From now on over `send`; the calls still unanswered are sent again on it. */
+  reroute: (send: (f: Frame) => void) => void;
+};
 
-/** Calls by id over one channel; a closed channel fails every call still pending. */
-function caller(send: (f: Frame) => void): { call: (method: RpcMethod, args: unknown[]) => Promise<unknown>; settle: (f: Frame) => void; fail: (why: string) => void } {
+/** Calls by id over one channel; a closed channel fails every call still pending, unless rerouted. */
+function callsOver(firstSend: (f: Frame) => void): Calls {
+  let send = firstSend;
   const pending = new Map<string, Pending>();
   let next = 0;
   // the server answers a resent id from its cache (D4): ids unique across processes, a pid being reused
@@ -165,9 +173,13 @@ function caller(send: (f: Frame) => void): { call: (method: RpcMethod, args: unk
     call(method, args) {
       if (closed) return Promise.reject(new Error(closed));
       const id = `${callPrefix}-${++next}`;
+      // JSON turns a trailing undefined into null: an optional argument left out stays left out
+      const given = [...args];
+      while (given.length && given[given.length - 1] === undefined) given.pop();
+      const frame: Frame = { type: "call", id, method, args: given };
       return new Promise((resolve, reject) => {
-        pending.set(id, { resolve, reject });
-        send({ type: "call", id, method, args });
+        pending.set(id, { call: frame, resolve, reject });
+        send(frame);
       });
     },
     settle(f) {
@@ -183,6 +195,10 @@ function caller(send: (f: Frame) => void): { call: (method: RpcMethod, args: unk
       closed ??= why;
       for (const p of pending.values()) p.reject(new Error(closed));
       pending.clear();
+    },
+    reroute(to) {
+      send = to;
+      for (const p of pending.values()) send(p.call);
     },
   };
 }
@@ -222,15 +238,37 @@ function asRemote(call: (method: RpcMethod, args: unknown[]) => Promise<unknown>
 export async function connectBoard(opts: { dataRoot: string; member?: BoardMember }): Promise<RemoteBoard & { close(): void }> {
   const state = await ensureServer(opts.dataRoot);
   if (opts.member) {
-    const sock = await openLinkPipe(opts.dataRoot, opts.member, bindingOf(opts.member));
-    const calls = caller((f) => sock.write(`${encode(f)}\n`));
+    const member = opts.member;
+    const sock = await openLinkPipe(opts.dataRoot, member, bindingOf(member));
+    const calls = callsOver((f) => sock.write(`${encode(f)}
+`));
     lineFrames(sock, (f) => calls.settle(f));
-    sock.on("close", () => calls.fail(`swarm: ${opts.member!.name}'s link closed the pipe`));
+    let direct: Awaited<ReturnType<typeof connectServer>> | null = null;
+    let closing = false;
+    // the link exits when its member ends or its run closes (D15): what the verb still asks goes to the server
+    sock.on("close", () => {
+      if (closing) return;
+      connectServer(state).then(
+        (conn) => {
+          direct = conn;
+          conn.onFrame((f) => calls.settle(f));
+          conn.onClose(() => calls.fail("swarm: the board server closed the connection"));
+          calls.reroute(conn.send);
+        },
+        () => calls.fail(`swarm: ${member.name}'s link closed the pipe`),
+      );
+    });
     sock.on("error", () => {});
-    return Object.assign(asRemote(calls.call), { close: () => sock.destroy() });
+    return Object.assign(asRemote(calls.call), {
+      close: () => {
+        closing = true;
+        sock.destroy();
+        direct?.close();
+      },
+    });
   }
   const conn = await connectServer(state);
-  const calls = caller(conn.send);
+  const calls = callsOver(conn.send);
   conn.onFrame((f) => calls.settle(f));
   conn.onClose(() => calls.fail("swarm: the board server closed the connection"));
   return Object.assign(asRemote(calls.call), { close: conn.close });

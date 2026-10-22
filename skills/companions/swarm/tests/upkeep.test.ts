@@ -118,6 +118,17 @@ test("upkeepIfDue runs again after five minutes", async () => {
   }
 });
 
+/** The events of `event` once the board server's upkeep, looked at every second, has had its turn (swarm-relay D13). */
+const eventsAfterUpkeep = async (event: string) => {
+  let found = await events(event);
+  for (let i = 0; i < 40 && !found.length; i++) {
+    await new Promise((r) => setTimeout(r, 150));
+    found = await events(event);
+  }
+  return found;
+};
+
+// the upkeep runs in the board server a verb starts, no longer in the verb (swarm-relay D13)
 test("a verb after a silent ten minutes posts the quiet event", async () => {
   const run = openRunCli("hush");
   assert.equal((await events("quiet")).length, 0);
@@ -125,7 +136,7 @@ test("a verb after a silent ten minutes posts the quiet event", async () => {
   lastUpkeepAgo(6 * MINUTE);
   const r = cli("status");
   assert.equal(r.status, 0, r.stderr);
-  const quiet = await events("quiet");
+  const quiet = await eventsAfterUpkeep("quiet");
   assert.equal(quiet.length, 1);
   assert.equal(quiet[0].run, run);
 });
@@ -154,13 +165,18 @@ test("a pending wait posts the stale event of an all-silent run", async () => {
   }
 });
 
-test("an upkeep failure does not stop the verb", () => {
+// the upkeep fails in the board server's tick now (swarm-relay D13), which keeps no word of it on a verb's stderr
+test("an upkeep failure does not stop the verb", async () => {
   openRunCli("broken");
   // an unreadable retention: prune throws
   withRaw((raw) => raw.prepare("INSERT INTO settings (name, value) VALUES ('retention-days', 'bogus') ON CONFLICT (name) DO UPDATE SET value = excluded.value").run());
   lastUpkeepAgo(6 * MINUTE);
   const r = cli("status");
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stderr, /swarm: upkeep failed/);
   assert.match(r.stdout, /broken/);
+  // the server's failed upkeep, a tick later, stops neither it nor the next verb
+  await new Promise((res) => setTimeout(res, 1500));
+  const again = cli("status");
+  assert.equal(again.status, 0, again.stderr);
+  assert.match(again.stdout, /broken/);
 });

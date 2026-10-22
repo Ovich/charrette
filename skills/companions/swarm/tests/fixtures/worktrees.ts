@@ -42,7 +42,8 @@ export function makeRepo(prefix = "swarm-merge-"): Repo {
   const repo = path.join(home, "repo");
   const wtA = path.join(home, "wt-a");
   const wtB = path.join(home, "wt-b");
-  const env = (): NodeJS.ProcessEnv => ({ ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home, GIT_EDITOR: "true" });
+  // no stall poller: it would outlive the test (D27)
+  const env = (): NodeJS.ProcessEnv => ({ ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home, GIT_EDITOR: "true", SWARM_NO_POLLER: "1" });
   const git = (cwd: string, ...argv: string[]): string => {
     const r = spawnSync("git", argv, { cwd, encoding: "utf8", env: env() });
     assert.equal(r.status, 0, `git ${argv.join(" ")}: ${r.stderr}`);
