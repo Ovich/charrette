@@ -51,7 +51,7 @@ phase's text says the validator's part is none, so it marks itself done at once 
 the phase before built, the stories or screens to walk, from the plan's goal for it), and
 mention it, `@validator your turn: validate <branch> at <sha>`; no other seat is dispatched in it.
 A validator that ended (its context spent) is replaced by a fresh one in the same row. Answer it on the board when it talks
-to you; when it asks for a seat, dispatch one into a fix slice (`slice add`). **Its verdict decides
+to you; when it asks for a seat, dispatch one into a fix slice (`slice add`). Its findings are weighed first, as the `orchestrate` skill's *Findings* says: its verdict on the board, your opinion the next post, then the next cut. **Its verdict decides
 the next cut**: the next phase as planned, amended, a fix phase, or a pause when a finding
 breaks a decision. Write what changed into the plan before cutting.
 

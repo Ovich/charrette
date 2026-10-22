@@ -31,6 +31,10 @@ The completion notification ends a member; it does not tell you the work is heal
 - **Report only what is news**: a stale member (no new call in ten minutes), a `BREACH` of the brief's boundary, work clearly outside the member's document. `--forbidden` is the brief's boundary as a regex anchored on a command's verb, never a path.
 - **Steer only a drift from the brief**: one `SendMessage` naming the brief line it left. A member that drifts again is stopped and re-dispatched with the brief amended. Decisions its document leaves to the member are its own.
 
+## Findings
+
+**Weigh every finding a member returns before anything acts on it** (a verifier's, a reviewer's, a runner's): you know the document, its decisions and the inputs, which the member may not. Each gets your opinion beside it: stands, its weight changed, a question for the person (a result that may be right for the data), or not a fault, with your reason. On a board, the finding is the member's post and your opinion the next post, in reply; nothing is dispatched before it. Only what stands reaches the next member's document, your opinion with it; the member that found it is told what you set aside before it looks again.
+
 ## A member that stops on a finding
 
 It is done. Fix the kind's document or the member's; never re-brief it past what it found.
