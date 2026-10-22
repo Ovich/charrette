@@ -83,7 +83,7 @@ test("open then join prints the roster", () => {
   const r = run("join", "--run", String(id), "--slice", "S3", "--doing", "the page", "--file", "src/page.ts:interface", "--file", "src/a.ts");
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /you are review-tool\/S3/);
-  assert.match(r.stdout, /review-tool\/S3 {2}run \d+ {2}doing: the page {2}files: src\/page\.ts \(interface\), src\/a\.ts/);
+  assert.match(r.stdout, /review-tool\/S3 {2}run \d+ {2}working {2}doing: the page {2}files: src\/page\.ts \(interface\), src\/a\.ts/);
   assert.match(r.stdout, /review-tool\/orchestrator/);
 });
 
@@ -263,7 +263,7 @@ test("status --json lists each open run with its kind; the text names the kind (
   assert.equal(s.runs, 1);
   const nick = s.open[0]?.members[0]?.nick as string;
   assert.match(nick, /^[A-Z][a-z]+ [A-Z][a-z]+$/, "the orchestrator's funny name, given at open (D17)");
-  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null }], lastActivity: s.open[0].lastActivity, forgotten: false }]);
+  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null, state: "working", activity: null }], lastActivity: s.open[0].lastActivity, forgotten: false }]);
   assert.match(run("status").stdout, new RegExp(`run ${id}  plan  review-tool  A plan`));
 });
 
@@ -807,7 +807,7 @@ test("join --on with an unknown event exits 1 listing the known ones; --on store
   const id = openBrainstorm();
   const bad = joinSeat(id, "architect", "--on", "agreed");
   assert.equal(bad.status, 1);
-  assert.match(bad.stderr, /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, quiet, back, opened, closed, urgent, phase, pause, resume, done, all-done, idle, stalled, liveness, flag/);
+  assert.match(bad.stderr, /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, quiet, back, opened, closed, urgent, phase, pause, resume, done, all-done, idle, stalled, gone, liveness, flag/);
   const ok = joinSeat(id, "architect", "--on", "agreement,any:merged");
   assert.equal(ok.status, 0, ok.stderr);
   const roster = run("roster");
@@ -1043,38 +1043,28 @@ test("open --transcript, slice --transcript and the seats file's transcript are 
   for (const help of [run("--help").stdout, run("--help", "code").stdout]) assert.doesNotMatch(help, /transcript/);
 });
 
-test("no transcript for a member: the board's liveness warning names it once (D8)", () => {
-  const id = String(openBrainstorm());
-  assert.equal(joinSeat(Number(id), "architect").status, 0);
-  const told = run("deliver", "--as", "idea/orchestrator").stdout;
-  assert.equal((told.match(/liveness: no readable transcript for idea\/architect/g) ?? []).length, 1, told);
-  run("doing", "--as", "idea/architect", "still here");
-  const again = run("deliver", "--as", "idea/orchestrator").stdout;
-  assert.doesNotMatch(again, /no readable transcript for idea\/architect/);
-});
-
-test("open starts the run's poller, its pid in the data home; close stops it", async () => {
+test("open starts no poller process, and the hidden poll verb is gone (US6, D13)", () => {
   const seats = path.join(toolRoot, "seats.json");
   fs.writeFileSync(seats, SEATS);
   const live = { ...env(), SWARM_NO_POLLER: "0" };
   const opened = spawnSync(process.execPath, [CLI, "open", "--kind", "brainstorm", "--group", "idea", "--title", "I", "--seats", seats], { cwd: repo, encoding: "utf8", env: live });
+  assert.equal(opened.status, 0, opened.stderr);
   const id = Number(opened.stdout.split("\n")[0]);
-  const pidFile = path.join(toolRoot, `swarm-poll-${id}.pid`);
-  for (let i = 0; i < 50 && !fs.existsSync(pidFile); i++) await new Promise((r) => setTimeout(r, 100));
-  const pid = Number(fs.readFileSync(pidFile, "utf8"));
-  const alive = (): boolean => {
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  assert.ok(alive());
-  spawnSync(process.execPath, [CLI, "close", "--run", String(id)], { cwd: repo, encoding: "utf8", env: live });
-  for (let i = 0; i < 50 && alive(); i++) await new Promise((r) => setTimeout(r, 100));
-  assert.ok(!alive(), "the poller stopped");
-  assert.ok(!fs.existsSync(pidFile));
+  assert.ok(!fs.readdirSync(toolRoot).some((f) => f.startsWith("swarm-poll-")), "no poller pid file");
+  const poll = spawnSync(process.execPath, [CLI, "poll", "--run", String(id)], { cwd: repo, encoding: "utf8", env: live, timeout: 20000 });
+  assert.notEqual(poll.status, 0, "poll is no verb");
+});
+
+test("status and roster print each member's state and what it is doing", () => {
+  const id = openRun();
+  assert.equal(run("join", "--run", String(id), "--slice", "S3", "--doing", "page").status, 0);
+  // no activity yet from its link: working, nothing open
+  assert.match(run("roster").stdout, /review-tool\/S3  run \d+  working  doing: page/);
+  const roster = JSON.parse(run("roster", "--json").stdout).roster.find((r: { name: string }) => r.name === "review-tool/S3");
+  assert.deepEqual([roster.state, roster.activity], ["working", null]);
+  assert.match(run("status").stdout, /^  review-tool\/S3  working$/m);
+  const status = JSON.parse(run("status", "--json").stdout).open.find((r: { run: number }) => r.run === id);
+  assert.equal(status.members.find((m: { name: string }) => m.name === "review-tool/S3").state, "working");
 });
 
 test("on a plan run too: the current phase heads wait, deliver and read, follows the roster at join, and sits beside the title in roster and status", () => {
@@ -1100,7 +1090,7 @@ test("on a plan run too: the current phase heads wait, deliver and read, follows
   assert.equal(JSON.parse(run("read", seqOf(posted.stdout), "--as", s3, "--json").stdout).phase, header);
 
   const joined = run("join", "--run", String(id), "--slice", "S5", "--doing", "skill").stdout.split("\n");
-  const lastRoster = joined.map((l) => / run \d+ {2}doing: /.test(l)).lastIndexOf(true);
+  const lastRoster = joined.map((l) => / run \d+ {2}\w+ .*doing: /.test(l)).lastIndexOf(true);
   assert.equal(joined[lastRoster + 1], header);
 
   assert.match(run("roster").stdout, new RegExp(`^run ${id} {2}A plan {2}phase build: the first wave {2}0/2 done$`, "m"));

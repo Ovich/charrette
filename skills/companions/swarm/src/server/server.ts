@@ -5,12 +5,12 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { WebSocketServer, type WebSocket } from "ws";
-import { openBoard, type Board } from "../board/board.ts";
+import { openBoard, type Board, type Presence } from "../board/board.ts";
 import { RPC_METHODS, bundleVersion, decode, encode, serverStateFile, type Call, type Frame, type Hello, type RpcMethod, type ServerState } from "../wire.ts";
 
 /** A resent call is answered from this cache for this long (D4). */
 const RESULT_CACHE_MS = 10 * 60 * 1000;
-/** The board's upkeep is looked at this often; it runs only when due (D13). */
+/** The board's upkeep is looked at this often, and every open run's liveness ticked (D13). */
 const UPKEEP_LOOK_MS = 1000;
 /** The ping that keeps a link's socket honest (D10). */
 const PING_EVERY_MS = 10 * 1000;
@@ -33,6 +33,23 @@ export async function startBoardServer(opts: { dataRoot: string; host?: string; 
   const version = bundleVersion();
   const speakers = new Set<Speaker>();
   const calls = new Map<string, CallRecord>();
+  /** Per run, per member (its seat or slice id): its link connected, else since when it is lost (D12). */
+  const links = new Map<number, Map<string, { connected: boolean; lostAt: number | null }>>();
+  const memberOf = (name: string): string => name.slice(name.lastIndexOf("/") + 1);
+  const linked = (m: NonNullable<Speaker["member"]>, connected: boolean): void => {
+    const run = links.get(m.run) ?? new Map<string, { connected: boolean; lostAt: number | null }>();
+    links.set(m.run, run);
+    run.set(memberOf(m.name), connected ? { connected: true, lostAt: null } : { connected: false, lostAt: now().getTime() });
+  };
+  const presenceIn = (run: number): Presence => (member) => links.get(run)?.get(member) ?? { connected: false, lostAt: null };
+  /** An upkeep or tick that throws is logged, and the server goes on (S21). */
+  const logged = (what: string, fn: () => void): void => {
+    try {
+      fn();
+    } catch (e) {
+      console.error(`swarm server: ${what} failed: ${(e as Error).stack ?? (e as Error).message}`);
+    }
+  };
 
   const send = (s: Speaker, f: Frame): void => {
     if (s.socket.readyState === s.socket.OPEN) s.socket.send(encode(f));
@@ -125,6 +142,7 @@ export async function startBoardServer(opts: { dataRoot: string; host?: string; 
           for (const other of speakers)
             if (f.supersede && other.member && other.member.name === f.member.name && other.member.run === f.member.run) refuse(other, "superseded");
           s.member = f.member;
+          linked(f.member, true);
         }
         welcomed = true;
         speakers.add(s);
@@ -133,10 +151,16 @@ export async function startBoardServer(opts: { dataRoot: string; host?: string; 
       if (f.type === "call") run(s, f);
       else if (f.type === "cancel") dropWait(f.id);
       else if (f.type === "bye") socket.close();
-      // activity: kept by phase 2 (member states); nothing reads it yet
+      else if (f.type === "activity" && s.member) {
+        const m = s.member;
+        logged("activity", () => board.recordActivity(m.run, memberOf(m.name), f.activity, now()));
+      }
     });
     socket.on("close", () => {
       speakers.delete(s);
+      // its link lost, unless another link of the same member took over (superseded)
+      const m = s.member;
+      if (m && ![...speakers].some((o) => o.member?.run === m.run && o.member.name === m.name)) linked(m, false);
       // D16: a wait whose link went is cancelled at once; resent after a reconnect, it runs again
       for (const [id, rec] of calls) if (rec.speaker === s && rec.answer === null && rec.cancelWait) dropWait(id);
     });
@@ -149,9 +173,13 @@ export async function startBoardServer(opts: { dataRoot: string; host?: string; 
   fs.writeFileSync(stateFile, JSON.stringify(state));
 
   const upkeep = setInterval(() => {
-    try {
-      board.upkeepIfDue(now());
-    } catch {}
+    const at = now();
+    logged("upkeep", () => board.upkeepIfDue(at));
+    // D13: the per-run poller's tick, in the server
+    logged("liveness", () => {
+      // one run's failing tick never stops another's
+      for (const r of board.runs()) logged(`liveness of run ${r.id}`, () => board.livenessTick(r.id, at, presenceIn(r.id)));
+    });
     const t = Date.now();
     for (const [id, rec] of calls) if (rec.answer !== null && t - rec.answeredAt > RESULT_CACHE_MS) calls.delete(id);
   }, UPKEEP_LOOK_MS);

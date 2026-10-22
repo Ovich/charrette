@@ -82,14 +82,15 @@ export const readTranscript: TranscriptReader = (file, from) => {
   return null;
 };
 
-/** The stall rule: silent `silenceMs` (no readable counter moved), `posted` stalled events since the
- *  last move; a new one is due at every whole `thresholdMs` of silence (60 s, 120 s, 180 s…). */
-export const stallDue = (silenceMs: number, posted: number, thresholdMs: number): boolean => silenceMs >= (posted + 1) * thresholdMs;
-
-/** Every member but the orchestrator inside a board wait: an `idle` to the orchestrator at each whole
- *  IDLE_MS while it holds, below the stall threshold (15, 30, 45 s). */
+/** Every member but the orchestrator `waiting`: an `idle` to the orchestrator at each whole IDLE_MS while it holds (15, 30, 45 s…). */
 export const IDLE_MS = 15000;
-/** The default stall threshold of a run, in ms. */
+/** The default stall threshold of a run, in ms: a member silent this long is `quiet` (swarm-relay D9, D11). */
 export const STALL_MS_DEFAULT = 60000;
 /** Readings older than this are pruned. */
 export const READINGS_KEPT_MS = 10 * 60 * 1000;
+/** A tool call open longer than this no longer makes its member `busy`: it is `quiet` (S21). */
+export const BUSY_MAX_MS = 15 * 60 * 1000;
+/** `stalled <member>` is told again after this, while the member stays `quiet` (D11). */
+export const STALLED_AGAIN_MS = 15 * 60 * 1000;
+/** A member's link closed and not back this long: the member is `gone` (D12). */
+export const LINK_LOST_MS = 30 * 1000;

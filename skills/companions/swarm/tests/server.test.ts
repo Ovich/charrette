@@ -7,9 +7,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { DatabaseSync } from "node:sqlite";
 import { openBoard } from "../src/board/board.ts";
 import { startBoardServer, stopBoardServer } from "../src/server/server.ts";
-import { decode, encode, serverStateFile, type Frame, type Hello, type RpcMethod, type ServerState } from "../src/wire.ts";
+import { decode, encode, serverStateFile, type Frame, type Hello, type MemberActivity, type RpcMethod, type ServerState } from "../src/wire.ts";
 
 const REPO = "/repos/one/.git";
 const SEATS = [
@@ -20,10 +21,13 @@ const SEATS = [
 let dir: string;
 let server: { url: string; close(): Promise<void> } | null;
 const sockets: WebSocket[] = [];
+/** The server's clock runs this far ahead of the real one: a test moves time without sleeping. */
+let skew = 0;
 
 beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-server-"));
-  server = await startBoardServer({ dataRoot: dir });
+  skew = 0;
+  server = await startBoardServer({ dataRoot: dir, now: () => new Date(Date.now() + skew) });
 });
 
 afterEach(async () => {
@@ -257,4 +261,97 @@ test("the built bundle, alone in an empty folder, runs serve, answers a client a
   await got(3);
   assert.deepEqual(frames[2], { type: "refused", reason: "shutdown" });
   assert.equal(fs.existsSync(serverStateFile(home)), false);
+});
+
+// ── liveness in the server (swarm-relay S21) ──────────────────────────────────────────
+const activity = (o: Partial<MemberActivity> = {}): MemberActivity => ({ grewAt: Date.now(), tokens: 0, context: null, openTool: null, lastTool: null, finished: false, ...o });
+/** Asks the snapshot every 100 ms until `ok`, or fails after `ms`. */
+const within = async <T>(c: Client, ms: number, pick: (snap: any) => T | undefined): Promise<T> => {
+  const until = Date.now() + ms;
+  for (;;) {
+    const got = pick(await value(c, "snapshot", REPO));
+    if (got !== undefined) return got;
+    if (Date.now() > until) assert.fail(`not within ${ms} ms`);
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
+const goneEvents = (snap: any): { body: string; mentions: string[] }[] => snap.events.filter((e: { event?: string }) => e.event === "gone");
+/** A run with S1 and S2 joined, and S1's link welcomed. */
+const linkedRun = async () => {
+  const c = await welcomed();
+  const run = await value(c, "openRun", { repo: REPO, group: "g", title: "T", seats: SEATS });
+  const s1 = (await value(c, "join", { run: run.id, slice: "S1", doing: "x", files: [] })).runner;
+  await value(c, "join", { run: run.id, slice: "S2", doing: "y", files: [] });
+  const link = await welcomed({ member: { name: s1.name, run: run.id } });
+  return { c, run, s1, link };
+};
+
+test("an activity frame from a member's link updates its member_activity row and a token reading; the snapshot carries state and doing", async () => {
+  const { c, run, link } = await linkedRun();
+  link.send({ type: "activity", at: Date.now(), activity: activity({ tokens: 77, openTool: { name: "Bash", target: "npm test", since: Date.now() } }) });
+  const live = await within(c, 3000, (snap) => snap.roster.find((r: { runner: string; liveness?: { tokens: number | null } }) => r.runner === "g/S1" && r.liveness?.tokens === 77)?.liveness);
+  assert.deepEqual([live.state, live.doing], ["busy", "Bash npm test"]);
+  const db = new DatabaseSync(path.join(dir, "swarm.sqlite"));
+  try {
+    assert.equal((db.prepare("SELECT COUNT(*) AS n FROM token_readings WHERE run = ? AND member = 'S1'").get(run.id) as { n: number }).n, 1);
+    assert.equal((db.prepare("SELECT open_tool FROM member_activity WHERE run = ? AND member = 'S1'").get(run.id) as { open_tool: string }).open_tool, "Bash");
+  } finally {
+    db.close();
+  }
+});
+
+test("gone is posted within 5 s of an activity with finished and no end, to the orchestrator alone (US3, D12)", async () => {
+  const { c, link } = await linkedRun();
+  const sent = Date.now();
+  link.send({ type: "activity", at: sent, activity: activity({ finished: true }) });
+  const gone = await within(c, 5000, (snap) => goneEvents(snap)[0]);
+  assert.ok(Date.now() - sent < 5000);
+  assert.deepEqual([gone.body, gone.mentions], ["gone g/S1: its agent finished without end", ["g/orchestrator"]]);
+});
+
+test("gone is posted within 35 s of a link lost and not back; never for an ended member (US3, D12)", async () => {
+  const { c, run, s1, link } = await linkedRun();
+  const s2 = await value(c, "participant", "g/S2");
+  const link2 = await welcomed({ member: { name: s2.name, run: run.id } });
+  link.socket.close();
+  await link.closed;
+  // S2 ends, then its link goes: never gone
+  await value(c, "end", s2);
+  link2.socket.close();
+  await link2.closed;
+  skew += 29_000;
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.equal(goneEvents(await value(c, "snapshot", REPO)).length, 0, "not before 30 s");
+  skew += 2_000;
+  const gone = await within(c, 4000, (snap) => goneEvents(snap)[0]);
+  assert.equal(gone.body, `gone ${s1.name}: its link was lost`);
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.deepEqual(goneEvents(await value(c, "snapshot", REPO)).map((e) => e.body), [`gone ${s1.name}: its link was lost`]);
+});
+
+test("an upkeep or tick that throws is logged to stderr, and the server goes on", async () => {
+  const { c, run, link } = await linkedRun();
+  const broken = await value(c, "openRun", { repo: REPO, group: "b", title: "B", seats: SEATS });
+  await value(c, "join", { run: broken.id, slice: "S1", doing: "x", files: [] });
+  // the broken run's tick throws: pruning its old token reading is refused by a trigger
+  const db = new DatabaseSync(path.join(dir, "swarm.sqlite"));
+  try {
+    db.prepare("INSERT INTO token_readings (run, member, t, tokens) VALUES (?, 'S1', '2000-01-01T00:00:00.000Z', 1)").run(broken.id);
+    db.exec(`CREATE TRIGGER refuse_prune BEFORE DELETE ON token_readings WHEN old.run = ${Number(broken.id)} BEGIN SELECT RAISE(ABORT, 'refused'); END`);
+  } finally {
+    db.close();
+  }
+  const logged: string[] = [];
+  const was = console.error;
+  console.error = (...a: unknown[]) => void logged.push(a.join(" "));
+  try {
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.ok(logged.some((l) => l.startsWith(`swarm server: liveness of run ${broken.id} failed`)), logged.join("\n"));
+    // the other run still ticks, and the server still answers
+    link.send({ type: "activity", at: Date.now(), activity: activity({ finished: true }) });
+    assert.equal((await within(c, 5000, (snap) => goneEvents(snap).find((e) => e.mentions.includes("g/orchestrator")))).body, "gone g/S1: its agent finished without end");
+    assert.ok((await value(c, "runs")).some((r: { id: number }) => r.id === run.id));
+  } finally {
+    console.error = was;
+  }
 });

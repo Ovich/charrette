@@ -5,8 +5,8 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Board } from "./board/board.ts";
 
-/** The Board methods a verb calls over the wire: all but onChange, close, livenessTick,
- *  upkeepIfDue, prune and flagStale, which only the server's own process runs. */
+/** The Board methods a verb calls over the wire: all but onChange, close, livenessTick, recordActivity,
+ *  memberStates, upkeepIfDue, prune and flagStale, which only the server's own process runs. */
 export const RPC_METHODS = [
   "openRun",
   "setSliceState",
@@ -21,7 +21,6 @@ export const RPC_METHODS = [
   "phaseProgress",
   "lastActivity",
   "owedPhase",
-  "registerTranscript",
   "setting",
   "runs",
   "join",
@@ -53,7 +52,7 @@ export const RPC_METHODS = [
 export type RpcMethod = (typeof RPC_METHODS)[number];
 
 /** The Board methods kept off the wire; with RPC_METHODS, every method of Board (checked below). */
-type ServerOnly = "onChange" | "close" | "livenessTick" | "upkeepIfDue" | "prune" | "flagStale";
+type ServerOnly = "onChange" | "close" | "livenessTick" | "recordActivity" | "memberStates" | "upkeepIfDue" | "prune" | "flagStale";
 // a Board method added later must be put on one side or the other: this fails to compile until it is
 type Unlisted = Exclude<keyof Board, RpcMethod | ServerOnly>;
 const everyMethodPlaced: [Unlisted] extends [never] ? true : Unlisted = true;
