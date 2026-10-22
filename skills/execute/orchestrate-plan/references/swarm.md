@@ -7,6 +7,11 @@ phases, seats and roles are the plan's *Mandate*; the cut is the `write-plan` sk
 
 ## The run
 
+- **Every phase runs on the board, from the first to the close, whatever its width.** A ground
+  phase of one seat is opened, dispatched and closed on the board like any other: the board is
+  the run's record, the person's view of it and the next phase's memory, not only a way to
+  share files. Running a phase without it, or merging a seat's work yourself, is changing the
+  mode, which is the person's (the `orchestrate` skill's `references/charter.md`).
 - **One board run for the plan**, opened before the first phase with the first phase's slices
   as its rows; a later phase's slices are added at its open (`slice add`). A row is a slice,
   `S<phase><seat>`, as the tracker numbers it; its `role` names the seat and its role in the phase, `seat2 · builder`.

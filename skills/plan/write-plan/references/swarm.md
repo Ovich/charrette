@@ -18,6 +18,8 @@ tracker and when the slice documents are written.
   phase. Most plans need one to three.
 - **Derive the phases from what each piece of work needs merged**: name, for each, the merged
   work it cannot start without; that, and nothing else, puts it in a later phase.
+- **A phase of one seat is still a phase**, a ground phase most often: on the board like the
+  others, never run outside it.
 - **A phase is seats working, nothing else.** A run of the person's (a gate, a trial) is a `👤`
   step; work of yours (a baseline, a check) is an orchestrator step. Neither is called a phase,
   and neither is added unless the person asks for it: offer it with its cost, never as a
