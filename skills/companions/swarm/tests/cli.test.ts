@@ -546,17 +546,10 @@ test("the launcher has no hook verb: usage, exit 1, and the usage never names a 
   }
 });
 
-// ── no page, no server (companions-merge D4) ─────────────────────────────────────
+// ── serve is a hidden verb (swarm-relay D6); its server is tested in server.test.ts ─────────
 
-test("serve is an unknown verb: exit 2, and --help lists no serve", () => {
-  for (const argv of [["serve"], ["serve", "--detach"], ["serve", "--detach", "--port", "4322", "--json"]]) {
-    const r = run(...argv);
-    assert.equal(r.status, 2, argv.join(" "));
-    assert.match(r.stderr, /unknown verb serve/);
-    assert.equal(r.stdout, "");
-  }
-  assert.equal(fs.existsSync(path.join(toolRoot, "swarm.pid")), false, "no server started");
-  for (const help of [run("--help"), run("--help", "code")]) assert.doesNotMatch(help.stdout, /\bserve\b/);
+test("--help lists no serve: the board server is a hidden verb", () => {
+  for (const help of [run("--help"), run("--help", "code")]) assert.doesNotMatch(help.stdout, /serve/);
 });
 
 test("status has no server: the data home, the store and the open runs", () => {

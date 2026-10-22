@@ -301,7 +301,8 @@ export interface Board {
    *  message that mentions `p`, is urgent, or is an event `p` subscribed to (D59) ends it, and only those are marked delivered; the rest
    *  stays for the next `deliver`. A runner has one live wait (D64): a newer `wait` of `p`, from
    *  any process, makes this one return at once, empty, with `superseded`. */
-  wait(p: Participant, opts?: { timeoutMs?: number; mentionsOnly?: boolean }): Promise<Delivery>;
+  /** `signal`: aborting it ends the wait at once, empty, its waiting cleared (swarm-relay D16). */
+  wait(p: Participant, opts?: { timeoutMs?: number; mentionsOnly?: boolean; signal?: AbortSignal }): Promise<Delivery>;
 
   /** A claim before an edit of `path` (absolute, or repository-relative), `swarm claim` (D58).
    *  Free: claimed, silently. Held by others (D40, D41): `p`'s first claim is held until `p` has
@@ -640,7 +641,13 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
   const signal = `${dbPath}.signal`;
   if (!fs.existsSync(signal)) fs.writeFileSync(signal, "0");
   let touches = 0;
-  const touch = (): void => fs.writeFileSync(signal, `${process.pid}:${++touches}`);
+  // the waits and watchers of this process, woken on its own commits at once (swarm-relay D14);
+  // another process's commits still reach them through the signal
+  const localWakers = new Set<() => void>();
+  const touch = (): void => {
+    fs.writeFileSync(signal, `${process.pid}:${++touches}`);
+    for (const wake of [...localWakers]) queueMicrotask(wake);
+  };
 
   const now = (): string => new Date().toISOString();
 
@@ -1582,7 +1589,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
     },
 
     wait(p, opts = {}) {
-      const { timeoutMs, mentionsOnly = false } = opts;
+      const { timeoutMs, mentionsOnly = false, signal: abort } = opts;
       const column = mentionsOnly ? "listening" : "waiting";
       // a runner inside a `wait` shows `waiting` on the page; inside a `wait --mentions`, `listening`
       // beside its state. One live wait per runner (D64): this one takes the next number and the page's state, and any
@@ -1603,6 +1610,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
           if (settled) return;
           settled = true;
           watcher?.close();
+          localWakers.delete(check);
+          abort?.removeEventListener("abort", onAbort);
           clearInterval(poll);
           clearTimeout(timer);
           try {
@@ -1629,7 +1638,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
           }
         };
         // watch first, then look: a post landing between the two is still seen
+        const onAbort = (): void => finish({ full: [], lines: [] });
+        if (abort?.aborted) return onAbort();
+        abort?.addEventListener("abort", onAbort);
         watcher = fs.watch(signal, check);
+        localWakers.add(check);
         poll = setInterval(check, WAIT_POLL_MS);
         if (timeoutMs !== undefined) timer = setTimeout(() => finish({ full: [], lines: [] }), timeoutMs);
         check();
@@ -1835,11 +1848,12 @@ export async function openBoard(dbPath: string = SQLITE_PATH, opts: { readTransc
           for (const repo of moved) for (const l of [...listeners]) l(repo);
         };
         const watcher = fs.watch(signal, check);
+        localWakers.add(check);
         const poll = setInterval(check, WAIT_POLL_MS);
         // watching must never be what keeps a process alive
         watcher.unref?.();
         poll.unref?.();
-        watching = { close: () => (watcher.close(), clearInterval(poll)) };
+        watching = { close: () => (watcher.close(), localWakers.delete(check), clearInterval(poll)) };
       }
       return () => {
         listeners.delete(listener);

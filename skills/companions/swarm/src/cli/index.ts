@@ -1009,9 +1009,12 @@ if (args.verb === "link") {
   }
 }
 if (args.verb === "serve") {
-  // swarm has no page and no server: aiview reads the board (companions-merge D4)
-  console.error(`swarm: unknown verb serve: swarm has no page; the board is read in aiview\n${USAGE}`);
-  process.exit(2);
+  // the board server (swarm-relay D2, D6): a hidden verb; `serve stop` ends the running one (D27)
+  const { startBoardServer, stopBoardServer, onBoardServerClosed } = await import("../server/server.ts");
+  if (args.positional[0] === "stop") process.exit((await stopBoardServer(DATA_ROOT)) ? 0 : 1);
+  const server = await startBoardServer({ dataRoot: DATA_ROOT });
+  onBoardServerClosed(DATA_ROOT, () => process.exit(0));
+  console.log(server.url);
 } else {
   const board = await openBoard();
   try {
