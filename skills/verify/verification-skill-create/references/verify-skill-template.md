@@ -1,6 +1,6 @@
 # The shape of `verify-<app>-<focus>/SKILL.md`
 
-Short, as a proven project skill is: an agent arriving cold reads it in a minute and works. Angle brackets are filled from the repository; the sentences outside them are carried as written. When the project already has a skill that runs the app, its words fill **Run the app** and its own sections as they are: it is proven, the template only wraps it.
+Short, as a proven project skill is: an agent arriving cold reads it in a minute and works. Angle brackets are filled from the repository; the sentences outside them are carried as written. When the project already has a skill that runs the app, **Run the app** names it and restates none of it.
 
 ```markdown
 ---
@@ -10,15 +10,15 @@ description: Use when an orchestrator's brief or the person asks for a <focus> v
 
 # Verify <app>: <focus>
 
-<The role prompt, written as `role-prompt.md` says: you are <app>'s quality owner and the owner of this skill, who the consumer is and what they come for, each expert role and what it answers for, in the product's terms.> You decide alone whether it is done as specified, usable without help, and finished. **You judge the product as its consumer meets it, never its code: you do not open the source to decide anything.** When this skill, its map or a state it starts from no longer matches the app, you fix them in place, in the same run.
+<The role prompt, written as `role-prompt.md` says: you are <app>'s quality owner and the owner of this skill, who the consumer is and what they come for, each expert role and what it answers for, in the product's terms.> You decide alone whether it is done as specified, usable without help, and finished. **You judge the product as its consumer meets it, never its code: you do not open the source to decide anything.** When this skill or a state it starts from no longer matches the app, you fix them in place, in the same run.
 
 ## Run the app
 
-<What runs and how to see it, how to start only what is down, the ready signal, who may start and stop it, how the browser or client the agent acts in is opened.>
+<The project skill that runs the app, named, its steps not restated; else what runs and how to see it, how to start only what is down, the ready signal, who may start and stop it, how the browser or client the agent acts in is opened.>
 
 ## Scope and inputs
 
-**A pass judges the scope it is given, and only that**: the orchestrator's brief or the person names it (what was delivered, the range, the parts), and what lies outside is not walked, judged or reported. **A pass names its inputs and judges against them**, each given in the scope or taken from its default here: <the inputs of this focus, each with its default; for example the services the app runs against (real or mocked, which model), the starting state, the data fed in, the reference each part is judged against (a specification, a prototype for a pixel match)>. An input neither given nor defaulted is asked for, never guessed. Content that varies with the inputs (what a real service returns) is judged for its shape and quality, never for matching a reference's example word for word. A result whose rightness depends on data the inputs do not settle (an empty answer, a count) is a question with its evidence, never a finding. The inputs open the report.
+**A pass judges the scope it is given, and only that**: the orchestrator's brief or the person names it (what was delivered, the range, the parts), and what lies outside is not walked, judged or reported. **A pass names its inputs and judges against them**, each given in the scope or taken from its default here: <the inputs of this focus, each with its default; for example the services the app runs against (real or mocked, which model), the starting state, the data fed in, the reference each part is judged against (a specification; the `design-prototype` skill's mockup or prototype, with the fidelity to hold: the experience, the layout, or a pixel match)>. An input neither given nor defaulted is asked for, never guessed. Content that varies with the inputs (what a real service returns) is judged for its shape and quality, never for matching a reference's example word for word. A result whose rightness depends on data the inputs do not settle (an empty answer, a count) is a question with its evidence, never a finding. The inputs open the report.
 
 ## Look
 

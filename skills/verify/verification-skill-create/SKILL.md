@@ -5,7 +5,7 @@ description: "Use when a project has no verifier for a focus (what is judged, th
 
 # Create a verification skill
 
-**One thing is produced, and a later agent works from it alone**: the project's verifier for one focus, `verify-<app>-<focus>` (plain `verify-<app>` while the project has one only). A project keeps as many as it has focuses, whatever they are; for example: the app judged end to end in its browser, a workflow judged on its workbench, the API judged by its requests. The skill is short, as a proven project skill is: an agent arriving cold reads it in a minute and works.
+**One thing is produced, and a later agent works from it alone**: the project's verifier for one focus, `verify-<app>-<focus>` (plain `verify-<app>` while the project has one only). A project keeps as many as it has focuses, whatever they are; for example: the app judged end to end in its browser, the API judged by its requests, whatever a project's workbench shows judged on it. The skill is short, as a proven project skill is: an agent arriving cold reads it in a minute and works.
 
 **The skill opens on its role prompt and leaves the judging to the agent**: one paragraph that makes the agent the product's quality owner, seen through expert roles (a web product's UI/UX expert and art director among them). Written as `references/role-prompt.md` says, read before the first line, with the surface's roles from its harness reference.
 
@@ -13,11 +13,12 @@ description: "Use when a project has no verifier for a focus (what is judged, th
 
 ## Before writing
 
-- **Settle the focus with the person first**: what this verifier judges and through what. **Stop if a verifier with that focus exists**: it keeps itself true when run. Say so; never overwrite one.
-- **A project skill that already runs the app is the base.** It is proven: its words are kept as they are, wrapped with the role prompt, the map and the judgment, and it is removed once the verify skill holds all of it.
-- **Establish from the repository, never by asking**: the consumer and what they come for, the interface they use, how the app starts and signals ready, the tool the agent acts through, where the specification lives (plans and their stories, decisions, reference mockups, the `design-prototype` skill's design language), the widths, themes and inputs the product supports, and **the inputs a pass of this focus depends on**, each with its default (`references/verify-skill-template.md`, *Scope and inputs*).
-- **The harness reference** of the interface, read for the tool to act through and the surface's expert roles: `references/web.md`, `api.md`, `service.md`, `cli.md` or `mcp.md`. A tool the agent operates is built as `references/tooling.md` says.
-- **Journeys come from the design**: the plans, the roadmap's slots, the README's promises. None: ask the person for the three to five the product exists for.
+**Four decisions are the person's, settled through the `interview` skill, one at a time, each proposed with its reason**: the focus, the inputs and their defaults, the experts, the feature to prove it on. The rest is established from the repository.
+
+- **Understand the project, then settle the focus with the person**: what this verifier judges and through what. The project can be anything (an app, a service, a library, a pipeline); the candidates come from what it is: every surface it offers its consumers and every way the project already runs or judges a part of it, each proposed with what it would judge and why, one recommended. The examples above are examples, never the list. **Stop if a verifier with that focus exists**: it keeps itself true when run. Say so; never overwrite one. A first verifier named plain `verify-<app>` is renamed to its focus when a second is created, on the person's yes.
+- **A project skill that already runs the app stays its own**, shared by every verifier: it is proven, and the next verifier needs it too. The verify skill names it in *Run the app* and restates none of it. None: the steps to run the app go in the verify skill, and a second verifier moves them into a skill of their own.
+- **Establish from the repository, never by asking**: the consumer and what they come for, the interface they use, how the app starts and signals ready, the tool the agent acts through, where the specification lives (plans and their stories, decisions, reference mockups, the `design-prototype` skill's design language), and **the inputs a pass of this focus depends on** (the widths and themes among them, where the focus has any), each with its default (`references/verify-skill-template.md`, *Scope and inputs*): a default follows the project's decisions first (its plans, its mockups and prototypes), its code second, and is the cheapest pass that answers the focus (the widths: the mockups', not the code's breakpoints); the rest the scope sets. **The reference and its fidelity is an input of every focus with a mockup or prototype**: the experience, the layout, or a pixel match.
+- **The harness reference** of the interface, read for the tool to act through and its observations, its expert roles an example to choose from (`references/role-prompt.md`): `references/web.md`, `api.md`, `service.md`, `cli.md` or `mcp.md`. A tool the agent operates is built as `references/tooling.md` says.
 
 ## The skill
 
@@ -25,7 +26,7 @@ description: "Use when a project has no verifier for a focus (what is judged, th
 
 ## Prove it
 
-**Run one quality pass through the generated skill** on a real scope, a feature at least. The skill is proven when the pass is complete: every part of the scope reached, judged against its inputs, the verdict and its findings table in its report. A `not ready` verdict proves it as well as `ready`; what the pass finds on the app is reported, never fixed inside this skill. A part it could not reach fails on the skill: fix it and run again.
+**Run one quality pass through the generated skill** on the feature to prove it on: the smallest delivered feature that exercises the focus, chosen only to prove the skill, never what the verifier covers. It is taken from the product as it stands now (the roadmap and the newest plans read first), with references that still describe it, never a feature since reworked, proposed to the person with what was established to run it (the start, the ready signal, how the agent's tool is opened), run on their yes or on the one they name instead. The skill is proven when the pass is complete: every part of the scope reached, judged against its inputs, the verdict and its findings table in its report. A `not ready` verdict proves it as well as `ready`; what the pass finds on the app is reported, never fixed inside this skill. A part it could not reach fails on the skill: fix it and run again.
 
 **Handoff**: the skill's path, its focus, the pass's report.
 

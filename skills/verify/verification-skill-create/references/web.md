@@ -1,10 +1,10 @@
 # Harness: a web front end
 
-**The tool**: a browser MCP the agent already has (the project's watched browser, Playwright MCP) before anything written: navigate, snapshot, click, type, resize, emulate the theme, screenshot, read the console and the network. With none, Playwright from the repository, headless, one fresh context per run, never the person's own browser.
+**The tool**: a browser MCP the agent already has (the project's watched browser, Playwright MCP) before anything written: navigate, snapshot, click, type, resize, emulate the theme, screenshot, read the console and the network. With none, Playwright from the repository, headless, one fresh context per run, never the person's own browser. **An MCP that attaches to a running browser** (a CDP endpoint) **needs its launcher**: the browser started on that port with its own profile and the consumer signed in, one script in the skill that runs the app, as `tooling.md` says.
 
 **The starting state** the way the consumer gets it, or the way the project's e2e support restores it (a seed onto a fresh person). Sign-in as the project's tests do it locally.
 
-**What to observe**: the screen at each state, at each width the product supports and in both themes; the outcome on the page the consumer would open next, never in the database; the console's errors and the failed requests; a reference mockup at the same width beside the app when the scope takes one. A page that scrolls inside its columns shows its fold only when the column is scrolled.
+**What to observe**: the screen at each state, at the widths and themes the pass's inputs name (by default those the product supports); the outcome on the page the consumer would open next, never in the database; the console's errors and the failed requests; a reference mockup at the same width beside the app when the scope takes one. A page that scrolls inside its columns shows its fold only when the column is scrolled.
 
 ## The role prompt of this surface
 
