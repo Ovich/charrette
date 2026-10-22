@@ -15,6 +15,7 @@ import { unclaimedLines } from "./unclaimed.ts";
 import { git } from "./git.ts";
 import { conflictsOf, headReflogLength } from "./conflicts.ts";
 import { readTranscript } from "../board/liveness.ts";
+import { runLink, type Binding } from "../link/link.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
@@ -990,6 +991,22 @@ if (args.verb === "--help") {
   // the core verbs; `--help code` the claim and merge verbs (D22)
   console.log(args.positional[0] === "code" ? CODE_USAGE : USAGE);
   process.exit(0);
+}
+if (args.verb === "link") {
+  // a member's link, spawned detached by join and open: not a member's verb, so not in the usage
+  try {
+    await runLink({
+      dataRoot: DATA_ROOT,
+      member: args.flag("--member") ?? "",
+      run: Number(args.flag("--run")),
+      session: process.env.CLAUDE_CODE_SESSION_ID ?? null,
+      binding: JSON.parse(args.flag("--binding") ?? "null") as Binding,
+    });
+    process.exit(0);
+  } catch (e) {
+    console.error(`swarm link: ${(e as Error).message}`);
+    process.exit(1);
+  }
 }
 if (args.verb === "serve") {
   // swarm has no page and no server: aiview reads the board (companions-merge D4)
