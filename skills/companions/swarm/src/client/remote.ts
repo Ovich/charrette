@@ -1,6 +1,7 @@
 // The board as the CLI sees it (swarm-relay D5, D6, D19, D29, D30): every Board call a verb makes,
 // awaited over a member's link or straight to the server, either started on demand.
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
@@ -16,8 +17,11 @@ export type BoardMember = { name: string; run: RunId };
 const START_TIMEOUT_MS = 5000;
 const START_POLL_MS = 50;
 
-/** The entry this CLI runs from, and the node flags it runs with: what a server or a link is spawned as (D28). */
-const entry = (): string[] => [...process.execArgv, process.argv[1]];
+/** The entry this CLI runs from: what a server or a link is spawned as (D28); no node flag of the caller carried over. */
+const entry = (): string[] => [process.argv[1]];
+
+/** The environment a server or a link of `dataRoot` runs in: that data home, whatever the caller's. */
+const homeEnv = (dataRoot: string): NodeJS.ProcessEnv => ({ ...process.env, CHARRETTE_HOME: dataRoot });
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -64,7 +68,7 @@ export async function ensureServer(dataRoot: string): Promise<ServerState> {
     fs.writeFileSync(serverLog(dataRoot), "");
     log = fs.openSync(serverLog(dataRoot), "a");
   } catch {}
-  const child = spawn(process.execPath, [...entry(), "serve"], { detached: true, stdio: ["ignore", log, log], windowsHide: true });
+  const child = spawn(process.execPath, [...entry(), "serve"], { detached: true, stdio: ["ignore", log, log], windowsHide: true, env: homeEnv(dataRoot) });
   let exited: string | null = null;
   child.on("exit", (code, signal) => (exited = signal ? `it was killed by ${signal}` : `it exited with code ${code}`));
   child.on("error", (e) => (exited = e.message));
@@ -78,7 +82,9 @@ export async function ensureServer(dataRoot: string): Promise<ServerState> {
   }
   let said = "";
   try {
-    said = fs.readFileSync(serverLog(dataRoot), "utf8").trim().split(/\r?\n/).pop() ?? "";
+    // the error a crash prints, else the server's last word
+    const lines = fs.readFileSync(serverLog(dataRoot), "utf8").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    said = lines.find((l) => /^(\w*Error|swarm\b)[^:]*:/.test(l)) ?? lines.filter((l) => !/^Node\.js v/.test(l)).pop() ?? "";
   } catch {}
   const reason = said || exited || `it did not answer within ${START_TIMEOUT_MS / 1000} s`;
   throw new Error(`swarm: the board server did not start: ${reason}; run swarm serve to see it`);
@@ -120,6 +126,7 @@ async function openLinkPipe(dataRoot: string, member: BoardMember, binding: Bind
     detached: true,
     stdio: "ignore",
     windowsHide: true,
+    env: homeEnv(dataRoot),
   });
   child.on("error", () => {});
   child.unref();
@@ -151,11 +158,13 @@ type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void };
 function caller(send: (f: Frame) => void): { call: (method: RpcMethod, args: unknown[]) => Promise<unknown>; settle: (f: Frame) => void; fail: (why: string) => void } {
   const pending = new Map<string, Pending>();
   let next = 0;
+  // the server answers a resent id from its cache (D4): ids unique across processes, a pid being reused
+  const callPrefix = crypto.randomUUID();
   let closed: string | null = null;
   return {
     call(method, args) {
       if (closed) return Promise.reject(new Error(closed));
-      const id = `c${process.pid}-${++next}`;
+      const id = `${callPrefix}-${++next}`;
       return new Promise((resolve, reject) => {
         pending.set(id, { resolve, reject });
         send({ type: "call", id, method, args });
