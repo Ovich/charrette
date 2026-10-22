@@ -25,9 +25,9 @@ description: "Use when a project has no verifier for a focus (what is judged, th
 
 ## Prove it
 
-**Run one quality pass through the generated skill** on a real scope, a feature at least. The skill is proven when the pass is complete: every part of the scope reached, judged against its inputs, the verdict and its findings in the verification document. A `not ready` verdict proves it as well as `ready`; what the pass finds on the app is reported, never fixed inside this skill. A part it could not reach fails on the skill: fix it and run again.
+**Run one quality pass through the generated skill** on a real scope, a feature at least. The skill is proven when the pass is complete: every part of the scope reached, judged against its inputs, the verdict and its findings table in its report. A `not ready` verdict proves it as well as `ready`; what the pass finds on the app is reported, never fixed inside this skill. A part it could not reach fails on the skill: fix it and run again.
 
-**Handoff**: the skill's path, its focus, the pass's verdict and its document.
+**Handoff**: the skill's path, its focus, the pass's report.
 
 ## Red flags
 

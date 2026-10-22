@@ -33,7 +33,7 @@ The completion notification ends a member; it does not tell you the work is heal
 
 ## Findings
 
-**Weigh every finding a member returns before anything acts on it** (a verifier's, a reviewer's, a runner's): you know the document, its decisions and the inputs, which the member may not. Each gets your opinion beside it: stands, its weight changed, a question for the person (a result that may be right for the data), or not a fault, with your reason. On a board, the finding is the member's post and your opinion the next post, in reply; nothing is dispatched before it. Only what stands reaches the next member's document, your opinion with it; the member that found it is told what you set aside before it looks again.
+**Weigh every finding a member returns before anything acts on it** (a verifier's, a reviewer's, a runner's): you know the document, its decisions and the inputs, which the member may not. **Findings travel as a table in a message, never in a document**: on a board, the member's post to you; in a dispatch, its return. **Your answer is the same table, two columns added**, `judgement` (stands, weight changed, a question for the person, not a fault) and `reason`: on a board your next post, in reply, before anything is dispatched; with no board, in the brief of the next member and of the one that looks again, and to the person in chat. Only the rows that stand reach a fix; the member that found them looks again only at those.
 
 ## A member that stops on a finding
 
