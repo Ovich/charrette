@@ -652,22 +652,18 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     `);
   }
 
-  // Waking and watching: every write moves its repository's version and touches this sibling
-  // file once committed; a wait and onChange watch it (one mechanism, D39).
-  const signal = `${dbPath}.signal`;
-  if (!fs.existsSync(signal)) fs.writeFileSync(signal, "0");
-  let touches = 0;
-  // the waits and watchers of this process, woken on its own commits at once (swarm-relay D14);
-  // another process's commits still reach them through the signal
+  // Waking and watching: every write moves its repository's version; once committed, the waits
+  // and watchers of this process are woken at once (swarm-relay D14): the server is the one
+  // process that writes, so no file carries the wake to another (no `.signal`, D14). The poll
+  // stays as the floor.
   const localWakers = new Set<() => void>();
   const touch = (): void => {
-    fs.writeFileSync(signal, `${process.pid}:${++touches}`);
     for (const wake of [...localWakers]) queueMicrotask(wake);
   };
 
   const now = (): string => new Date().toISOString();
 
-  // Re-entrant: an inner call inside an open transaction joins it. The signal is touched
+  // Re-entrant: an inner call inside an open transaction joins it. The wakers are woken
   // once, after the outermost commit, so a watcher never looks before the write is there.
   let depth = 0;
   let dirty = false;
@@ -692,7 +688,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       }
     }
   };
-  /** A write to `repo`: its version moves, and the signal is touched after the commit. */
+  /** A write to `repo`: its version moves, and the wakers are woken after the commit. */
   const bump = (repo: string): void => {
     db.prepare("INSERT INTO changes (repo, version) VALUES (?, 1) ON CONFLICT (repo) DO UPDATE SET version = version + 1").run(repo);
     if (depth > 0) dirty = true;
@@ -1617,13 +1613,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       const current = (): boolean => Number((db.prepare("SELECT wait_gen FROM participants WHERE id = ?").get(p.id) as Row).wait_gen) === gen;
       return new Promise<Delivery>((resolve, reject) => {
         let settled = false;
-        let watcher: fs.FSWatcher | undefined;
         let poll: NodeJS.Timeout | undefined;
         let timer: NodeJS.Timeout | undefined;
         const finish = (d: Delivery | Error): void => {
           if (settled) return;
           settled = true;
-          watcher?.close();
           localWakers.delete(check);
           abort?.removeEventListener("abort", onAbort);
           clearInterval(poll);
@@ -1651,11 +1645,10 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
             finish(e as Error);
           }
         };
-        // watch first, then look: a post landing between the two is still seen
+        // listen first, then look: a post landing between the two is still seen
         const onAbort = (): void => finish({ full: [], lines: [] });
         if (abort?.aborted) return onAbort();
         abort?.addEventListener("abort", onAbort);
-        watcher = fs.watch(signal, check);
         localWakers.add(check);
         poll = setInterval(check, WAIT_POLL_MS);
         if (timeoutMs !== undefined) timer = setTimeout(() => finish({ full: [], lines: [] }), timeoutMs);
@@ -1866,13 +1859,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           versions = next;
           for (const repo of moved) for (const l of [...listeners]) l(repo);
         };
-        const watcher = fs.watch(signal, check);
         localWakers.add(check);
         const poll = setInterval(check, WAIT_POLL_MS);
         // watching must never be what keeps a process alive
-        watcher.unref?.();
         poll.unref?.();
-        watching = { close: () => (watcher.close(), localWakers.delete(check), clearInterval(poll)) };
+        watching = { close: () => (localWakers.delete(check), clearInterval(poll)) };
       }
       return () => {
         listeners.delete(listener);

@@ -80,6 +80,8 @@ export type Call = { type: "call"; id: string; method: RpcMethod; args: unknown[
 export type Cancel = { type: "cancel"; id: string };
 export type Activity = { type: "activity"; at: number; activity: MemberActivity };
 export type Bye = { type: "bye"; reason: "ended" | "closed" | "finished" | "idle" };
+/** a reader (aiview) asks to hear every commit as `changed` (swarm-relay D23) */
+export type Subscribe = { type: "subscribe" };
 // down: the server to a link or a CLI
 export type Welcome = { type: "welcome"; version: string };
 export type Result = { type: "result"; id: string; ok: true; value: unknown } | { type: "result"; id: string; ok: false; error: string };
@@ -87,9 +89,9 @@ export type Refused = { type: "refused"; reason: "secret" | "version" | "superse
 /** to a reader that called subscribe, after each commit */
 export type Changed = { type: "changed"; repo: string };
 
-export type Frame = Hello | Call | Cancel | Activity | Bye | Welcome | Result | Refused | Changed;
+export type Frame = Hello | Call | Cancel | Activity | Bye | Subscribe | Welcome | Result | Refused | Changed;
 
-const FRAME_TYPES: ReadonlySet<string> = new Set<Frame["type"]>(["hello", "call", "cancel", "activity", "bye", "welcome", "result", "refused", "changed"]);
+const FRAME_TYPES: ReadonlySet<string> = new Set<Frame["type"]>(["hello", "call", "cancel", "activity", "bye", "subscribe", "welcome", "result", "refused", "changed"]);
 
 /** One JSON text. */
 export function encode(f: Frame): string {

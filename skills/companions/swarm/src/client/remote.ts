@@ -44,17 +44,18 @@ function readServerState(dataRoot: string): ServerState | null {
   }
 }
 
-/** A state naming a live process of this CLI's version. */
-const isCurrent = (s: ServerState | null): boolean => !!s && s.version === bundleVersion() && isAlive(s.pid);
+/** A state naming a live process of `swarmEntry`'s version. */
+const isCurrent = (s: ServerState | null, swarmEntry: string): boolean => !!s && s.version === bundleVersion(swarmEntry) && isAlive(s.pid);
 
 /** The server's own log, where `serve`'s errors land when the CLI started it. */
 const serverLog = (dataRoot: string): string => path.join(dataRoot, "swarm-server.log");
 
 /** The running server's state, started first when the state file names no live process or another
- *  version (D6, D28); a server that does not come up within 5 s fails with the D19 message. */
-export async function ensureServer(dataRoot: string): Promise<ServerState> {
+ *  version (D6, D28); a server that does not come up within 5 s fails with the D19 message. `swarmEntry`:
+ *  the swarm launcher a server is spawned and versioned from, this CLI's own by default (aiview names it). */
+export async function ensureServer(dataRoot: string, swarmEntry: string = entry()[0]): Promise<ServerState> {
   const found = readServerState(dataRoot);
-  if (found && isCurrent(found)) return found;
+  if (found && isCurrent(found, swarmEntry)) return found;
   // another version still running: stopped, then replaced (D28)
   if (found && found.pid !== process.pid && isAlive(found.pid)) {
     try {
@@ -68,7 +69,7 @@ export async function ensureServer(dataRoot: string): Promise<ServerState> {
     fs.writeFileSync(serverLog(dataRoot), "");
     log = fs.openSync(serverLog(dataRoot), "a");
   } catch {}
-  const child = spawn(process.execPath, [...entry(), "serve"], { detached: true, stdio: ["ignore", log, log], windowsHide: true, env: homeEnv(dataRoot) });
+  const child = spawn(process.execPath, [swarmEntry, "serve"], { detached: true, stdio: ["ignore", log, log], windowsHide: true, env: homeEnv(dataRoot) });
   let exited: string | null = null;
   child.on("exit", (code, signal) => (exited = signal ? `it was killed by ${signal}` : `it exited with code ${code}`));
   child.on("error", (e) => (exited = e.message));
@@ -76,7 +77,7 @@ export async function ensureServer(dataRoot: string): Promise<ServerState> {
   if (typeof log === "number") fs.closeSync(log);
   for (const until = Date.now() + START_TIMEOUT_MS; Date.now() < until; ) {
     const s = readServerState(dataRoot);
-    if (s && isCurrent(s)) return s;
+    if (s && isCurrent(s, swarmEntry)) return s;
     if (exited) break;
     await pause(START_POLL_MS);
   }
@@ -203,7 +204,7 @@ function callsOver(firstSend: (f: Frame) => void): Calls {
 }
 
 /** The anonymous connection to the server: a Hello with no member, then calls. */
-async function connectServer(state: ServerState): Promise<{ send: (f: Frame) => void; onFrame: (h: (f: Frame) => void) => void; onClose: (h: () => void) => void; close: () => void }> {
+export async function connectServer(state: ServerState): Promise<{ send: (f: Frame) => void; onFrame: (h: (f: Frame) => void) => void; onClose: (h: () => void) => void; close: () => void }> {
   const ws = new WebSocket(`ws://127.0.0.1:${state.port}`);
   let handler: (f: Frame) => void = () => {};
   let closer: () => void = () => {};

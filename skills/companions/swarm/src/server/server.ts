@@ -18,10 +18,13 @@ const PONG_WITHIN_MS = 25 * 1000;
 /** `serve stop` asks the running server here, over HTTP, the secret in a header (D27). */
 const STOP_PATH = "/stop";
 const SECRET_HEADER = "x-swarm-secret";
+/** How long a closing server lets its clients finish their close handshake. */
+const CLOSE_GRACE_MS = 500;
 
 const CALLABLE: ReadonlySet<string> = new Set(RPC_METHODS);
 
-type Speaker = { socket: WebSocket; member: Hello["member"] | null; lastPong: number };
+/** `subscribed`: a reader that sent `subscribe`, told `changed` after each commit (D23). */
+type Speaker = { socket: WebSocket; member: Hello["member"] | null; lastPong: number; subscribed: boolean };
 /** A call running or answered, keyed by its id, whatever connection sent it. */
 type CallRecord = { speaker: Speaker; answer: string | null; answeredAt: number; cancelWait: AbortController | null };
 
@@ -124,7 +127,7 @@ export async function startBoardServer(opts: { dataRoot: string; host?: string; 
   const wss = new WebSocketServer({ server: httpServer });
 
   wss.on("connection", (socket) => {
-    const s: Speaker = { socket, member: null, lastPong: Date.now() };
+    const s: Speaker = { socket, member: null, lastPong: Date.now(), subscribed: false };
     let welcomed = false;
     socket.on("pong", () => (s.lastPong = Date.now()));
     socket.on("message", (data) => {
@@ -154,7 +157,7 @@ export async function startBoardServer(opts: { dataRoot: string; host?: string; 
       else if (f.type === "activity" && s.member) {
         const m = s.member;
         logged("activity", () => board.recordActivity(m.run, memberOf(m.name), f.activity, now()));
-      }
+      } else if (f.type === "subscribe") s.subscribed = true;
     });
     socket.on("close", () => {
       speakers.delete(s);
@@ -171,6 +174,11 @@ export async function startBoardServer(opts: { dataRoot: string; host?: string; 
   const stateFile = serverStateFile(opts.dataRoot);
   fs.mkdirSync(opts.dataRoot, { recursive: true });
   fs.writeFileSync(stateFile, JSON.stringify(state));
+
+  // D23: every commit, as the board sees it in this process, told to the readers that subscribed
+  const stopTellingReaders = board.onChange((repo) => {
+    for (const s of speakers) if (s.subscribed) send(s, { type: "changed", repo });
+  });
 
   const upkeep = setInterval(() => {
     const at = now();
@@ -196,10 +204,14 @@ export async function startBoardServer(opts: { dataRoot: string; host?: string; 
     (closing ??= (async () => {
       clearInterval(upkeep);
       clearInterval(ping);
+      stopTellingReaders();
       for (const s of speakers) refuse(s, "shutdown");
       for (const id of [...calls.keys()]) dropWait(id);
-      await new Promise<void>((r) => wss.close(() => r()));
-      for (const c of wss.clients) c.terminate();
+      // wss.close waits for every client: one caught mid-close would hold it for its own timeout
+      const wssClosed = new Promise<void>((r) => wss.close(() => r()));
+      const cut = setTimeout(() => wss.clients.forEach((c) => c.terminate()), CLOSE_GRACE_MS);
+      await wssClosed;
+      clearTimeout(cut);
       await new Promise<void>((r) => httpServer.close(() => r()));
       board.close();
       try {

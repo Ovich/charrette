@@ -123,12 +123,11 @@ test("@swarm reaches its run only, @<plan>/S1 and @<CODE>·S3 cross; @all names 
 
 test("wait resolves within 100 ms of a post for it", async () => {
   const { s3, s5 } = twoRunners();
-  const poster = await another(); // a second connection, as a second process would hold
-  const s3There = poster.participant(s3.name)!;
+  // the post through the same board, as the server commits every call in its one process (swarm-relay D14)
   let posted = 0;
   setTimeout(() => {
     posted = Date.now();
-    poster.post(s3There, "@S5 done with src/a.ts");
+    board.post(s3, "@S5 done with src/a.ts");
   }, 300);
   const d = await board.wait(s5, { timeoutMs: 5000 });
   const latency = Date.now() - posted;
