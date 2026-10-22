@@ -16,9 +16,9 @@ phases, seats and roles are the plan's *Mandate*; the cut is the `write-plan` sk
 
 ## A phase
 
-1. **Its slices are cut**: the first phase's with the plan; a later one's now, with the
-   `write-slice` skill's `references/swarm.md`, from what the phases before taught. The tracker's
-   placeholder step becomes the slices.
+1. **Write its slices now**, one per seat, with the `write-slice` skill's `references/swarm.md`,
+   from the phase's goal and every seat's role and area in the plan, and from what the run taught
+   so far. The tracker's placeholder becomes the slices.
 2. **Open it**: `slice add` each slice, then the `swarm` skill's `phase <name> "<text>"`, the
    text naming every seat's role in it.
 3. **Dispatch every seat of the phase at once**, one fresh subagent each, each in its own git
@@ -35,6 +35,19 @@ phases, seats and roles are the plan's *Mandate*; the cut is the `write-plan` sk
    merged branch: the board's `all-done`, then that check. Only then the next phase is cut and
    opened. A seat that stopped on a finding ended on the board: fix the slice document and
    dispatch a fresh subagent into the same slice, or pause when the finding changes the phase.
+
+## The validator's phase
+
+**When the mandate's `validator:` is on**, it is dispatched once, at the run's open, with the
+first phase's seats: one board row, `validator`, its role from the *Mandate* verbatim in its
+brief, in a detached worktree; it merges nothing and lies dormant on the board. A building
+phase's text says the validator's part is none, so it marks itself done at once and waits.
+**Its phase is yours to announce**: open it with `phase`, its text the validator's task, and
+mention it, `@validator your turn: validate <branch> at <sha>`; no other seat is dispatched in it.
+A validator that ended (its context spent) is replaced by a fresh one in the same row. Answer it on the board when it talks
+to you; when it asks for a seat, dispatch one into a fix slice (`slice add`). **Its verdict decides
+the next cut**: the next phase as planned, amended, a fix phase, or a pause when a finding
+breaks a decision. Write what changed into the plan before cutting.
 
 ## Agreements
 

@@ -6,7 +6,8 @@ except `open`, `slice`, `close` and `status`.
 
 ## Open the run
 
-1. **The seats file**, one entry per member the run will have.   - **A plan**: the first phase's slices, each with its seat and role as `role` and the aiview
+1. **The seats file**, one entry per member the run will have.
+   - **A plan**: the first phase's slices, each with its seat and role as `role` and the aiview
      URL of its slice document as `link`; a later phase's are added at its open (*Slice states*):
 
      ```json

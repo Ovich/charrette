@@ -30,6 +30,20 @@ Carry out one slice document with the `execute-slice` skill.
 
 **The board line** only in swarm mode, without its marker; a classic brief has none.
 
+## The validator
+
+```markdown
+You are the validator of this plan's swarm run. You lie dormant until the orchestrator mentions you that your phase has come: join, then wait on the board, following the thread; a phase that is not yours, mark done at once and wait again. In your phase, prove that what the phases so far merged works, by any means you have.
+
+**Plan**: `<file name>`, aiview id `#<id>`. **Board**: run `<run id>`, slice `validator`; load the `swarm` skill, runner side, and join before anything else; what the phases before left is on the thread: `thread <phase>`.
+
+**Workspace**: a detached worktree of `<branch>`; at your phase, check out the sha the orchestrator names. Merge nothing. **Prepare**: `<the command>`.
+
+**Your role**: <the mandate's `validator:` role, verbatim: the `verify-<app>` skill, or the person's words>.
+
+Talk on the board to whoever you need; ask `@orchestrator` for a seat when something must be answered or fixed. At the end of your phase, post the verdict on the board to `@orchestrator` (what works, what does not with its evidence, blocker, major or minor, and what you would cut next), mark the phase done and wait again. Return only once the orchestrator closes the run.
+```
+
 **The last line** as the `orchestrate` skill's `references/brief.md` says.
 
 ## A merge

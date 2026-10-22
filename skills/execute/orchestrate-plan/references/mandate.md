@@ -16,8 +16,27 @@ Both are recommended, each for its work; recommend the one the plan fits, first.
 2. **classic**, recommended for a small or strictly sequential change: slices one after another,
    forks proved apart and joined at the end.
 
-**`seats:`** swarm mode only, asked with `mode:`: the number of seats, and any special seat.
-Propose it from the work, **4** for a normal plan, 2–3 small, 5–6 large, e.g. `seats 4 + validator`.
+**In swarm mode, three more fields, asked right after `mode:`, before the cut**, in their own
+exchange, never folded into the approval of the defaults. The rules behind them are the
+`write-plan` skill's `references/swarm.md`.
+
+**First show the run as one numbered table**, the same in every question that follows: each
+phase, what merged work it waits on, its goal, who works in it (which seats, the validator, the
+person), and every seat's role and area. Only the word *phase*: no wave, step or round. A `👤`
+step or an orchestrator step stands as a row of its own, named as such. Then ask, one field per
+message, each proposed from the work with its reason:
+
+- **`phases:`** the table itself: is the ordering right, is any phase there without a merge to
+  wait on, is any missing. A phase narrower than the seats is pointed out with the offer to
+  merge or shrink it. An extra (a baseline, a cross-review, a gate) is offered with its cost and
+  is in only on a yes.
+- **`seats:`** the number of seats working at once, proposed as the widest phase: **4** for a
+  normal plan, 2–3 small, 5–6 large.
+- **`validator:`** opt in. Ask whether they want one and when it runs: `after each phase`,
+  `at the end`, or `off`. Then what it does: the project's `verify-<app>` skill when there is
+  one, or a role the person describes in their own words (run the workbench, drive the app in
+  the browser, test it however it can), written into the *Mandate* as said. Any other special
+  seat (a reviewer of every merge) is asked the same way.
 
 **`pace:`**
 
@@ -54,4 +73,4 @@ the brief: `references/tests.md`.
 **`verify:`** `each slice | slot done | off`. Look for a `verify-<app>` skill in the project's
 local skill folder. It exists: ask "Verify after each slice (recommended), or once the slot is
 done?". It does not: ask whether to create one; yes runs `verification-skill-create` before the
-first slice, then the first question; no is `verify: off`. In `mode: swarm`, `each slice` means once per phase, and the validator seat runs it, alone in its phase.
+first slice, then the first question; no is `verify: off`. Not asked in `mode: swarm`: the `validator:` field replaces it.

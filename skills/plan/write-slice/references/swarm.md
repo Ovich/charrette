@@ -4,8 +4,9 @@ Read when the plan's mandate says `mode: swarm`. Everything else in this skill h
 
 - **The cut is the `write-plan` skill's `references/swarm.md`**: one slice per seat per phase,
   no fork proof, no blocker inside a phase.
-- **A phase's slices are cut when it is about to open**, the first phase's with the plan. Read
-  first what the phases before it left: their merges, the agreements and findings on the
+- **A slice is written when it is about to be dispatched**, at its phase's open, the first
+  phase's included, never with the plan. The plan gives the phase's goal and the seat's role and
+  area; read first what the run left so far: their merges, the agreements and findings on the
   board's thread (the `swarm` skill's `thread <phase>`), each seat's report. A slice says what
   it builds on from them. A finding that changes the phase's goal is a pause, not a recut.
 - **A phase of `tests: at the plan end`** is the plan's test slice, cut one slice per seat: each
