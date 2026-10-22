@@ -85,11 +85,10 @@ test("a post of A in one process wakes B's wait in another, through the server a
   assert.match(out, /start this listener again/);
 });
 
-test("the server and a link are started when absent, and the second verb in a row starts nothing (D6)", async () => {
+test("the server and a link are started when absent, a verb that finds no link answering spawning a detached one, and the second verb in a row starts nothing (D6, D32)", async () => {
   const r = fresh();
   const run = openTwoRunners(r);
   const member = { name: "review-tool/S3", run };
-  assert.ok(await answers(linkPipe(r.home, run, member.name)), "join started the member's link");
   stopServerOf(r.home);
   assert.ok(await until(() => state(r.home) === null || !alive(state(r.home)!.pid)), "serve stop stopped the server");
   await new Promise((res) => setTimeout(res, 500)); // its links see it go and exit
@@ -110,6 +109,47 @@ test("the server and a link are started when absent, and the second verb in a ro
   anon.close();
   assert.deepEqual(spawned, ["link", "serve"]);
   assert.equal(state(r.home)!.pid, pid);
+});
+
+test("join and open end on the command that starts the member's link; started from it, it answers the member's pipe, and the next verb starts no other (D32)", async () => {
+  const r = fresh();
+  const slices = path.join(r.home, "slices-link.json");
+  fs.writeFileSync(slices, JSON.stringify([{ id: "S3", title: "S3", blockers: [] }]));
+  const opened = r.cli(r.repo, "open", "--plan", "link-plan", "--title", "T", "--slices", slices).trimEnd().split(/\r?\n/);
+  const run = Number(opened[0]);
+  const linkLine = /^start your link now, in the background \(your harness's background task\): node (\S+) (link .*)$/;
+  assert.match(opened.at(-1)!, linkLine);
+  assert.ok(opened.at(-1)!.endsWith(`link --run ${run} --as link-plan/orchestrator`), opened.at(-1)!);
+  const joined = r.cli(r.wtA, "join", "--run", String(run), "--slice", "S3", "--doing", "x").trimEnd().split(/\r?\n/);
+  const [, entry, verb] = joined.at(-1)!.match(linkLine)!;
+  assert.equal(verb, `link --run ${run} --as link-plan/S3`);
+  assert.match(joined.at(-2)!, /^start your listener now, in the background/);
+  // no verb ran since join: no link of S3 yet
+  assert.equal(await answers(linkPipe(r.home, run, "link-plan/S3")), false, "join spawns no link of its own");
+  // the agent's background task
+  const link = spawn(process.execPath, [entry, ...verb.split(" ")], { cwd: r.wtA, env: { ...process.env, SWARM_ROOT: r.home, CHARRETTE_HOME: r.home }, stdio: "ignore" });
+  const linkExited = new Promise((resolve) => link.on("exit", resolve));
+  try {
+    let answered = false;
+    for (let i = 0; i < 100 && !answered; i++) {
+      answered = await answers(linkPipe(r.home, run, "link-plan/S3"));
+      if (!answered) await new Promise((res) => setTimeout(res, 50));
+    }
+    assert.ok(answered, "the started link answers the member's pipe");
+    const spawned = countSpawns();
+    const member = { name: "link-plan/S3", run };
+    const b = await connectBoard({ dataRoot: r.home, member });
+    try {
+      assert.equal((await b.participant(member.name))?.name, member.name);
+    } finally {
+      b.close();
+    }
+    assert.deepEqual(spawned, [], "the next verb started no other link");
+  } finally {
+    link.kill();
+    await linkExited;
+    stopServerOf(r.home);
+  }
 });
 
 test("a server of another version is stopped and replaced by the verb (D28)", async () => {

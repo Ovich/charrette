@@ -6,13 +6,12 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { bundleVersion, decode, encode, serverStateFile, type Call, type Frame, type ServerState } from "../wire.ts";
-
-import type { Binding } from "./transcripts.ts";
+import { bundleVersion, decode, encode, serverStateFile, type Activity, type Bye, type Call, type Frame, type ServerState } from "../wire.ts";
+import { locate, observe, type Binding, type TranscriptCursor } from "./transcripts.ts";
 
 type RunId = number;
 
-/** What started the link, kept for phase 2's transcript search (declared by transcripts.ts). */
+/** What started the link: the verb its transcript search looks for (declared by transcripts.ts). */
 export type { Binding };
 
 /** The link's clocks; tests shorten them. */
@@ -21,13 +20,17 @@ export type LinkTiming = {
   reconnectGiveUpMs: number;
   /** between two reconnect attempts */
   reconnectEveryMs: number;
-  /** no call on any pipe for this long, none pending: the link exits (D15) */
+  /** no call on any pipe and no transcript growth for this long, none pending: the link exits (D15) */
   idleMs: number;
+  /** between two looks at the transcript: a locate until found, then a read (D8) */
+  watchEveryMs: number;
+  /** the least time between two activity frames (D10) */
+  activityGapMs: number;
   /** at start, how long to wait for the server's state file */
   stateFileWaitMs: number;
 };
 
-const DEFAULT_TIMING: LinkTiming = { reconnectGiveUpMs: 60_000, reconnectEveryMs: 500, idleMs: 2 * 60 * 60_000, stateFileWaitMs: 5_000 };
+const DEFAULT_TIMING: LinkTiming = { reconnectGiveUpMs: 60_000, reconnectEveryMs: 500, idleMs: 2 * 60 * 60_000, stateFileWaitMs: 5_000, watchEveryMs: 1_000, activityGapMs: 3_000 };
 
 /** D7: keyed by the data home. `\\.\pipe\swarm-<hash>-<run>-<member>` on Windows, a socket file in
  *  the OS temp folder elsewhere. Built in code: a pipe path passed through Git Bash loses its
@@ -71,14 +74,15 @@ async function listenOnPipe(pipe: string, onPipe: (s: net.Socket) => void): Prom
 }
 
 /** Runs one member's link until it exits: its member's `end`, a `refused`, no server for a minute
- *  after a drop, or idle. Rejects only when no server state file appears at start. */
+ *  after a drop, idle, or its agent finished (D15). Meanwhile it finds its member's transcript and
+ *  sends the board what the agent is doing (D8, D10). Rejects only when no server state file appears at start. */
 export async function runLink(opts: {
   dataRoot: string;
   member: string;
   run: RunId;
-  session: string | null;
-  transcript?: string;
   binding: Binding;
+  /** where the transcript search reads the session and the harness root from; process.env by default */
+  env?: NodeJS.ProcessEnv;
   timing?: Partial<LinkTiming>;
 }): Promise<void> {
   const timing = { ...DEFAULT_TIMING, ...opts.timing };
@@ -96,7 +100,8 @@ export async function runLink(opts: {
   let socket: WebSocket | null = null;
   let welcomed = false;
   let exiting = false;
-  let lastCallAt = Date.now();
+  /** the last call on a pipe or growth of the transcript: what keeps the link from idling out */
+  let lastStirAt = Date.now();
   let finish!: () => void;
   const finished = new Promise<void>((r) => (finish = r));
 
@@ -104,11 +109,51 @@ export async function runLink(opts: {
     if (socket && welcomed && socket.readyState === WebSocket.OPEN) socket.send(encode(f));
   };
 
-  const exit = (bye?: "ended" | "idle") => {
+  // ── activity (D10): on change only, at most one per gap, behind the calls ──
+  /** the newest activity not yet sent; a newer one replaces it while the socket is behind */
+  let queuedActivity: Activity | null = null;
+  let lastActivitySentAt = -Infinity;
+  /** sends the queued activity when the socket has nothing of the calls left to write; `now`: the gap ignored */
+  const flushActivity = (now = false) => {
+    if (!queuedActivity || !socket || !welcomed || socket.readyState !== WebSocket.OPEN) return;
+    if (!now && (socket.bufferedAmount > 0 || Date.now() - lastActivitySentAt < timing.activityGapMs)) return;
+    socket.send(encode(queuedActivity));
+    lastActivitySentAt = Date.now();
+    queuedActivity = null;
+  };
+
+  let transcript: string | null = null;
+  let cursor: TranscriptCursor | null = null;
+  let lastSeen: string | null = null;
+  const env = opts.env ?? process.env;
+  /** one look: locate until found (D8), then read what was appended; a change queues an activity */
+  const watchTranscript = () => {
+    if (exiting) return;
+    transcript ??= locate(opts.binding, env);
+    if (!transcript) return; // not found (yet), or a harness that keeps none: no activity
+    const read = observe(transcript, cursor);
+    const grew = read.cursor.offset !== cursor?.offset;
+    cursor = read.cursor;
+    if (grew) lastStirAt = Date.now();
+    const seen = JSON.stringify(read.activity);
+    if (seen !== lastSeen) {
+      lastSeen = seen;
+      queuedActivity = { type: "activity", at: Date.now(), activity: read.activity };
+    }
+    if (read.activity.finished) {
+      // the harness says the agent ended (E14): the last activity, then bye
+      flushActivity(true);
+      return exit("finished");
+    }
+    flushActivity();
+  };
+
+  const exit = (bye?: Bye["reason"]) => {
     if (exiting) return;
     exiting = true;
     if (bye) sendUp({ type: "bye", reason: bye });
     clearInterval(idleCheck);
+    clearInterval(watch);
     pipeServer?.close();
     for (const p of pipes) p.end(); // a result just written still reaches its CLI
     socket?.close();
@@ -119,6 +164,7 @@ export async function runLink(opts: {
     if (f.type === "welcome") {
       welcomed = true;
       for (const { call } of unanswered.values()) sendUp(call); // D4: resent, answered from the cache
+      flushActivity();
     } else if (f.type === "refused") {
       exit();
     } else if (f.type === "result") {
@@ -193,7 +239,7 @@ export async function runLink(opts: {
           continue;
         }
         if (f.type === "call") {
-          lastCallAt = Date.now();
+          lastStirAt = Date.now();
           unanswered.set(f.id, { call: f, pipe });
           sendUp(f);
         } else if (f.type === "cancel") {
@@ -218,10 +264,12 @@ export async function runLink(opts: {
   if (!pipeServer) return; // one link per member per data home: this one is the second
 
   const idleCheck = setInterval(() => {
-    if (unanswered.size === 0 && Date.now() - lastCallAt >= timing.idleMs) exit("idle");
+    if (unanswered.size === 0 && Date.now() - lastStirAt >= timing.idleMs) exit("idle");
   }, Math.min(60_000, Math.max(10, Math.floor(timing.idleMs / 4))));
 
+  const watch = setInterval(watchTranscript, timing.watchEveryMs);
   if (state.version !== bundleVersion()) return exit(); // D28: a server of another version would refuse it
   void connectionLoop();
+  watchTranscript();
   return finished;
 }

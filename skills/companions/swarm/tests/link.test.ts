@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { linkPipe, runLink, type LinkTiming } from "../src/link/link.ts";
 import { bundleVersion, decode, encode, serverStateFile, type Call, type Frame } from "../src/wire.ts";
+import { bashCall, textLine, writeSubagent } from "./fixtures/transcripts.ts";
 
 const MEMBER = "plan-x/S1";
 const RUN = 68;
@@ -96,9 +97,13 @@ function writeState(home: string, port: number) {
   fs.writeFileSync(serverStateFile(home), JSON.stringify({ pid: process.pid, port, secret: "s3cret", version: bundleVersion() }));
 }
 
+/** A link with no session to search: it sends no activity. */
 function startLink(home: string, timing: Partial<LinkTiming> = FAST, member = MEMBER) {
+  return runLinkWith(home, {}, timing, member);
+}
+function runLinkWith(home: string, env: NodeJS.ProcessEnv, timing: Partial<LinkTiming> = FAST, member = MEMBER) {
   let exited = false;
-  const done = runLink({ dataRoot: home, member, run: RUN, session: null, binding: { verb: "join", run: RUN, seat: "S1" }, timing }).then(() => {
+  const done = runLink({ dataRoot: home, member, run: RUN, env, binding: { verb: "join", run: RUN, seat: "S1" }, timing }).then(() => {
     exited = true;
   });
   return { done, exited: () => exited };
@@ -260,4 +265,135 @@ test("pipe names differ by data home; a second link of the same member exits at 
 test("no server state file: the link gives up after its wait, naming the data home", async () => {
   const home = dataHome();
   await assert.rejects(startLink(home, { ...FAST, stateFileWaitMs: 200 }).done, (e: Error) => e.message.includes(home));
+});
+
+// ── activity (swarm-relay S22: D8, D10, D15), from fixture sessions under SWARM_TRANSCRIPTS_ROOT ──
+
+const SESSION = "33333333-aaaa-bbbb-cccc-000000000003";
+const PROJECT = "C--repos-link";
+const JOIN_COMMAND = `node C:/x/swarm.mjs join --run ${RUN} --slice S1 --doing "start"`;
+
+/** A fixture session root, and the environment a link of that session sees. */
+function sessionRoot() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-link-session-"));
+  homes.push(root);
+  return { root, env: { CLAUDE_CODE_SESSION_ID: SESSION, SWARM_TRANSCRIPTS_ROOT: root } as NodeJS.ProcessEnv };
+}
+const usage = (n: number) => ({ input_tokens: n, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 });
+const activities = (frames: Frame[]) => frames.filter((f): f is Extract<Frame, { type: "activity" }> => f.type === "activity");
+
+/** Records when each frame arrived, answering as the default stub does. */
+function timedAnswers(arrivals: { f: Frame; at: number }[]) {
+  return (f: Frame, conn: StubConnection) => {
+    arrivals.push({ f, at: Date.now() });
+    defaultAnswers(f, conn);
+  };
+}
+
+test("a link whose session holds its member's join sends a first activity within 2 s of the join being written, locate retried each second (US1, D8)", async () => {
+  const arrivals: { f: Frame; at: number }[] = [];
+  const server = await stubServer(timedAnswers(arrivals));
+  servers.push(server);
+  const { root, env } = sessionRoot();
+  const link = runLinkWith(dataHome(server.port), env, { ...FAST, watchEveryMs: 1000, activityGapMs: 3000 });
+  await pause(1200); // the link has looked, and found nothing
+  assert.equal(activities(server.frames()).length, 0);
+  const writtenAt = Date.now();
+  writeSubagent(root, PROJECT, SESSION, "a1", [bashCall(JOIN_COMMAND)], {});
+  await until("a first activity", () => activities(server.frames()).length > 0, 2500);
+  const first = arrivals.find((a) => a.f.type === "activity")!;
+  assert.ok(first.at - writtenAt <= 2000, `${first.at - writtenAt} ms after the join was written`);
+  await exitLink(server, link);
+});
+
+test("activity is sent only on change, never more than one per gap (D10)", async () => {
+  const arrivals: { f: Frame; at: number }[] = [];
+  const server = await stubServer(timedAnswers(arrivals));
+  servers.push(server);
+  const { root, env } = sessionRoot();
+  const file = writeSubagent(root, PROJECT, SESSION, "a1", [bashCall(JOIN_COMMAND)], {});
+  const link = runLinkWith(dataHome(server.port), env, { ...FAST, watchEveryMs: 20, activityGapMs: 300 });
+  await until("a first activity", () => activities(server.frames()).length === 1);
+  // growing every 20 ms for a second: never more than one per 300 ms
+  for (let i = 0; i < 50; i++) {
+    fs.appendFileSync(file, JSON.stringify(textLine(`step ${i}`, usage(i + 1))) + "\n");
+    await pause(20);
+  }
+  await pause(400);
+  const sent = arrivals.filter((a) => a.f.type === "activity").map((a) => a.at);
+  assert.ok(sent.length >= 3, `${sent.length} activities`);
+  for (let i = 1; i < sent.length; i++) assert.ok(sent[i] - sent[i - 1] >= 280, `gap ${sent[i] - sent[i - 1]} ms`);
+  assert.equal(activities(server.frames()).at(-1)!.activity.context, 50, "the newest state is the last sent");
+  // nothing changes: nothing is sent
+  const before = activities(server.frames()).length;
+  await pause(700);
+  assert.equal(activities(server.frames()).length, before);
+  await exitLink(server, link);
+});
+
+test("activity queues behind calls, a queued one replaced by a newer while the socket is behind (D10, §3)", async () => {
+  let welcoming = false;
+  const server = await stubServer((f, conn) => {
+    if (f.type === "hello") {
+      const answer = (): unknown => (welcoming ? conn.send({ type: "welcome", version: f.version }) : setTimeout(answer, 20));
+      answer();
+    }
+    if (f.type === "call") conn.send({ type: "result", id: f.id, ok: true, value: f.method });
+  });
+  servers.push(server);
+  const { root, env } = sessionRoot();
+  const home = dataHome(server.port);
+  const file = writeSubagent(root, PROJECT, SESSION, "a1", [bashCall(JOIN_COMMAND)], {});
+  const link = runLinkWith(home, env, { ...FAST, watchEveryMs: 20, activityGapMs: 0 });
+  const cli = await openPipe(home);
+  cli.call({ id: "c1", method: "roster", args: [] });
+  // not welcomed yet: nothing goes up; three changes, the newest kept
+  for (let i = 1; i <= 3; i++) {
+    fs.appendFileSync(file, JSON.stringify(textLine(`step ${i}`, usage(i * 10))) + "\n");
+    await pause(80);
+  }
+  welcoming = true;
+  await until("the call answered", () => cli.received.length === 1);
+  await until("an activity", () => activities(server.frames()).length > 0);
+  await pause(100);
+  const frames = server.frames();
+  const sent = activities(frames);
+  const callAt = frames.findIndex((f) => f.type === "call" && f.id === "c1");
+  assert.ok(callAt >= 0 && callAt < frames.indexOf(sent[0]), "the call went before the activity");
+  assert.equal(sent.length, 1, "one activity: the queued ones replaced");
+  assert.equal(sent[0].activity.context, 30);
+  await exitLink(server, link);
+});
+
+test("finished: true in the transcript's meta.json: a last activity, bye finished, and the link exits (D15, E14)", async () => {
+  const server = await stubServer();
+  servers.push(server);
+  const { root, env } = sessionRoot();
+  writeSubagent(root, PROJECT, SESSION, "a1", [bashCall(JOIN_COMMAND)], {});
+  const link = runLinkWith(dataHome(server.port), env, { ...FAST, watchEveryMs: 20, activityGapMs: 3000 });
+  await until("a first activity", () => activities(server.frames()).length === 1);
+  writeSubagent(root, PROJECT, SESSION, "a1", [bashCall(JOIN_COMMAND), textLine("done", usage(7))], { finished: true });
+  await link.done;
+  await until("the bye reached the server", () => server.frames().some((f) => f.type === "bye"));
+  const frames = server.frames();
+  const last = activities(frames).at(-1)!;
+  assert.equal(activities(frames).length, 2, "the last one sent at once, the gap aside");
+  assert.equal(last.activity.finished, true);
+  assert.deepEqual(frames.at(-1), { type: "bye", reason: "finished" });
+  assert.equal(frames.indexOf(last), frames.length - 2);
+});
+
+test("no transcript found (no session id, or another harness): the link sends no activity, and still relays calls", async () => {
+  const server = await stubServer();
+  servers.push(server);
+  const { root } = sessionRoot();
+  writeSubagent(root, PROJECT, SESSION, "a1", [bashCall(JOIN_COMMAND)], {});
+  const home = dataHome(server.port);
+  const link = runLinkWith(home, { SWARM_TRANSCRIPTS_ROOT: root }, { ...FAST, watchEveryMs: 20 });
+  const cli = await openPipe(home);
+  cli.call({ id: "c1", method: "roster", args: [] });
+  await until("the call answered", () => cli.received.length === 1);
+  await pause(300);
+  assert.equal(activities(server.frames()).length, 0);
+  await exitLink(server, link);
 });

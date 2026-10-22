@@ -112,17 +112,16 @@ function connectPipe(pipe: string): Promise<net.Socket | null> {
   });
 }
 
-/** Spawns the member's link when its pipe does not answer; a link that died comes back on the next verb (D6). */
-export async function ensureLink(dataRoot: string, member: BoardMember, binding: Binding): Promise<void> {
-  const s = await openLinkPipe(dataRoot, member, binding);
-  s.destroy();
-}
+/** The hidden verb that runs `member`'s link, its binding derived from the name (D29, D32). */
+export const linkVerbArgs = (member: BoardMember): string[] => ["link", "--run", String(member.run), "--as", member.name];
 
-async function openLinkPipe(dataRoot: string, member: BoardMember, binding: Binding): Promise<net.Socket> {
+/** The member's pipe; when no link answers on it, a detached one is spawned first: the fallback for an
+ *  agent that did not start its own as a background task (D32), and a link that died comes back (D6). */
+async function openLinkPipe(dataRoot: string, member: BoardMember): Promise<net.Socket> {
   const pipe = linkPipe(dataRoot, member.run, member.name);
   const there = await connectPipe(pipe);
   if (there) return there;
-  const child = spawn(process.execPath, [...entry(), "link", "--run", String(member.run), "--member", member.name, "--binding", JSON.stringify(binding)], {
+  const child = spawn(process.execPath, [...entry(), ...linkVerbArgs(member)], {
     detached: true,
     stdio: "ignore",
     windowsHide: true,
@@ -239,7 +238,7 @@ export async function connectBoard(opts: { dataRoot: string; member?: BoardMembe
   const state = await ensureServer(opts.dataRoot);
   if (opts.member) {
     const member = opts.member;
-    const sock = await openLinkPipe(opts.dataRoot, member, bindingOf(member));
+    const sock = await openLinkPipe(opts.dataRoot, member);
     const calls = callsOver((f) => sock.write(`${encode(f)}
 `));
     lineFrames(sock, (f) => calls.settle(f));

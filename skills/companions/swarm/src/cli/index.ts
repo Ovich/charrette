@@ -7,7 +7,7 @@ import { openBoard, type Declared, type Delivery, type Flag, type Kind, type Mes
 import { profileOf } from "../board/kinds.ts";
 import { EVENTS, eventOf, formatSubscriptions, parseSubscriptions, type Subscription } from "../board/events.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
-import { connectBoard, ensureLink, type RemoteBoard } from "../client/remote.ts";
+import { bindingOf, connectBoard, linkVerbArgs, type BoardMember, type RemoteBoard } from "../client/remote.ts";
 import { parseArgs } from "./args.ts";
 import { fullText, seqLine } from "./format.ts";
 import { nameHandle, unmatchedMentions } from "../board/mentions.ts";
@@ -16,7 +16,7 @@ import { unclaimedLines } from "./unclaimed.ts";
 import { git } from "./git.ts";
 import { conflictsOf, headReflogLength } from "./conflicts.ts";
 import { readTranscript } from "../board/liveness.ts";
-import { runLink, type Binding } from "../link/link.ts";
+import { runLink } from "../link/link.ts";
 
 const args = parseArgs(process.argv.slice(2));
 const asJson = args.has("--json");
@@ -25,18 +25,18 @@ const FORGOTTEN_MS = 24 * 60 * 60 * 1000;
 
 const USAGE = [
   "usage: swarm <verb> [--json]        (swarm --help code: the claim and merge verbs)",
-  "  open    --kind plan|brainstorm --group <slug> --title <t> --seats <file.json> [--link <url>] [--transcript <path>] [--stall-ms <ms>]   # opens a run, registers the project's board in aiview, starts its stall poller, prints the run id then the board's URL (orchestrator)",
-  "          # --transcript: your own transcript, its token counter read for the stall check; --stall-ms: no counter moved this long posts stalled, default 60000",
+  "  open    --kind plan|brainstorm --group <slug> --title <t> --seats <file.json> [--link <url>] [--stall-ms <ms>]   # opens a run, registers the project's board in aiview, starts its stall poller, prints the run id then the board's URL (orchestrator)",
+  "          # --stall-ms: no counter moved this long posts stalled, default 60000; ends on the command that starts your link",
   "          # --plan <slug> --slices <file.json>: the same as --kind plan --group <slug> --seats <file.json>",
-  '          # the seats file: [{"id", "title", "role"?, "blockers": [...], "link"?: "<URL>", "on"?: ["agreement", …], "transcript"?: "<path>"}]',
-  "  slice   <id> --run <id> [--state ready|running|done|blocked] [--transcript <path>]   # --transcript: the dispatched member's transcript, after dispatch (orchestrator)",
+  '          # the seats file: [{"id", "title", "role"?, "blockers": [...], "link"?: "<URL>", "on"?: ["agreement", …]}]',
+  "  slice   <id> --run <id> --state ready|running|done|blocked     # (orchestrator)",
   "  slice   add <id> --run <id> --title <t> [--blockers a,b] [--link <url>] [--role <r>] [--on <events>]   # adds a slice or seat mid-run (orchestrator)",
   "  phase   <name> <text> [--as <member>]                           # opens phase <name>; the current phase ends with it: a separator on the thread that wakes every member of the run (orchestrator)",
   "  pause   [<text>] [--as <member>]                               # every member stops where it is and waits; claim and merge-lock refused, no stall, quiet or stale alert until resume (orchestrator)",
   "  resume  [<message>] [--as <member>]                             # lifts the pause; every member wakes on the message and continues (orchestrator)",
   "  done    <phase> [--as <member>]                                 # your part of the current phase is in: tells the orchestrator; when every member is done, the board tells it",
   "  close   --run <id>                                              # (orchestrator)",
-  '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # --slice <id> the same; a file not there yet is one you create, declared from the repository root; prints the roster, then how you listen: a seat waits in the foreground, a slice runner listens in the background',
+  '  join    --run <id> --seat <id> --doing <t> [--files "<path>:interface,<path>:inside,…"]   # --slice <id> the same; a file not there yet is one you create, declared from the repository root; prints the roster, how you listen (a seat waits in the foreground, a slice runner listens in the background), then the command that starts your link',
   "          # --on <events>: what wakes your wait --mentions besides mentions and urgent posts, e.g. agreement,any:merged; else the seat row's on, else the kind's defaults",
   "  subscribe   [--as <member>] <events>                            # prints your subscriptions after",
   "  unsubscribe [--as <member>] <events>",
@@ -109,19 +109,10 @@ const emit = (json: unknown, human: string | (() => void)): void => {
   } else human();
 };
 
-/** A `liveness` warning for a transcript `open` or `slice` registers, printed at once: a missing, empty or
- *  unparseable file is no transcript (an empty task-output file is the usual mistake); null when it reads. */
-function transcriptWarning(member: string, file: string): string | null {
-  let size: number;
-  try {
-    size = fs.statSync(file).size;
-  } catch {
-    return `liveness: ${member}'s transcript ${file} does not exist: the stall check is blind for it; register the agent's own transcript`;
-  }
-  if (size === 0) return `liveness: ${member}'s transcript ${file} is empty: not a transcript, the stall check is blind for it; register the agent's own transcript, not its task output`;
-  if (!readTranscript(file, null)) return `liveness: ${member}'s transcript ${file} is in no known format: the stall check is blind for it; register the agent's own transcript`;
-  return null;
-}
+/** The flag D24 removed: no member, and no orchestrator, ever names a transcript; the link finds it. */
+const refuseTranscriptFlag = (verb: string): void => {
+  if (args.has("--transcript")) fail(`${verb}: unknown flag --transcript\n${USAGE}`);
+};
 
 /** The repository (D29): its common git dir, so every worktree of one repository is one. */
 function repoOf(dir: string): string {
@@ -272,6 +263,10 @@ const self = (): string[] => ["node", shellWord(process.argv[1].replace(/\\/g, "
 /** How a member listens, the one source the docs point at: a seat waits in the foreground (a subagent
  *  that ends its turn is gone, no background listener wakes it); the orchestrator and a slice runner
  *  listen in the background while they work. */
+/** The last line of join and open (D32, AGENTS rule 10): the member's link, run as its agent's own
+ *  background task, so a stopped agent takes it down; a verb that finds none spawns one detached. */
+const startLinkLine = (member: BoardMember): string =>
+  `start your link now, in the background (your harness's background task): ${[...self(), ...linkVerbArgs(member).map(shellWord)].join(" ")}`;
 const listensInForeground = (p: Pick<Participant, "slice" | "kind">): boolean => p.slice !== "orchestrator" && profileOf(p.kind).member === "seat";
 const waitCommand = (name: string): string => [...self(), "wait", "--mentions", "--as", shellWord(name)].join(" ");
 /** The line that starts a member's listener: the exact command, --as included (D61); `afterPhase`: it
@@ -407,8 +402,10 @@ function readSlices(file: string): SliceSpec[] {
   }
   const list = Array.isArray(raw) ? raw : (raw as { slices?: unknown }).slices;
   if (!Array.isArray(list)) return fail(`${file}: expected an array of {id, title, blockers}`);
-  return list.map((s: { id?: unknown; title?: unknown; role?: unknown; blockers?: unknown; link?: unknown; on?: unknown; transcript?: unknown }) => {
+  return list.map((s: { id?: unknown; title?: unknown; role?: unknown; blockers?: unknown; link?: unknown; on?: unknown }) => {
     if (typeof s.id !== "string") fail(`${file}: a slice without an id`);
+    // D24: the link finds each member's transcript; a seat row naming one is refused
+    if ("transcript" in s) fail(`${file}: unknown field transcript in ${s.id}`);
     return {
       id: String(s.id),
       title: String(s.title ?? s.id),
@@ -416,7 +413,6 @@ function readSlices(file: string): SliceSpec[] {
       blockers: Array.isArray(s.blockers) ? s.blockers.map(String) : [],
       link: typeof s.link === "string" && s.link ? s.link : null,
       ...(Array.isArray(s.on) ? { on: s.on.map(String) } : {}),
-      ...(typeof s.transcript === "string" && s.transcript ? { transcript: path.resolve(s.transcript) } : {}),
     };
   });
 }
@@ -494,7 +490,7 @@ async function main(): Promise<void> {
       const rawStall = args.flag("--stall-ms");
       const stallMs = rawStall === undefined ? undefined : Number(rawStall);
       if (stallMs !== undefined && !(Number.isInteger(stallMs) && stallMs > 0)) fail(`--stall-ms takes a positive whole number of ms, got ${rawStall}`);
-      const transcript = args.flag("--transcript");
+      refuseTranscriptFlag("open");
       const run = await board.openRun({
         repo: repoOf(process.cwd()),
         kind,
@@ -502,23 +498,20 @@ async function main(): Promise<void> {
         title: need("--title"),
         link: args.flag("--link") ?? null,
         seats: readSlices(seatsFile),
-        ...(transcript ? { transcript: path.resolve(transcript) } : {}),
         ...(stallMs !== undefined ? { stallMs } : {}),
       });
       startPoller(run.id);
-      // the orchestrator's link, from now on how its verbs reach the board (D29)
-      await ensureLink(DATA_ROOT, { name: `${run.group}/orchestrator`, run: run.id }, { verb: "open", group: run.group });
-      // a transcript that will not read, said now, naming the path
-      const warning = transcript ? transcriptWarning("orchestrator", path.resolve(transcript)) : null;
+      // the orchestrator's link, from now on how its verbs reach the board (D29), started by its agent (D32)
+      const link = startLinkLine({ name: `${run.group}/orchestrator`, run: run.id });
       // the person watches the project's board in aiview, pinned first (plan D17, D30, D39)
       const doc = registerBoardDocument({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run.repo });
       if (!doc.registered) {
         // the run is open all the same; swarm has no page of its own (companions-merge D13)
         console.error(`swarm: ${doc.reason}: the run is open; its board is read in aiview once aiview is installed and knows this project`);
-        emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url: null, ...(warning ? { warning } : {}) }, [String(run.id), warning].filter(Boolean).join("\n"));
+        emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url: null, link }, [String(run.id), link].join("\n"));
         break;
       }
-      emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url: doc.url, ...(warning ? { warning } : {}) }, [String(run.id), doc.url, warning].filter(Boolean).join("\n"));
+      emit({ run: run.id, repo: run.repo, kind: run.kind, group: run.group, plan: run.plan, url: doc.url, link }, [String(run.id), doc.url, link].join("\n"));
       break;
     }
     case "slice": {
@@ -541,19 +534,10 @@ async function main(): Promise<void> {
       }
       const id = args.positional[0] ?? fail(`slice: which slice?\n${USAGE}`);
       const run = runArg();
-      const transcript = args.flag("--transcript");
-      const state = (transcript === undefined ? need("--state") : args.flag("--state")) as SliceState | undefined;
-      if (state !== undefined) await board.setSliceState(run, id, state);
-      // the dispatched member's transcript: its token counter, read for the stall check
-      const liveness = transcript !== undefined ? await board.registerTranscript(run, id, path.resolve(transcript)) : undefined;
-      // a transcript that will not read, said now, naming the path
-      const warning = transcript !== undefined ? transcriptWarning(id, path.resolve(transcript)) : null;
-      const said = [
-        state !== undefined ? `${id} ${state}` : null,
-        liveness && !warning ? `${id} transcript ${liveness.state === "ok" ? `read, ${liveness.tokens} tokens` : "not readable yet: the board warned on the thread"}` : null,
-        warning,
-      ];
-      emit({ run, slice: id, ...(state !== undefined ? { state } : {}), ...(liveness ? { liveness } : {}), ...(warning ? { warning } : {}) }, said.filter(Boolean).join("\n"));
+      refuseTranscriptFlag("slice");
+      const state = need("--state") as SliceState;
+      await board.setSliceState(run, id, state);
+      emit({ run, slice: id, state }, `${id} ${state}`);
       break;
     }
     case "close": {
@@ -651,8 +635,8 @@ ${USAGE}`);
         worktree: worktreeOf(process.cwd()) ?? undefined,
         ...(args.flag("--on") !== undefined ? { on: subscriptionsArg(args.flag("--on")!) } : {}),
       });
-      // the member's link, from now on how its verbs reach the board (D29)
-      await ensureLink(DATA_ROOT, { name: runner.name, run: runner.run }, { verb: "join", run: runner.run, seat: runner.slice });
+      // the member's link, from now on how its verbs reach the board (D29), started by its agent (D32)
+      const link = startLinkLine({ name: runner.name, run: runner.run });
       // the runner's next step, last: the open phase it owes, then its listener (D61)
       const next = await nextStep(runner);
       // a kind without worktree: the checkout is shared, so every call names the member (D21, D36)
@@ -663,7 +647,7 @@ ${USAGE}`);
       const drawing = profileOf(runner.kind).member === "seat" ? SEAT_POSTS_DRAW : null;
       // the run's current phase after the roster: a late or restarted member starts in it
       const phase = await phaseHeader(runner.run);
-      emit({ runner: runner.name, nick: runner.nick, roster, phase, ...(shared ? { as: runner.name, commands } : {}), ...(drawing ? { drawing } : {}), next }, () => {
+      emit({ runner: runner.name, nick: runner.nick, roster, phase, ...(shared ? { as: runner.name, commands } : {}), ...(drawing ? { drawing } : {}), next, link }, () => {
         console.log(`you are ${runner.name}, ${runner.nick}: @${runner.slice} or @${runner.nick.replace(/\s+/g, "")} mentions you`);
         for (const r of roster) console.log(rosterLine(r));
         if (phase) console.log(phase);
@@ -671,6 +655,7 @@ ${USAGE}`);
         for (const c of commands ?? []) console.log(c);
         if (drawing) console.log(drawing);
         console.log(next);
+        console.log(link);
       });
       break;
     }
@@ -1004,15 +989,11 @@ if (args.verb === "--help") {
   process.exit(0);
 }
 if (args.verb === "link") {
-  // a member's link, spawned detached by join and open: not a member's verb, so not in the usage
+  // a member's link, started by its agent from join's or open's last line, or detached by a verb that
+  // found none (D32): not a member's verb, so not in the usage
   try {
-    await runLink({
-      dataRoot: DATA_ROOT,
-      member: args.flag("--member") ?? "",
-      run: Number(args.flag("--run")),
-      session: process.env.CLAUDE_CODE_SESSION_ID ?? null,
-      binding: JSON.parse(args.flag("--binding") ?? "null") as Binding,
-    });
+    const member = { name: args.flag("--as") ?? "", run: Number(args.flag("--run")) };
+    await runLink({ dataRoot: DATA_ROOT, member: member.name, run: member.run, binding: bindingOf(member) });
     process.exit(0);
   } catch (e) {
     console.error(`swarm link: ${(e as Error).message}`);
