@@ -24,7 +24,7 @@ done when: <the command that exits 0, or what is observed>
 | Glyph | Means | Second line |
 |---|---|---|
 | ⬜ | not started | `done when: …` |
-| ▶ | in progress; one at a time, one per fork arm | `done when: …` |
+| ▶ | in progress; one at a time, one per fork arm, one per running slice in swarm mode | `done when: …` |
 | ✅ | done, re-run here | `went on: <what was observed here> · <sha> · #<pr>` |
 | ⏸ | blocked on someone | the done-when, then `paused: <on whom, for what, asked <date>>` |
 | ✖ | dropped | `dropped: <what happened> · <decision id, or the step replacing it>` |

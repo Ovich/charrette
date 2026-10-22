@@ -10,8 +10,8 @@ except `open`, `slice`, `close` and `status`.
      URL of its slice document as `link`; a later phase's are added at its open (*Slice states*):
 
      ```json
-     [{ "id": "P1.S1", "title": "<the slice's title>", "role": "dev1 · builder", "link": "<slice document URL>" },
-      { "id": "P1.S2", "title": "<…>", "role": "dev2 · builder", "link": "<…>" }]
+     [{ "id": "S11", "title": "<the slice's title>", "role": "seat1 · builder", "link": "<slice document URL>" },
+      { "id": "S12", "title": "<…>", "role": "seat2 · builder", "link": "<…>" }]
      ```
 
    - **A brainstorm**: every seat, with its `role` and the brainstorm board's URL as `link`;

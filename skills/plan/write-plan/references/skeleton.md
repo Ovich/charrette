@@ -58,7 +58,8 @@ what is owed for it. The status line names the `agent default` rows the person c
 
 ## 9. The slices
 One heading per slice: the stories it serves, delivers, blocked by, its
-check, its mark, its slice document.
+check, its mark, its slice document. In swarm mode, one heading per phase first: its goal, every
+seat's role, and its slices once cut.
 
 ## 10. The mandate
 The orchestrator's mandate, as answered.

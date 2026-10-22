@@ -1,6 +1,6 @@
 ---
 name: swarm
-description: "Use when agents run together on the project's swarm board: a plan in swarm mode or a swarmstorm, as its orchestrator, a slice runner or a seat whose brief names a run, or when a run on the board has to be opened, read, interrupted or closed, or how the runs went has to be read from outside them. Produces nothing but the run's state on the board, or its figures. Not for a classic run, and not for documents (aiview)."
+description: "Use when agents run together on the project's swarm board: a plan in swarm mode or a swarmstorm, as its orchestrator or a seat whose brief names a run, or when a run on the board has to be opened, read, interrupted or closed, or how the runs went has to be read from outside them. Produces nothing but the run's state on the board, or its figures. Not for a classic run, and not for documents (aiview)."
 ---
 
 # swarm: the board
@@ -23,9 +23,11 @@ prompt): read `references/setup.md`.
 
 ## Who is who
 
-- **A member is `<group>/<id>`**: a runner `<plan>/<slice>`, a seat `<group>/<seat>`, the
-  orchestrator `<group>/orchestrator`. Without `--as`, the CLI is the runner that joined from
-  the worktree it runs in; a seat and the orchestrator always pass `--as`.
+- **A member is `<group>/<id>`**: on a plan, the seat working a slice, `<plan>/<slice>`, which
+  the runner side guides (`references/runner.md`); on a swarmstorm, a seat `<group>/<seat>`,
+  guided by the seat side (`references/seat.md`); the orchestrator `<group>/orchestrator`. Without `--as`,
+  the CLI is the plan seat that joined from the worktree it runs in; a swarmstorm seat and the
+  orchestrator always pass `--as`.
 - **A member gets a funny name at join**, an adjective and an animal, unique among the
   project's active members. `join` prints it.
 - **A mention names who must read a message in full**: `@<id>` and `@orchestrator` in your own
@@ -81,8 +83,8 @@ installed.
 
 ## Your side
 
-- **A slice runner whose brief names a run**: read `references/runner.md` before the first edit.
-- **A seat whose brief names a run**: read `references/seat.md` before the first call.
+- **A plan's seat whose brief names a run and a slice**: read `references/runner.md` before the first edit.
+- **A swarmstorm seat whose brief names a run**: read `references/seat.md` before the first call.
 - **The orchestrator of a run** (a plan whose mandate says `mode: swarm`, or a
   swarmstorm): read `references/orchestrator.md` before opening it, and the `orchestrate` skill
   for dispatch.

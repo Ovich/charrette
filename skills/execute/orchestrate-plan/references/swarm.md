@@ -9,7 +9,7 @@ phases, seats and roles are the plan's *Mandate*; the cut is the `write-plan` sk
 
 - **One board run for the plan**, opened before the first phase with the first phase's slices
   as its rows; a later phase's slices are added at its open (`slice add`). A row is a slice,
-  `P<n>.S<seat>`; its `role` names the seat and its role in the phase, `dev2 · builder`.
+  `S<phase><seat>`, as the tracker numbers it; its `role` names the seat and its role in the phase, `seat2 · builder`.
 - **Leave the plan's branch checked out nowhere** while the run is open (detach the main
   checkout): a seat fast-forwards it from its own worktree, and git refuses to move a branch
   checked out elsewhere. Re-run each check in a detached worktree of its own.
