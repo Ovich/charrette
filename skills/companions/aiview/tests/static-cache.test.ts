@@ -24,7 +24,7 @@ before(async () => {
   fs.writeFileSync(path.join(tmp, "dist", "assets", "index-abc123.js"), "console.log(1)");
   fs.writeFileSync(path.join(tmp, "dist", "favicon.svg"), "<svg/>");
   index = openIndex(path.join(tmp, "test.sqlite"), root);
-  server = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp, writeState: false, boardDbPath: path.join(tmp, "swarm.sqlite") });
+  server = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp, writeState: false, boardDataRoot: tmp });
   await new Promise<void>((r) => server.on("listening", () => r()));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });

@@ -1,4 +1,4 @@
-import type { BoardSnapshot } from "../../../../../swarm/src/board/snapshot.ts";
+import type { BoardSnapshot } from "../../../../../swarm/src/client/reader.ts";
 import { useEffect, useRef, useState } from "react";
 import { formatDuration } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";

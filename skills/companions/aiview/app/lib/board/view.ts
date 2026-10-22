@@ -1,7 +1,7 @@
 // What the page shows, as pure functions of the snapshot and the three selections App owns:
 // the run it is scoped to, the runner it follows, the filter. No child computes any of it.
-import type { BoardSnapshot, SnapshotEvent, SnapshotRunner, RunSummary, Kind } from "../../../../swarm/src/board/snapshot.ts";
-import { nameHandle, parseMentions, planCode } from "../../../../swarm/src/board/snapshot.ts";
+import type { BoardSnapshot, SnapshotEvent, SnapshotRunner, RunSummary, Kind } from "../../../../swarm/src/client/reader.ts";
+import { nameHandle, parseMentions, planCode } from "../../../../swarm/src/client/reader.ts";
 
 /** A run's id, as the BoardReader's summaries carry it. */
 export type RunId = RunSummary["run"];

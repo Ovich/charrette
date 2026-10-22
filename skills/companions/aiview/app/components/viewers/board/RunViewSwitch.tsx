@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Phase } from "../../../../../swarm/src/board/snapshot.ts";
+import type { Phase } from "../../../../../swarm/src/client/reader.ts";
 import type { RunView } from "../../../lib/board/analytics.ts";
 
 /** A run tab's head (plan D31, mockup #677 `run`, `brun`, `conv`): Conversation / Analytics, the run's

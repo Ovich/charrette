@@ -1,7 +1,7 @@
 // One repository's whole board, live: GET /api/board and aiview's /events; refetched on the
 // `board-changed` of the snapshot's repository; `hello` and `ping` keep the connection state.
 import { useEffect, useState } from "react";
-import type { BoardSnapshot, RepoSummary } from "../../../swarm/src/board/snapshot.ts";
+import type { BoardSnapshot, RepoSummary } from "../../../swarm/src/client/reader.ts";
 import { reloadOnNewBuild } from "../lib/build.ts";
 
 export type Connection = "live" | "reconnecting";

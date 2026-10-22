@@ -1,63 +1,63 @@
-// The seam from aiview's side (D3): aiview reads the swarm board through swarm's BoardReader,
-// imported by relative path, so aiview's typecheck and test runner prove the cross-folder import.
+// The seam from aiview's side (D3, swarm-relay D23): aiview reads the swarm board through swarm's
+// BoardReader, a client of the board server, imported by relative path, so aiview's typecheck and
+// test runner prove the cross-folder import. The board is seeded through a test server.
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { openBoardReader } from "../../swarm/src/board/snapshot.ts";
-// The board is written here as swarm's own process would write it: seeding only, never what aiview reads through.
-import { openBoard } from "../../swarm/src/board/board.ts";
+import { openBoardReader } from "../../swarm/src/client/reader.ts";
+import { SWARM_CLI, startTestBoard } from "./fixtures/board-server.ts";
 
 test("aiview reads a run through the reader", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aiview-board-reader-"));
-  const db = path.join(dir, "swarm.sqlite");
-  const board = await openBoard(db);
-  const reader = await openBoardReader(db);
+  const board = await startTestBoard(dir);
+  const reader = await openBoardReader({ dataRoot: dir, swarmEntry: SWARM_CLI });
   try {
+    const { writer } = board;
     const repo = "/repos/one/.git";
-    const run = board.openRun({ repo, group: "review-tool", title: "Review tool", seats: [{ id: "S1", title: "the board", blockers: [] }] });
-    const s1 = board.join({ run: run.id, slice: "S1", doing: "the schema", files: [] }).runner;
-    board.post(s1, "@orchestrator the schema is in");
+    const run = await writer.openRun({ repo, group: "review-tool", title: "Review tool", seats: [{ id: "S1", title: "the board", blockers: [] }] });
+    const s1 = (await writer.join({ run: run.id, slice: "S1", doing: "the schema", files: [] })).runner;
+    await writer.post(s1, "@orchestrator the schema is in");
 
-    const [summary] = reader.repos();
+    const [summary] = await reader.repos();
     assert.equal(summary.repo, repo);
     assert.deepEqual(summary.runs.map((r) => [r.run, r.title]), [[run.id, "Review tool"]]);
-    assert.deepEqual(reader.snapshot(repo), board.snapshot(repo));
+    assert.deepEqual(await reader.snapshot(repo), await writer.snapshot(repo));
   } finally {
     reader.close();
-    board.close();
+    await board.close();
     fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 });
 
 test("`BoardReader.stats` deep-equals `Board.stats` for a run, the across scopes and both kinds (D2, SL2)", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aiview-board-reader-stats-"));
-  const db = path.join(dir, "swarm.sqlite");
   // a still clock, so an open run is computed to the same now by both
   mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-10-01T09:00:00.000Z") });
-  const board = await openBoard(db);
-  const reader = await openBoardReader(db);
+  const board = await startTestBoard(dir);
+  const reader = await openBoardReader({ dataRoot: dir, swarmEntry: SWARM_CLI });
   try {
+    const { writer } = board;
     const repo = "/repos/one/.git";
     const seats = [
       { id: "S1", title: "the schema", blockers: [] },
       { id: "S2", title: "the page", blockers: [] },
     ];
-    const plan = board.openRun({ repo, group: "review-tool", title: "Review tool", seats });
-    const s1 = board.join({ run: plan.id, slice: "S1", doing: "the schema", files: [{ path: "src/a.ts", interface: true }] }).runner;
-    const s2 = board.join({ run: plan.id, slice: "S2", doing: "the page", files: [] }).runner;
-    board.checkEdit(s2, "src/a.ts");
-    board.post(s2, `@${s1.name} I add a helper to src/a.ts`, { about: "src/a.ts" });
+    const plan = await writer.openRun({ repo, group: "review-tool", title: "Review tool", seats });
+    const s1 = (await writer.join({ run: plan.id, slice: "S1", doing: "the schema", files: [{ path: "src/a.ts", interface: true }] })).runner;
+    const s2 = (await writer.join({ run: plan.id, slice: "S2", doing: "the page", files: [] })).runner;
+    await writer.checkEdit(s2, "src/a.ts");
+    await writer.post(s2, `@${s1.name} I add a helper to src/a.ts`, { about: "src/a.ts" });
     mock.timers.tick(60_000);
-    assert.equal(board.lockMerge(s1, "main").granted, true);
-    board.merged(s1, "abc123", ["src/a.ts"], { files: ["src/a.ts"] });
-    board.end(s1);
-    board.end(s2);
+    assert.equal((await writer.lockMerge(s1, "main")).granted, true);
+    await writer.merged(s1, "abc123", ["src/a.ts"], { files: ["src/a.ts"] });
+    await writer.end(s1);
+    await writer.end(s2);
     mock.timers.tick(60_000);
-    board.closeRun(plan.id);
+    await writer.closeRun(plan.id);
 
-    const idea = board.openRun({
+    const idea = await writer.openRun({
       repo,
       kind: "brainstorm",
       group: "idea",
@@ -67,11 +67,11 @@ test("`BoardReader.stats` deep-equals `Board.stats` for a run, the across scopes
         { id: "builder", title: "the builder", role: "builder", blockers: [] },
       ],
     });
-    const skeptic = board.join({ run: idea.id, slice: "skeptic", doing: "doubting", files: [] }).runner;
-    const builder = board.join({ run: idea.id, slice: "builder", doing: "building", files: [] }).runner;
-    board.post(builder, "a cache in front, see src/a.ts:12", { about: "D1" });
-    const agreed = board.post(builder, "a cache with a one-minute TTL", { about: "D1", kind: "agreement" });
-    board.endorse(skeptic, agreed.seq);
+    const skeptic = (await writer.join({ run: idea.id, slice: "skeptic", doing: "doubting", files: [] })).runner;
+    const builder = (await writer.join({ run: idea.id, slice: "builder", doing: "building", files: [] })).runner;
+    await writer.post(builder, "a cache in front, see src/a.ts:12", { about: "D1" });
+    const agreed = await writer.post(builder, "a cache with a one-minute TTL", { about: "D1", kind: "agreement" });
+    await writer.endorse(skeptic, agreed.seq);
     mock.timers.tick(60_000); // the brainstorm run stays open
 
     const scopes = [
@@ -83,12 +83,12 @@ test("`BoardReader.stats` deep-equals `Board.stats` for a run, the across scopes
       { repo, kinds: ["plan" as const] },
       { repo, kinds: ["brainstorm" as const] },
     ];
-    for (const scope of scopes) assert.deepEqual(reader.stats(scope), board.stats(scope), JSON.stringify(scope));
-    assert.equal(reader.stats({ repo }).runs.length, 2, "both kinds are in the across scope");
+    for (const scope of scopes) assert.deepEqual(await reader.stats(scope), await writer.stats(scope), JSON.stringify(scope));
+    assert.equal((await reader.stats({ repo })).runs.length, 2, "both kinds are in the across scope");
   } finally {
     mock.timers.reset();
     reader.close();
-    board.close();
+    await board.close();
     fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 });

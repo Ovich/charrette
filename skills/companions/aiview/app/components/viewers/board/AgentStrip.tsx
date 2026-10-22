@@ -2,7 +2,7 @@
 // each card its member (code, then nick), its status, the slice, what it does, its token counter. A card clicked
 // follows the member and narrows the conversation; clicked again, released.
 import { useEffect, useState, type CSSProperties } from "react";
-import type { SnapshotRunner } from "../../../../../swarm/src/board/snapshot.ts";
+import type { SnapshotRunner } from "../../../../../swarm/src/client/reader.ts";
 import { hhmm, ORCHESTRATOR } from "../../../lib/board/view.ts";
 import { RunnerName } from "./chips.tsx";
 

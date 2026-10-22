@@ -2,7 +2,7 @@
 // fixtures; each call's selection is recorded, and the snapshot answered is the repository it asks for.
 import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import type { BoardSnapshot } from "../../swarm/src/board/snapshot.ts";
+import type { BoardSnapshot } from "../../swarm/src/client/reader.ts";
 import type { BoardState } from "./hooks/useBoard.ts";
 import { ALL_CLOSED, APP, BRAINSTORM, CLOSED, LIVE, NICKS, OTHER, PHASED, REPOS, SITE } from "./board-fixtures.ts";
 

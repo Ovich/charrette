@@ -2,16 +2,13 @@
 // seeded through swarm's board, the CLI's run lines read against the page's formatting of the same JSON.
 import { test, before, after, mock } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { formatDuration, runLength } from "../app/lib/board/analytics.ts";
-// The board is written here as swarm's own process would write it: seeding only.
-import { openBoard } from "../../swarm/src/board/board.ts";
-
-const SWARM_CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "swarm", "src", "cli", "index.ts");
+// The board is seeded through swarm's board server, which the spawned CLI reads too.
+import { SWARM_CLI, startTestBoard, type TestBoard } from "./fixtures/board-server.ts";
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 /** The lengths seeded: under a minute, under ten minutes with seconds, past ten with seconds, past an hour. */
@@ -19,16 +16,15 @@ const LENGTHS = [40 * SECOND, 5 * MINUTE + 30 * SECOND, 14 * MINUTE + 47 * SECON
 
 let home: string;
 let repoDir: string;
+let board: TestBoard;
 
-const swarmStats = (...argv: string[]): string => {
-  const r = spawnSync(process.execPath, [SWARM_CLI, "stats", "--all", ...argv], {
-    cwd: repoDir,
-    encoding: "utf8",
-    env: { ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home },
-  });
-  assert.equal(r.status, 0, r.stderr);
-  return r.stdout.trimEnd();
-};
+// spawned without blocking: the board server it reads runs in this process
+const swarmStats = (...argv: string[]): Promise<string> =>
+  new Promise((resolve, reject) =>
+    execFile(process.execPath, [SWARM_CLI, "stats", "--all", ...argv], { cwd: repoDir, encoding: "utf8", env: { ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home } }, (err, stdout, stderr) =>
+      err ? reject(new Error(`${err.message}: ${stderr}`)) : resolve(stdout.trimEnd()),
+    ),
+  );
 
 before(async () => {
   home = fs.mkdtempSync(path.join(os.tmpdir(), "aiview-run-length-"));
@@ -39,32 +35,32 @@ before(async () => {
   const repo = fs.realpathSync.native(path.join(repoDir, ".git"));
   const start = Date.now() - 2 * 24 * 60 * MINUTE;
   mock.timers.enable({ apis: ["Date"], now: start });
-  const board = await openBoard(path.join(home, "swarm.sqlite"));
+  board = await startTestBoard(home);
   try {
-    LENGTHS.forEach((length, i) => {
+    for (const [i, length] of LENGTHS.entries()) {
       mock.timers.setTime(start + i * 3 * 60 * MINUTE);
-      const run = board.openRun({ repo, group: `run-${i}`, title: `Run ${i}`, seats: [{ id: "S1", title: "the work", blockers: [] }] });
+      const run = await board.writer.openRun({ repo, group: `run-${i}`, title: `Run ${i}`, seats: [{ id: "S1", title: "the work", blockers: [] }] });
       mock.timers.setTime(start + i * 3 * 60 * MINUTE + length);
-      board.closeRun(run.id);
-    });
+      await board.writer.closeRun(run.id);
+    }
   } finally {
-    board.close();
     mock.timers.reset();
   }
 });
 
-after(() => {
+after(async () => {
+  await board.close();
   fs.rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 });
 
-test("the page writes each run's length as the CLI's run line does, floored to the minute (D46, SL11)", () => {
-  const runs = (JSON.parse(swarmStats("--json")) as { runs: { lengthMs: number }[] }).runs;
+test("the page writes each run's length as the CLI's run line does, floored to the minute (D46, SL11)", async () => {
+  const runs = (JSON.parse(await swarmStats("--json")) as { runs: { lengthMs: number }[] }).runs;
   assert.deepEqual(
     runs.map((r) => r.lengthMs),
     LENGTHS,
   );
   // `<code> <title> · <kind> · <length> · <open|closed> · conflicts <n>`, one line per run, oldest first
-  const cliLengths = swarmStats()
+  const cliLengths = (await swarmStats())
     .split(/\r?\n/)
     .filter((l) => / · plan · /.test(l))
     .map((l) => l.split(" · ")[2]);

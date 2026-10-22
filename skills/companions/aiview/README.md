@@ -10,9 +10,9 @@ the one server of the collection: swarm has none of its own.
 One npm package: a React + TypeScript + Tailwind + shadcn-style UI (`app/`, built to
 `dist/`), a small plain-Node server (the documents' API routes, the board's
 `/api/board` and static, `src/server/`), and a CLI (`src/cli/`), all sharing `src/core/`
-(typed sqlite index, path rules, file watcher). The board is read from `swarm.sqlite`
-only through swarm's BoardReader (`swarm/src/board/snapshot.ts`), bundled into
-`dist-cli/` at build; aiview never writes it.
+(typed sqlite index, path rules, file watcher). The board is read only through swarm's
+BoardReader (`swarm/src/client/reader.ts`), a client of the swarm board server, bundled
+into `dist-cli/` at build; aiview never opens swarm's store and never writes the board.
 
 ## Requirements
 

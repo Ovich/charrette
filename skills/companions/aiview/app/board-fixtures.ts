@@ -1,6 +1,6 @@
 // The mockup's "live" variant (2026-10-07-swarm-board.mockup.html) as the Board would return
 // it: two plans and a brainstorm open on one repository, two closed runs, a second repository.
-import type { BoardSnapshot, RepoSummary, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm/src/board/snapshot.ts";
+import type { BoardSnapshot, RepoSummary, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm/src/client/reader.ts";
 
 const at = (hm: string): string => {
   const [h, m] = hm.split(":").map(Number);

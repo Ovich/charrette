@@ -2,7 +2,7 @@
 // for with one run's `Stats`, its members' counts disagreeing with their spans and marks.
 import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import type { RunSummary, Stats } from "../../swarm/src/board/snapshot.ts";
+import type { RunSummary, Stats } from "../../swarm/src/client/reader.ts";
 import { CLOSED, LIVE, RUNS } from "./board-fixtures.ts";
 import { BRAINSTORM_RUN, EVENTS_READ_RUN, LP_S4, OPEN_RUN, PLAN_RUN, UNRECORDED_RUN, bodyOf } from "./stats-fixtures.ts";
 import { source, standIn } from "./stats-stand-in.ts";
