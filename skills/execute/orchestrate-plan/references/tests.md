@@ -1,6 +1,6 @@
 # The testing prompt
 
-The slice runner knows nothing about testing; what it does about tests is only what its brief
+The plan worker knows nothing about testing; what it does about tests is only what its brief
 says. The orchestrator puts one of these in the brief, its commands filled for the project, and
 copies it from here rather than rewriting it. The seams and cases are the slice document's.
 

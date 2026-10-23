@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import type http from "node:http";
 import path from "node:path";
-import { openBoardReader, type BoardReader, type Kind, type StatsScope } from "../../../swarm/src/client/reader.ts";
+import { openBoardReader, type BoardReader, type Kind, type StatsScope } from "../../../swarm-board/src/client/reader.ts";
 import type { BoardChangedEventPayload } from "../core/api.ts";
 import { TOOL_ROOT } from "../core/db.ts";
 import { DATA_ROOT } from "../core/home.ts";
@@ -19,7 +19,7 @@ export interface BoardRoutes {
 }
 
 /** The swarm launcher beside aiview's own, as the plugin lays the two companions out. */
-const DEFAULT_SWARM_ENTRY = path.join(TOOL_ROOT, "..", "swarm", "swarm.mjs");
+const DEFAULT_SWARM_ENTRY = path.join(TOOL_ROOT, "..", "swarm-board", "swarm.mjs");
 /** What a running board server writes in its data home: one there, the reader opens at start. */
 const SERVER_STATE_FILE = "swarm-server.json";
 

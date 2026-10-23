@@ -45,7 +45,7 @@ the old viewer.** Run the build before tagging, every time, and commit what it p
 
 ```bash
 cd skills/companions/aiview && npm install && npm run build && npm test && npm run test:app && cd ../../..   # the one page and server: dist/ + dist-cli/
-cd skills/companions/swarm && npm install && npm run build && npm test && cd ../../..   # the board's CLI: dist-cli/ only
+cd skills/companions/swarm-board && npm install && npm run build && npm test && cd ../../..   # the board's CLI: dist-cli/ only
 node --test skills/plan/write-plan/scripts/decisions.test.mjs     # the decision ids check
 node --test skills/review/pr-review/scripts/scope.test.mjs            # the review scope script
 node --test skills/project/write-conventions/scripts/rules.test.mjs # the conventions rules script
@@ -88,7 +88,7 @@ Users with background marketplace refresh still need the second command and the 
 
 ## Notes
 
-- swarm builds its CLI only: `skills/companions/swarm/dist-cli/cli.mjs` is committed; it has no
+- swarm builds its CLI only: `skills/companions/swarm-board/dist-cli/cli.mjs` is committed; it has no
   page and no server. The board's page is aiview's, so a release that changes swarm's board
   reader or the board's page rebuilds aiview too, or ships the old board.
 - `aiview mermaid-check` is its own bundle, `dist-cli/mermaid-check.mjs`, about 3.5 MB,

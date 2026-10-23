@@ -2,7 +2,7 @@
 // charrette-app, and one run's answer each for a plan run, a brainstorm run, a run before the records
 // and an open run. The totals are written by hand, and on purpose they disagree with what summing or
 // counting the runs would give: the page reads them, it never counts (D34, D35).
-import type { MemberStats, RunStats, Stats, Totals } from "../../swarm/src/client/reader.ts";
+import type { MemberStats, RunStats, Stats, Totals } from "../../swarm-board/src/client/reader.ts";
 import { APP } from "./board-fixtures.ts";
 
 const at = (hm: string): string => {

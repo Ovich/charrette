@@ -3,7 +3,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
-import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm/src/client/reader.ts";
+import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm-board/src/client/reader.ts";
 import { conversation, narrow, type Narrow } from "./lib/board/view.ts";
 import { Conversation } from "./components/viewers/board/Conversation.tsx";
 import { ConversationFilters } from "./components/viewers/board/ConversationFilters.tsx";

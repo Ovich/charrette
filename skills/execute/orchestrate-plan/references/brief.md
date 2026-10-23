@@ -10,11 +10,11 @@ Carry out one slice document with the `execute-slice` skill.
 
 **Slice document**: `<file name>`, aiview id `#<id>`, in project `<slug>`. Read it through the aiview skill's tool.
 
-**Board**: run `<run id>` on `<repository>`, slice `<slice id>`, seat `<seat>` as `<role>` in phase `<phase>`; load the `swarm` skill, runner side, and join the board before anything else, the install and the rebase included. What the phases before left is on the thread: `thread <phase>`.
+**Board**: run `<run id>` on `<repository>`, slice `<slice id>`, seat `<seat>` as `<role>` in phase `<phase>`; load the `swarm-board` skill, plan-worker side, and join the board before anything else, the install and the rebase included. What the phases before left is on the thread: `thread <phase>`.
 
 **Workspace**: <the worktree>. **Branch**: `<slice branch>`, based on `<branch>` at `<sha>`; confirm that base in your return. **Prepare**: `<the command, install included>`.
 
-**Merge**: yourself, under the board's lock, as the `swarm` skill's runner side says: rebase onto `<branch>`, run your check, then from your worktree `git push . HEAD:<branch>` (fast-forward only, never force). Open no pull request.
+**Merge**: yourself, under the board's lock, as the `swarm-board` skill's plan-worker side says: rebase onto `<branch>`, run your check, then from your worktree `git push . HEAD:<branch>` (fast-forward only, never force). Open no pull request.
 
 <the testing prompt of the mandate's `tests` answer, from `references/tests.md`>
 
@@ -23,16 +23,15 @@ Carry out one slice document with the `execute-slice` skill.
 
 ## The validator
 
+Dispatched on the `verifier` agent, which holds how a validator behaves; the brief gives only
+this run.
+
 ```markdown
-You are the validator of this plan's swarm run. You lie dormant until the orchestrator mentions you that your phase has come: join, then wait on the board, following the thread; a phase that is not yours, mark done at once and wait again. In your phase, run the `verify-<app>` skill on what the orchestrator scopes in its mention.
+**Plan**: `<file name>`, aiview id `#<id>`. **Board**: run `<run id>` on `<repository>`, slice `validator`; what the phases before left is on the thread: `thread <phase>`.
 
-**Plan**: `<file name>`, aiview id `#<id>`. **Board**: run `<run id>`, slice `validator`; load the `swarm` skill, runner side, and join before anything else; what the phases before left is on the thread: `thread <phase>`.
+**Workspace**: a detached worktree of `<branch>`. **Prepare**: `<the command>`.
 
-**Workspace**: a detached worktree of `<branch>`; at your phase, check out the sha the orchestrator names. Merge nothing. **Prepare**: `<the command>`.
-
-**Your skill**: `verify-<app>-<focus>`, over the range, scope and inputs the orchestrator names at your phase (what was merged since the last validation, the feature to walk); judge that scope only. <What the person added to watch, verbatim from the *Mandate*, or nothing>.
-
-Talk on the board to whoever you need; ask `@orchestrator` for a seat when something must be answered or fixed. At the end of your phase, post your report on the board to `@orchestrator`, as the skill shapes it (the inputs, the verdict, the findings table), and what you would cut next; mark the phase done and wait again. The orchestrator answers with the same table judged; look again only at what it left standing. Return only once the orchestrator closes the run.
+**Your skill**: `verify-<app>-<focus>`. <What the person added to watch, verbatim from the *Mandate*, or nothing>.
 ```
 
 **The last line** as the `orchestrate` skill's `references/brief.md` says.

@@ -1,4 +1,4 @@
-import type { RunStats, Stats } from "../../../../../swarm/src/client/reader.ts";
+import type { RunStats, Stats } from "../../../../../swarm-board/src/client/reader.ts";
 import { SOURCED_RULE, less, percent, runLength } from "../../../lib/board/analytics.ts";
 import { ORCHESTRATOR } from "../../../lib/board/view.ts";
 import { KpiTile } from "./KpiTile.tsx";

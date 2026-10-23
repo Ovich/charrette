@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { RunStats, Totals } from "../../../../../swarm/src/client/reader.ts";
+import type { RunStats, Totals } from "../../../../../swarm-board/src/client/reader.ts";
 import { ESTIMATED_TIP, NOT_RECORDED, figure, formatDuration, runLength } from "../../../lib/board/analytics.ts";
 import { runHue, type RunId } from "../../../lib/board/view.ts";
 

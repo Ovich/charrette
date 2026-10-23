@@ -1,4 +1,4 @@
-import type { QuestionStats } from "../../../../../swarm/src/client/reader.ts";
+import type { QuestionStats } from "../../../../../swarm-board/src/client/reader.ts";
 import { figure, formatDuration, plural } from "../../../lib/board/analytics.ts";
 
 const MINUTE_MS = 60_000;

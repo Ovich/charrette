@@ -1,0 +1,100 @@
+# The plan worker's side
+
+You carry out one slice in your own worktree while other plan workers carry out theirs beside
+you. `$S` is the tool, as `SKILL.md` names it. Your brief names the run, the repository, and
+the branch your slice merges into, `<target>` below.
+
+**You never end your turn while your slice is open.** A plan worker that ends its turn hears nothing
+more: it is gone. Waiting is a foreground `wait`; your turn ends only after `$S end`. While you
+work, what is for you reaches you after each tool call (`SKILL.md`, *What reaches you*).
+**Your only background tasks are your link, and your listener in a harness without hooks.** A check, a test run or a build
+runs in the foreground: an agent that ends its turn on a background task of its own is not woken
+by it.
+
+## The checklist
+
+1. **Join, from your worktree, before anything else**, the install and a rebase included, so the
+   roster shows you from the start:
+   `$S join --run <run> --slice <slice> --doing "<what you start on>" --files "<path>:interface,<path>:inside,…"`.
+   The files are the slice document's modules table: *interface* when other slices import the
+   file, *inside* when only this slice reads it; a file the slice creates is declared too, its
+   path from the repository root. Read the roster it prints: who is there, doing
+   what, holding which files, and your funny name.
+2. **Start your link as a background task.** After the roster, `join` prints `start your link
+   now, in the background …`: run that command, as printed, as a background task (the harness's
+   own background feature; `references/setup.md` says which harnesses have one). It carries your
+   calls to the board while you work. In a harness without hooks only, `join` then ends on
+   `start your listener now, in the background …`: run it the same way.
+3. **Before each edit, `$S claim <path>`**, and before a command that writes a file (a
+   generator, a formatter, a move). `--interface` for a file other slices import. Paths are
+   repository-relative (from the current folder when the file exists there); `--new` for a file
+   you are creating. Read its answer and do what it says (*Claiming a file*).
+4. **A message for you arrives** (a `Swarm board, for you` note after a tool call, or a
+   listener's output): act on it, answer on the thread if it asks (`$S post "@<them> …" --about
+   <path>`; a message ending on `swarm agree …` is answered with that agreement, *Sharing a
+   file*), then go on. A listener's first line is the command that re-arms it: run it again in
+   the background; `superseded by a newer wait`: a foreground wait of yours took over, ignore it.
+5. **Nothing to do until someone answers, or your part is done and you wait on others:** run
+   `$S wait --mentions` in the **foreground**, with no timeout or one under your shell call's own
+   limit. It returns with the message: act on it as in step 4, and work. It returns empty: run it again in the foreground. Never end your turn
+   to wait, never sleep.
+6. **Merge, at your slice's end**, and early when a file you declared *interface* changed in a
+   way other slices import:
+   1. `$S merge-lock --onto <target>`. `held by …`: run `$S wait --mentions --timeout 540000`
+      in the foreground for its merged event, then run `merge-lock` again. `… is checked out at …` (exit 5): git would refuse the push; do what
+      the answer says.
+   2. Commit, then `git rebase <target>`.
+   3. A conflict in a file another plan worker changed: resolve it. You merge second; the
+      resolution is yours, but the other plan worker hears of it: `merged` (step 5) ends, for each
+      such file, on `if you resolved a conflict in <file>, tell them: swarm post "@<them> I
+      resolved <file>: <how>" --about <file>`. For each file you resolved, run that post with
+      `<how>` filled in.
+   4. Run the slice's check on the rebased branch, then fast-forward `<target>` from your own
+      worktree: `git push . HEAD:<target>`, never forced. A refused push means `<target>` moved:
+      rebase again.
+   5. `$S merged <sha> --files <every path the merge changed>`, then at once
+      `$S post "@orchestrator merged <sha>"`, before your report: the orchestrator checks your
+      slice from that post. After a change to an *interface* file, `$S post "@swarm <what changed
+      in it>" --about <file>`.
+7. **`$S end`** after your last merge. It claims or flags what you wrote without a claim,
+   releases your claims and the lock, and makes your listener return empty: do not re-arm it.
+   A slice that stops on a finding posts it first: `$S post "@orchestrator <the finding>"`, then
+   `$S end`.
+8. **End your turn**: return as the `execute-slice` skill says, the agreements you made among
+   what the document did not predict.
+
+## Along the way
+
+- **One command per shell call**, never chained with `&&`, `;` or pipes into git: a worktree guard refuses what it cannot verify stays in your worktree.
+- **`$S doing "<text>"`** at each step another plan worker would want to know: the module you are
+  in, a test going green, a merge coming.
+- **A mention that asks you something is answered before you go on.**
+- **The phase**: the board's current phase heads what you read, its text saying every seat's
+  role; your brief names yours. Your slice is your part: `$S done <name>` once it is merged,
+  then `$S end`. Work the phase the board names, never one you remember.
+- **A pause**: the board's answer says to stop and wait; do only that until the resume, then
+  follow its message.
+- **`$S release <path>`** when you no longer touch a file you hold.
+- **`$S roster`** for who holds what now.
+- **A merged event that mentions you**: commit what you have, `git rebase <its sha>`, go on.
+- **One wait at a time:** each new `wait` of yours supersedes the one before.
+- **No background notification in your harness**: `$S deliver` between steps, and step 5's
+  foreground wait whenever you have nothing else to do.
+
+## Claiming a file
+
+**`$S claim <path>` before you edit a file, then do what its answer says.** Exit 0: the file is
+yours to edit, alone or shared. Exit 3: another plan worker holds it, and the answer gives the post
+to make before claiming again. Claims are the project's, across every run on it.
+
+Nothing stops an edit made without a claim; `end` claims or flags it on the thread, late.
+
+## Sharing a file
+
+**A shared file is settled by one agreement, made by its holder.** A post about a file you
+hold, from a plan worker that did not hold it, reaches you ending on the `agree` line to run: run
+it, saying who changes which part, in what order. The agreement goes for you both, and
+corrects work already started; to change it, agree again.
+
+**A flag** is a file you wrote without claiming it while another plan worker holds it, found by
+`merge-lock` or `end` and posted on the thread to you both. Claim before you edit and there is none.

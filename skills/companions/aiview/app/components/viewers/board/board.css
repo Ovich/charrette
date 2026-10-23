@@ -206,12 +206,42 @@
   .board .item .text, .board .event .text { grid-column: 1; }
 }
 
-/* SL7: the agent strip (D7, D20) and the claims row; the page a column: tabs, strip, conversation, claims */
-/* the cards wrap onto as many rows as they need, never a horizontal scroll */
-/* two rows at most, the rest scrolled to: rows of one height so the cap is exact */
-/* five cards a row, the orchestrator one of them: the person's decision; the rest wrap below */
-.board .agent-strip { --row: 77px; flex: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: var(--row); gap: 10px; padding: 12px 2px; max-height: calc(2 * var(--row) + 10px + 24px); overflow-y: auto; }
-.board .agent-strip .card { min-width: 0; }
+/* SL7: the agent roster (D7, D20) and the claims row. Under a run tab the page is two columns: the roster
+   left, its own scroll, as wide as a card reads; the conversation and the claims take the rest. */
+.board .run-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.board .run-body.with-roster { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 20px; }
+.board .run-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.board .agent-strip { display: flex; flex-direction: column; gap: 8px; padding: 12px 2px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.board .agent-strip .roster-head { margin: 0; }
+.board .agent-strip .cards { display: flex; flex-direction: column; gap: 8px; }
+.board .agent-strip .card { min-width: 0; flex: none; }
+/* a swarm past twelve: the search, a chip per state, then one row per member, by section */
+.board .roster-search { width: 100%; font: inherit; font-size: 12.5px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 9px; background: var(--background); color: var(--foreground); }
+.board .roster-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.board .roster-chips .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
+.board .roster-chips .chip .n { font-variant-numeric: tabular-nums; color: var(--foreground); font-weight: 600; }
+.board .roster-chips .chip.attention { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); }
+.board .roster-chips .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--foreground); }
+.board .roster-list { display: flex; flex-direction: column; gap: 10px; }
+.board .roster-group { display: flex; flex-direction: column; gap: 1px; }
+.board .roster-group .ghead { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--faint-foreground); padding: 2px 4px 4px; text-align: left; }
+.board .roster-group .ghead .n { letter-spacing: 0; font-weight: 500; color: var(--muted-foreground); }
+.board .roster-group.attention .ghead { color: var(--amber); }
+.board .roster-group .card { margin: 3px 0; }
+.board .agent-strip .row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; min-height: 28px; padding: 3px 6px 3px 10px; border-radius: var(--radius-sm); text-align: left; content-visibility: auto; contain-intrinsic-size: auto 28px; }
+.board .agent-strip .row::before { content: ""; position: absolute; inset: 5px auto 5px 0; width: 3px; border-radius: 2px; background: light-dark(hsl(var(--h) calc(var(--s) * 1%) 58%), hsl(var(--h) calc(var(--s) * .7%) 56%)); }
+.board .agent-strip .row:hover { background: var(--surface-2); }
+.board .agent-strip .row .rslice { font-size: 12px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board .agent-strip .row .state { margin-left: 0; white-space: nowrap; }
+.board .agent-strip .row.ended, .board .agent-strip .row.done, .board .agent-strip .row.gone { opacity: .55; }
+.board .agent-strip.following .row { opacity: .45; }
+/* messages for the member not yet delivered (swarm-relay D43): the hook hands them at its next tool call */
+.board .agent-strip .unread { display: inline-block; margin-right: 6px; font-size: 10.5px; font-weight: 600; color: var(--amber); }
+.board .agent-strip .card .unread { display: block; margin: 2px 0 0; }
+@media (max-width: 860px) {
+  .board .run-body.with-roster { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .board .agent-strip { max-height: 40vh; }
+}
 .board .agent-strip.following .card[aria-pressed="false"] { opacity: .45; }
 .board .agent-strip .card.ended, .board .agent-strip .card.done { opacity: .55; }
 .board .agent-strip .doing { min-height: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

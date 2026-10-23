@@ -1,7 +1,7 @@
 // What the page shows, as pure functions of the snapshot and the three selections App owns:
 // the run it is scoped to, the runner it follows, the filter. No child computes any of it.
-import type { BoardSnapshot, SnapshotEvent, SnapshotRunner, RunSummary, Kind } from "../../../../swarm/src/client/reader.ts";
-import { nameHandle, parseMentions, planCode } from "../../../../swarm/src/client/reader.ts";
+import type { BoardSnapshot, SnapshotEvent, SnapshotRunner, RunSummary, Kind } from "../../../../swarm-board/src/client/reader.ts";
+import { nameHandle, parseMentions, planCode } from "../../../../swarm-board/src/client/reader.ts";
 
 /** A run's id, as the BoardReader's summaries carry it. */
 export type RunId = RunSummary["run"];
@@ -222,6 +222,8 @@ export function phaseOf(e: SnapshotEvent): { name: string; text: string } {
 /** A brainstorm run's count, "3 seats": its slice rows are seats, never slices to merge. The tab, the archive and a
  *  closed run's archived line read it alike. */
 export const seatCount = (of: number): string => `${of} ${of === 1 ? "seat" : "seats"}`;
+/** A task run's count, "4 workers": its rows are workers taking tasks, never slices to finish. */
+export const workerCount = (of: number): string => `${of} ${of === 1 ? "worker" : "workers"}`;
 
 /** An open run as a tab: `quiet` while its orchestrator has a `quiet` event no `back` answered. */
 export type RunTab = { run: RunId; code: string; title: string; kind: Kind; state: "live" | "quiet" | "closed"; done: number; of: number };

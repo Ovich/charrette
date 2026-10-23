@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { openBoardReader } from "../../swarm/src/client/reader.ts";
+import { openBoardReader } from "../../swarm-board/src/client/reader.ts";
 import { SWARM_CLI, startTestBoard } from "./fixtures/board-server.ts";
 
 test("aiview reads a run through the reader", async () => {

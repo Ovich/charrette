@@ -8959,14 +8959,14 @@ var init_watcher = __esm({
   }
 });
 
-// ../swarm/src/board/mentions.ts
+// ../swarm-board/src/board/mentions.ts
 var init_mentions = __esm({
-  "../swarm/src/board/mentions.ts"() {
+  "../swarm-board/src/board/mentions.ts"() {
     "use strict";
   }
 });
 
-// ../swarm/src/wire.ts
+// ../swarm-board/src/wire.ts
 import crypto from "node:crypto";
 import fs7 from "node:fs";
 import path8 from "node:path";
@@ -9028,7 +9028,7 @@ function isAlive(pid) {
 }
 var RPC_METHODS, FRAME_TYPES, versionsByEntry, SERVER_STARTER_ENV, START_LOCK_GRACE_MS;
 var init_wire = __esm({
-  "../swarm/src/wire.ts"() {
+  "../swarm-board/src/wire.ts"() {
     "use strict";
     RPC_METHODS = [
       "openRun",
@@ -9061,6 +9061,7 @@ var init_wire = __esm({
       "read",
       "thread",
       "deliver",
+      "deliverMentions",
       "wait",
       "checkEdit",
       "reconcileWrites",
@@ -9079,10 +9080,10 @@ var init_wire = __esm({
   }
 });
 
-// ../swarm/src/board/liveness.ts
+// ../swarm-board/src/board/liveness.ts
 var IDLE_MS, NO_TRANSCRIPT_MS, READINGS_KEPT_MS, BUSY_MAX_MS, STALLED_AGAIN_MS, LINK_LOST_MS;
 var init_liveness = __esm({
-  "../swarm/src/board/liveness.ts"() {
+  "../swarm-board/src/board/liveness.ts"() {
     "use strict";
     IDLE_MS = 15 * 60 * 1e3;
     NO_TRANSCRIPT_MS = 30 * 1e3;
@@ -9093,15 +9094,22 @@ var init_liveness = __esm({
   }
 });
 
-// ../swarm/src/link/transcripts.ts
+// ../swarm-board/src/link/transcripts.ts
 var init_transcripts = __esm({
-  "../swarm/src/link/transcripts.ts"() {
+  "../swarm-board/src/link/transcripts.ts"() {
     "use strict";
     init_liveness();
   }
 });
 
-// ../swarm/src/link/link.ts
+// ../swarm-board/src/link/hooked.ts
+var init_hooked = __esm({
+  "../swarm-board/src/link/hooked.ts"() {
+    "use strict";
+  }
+});
+
+// ../swarm-board/src/link/link.ts
 import crypto2 from "node:crypto";
 import os2 from "node:os";
 import path9 from "node:path";
@@ -9112,15 +9120,16 @@ function linkPipe(dataRoot, run, member) {
 }
 var DEFAULT_TIMING;
 var init_link = __esm({
-  "../swarm/src/link/link.ts"() {
+  "../swarm-board/src/link/link.ts"() {
     "use strict";
     init_wire();
     init_transcripts();
+    init_hooked();
     DEFAULT_TIMING = { reconnectGiveUpMs: 6e4, reconnectEveryMs: 500, idleMs: 2 * 60 * 6e4, stateFileWaitMs: 5e3, watchEveryMs: 1e3, activityGapMs: 3e3 };
   }
 });
 
-// ../swarm/src/client/remote.ts
+// ../swarm-board/src/client/remote.ts
 var remote_exports = {};
 __export(remote_exports, {
   HARNESS_LINK_WAIT_MS: () => HARNESS_LINK_WAIT_MS,
@@ -9361,7 +9370,7 @@ async function connectBoard(opts) {
 }
 var START_TIMEOUT_MS, START_POLL_MS, entry, homeEnv, pause, isCurrent, linkVerbArgs, HARNESS_LINK_WAIT_MS, inHarnessSession;
 var init_remote = __esm({
-  "../swarm/src/client/remote.ts"() {
+  "../swarm-board/src/client/remote.ts"() {
     "use strict";
     init_wire();
     init_link();
@@ -9377,7 +9386,7 @@ var init_remote = __esm({
   }
 });
 
-// ../swarm/src/client/reader.ts
+// ../swarm-board/src/client/reader.ts
 async function openBoardReader(opts) {
   const { ensureServer: ensureServer2, connectServer: connectServer2 } = await Promise.resolve().then(() => (init_remote(), remote_exports));
   const listeners = /* @__PURE__ */ new Set();
@@ -9455,7 +9464,7 @@ async function openBoardReader(opts) {
 }
 var RECONNECT_MS, READING;
 var init_reader = __esm({
-  "../swarm/src/client/reader.ts"() {
+  "../swarm-board/src/client/reader.ts"() {
     "use strict";
     init_mentions();
     RECONNECT_MS = 200;
@@ -9574,7 +9583,7 @@ var init_board = __esm({
     init_reader();
     await init_db();
     init_home();
-    DEFAULT_SWARM_ENTRY = path10.join(TOOL_ROOT, "..", "swarm", "swarm.mjs");
+    DEFAULT_SWARM_ENTRY = path10.join(TOOL_ROOT, "..", "swarm-board", "swarm.mjs");
     SERVER_STATE_FILE = "swarm-server.json";
   }
 });

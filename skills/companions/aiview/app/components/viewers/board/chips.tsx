@@ -1,5 +1,5 @@
 import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
-import { planCode } from "../../../../../swarm/src/client/reader.ts";
+import { planCode } from "../../../../../swarm-board/src/client/reader.ts";
 import { SEQ_REF } from "../../../lib/board/post.ts";
 import { runHue, runnerLabel } from "../../../lib/board/view.ts";
 

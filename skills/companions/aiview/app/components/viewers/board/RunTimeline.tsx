@@ -1,5 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
-import type { Interval, Mark } from "../../../../../swarm/src/client/reader.ts";
+import type { Interval, Mark } from "../../../../../swarm-board/src/client/reader.ts";
 import { ESTIMATED_EVENTS_TIP, formatDuration } from "../../../lib/board/analytics.ts";
 import { hhmm, splitRunner } from "../../../lib/board/view.ts";
 import { RunnerTag } from "./chips.tsx";

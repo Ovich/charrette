@@ -3,7 +3,7 @@
 // sparkline `totals.series` (D28); the view formats and selects, never aggregates (D34, D35). The plan tiles show
 // when plan is among the kinds chosen, the brainstorm tiles when brainstorm is (D46); the funnel, the lock panel, the
 // hot files and the runs table's plan columns only with plan.
-import type { Stats } from "../../../../../swarm/src/client/reader.ts";
+import type { Stats } from "../../../../../swarm-board/src/client/reader.ts";
 import type { RunId } from "../../../lib/board/view.ts";
 import { useStats } from "../../../hooks/useStats.ts";
 import { SOURCED_RULE, figure, formatDuration, percent, plural, share, type AcrossScope } from "../../../lib/board/analytics.ts";

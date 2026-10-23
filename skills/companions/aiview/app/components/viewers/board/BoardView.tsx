@@ -1,10 +1,10 @@
 // The project's board, drawn by aiview (companions-merge §3): the repositories when the document
 // names several, the tab row (☰ archive, All, the open runs, the merge lock at its end), the picked
-// run's switch between its conversation (the agent strip, the conversation, the claims row) and its
+// run's switch between its conversation (the agent roster left of the conversation, the claims row) and its
 // Analytics, and the across-runs view. aiview's theme; board.css reaches only `.board`.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBoard } from "../../../hooks/useBoard.ts";
-import { agents, archive, claimRows, conversation, narrow, nicksOf, openingRun, runHue, runTabs, seatCount, type Narrow, type Pick, type RunId } from "../../../lib/board/view.ts";
+import { agents, archive, claimRows, conversation, narrow, nicksOf, openingRun, runHue, runTabs, seatCount, workerCount, type Narrow, type Pick, type RunId } from "../../../lib/board/view.ts";
 import {
   boardFieldsOf,
   DEFAULT_SCOPE,
@@ -129,7 +129,7 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
   const items = useMemo(() => (snapshot ? conversation(snapshot, { run: picked, follow: focus }) : []), [snapshot, picked, focus]);
   // a closed run picked reads "Archived <when> · read only · <done> of <of> slices" first, a brainstorm its seats
   const shown = useMemo(() => narrow(items, narrowing), [items, narrowing]);
-  const archivedLine = useMemo(() => (archived ? { closed: archived.closed, summary: archived.kind === "brainstorm" ? seatCount(archived.of) : `${archived.done} of ${archived.of} slices` } : null), [archived]);
+  const archivedLine = useMemo(() => (archived ? { closed: archived.closed, summary: archived.kind === "brainstorm" ? seatCount(archived.of) : archived.kind === "task" ? workerCount(archived.of) : `${archived.done} of ${archived.of} slices` } : null), [archived]);
 
   useEffect(() => {
     if (postToShow === null || runView !== "conversation") return;
@@ -222,11 +222,15 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
           ) : (
             <>
               {selectedRun && <RunViewSwitch view="conversation" line={summaryLine(selectedRun)} phase={selectedRun.phase ?? null} json={null} onView={(v) => showRunView(selectedRun.run, v)} />}
-              {/* the strip belongs to a run tab: All has none */}
-              {selectedRun && <AgentStrip agents={members} hue={runHue(selectedRun.code)} follow={focus} onFollow={setFocus} />}
-              <ConversationFilters items={items} narrow={narrowing} onNarrow={setNarrowing} />
-              <Conversation items={shown} archived={archivedLine} fresh={NONE} />
-              {claims && <ClaimsRow rows={claims} />}
+              {/* the roster sits left of the conversation, under a run tab only: All has none */}
+              <div className={selectedRun && members.length > 0 ? "run-body with-roster" : "run-body"}>
+                {selectedRun && <AgentStrip agents={members} hue={runHue(selectedRun.code)} follow={focus} onFollow={setFocus} />}
+                <div className="run-main">
+                  <ConversationFilters items={items} narrow={narrowing} onNarrow={setNarrowing} />
+                  <Conversation items={shown} archived={archivedLine} fresh={NONE} />
+                  {claims && <ClaimsRow rows={claims} />}
+                </div>
+              </div>
             </>
           )}
         </div>

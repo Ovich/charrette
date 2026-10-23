@@ -1,8 +1,8 @@
 // The board's top row (D7, mockup #643): ☰ opens the archive, All, one tab per open run, an
 // archived run picked as a tab with ×, and the merge lock at the row's end, always visible.
 // Analytics, beside the lock, opens the across-runs view; while it shows, no run tab is pressed.
-import type { BoardSnapshot } from "../../../../../swarm/src/client/reader.ts";
-import { runHue, seatCount, type RunId, type RunTab } from "../../../lib/board/view.ts";
+import type { BoardSnapshot } from "../../../../../swarm-board/src/client/reader.ts";
+import { runHue, seatCount, workerCount, type RunId, type RunTab } from "../../../lib/board/view.ts";
 import { AnalyticsButton } from "./AnalyticsButton.tsx";
 import { MergeLock } from "./MergeLock.tsx";
 
@@ -10,7 +10,7 @@ import { MergeLock } from "./MergeLock.tsx";
  *  to merge), as the archive reads them; none for a run with none. */
 function TabCount({ tab }: { tab: RunTab }) {
   if (tab.of === 0) return null;
-  return <span className="of">{tab.kind === "brainstorm" ? seatCount(tab.of) : `${tab.done}/${tab.of}`}</span>;
+  return <span className="of">{tab.kind === "brainstorm" ? seatCount(tab.of) : tab.kind === "task" ? workerCount(tab.of) : `${tab.done}/${tab.of}`}</span>;
 }
 
 function RunTabButton({ tab, picked, onPick }: { tab: RunTab; picked: boolean; onPick: () => void }) {

@@ -1,4 +1,4 @@
-import type { MemberStats } from "../../../../../swarm/src/client/reader.ts";
+import type { MemberStats } from "../../../../../swarm-board/src/client/reader.ts";
 import { figure } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";
 

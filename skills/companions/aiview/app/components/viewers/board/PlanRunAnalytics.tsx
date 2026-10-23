@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { MemberStats, RunStats, Stats } from "../../../../../swarm/src/client/reader.ts";
+import type { MemberStats, RunStats, Stats } from "../../../../../swarm-board/src/client/reader.ts";
 import { agreementText, countedWithoutAgreement, formatDuration, plural, runLength } from "../../../lib/board/analytics.ts";
 import { basename, splitRunner } from "../../../lib/board/view.ts";
 import { KpiTile } from "./KpiTile.tsx";

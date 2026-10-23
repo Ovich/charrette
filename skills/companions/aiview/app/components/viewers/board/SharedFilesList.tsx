@@ -1,4 +1,4 @@
-import type { SharedFile } from "../../../../../swarm/src/client/reader.ts";
+import type { SharedFile } from "../../../../../swarm-board/src/client/reader.ts";
 import { ESTIMATED_TIP, agreementText, countedWithoutAgreement } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";
 

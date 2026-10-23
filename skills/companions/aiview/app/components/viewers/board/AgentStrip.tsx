@@ -1,10 +1,10 @@
-// A picked run's members, a closed run's as they ended, five cards a row under the tabs, the orchestrator the first card (D7, D20):
+// A picked run's members, a closed run's as they ended, a column left of the conversation, the orchestrator first (D7, D20):
 // each card its member (code, then nick), its status, the slice, what it does. A card clicked
 // follows the member and narrows the conversation; clicked again, released.
-import { useEffect, useState, type CSSProperties } from "react";
-import type { Liveness, SnapshotRunner } from "../../../../../swarm/src/client/reader.ts";
+import { useContext, useEffect, useState, type CSSProperties } from "react";
+import type { Liveness, SnapshotRunner } from "../../../../../swarm-board/src/client/reader.ts";
 import { hhmm, ORCHESTRATOR } from "../../../lib/board/view.ts";
-import { RunnerName } from "./chips.tsx";
+import { NicksContext, RunnerName } from "./chips.tsx";
 
 /** A member's activity as the server computes it (swarm-relay#D9, #D20), its two ages' instants included (swarm-relay#D38). */
 type MemberActivity = Liveness;
@@ -98,6 +98,7 @@ function AgentCard({ p, hue, followed, onFollow, now }: { p: SnapshotRunner; hue
         </span>
       </span>
       <span className="slice">{orch ? "orchestrator" : p.title ? `${p.slice} · ${p.title}` : p.slice}</span>
+      {!!p.unread && <span className="unread" data-component="UnreadCount">{p.unread} unread</span>}
       <span className="doing">{p.doing}</span>
       {activity && <MemberAges activity={activity} now={now} />}
       {activity && <ActivityLine activity={activity} />}
@@ -105,6 +106,58 @@ function AgentCard({ p, hue, followed, onFollow, now }: { p: SnapshotRunner; hue
   );
 }
 
+/** Up to this many members, every one a full card; past it, a row each, the followed one a card (a swarm of hundreds). */
+export const CARDS_UP_TO = 12;
+
+/** The roster's sections, in reading order: what needs the person first, the ended last and folded. */
+const BUCKETS = [
+  { id: "attention", label: "Needs attention" },
+  { id: "active", label: "Working" },
+  { id: "waiting", label: "Waiting" },
+  { id: "ended", label: "Ended" },
+] as const;
+type Bucket = (typeof BUCKETS)[number]["id"];
+
+function bucketOf(p: SnapshotRunner): Bucket {
+  if (p.state === "ended" || p.state === "done") return "ended";
+  const a = activityOf(p);
+  if (a) return a.state === "quiet" || a.state === "gone" ? "attention" : a.state === "waiting" ? "waiting" : "active";
+  if (p.stale) return "attention";
+  return p.listening ? "waiting" : "active";
+}
+
+/** One member on one line: its stripe, name, slice and state; clicked, followed and drawn as its card. */
+function AgentRow({ p, hue, onFollow, now }: { p: SnapshotRunner; hue: number; onFollow: () => void; now: number }) {
+  const activity = p.state === "ended" || p.state === "done" ? null : activityOf(p);
+  const status = statusOf(p, activity, now);
+  return (
+    <button
+      className={["row", p.state, activity?.state === "gone" && "gone"].filter(Boolean).join(" ")}
+      style={{ "--h": hue, "--s": 60 } as CSSProperties}
+      aria-pressed={false}
+      onClick={onFollow}
+      title={p.doing}
+      data-component="AgentRow"
+    >
+      <RunnerName name={p.runner} plan={false} />
+      <span className="rslice">
+        {!!p.unread && <span className="unread" data-component="UnreadCount">{p.unread} unread</span>}
+        {p.title || p.slice}
+      </span>
+      <span className={`state ${status.className}`}>
+        <i />
+        {status.text}
+      </span>
+    </button>
+  );
+}
+
+const matches = (p: SnapshotRunner, nick: string | undefined, q: string): boolean =>
+  !q || [p.runner, p.slice, p.title, p.doing, nick].some((t) => t?.toLowerCase().includes(q));
+
+/** A picked run's members, a column left of the conversation, the orchestrator first. A card or row clicked follows its
+ *  member and narrows the conversation; clicked again, released. Past CARDS_UP_TO members: a search, a chip per state,
+ *  and a row each, by section. */
 export function AgentStrip({
   agents,
   hue,
@@ -118,12 +171,80 @@ export function AgentStrip({
   onFollow: (runner: string | null) => void;
 }) {
   const now = useNow();
+  const nicks = useContext(NicksContext);
+  const [query, setQuery] = useState("");
+  const [only, setOnly] = useState<Bucket | null>(null);
+  const [openEnded, setOpenEnded] = useState(false);
   if (agents.length === 0) return null;
+  const toggle = (p: SnapshotRunner) => () => onFollow(follow === p.runner ? null : p.runner);
+  const card = (p: SnapshotRunner) => <AgentCard key={p.runner} p={p} hue={hue} followed={follow === p.runner} onFollow={toggle(p)} now={now} />;
+  const many = agents.length > CARDS_UP_TO;
+  const cls = ["agent-strip", follow && "following", many && "many"].filter(Boolean).join(" ");
+  const head = (
+    <div className="label roster-head">
+      Agents <span className="n">{agents.length}</span>
+    </div>
+  );
+  if (!many) {
+    return (
+      <section className={cls} data-component="AgentStrip" aria-label="Agents">
+        {head}
+        <div className="cards">{agents.map(card)}</div>
+      </section>
+    );
+  }
+  const orch = agents.filter((p) => p.slice === ORCHESTRATOR);
+  const rest = agents.filter((p) => p.slice !== ORCHESTRATOR);
+  const q = query.trim().toLowerCase();
+  const byBucket = new Map<Bucket, SnapshotRunner[]>(BUCKETS.map((b) => [b.id, []]));
+  for (const p of rest) byBucket.get(bucketOf(p))!.push(p);
+  // under Needs attention, the stalled and quiet before the gone: they can still be steered
+  byBucket.get("attention")!.sort((a, b) => Number(activityOf(a)?.state === "gone") - Number(activityOf(b)?.state === "gone"));
+  const shown = (b: Bucket): SnapshotRunner[] => (only && only !== b ? [] : byBucket.get(b)!.filter((p) => matches(p, nicks.get(p.runner), q)));
+  const groups = BUCKETS.map((b) => ({ ...b, list: shown(b.id) })).filter((g) => g.list.length > 0);
   return (
-    <section className={follow ? "agent-strip following" : "agent-strip"} data-component="AgentStrip" aria-label="Agents">
-      {agents.map((p) => (
-        <AgentCard key={p.runner} p={p} hue={hue} followed={follow === p.runner} onFollow={() => onFollow(follow === p.runner ? null : p.runner)} now={now} />
-      ))}
+    <section className={cls} data-component="AgentStrip" aria-label="Agents">
+      {head}
+      <div className="cards">{orch.map(card)}</div>
+      <input
+        className="roster-search"
+        type="search"
+        placeholder={`Search ${rest.length} members`}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        aria-label="Search the members"
+      />
+      <div className="roster-chips" role="group" aria-label="By state">
+        {BUCKETS.map((b) => {
+          const n = byBucket.get(b.id)!.length;
+          if (n === 0) return null;
+          return (
+            <button key={b.id} className={`chip ${b.id}`} aria-pressed={only === b.id} onClick={() => setOnly(only === b.id ? null : b.id)} data-component="StateChip">
+              {b.label} <span className="n">{n}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="roster-list">
+        {groups.map((g) => {
+          const folded = g.id === "ended" && !openEnded && !q && only !== "ended";
+          return (
+            <div key={g.id} className={`roster-group ${g.id}`} data-component="RosterGroup">
+              {g.id === "ended" ? (
+                <button className="ghead" aria-expanded={!folded} onClick={() => setOpenEnded(!openEnded)}>
+                  {folded ? "▸" : "▾"} {g.label} <span className="n">{g.list.length}</span>
+                </button>
+              ) : (
+                <div className="ghead">
+                  {g.label} <span className="n">{g.list.length}</span>
+                </div>
+              )}
+              {!folded && g.list.map((p) => (follow === p.runner ? card(p) : <AgentRow key={p.runner} p={p} hue={hue} onFollow={toggle(p)} now={now} />))}
+            </div>
+          );
+        })}
+        {groups.length === 0 && <p className="none">No member matches.</p>}
+      </div>
     </section>
   );
 }

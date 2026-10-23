@@ -146,7 +146,7 @@ test("liveness draws a row of its own; a stall something came after has passed a
 test("the agent strip: the orchestrator is its first card; each card shows its counter, flat past the run's threshold marked, an unreadable one said", async () => {
   render(<BoardView repos={[REPO]} run={32} />);
   const strip = await screen.findByRole("region", { name: "Agents" });
-  const cards = Array.from(strip.children);
+  const cards = Array.from(strip.querySelectorAll("button.card"));
   expect(cards).toHaveLength(6);
   expect(cards.every((c) => c.getAttribute("data-component") === "AgentCard")).toBe(true);
   expect(cards[0].className).toMatch(/\borch\b/);

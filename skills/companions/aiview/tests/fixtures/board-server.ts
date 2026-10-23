@@ -5,11 +5,11 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { connectBoard, type RemoteBoard } from "../../../swarm/src/client/remote.ts";
-import { startBoardServer } from "../../../swarm/src/server/server.ts";
+import { connectBoard, type RemoteBoard } from "../../../swarm-board/src/client/remote.ts";
+import { startBoardServer } from "../../../swarm-board/src/server/server.ts";
 
 /** swarm's CLI entry: what a board server is started and versioned from in a test. */
-export const SWARM_CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "swarm", "src", "cli", "index.ts");
+export const SWARM_CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "swarm-board", "src", "cli", "index.ts");
 process.argv[1] = SWARM_CLI;
 
 export type TestBoard = { writer: RemoteBoard; close(): Promise<void> };

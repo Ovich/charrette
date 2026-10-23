@@ -2,7 +2,7 @@
 // does, useStats answers a `Stats` fixture with its body as the server would send it, and
 // navigator.clipboard keeps what "Copy as JSON" wrote, the only place its answer lands (US3).
 import { vi } from "vitest";
-import type { BoardSnapshot, Stats } from "../../swarm/src/client/reader.ts";
+import type { BoardSnapshot, Stats } from "../../swarm-board/src/client/reader.ts";
 import type { BoardState } from "./hooks/useBoard.ts";
 import type { StatsState } from "./hooks/useStats.ts";
 import type { StatsAsk } from "./lib/board/analytics.ts";

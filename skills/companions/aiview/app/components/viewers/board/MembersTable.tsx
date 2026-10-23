@@ -1,4 +1,4 @@
-import type { Interval, MemberStats } from "../../../../../swarm/src/client/reader.ts";
+import type { Interval, MemberStats } from "../../../../../swarm-board/src/client/reader.ts";
 import { ESTIMATED_EVENTS_TIP, figure, formatDuration } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";
 

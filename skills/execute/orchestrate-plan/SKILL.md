@@ -5,7 +5,7 @@ description: "Use whenever execute-plan runs, as the plan's orchestrator: settli
 
 # Orchestrate a plan
 
-**Load the `orchestrate` skill and the `swarm` skill's orchestrator side with this one.** The first holds the charter protocol, dispatch, briefs and findings; the second everything said on the board, and replaces the `orchestrate` skill's *Watching*. Here the charter is the plan's *Mandate*; a member is a seat's subagent for one slice. The phases, seats and roles are the plan's; the cut is the `write-plan` skill's `references/phases.md`.
+**Load the `orchestrate` skill and the `swarm-board` skill's orchestrator side with this one.** The first holds the charter protocol, dispatch, briefs and findings; the second everything said on the board, and replaces the `orchestrate` skill's *Watching*. Here the charter is the plan's *Mandate*; a member is a seat's subagent for one slice. The phases, seats and roles are the plan's; the cut is the `write-plan` skill's `references/phases.md`.
 
 ## The mandate
 
@@ -23,7 +23,7 @@ Read the plan's *Mandate* section. Ask what it leaves open before the first phas
 1. **Write its slices now**, one per seat, with the `write-slice` skill, from the phase's goal, every seat's role and area, and what the run taught so far. The tracker's placeholder becomes the slices.
 2. **Open it**: `slice add` each slice, then `phase <name> "<text>"`, the text naming every seat's role in it.
 3. **Dispatch every seat of the phase at once**, one fresh subagent each, in its own worktree, with the brief of `references/brief.md`, read before the first dispatch. A seat with no slice in this phase is not dispatched.
-4. **Watch the board**: it replaces the periodic check and the digest. Each seat's state, and the `stalled`, `gone`, `idle` and `liveness` events, are read and answered as the `swarm` skill's orchestrator side says; a drift is answered on the board, by its interrupt.
+4. **Watch the board**: it replaces the periodic check and the digest. Each seat's state, and the `stalled`, `gone`, `idle` and `liveness` events, are read and answered as the `swarm-board` skill's orchestrator side says; a drift is answered on the board, by its interrupt.
 5. **A return**: the seat merged its own branch under the board's lock. Re-run the slice's check on the merged branch, and what the testing prompt asked for; tick, mark the slice done on the board, remove its worktree once the tick stands, and check the path is gone.
 6. **The phase closes** when every slice is ticked and the full check is green on the merged branch: the board's `all-done`, then that check. Only then is the next phase cut. A seat that stopped on a finding: fix the slice document and dispatch a fresh subagent into the same slice, or pause when the finding changes the phase.
 
@@ -31,7 +31,7 @@ Read the plan's *Mandate* section. Ask what it leaves open before the first phas
 
 ## The validator
 
-**When the mandate's `verify:` is on**, it is dispatched once, at the run's open, with the first phase's seats: one board row, `validator`, its role from the *Mandate* verbatim, in a detached worktree; it merges nothing and lies dormant. A building phase's text says its part is none, so it marks itself done and waits. **Its phase is yours to announce**: `phase`, its text what to validate (the feature, the stories or screens to walk), and `@validator your turn: validate <branch> at <sha>`; no other seat works in it. One that ended (its context spent) is replaced by a fresh one in the same row. When it asks for a seat, dispatch one into a fix slice (`slice add`). Its findings are weighed as the `orchestrate` skill's *Findings* says. **Its verdict decides the next cut**: the next phase as planned, amended, a fix phase, or a pause when a finding breaks a decision. Write what changed into the plan before cutting.
+**When the mandate's `verify:` is on**, it is dispatched once, at the run's open, with the first phase's seats, on the plugin's `verifier` agent (`subagent_type: "charrette:verifier"`), which holds its rules: one board row, `validator`, its role from the *Mandate* verbatim, in a detached worktree. A building phase's text says its part is none. **Its phase is yours to announce**: `phase`, its text what to validate (the feature, the stories or screens to walk), and `@validator your turn: validate <branch> at <sha>`; no other seat works in it. One that ended (its context spent) is replaced by a fresh one in the same row. When it asks for a seat, dispatch one into a fix slice (`slice add`). Its findings are weighed as the `orchestrate` skill's *Findings* says. **Its verdict decides the next cut**: the next phase as planned, amended, a fix phase, or a pause when a finding breaks a decision. Write what changed into the plan before cutting.
 
 No `verify-<app>-<focus>` skill and the person wants one: the `verification-skill-create` skill runs before the first phase.
 

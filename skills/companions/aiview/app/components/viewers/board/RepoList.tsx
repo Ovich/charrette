@@ -1,5 +1,5 @@
 // The repositories on the board, when the URL names more than one (D39): pick one to read.
-import type { RepoSummary } from "../../../../../swarm/src/client/reader.ts";
+import type { RepoSummary } from "../../../../../swarm-board/src/client/reader.ts";
 
 export function RepoList({ repos, selected, onSelect }: { repos: RepoSummary[]; selected: string; onSelect: (repo: string) => void }) {
   return (

@@ -14,13 +14,13 @@ Every skill is one folder under `skills/`, opening on a `SKILL.md`; supporting f
 sit beside it, situational ones under `references/`. `project/` holds what a project
 has once and keeps, `verify/` its verification skill and the validation with the person, `workbench/` the pages worked on
 with the person during development and the project skills that feed them; the loop's phases group the rest,
-`architecture/`, `ui/`, `plan/`, `execute/`, `review/`; `interview/`, `swarmstorm/` and `whiteboard-defense/` sit at the root;
+`architecture/`, `ui/`, `plan/`, `execute/`, `review/`; `interview/`, `orchestrate/`, `swarm/`, `swarmstorm/` and `whiteboard-defense/` sit at the root;
 `companions/` holds the two tools, shipped as versioned bundles so an install never builds:
 aiview (`skills/companions/aiview/`), a CLI, the document server and the one UI, drawing the
-documents and the board; and swarm (`skills/companions/swarm/`, the board every plan
+documents and the board; and swarm (`skills/companions/swarm-board/`, the board every plan
 runs on), a CLI, a board server and one link per member, with no page of its own. The board
 server alone opens swarm's store; each member's link carries its calls over one WebSocket to
-it. aiview reads the board only through `skills/companions/swarm/src/client/reader.ts`, a
+it. aiview reads the board only through `skills/companions/swarm-board/src/client/reader.ts`, a
 client of that server, bundled into aiview's `dist-cli/`; never `board.ts` or SQL, and swarm
 never imports aiview. The plugin sees a group only through the `skills`
 list in `.claude-plugin/plugin.json`: the default scan reads one level under `skills/`,
@@ -45,13 +45,13 @@ file the person was looking for. Refresh the cache with
 
 3. **MUST write a description as the trigger and nothing else: what activates the skill, what it produces, what it excludes.** Method, mechanics and instructions to a loaded agent belong in the body, and the body carries no "when to use" section of its own. The router reads only the description; the agent reads the body only after.
 
-4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute/execute-plan/references/tracker.md`; diagram discipline is `skills/architecture/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/companions/aiview/`; the board protocol is `skills/companions/swarm/`; a seat swarm's phases are `skills/swarmstorm/`; the orchestrator's charter, dispatch, briefs, roles and watching are `skills/orchestrate/`.
+4. **MUST give a protocol one owner and have every other skill point at it, never restate it.** Two copies drift, and the reader has to work out which lies. The tracker is `skills/execute/execute-plan/references/tracker.md`; diagram discipline is `skills/architecture/write-diagrams/`; the interview is `skills/interview/`; the index contract is `skills/companions/aiview/`; the board protocol is `skills/companions/swarm-board/`; a seat swarm's phases are `skills/swarmstorm/`; the orchestrator's charter, dispatch, briefs, roles and watching are `skills/orchestrate/`.
 
 8. **MUST write a skill, its examples included, only in terms every project has, never a file, module or name from the project the change came from.** A skill loads in every project; a foreign name reads as a fact about the current codebase, and the agent looks for it. Abstract the case to the rule it taught, and the counterweight it needed.
 
 9. **MUST put a protocol used by more than one kind of work in a skill named for no kind, never in the first kind that needed it.** A plan-named owner reads as plan-only, and the next kind copies it instead.
 
-10. **MUST let a CLI verb's answer carry the next step it asks for, and have the skill say only to read that answer and why.** A step written in both drifts, and the agent follows whichever it read last. The swarm skill's `references/runner.md` names the verbs and their exits; the commands to run next are in their output.
+10. **MUST let a CLI verb's answer carry the next step it asks for, and have the skill say only to read that answer and why.** A step written in both drifts, and the agent follows whichever it read last. The swarm-board skill's `references/plan-worker.md` names the verbs and their exits; the commands to run next are in their output.
 
 ## aiview
 

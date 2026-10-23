@@ -7,7 +7,7 @@ description: Use when handed one slice document to carry out, as the agent doing
 
 **The slice document is the design; the brief is the mandate.** Where the brief asks for something, it wins over any habit, this skill's included.
 
-**Join the board before the first edit**: load the `swarm` skill, runner side, and join the run the brief names. A brief naming none: the `swarm` skill's `status` lists the open runs; join the plan's run on this repository and ask the orchestrator there which slice id is yours.
+**Join the board before the first edit**: load the `swarm-board` skill, plan-worker side, and join the run the brief names. A brief naming none: the `swarm-board` skill's `status` lists the open runs; join the plan's run on this repository and ask the orchestrator there which slice id is yours.
 
 ## When to stop
 

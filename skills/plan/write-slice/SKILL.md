@@ -7,7 +7,7 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 **Cutting a plan's increment into slices**: read `references/cutting.md`. The rest of this skill is one slice's document.
 
-**A slice is one seat's share of a phase, written when it is about to be dispatched**, at its phase's open, never with the plan. The plan gives the phase's goal and the seat's role and area; read first what the run left: its merges, the agreements and findings on the board's thread (the `swarm` skill's `thread <phase>`), each seat's report. A slice says what it builds on from them. A finding that changes the phase's goal is a pause, not a recut.
+**A slice is one seat's share of a phase, written when it is about to be dispatched**, at its phase's open, never with the plan. The plan gives the phase's goal and the seat's role and area; read first what the run left: its merges, the agreements and findings on the board's thread (the `swarm-board` skill's `thread <phase>`), each seat's report. A slice says what it builds on from them. A finding that changes the phase's goal is a pause, not a recut.
 
 **One document per slice, the whole design one agent needs.** The mandate (when tests are written, the pull request, the boundaries) is not in it: it reaches the agent through the brief at dispatch (the `orchestrate-plan` skill).
 

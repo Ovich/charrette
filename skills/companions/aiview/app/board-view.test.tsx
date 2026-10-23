@@ -2,7 +2,7 @@
 // fixtures; each call's selection is recorded, and the snapshot answered is the repository it asks for.
 import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import type { BoardSnapshot } from "../../swarm/src/client/reader.ts";
+import type { BoardSnapshot } from "../../swarm-board/src/client/reader.ts";
 import type { BoardState } from "./hooks/useBoard.ts";
 import { ALL_CLOSED, APP, BRAINSTORM, CLOSED, LIVE, NICKS, OTHER, PHASED, REPOS, SITE } from "./board-fixtures.ts";
 
@@ -217,6 +217,59 @@ test("a card followed narrows the conversation to its member; clicked again, rel
   expect(convo().queryByText(/return the new token/)).toBeNull();
   fireEvent.click(s5);
   expect(convo().getByText(/return the new token/)).toBeTruthy();
+});
+
+// ── a swarm of hundreds ──────────────────────────────────────────────────────────
+
+const SEAT = LIVE.roster.find((r) => r.runner === "refresh-tokens/S4")!;
+/** The refresh-tokens run with n more members: every fifth ended, every seventh gone. */
+const swarmOf = (n: number): BoardSnapshot => {
+  const extra = Array.from({ length: n }, (_, i) => ({
+    ...SEAT,
+    runner: `refresh-tokens/W${i + 1}`,
+    slice: `W${i + 1}`,
+    title: `worker ${i + 1}`,
+    state: (i % 5 === 4 ? "ended" : "working") as typeof SEAT.state,
+    liveness: i % 7 === 6 ? { state: "gone", doing: null, since: null, tokens: null, movedAt: null } : undefined,
+  }));
+  return { ...LIVE, roster: [...LIVE.roster, ...extra] } as BoardSnapshot;
+};
+
+test("up to twelve members every one is a card; past it, a row each, the orchestrator still a card", () => {
+  show([APP], 1);
+  expect(strip()!.querySelectorAll('[data-component="AgentRow"]')).toHaveLength(0);
+  cleanup();
+  show([APP], 1, [swarmOf(200)]);
+  const cards = strip()!.querySelectorAll('[data-component="AgentCard"]');
+  expect(cards).toHaveLength(1);
+  expect(cards[0].classList.contains("orch")).toBe(true);
+  expect(strip()!.querySelectorAll('[data-component="AgentRow"]').length).toBeGreaterThan(100);
+});
+
+test("a large swarm: gone members first under Needs attention, the ended folded until opened", () => {
+  show([APP], 1, [swarmOf(200)]);
+  const groups = Array.from(strip()!.querySelectorAll('[data-component="RosterGroup"]'));
+  expect(groups[0].className).toContain("attention");
+  const ended = groups.find((g) => g.className.includes("ended"))!;
+  expect(ended.querySelectorAll('[data-component="AgentRow"]')).toHaveLength(0);
+  fireEvent.click(within(ended as HTMLElement).getByRole("button", { name: /Ended/ }));
+  // the forty ended workers and the fixture's own S2
+  expect(ended.querySelectorAll('[data-component="AgentRow"]').length).toBe(41);
+});
+
+test("a large swarm: the search and a state chip narrow the rows; a row clicked becomes its card, followed", () => {
+  show([APP], 1, [swarmOf(200)]);
+  fireEvent.change(within(strip()!).getByRole("searchbox"), { target: { value: "worker 13" } });
+  const rows = strip()!.querySelectorAll('[data-component="AgentRow"]');
+  const slices = Array.from(rows).map((r) => r.querySelector(".rslice")!.textContent!);
+  expect(slices).toHaveLength(11);
+  expect(slices.every((t) => t.includes("worker 13"))).toBe(true);
+  fireEvent.click(Array.from(rows).find((r) => r.querySelector(".rslice")!.textContent === "worker 13")!);
+  const followed = strip()!.querySelector('[data-component="AgentCard"][aria-pressed="true"]')!;
+  expect(followed.textContent).toContain("W13 · worker 13");
+  fireEvent.change(within(strip()!).getByRole("searchbox"), { target: { value: "" } });
+  fireEvent.click(within(strip()!).getByRole("button", { name: /Needs attention/ }));
+  expect(strip()!.querySelectorAll('[data-component="RosterGroup"]')).toHaveLength(1);
 });
 
 // ── the member's activity (swarm-relay S24, D9, D20) ─────────────────────────────

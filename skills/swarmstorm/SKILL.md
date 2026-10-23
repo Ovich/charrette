@@ -6,7 +6,7 @@ description: "Use when a person wants a swarm of role seats to work a topic on t
 # Swarmstorm
 
 You are the **orchestrator**: you run role seats on the swarm board under one protocol, and you
-alone write the run's documents. The board's verbs are the `swarm` skill's, orchestrator side;
+alone write the run's documents. The board's verbs are the `swarm-board` skill's, orchestrator side;
 dispatch, charter and roles are the `orchestrate` skill's.
 
 - **The run goes to its end without the person.** They approve the strategy before and read the
@@ -86,18 +86,18 @@ date, or a recipe):
 
 ## Open and dispatch
 
-- **Open the run** as the `swarm` skill's orchestrator side says: kind from the protocol, group
+- **Open the run** as the `swarm-board` skill's orchestrator side says: kind from the protocol, group
   the topic, one seat per strategy row, each seat's `link` the dossier; the record created and
   indexed before the dispatch.
 - **A recording** starts before the joins, on this run's own tab (`#doc=<id>&run=<run>`), its
   own first frame checked before any seat is dispatched.
-- **Every seat at once on the plugin's `seat-runner` agent** (`subagent_type:
-  "charrette:seat-runner"`, no `isolation`), at its row's effort, web or MCP tools only when its
+- **Every seat at once on the plugin's `swarmstorm-seat` agent** (`subagent_type:
+  "charrette:swarmstorm-seat"`, no `isolation`), at its row's effort, web or MCP tools only when its
   evidence lists them.
 - **The brief**:
 
 ```markdown
-Take seat `<seat id>` in run `<run id>`, protocol `<protocol>` of the `swarmstorm` skill<, its file `<the project protocol's SKILL.md, absolute path>`>, with the `swarm` skill, seat side. `$S` = `<the swarm tool's command>`.
+Take seat `<seat id>` in run `<run id>`, protocol `<protocol>` of the `swarmstorm` skill<, its file `<the project protocol's SKILL.md, absolute path>`>, with the `swarm-board` skill, swarmstorm-seat side. `$S` = `<the swarm tool's command>`.
 
 **Join**: `<the exact join command, --as included>`. **You**: `--as <group>/<seat id>` on every call.
 
@@ -136,7 +136,7 @@ One command per shell call. Never end your turn while the run is open; when the 
 - **A move the phase does not allow** is answered on the thread with the phase's rule.
 - **Order of authority** in every ruling: truth (the evidence), then the person's preferences
   and feedback, then what the protocol ranks next, then a seat's taste.
-- **The person may interrupt in chat**: relay to a seat, pause the run (the `swarm` skill's `pause`, then `resume` with what changed), stop it, or change a criterion.
+- **The person may interrupt in chat**: relay to a seat, pause the run (the `swarm-board` skill's `pause`, then `resume` with what changed), stop it, or change a criterion.
 
 ## Close and after
 

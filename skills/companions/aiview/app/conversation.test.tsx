@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm/src/client/reader.ts";
+import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm-board/src/client/reader.ts";
 import { conversation, TIPS } from "./lib/board/view.ts";
 import { Conversation } from "./components/viewers/board/Conversation.tsx";
 import { TipLayer } from "./components/viewers/board/Tip.tsx";
@@ -179,16 +179,14 @@ test("a post's diagram box and code box are drawn by board.css's rules, inside t
   expect(css).toContain("@media (prefers-color-scheme: dark) { .board .post-md .shiki-box span { color: var(--shiki-dark); } }");
 }, 20_000);
 
-test("the agent strip: five cards a row (the person's decision), rows of 77px, padded 12px above and below, two rows at most, then scrolled", () => {
-  const strip = ruleOf(boardCss(), ".board .agent-strip");
-  expect(strip).toContain("--row: 77px");
-  expect(strip).toContain("grid-template-columns: repeat(5, minmax(0, 1fr))");
-  expect(boardCss()).toMatch(/five cards a row, the orchestrator one of them: the person's decision/);
-  expect(strip).toContain("grid-auto-rows: var(--row)");
-  expect(strip).toContain("padding: 12px 2px");
-  expect(strip).toContain("max-height: calc(2 * var(--row) + 10px + 24px)");
-  expect(strip).toContain("overflow-y: auto");
-  expect(strip).not.toMatch(/overflow-x|nowrap/);
+test("the agent roster: a column left of the conversation, its own scroll, the conversation the rest of the width", () => {
+  const css = boardCss();
+  expect(ruleOf(css, ".board .run-body.with-roster")).toContain("grid-template-columns: minmax(240px, 300px) minmax(0, 1fr)");
+  const roster = ruleOf(css, ".board .agent-strip");
+  expect(roster).toContain("min-height: 0");
+  expect(roster).toContain("overflow-y: auto");
+  expect(roster).not.toMatch(/overflow-x/);
+  expect(ruleOf(css, ".board .agent-strip .row")).toContain("content-visibility: auto");
 });
 
 test("messages run the full width: no measure caps a message's text", () => {

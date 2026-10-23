@@ -1,6 +1,6 @@
 // The board page's view model (plan D1, D7, D8, D13-D16, D18, D20), on snapshots built here.
 import { describe, expect, test } from "vitest";
-import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm/src/client/reader.ts";
+import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm-board/src/client/reader.ts";
 import { agents, archive, claimRows, conversation, feed, filters, flagAnswer, flagOf, mentionCtx, mergedRecipients, narrow, runTabs, type Item } from "./lib/board/view.ts";
 import { PHASE, PHASED } from "./board-fixtures.ts";
 

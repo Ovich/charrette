@@ -1,4 +1,4 @@
-import type { RunStats, Totals } from "../../../../../swarm/src/client/reader.ts";
+import type { RunStats, Totals } from "../../../../../swarm-board/src/client/reader.ts";
 import { figure, formatDuration, plural } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";
 

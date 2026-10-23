@@ -18,7 +18,7 @@ are its decisions rows, status open, ordered as a tree. Swarm kind `brainstorm`.
 | budget | as shared | 45 minutes |
 
 **One phase, `debate`**: seats post positions, `agree` and, the skeptic, `endorse`, as the
-`swarm` skill's seat side says. **Every claim names its source**; the skeptic's sign-off checks it
+`swarm-board` skill's swarmstorm-seat side says. **Every claim names its source**; the skeptic's sign-off checks it
 is there.
 
 ## While it runs
