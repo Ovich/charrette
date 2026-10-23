@@ -6,8 +6,8 @@ import type { Liveness, SnapshotRunner } from "../../../../../swarm/src/client/r
 import { hhmm, ORCHESTRATOR } from "../../../lib/board/view.ts";
 import { RunnerName } from "./chips.tsx";
 
-/** A member's activity as the server computes it (swarm-relay#D9, #D20), with its two ages' instants when the server sends them (swarm-relay#D38). */
-type MemberActivity = Liveness & { progressAt?: number | null; aliveAt?: number | null };
+/** A member's activity as the server computes it (swarm-relay#D9, #D20), its two ages' instants included (swarm-relay#D38). */
+type MemberActivity = Liveness;
 const ACTIVITY_STATES: ReadonlySet<string> = new Set(["working", "busy", "waiting", "quiet", "gone"]);
 
 /** Stalled is quiet with its link alive (swarm-relay#D36): the server says so in the reason, the state stays one of D9's five. */
