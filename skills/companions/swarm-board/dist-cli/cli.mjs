@@ -1830,7 +1830,11 @@ async function openBoard(dbPath = SQLITE_PATH) {
     }
     const open = a.open_tool == null ? null : `${a.open_tool} ${String(a.open_target ?? "")}`.trim();
     if (open && heldSince != null && Number(a.open_wait) === 1) return { member, state: "waiting", doing: open, since: Number(a.open_since) };
-    if (open && t - Number(a.open_since) < BUSY_MAX_MS) return { member, state: "busy", doing: open, since: Number(a.open_since) };
+    if (open) {
+      const since = Number(a.open_since);
+      const long = t - since >= BUSY_MAX_MS;
+      return { member, state: "busy", doing: open, since, ...long ? { reason: `busy ${Math.floor((t - since) / 6e4)} min in one call, link ${link.connected ? "alive" : "down"}; it may be hung` } : {} };
+    }
     const last = a.last_tool == null ? null : String(a.last_tool);
     const progressed = progressAtOf(p, run2, a);
     if (t - progressed < Number(run2.stall_ms ?? STALL_MS_DEFAULT)) return { member, state: "working", doing: open ?? last, since: progressed };
@@ -2266,7 +2270,8 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
             }
             continue;
           }
-          if (st.state !== "quiet" || r.paused != null || !presence(st.member).connected) {
+          const longCall = st.state === "busy" && st.since != null && t - st.since >= BUSY_MAX_MS;
+          if (st.state !== "quiet" && !longCall || r.paused != null || !presence(st.member).connected) {
             if (a.stalled_at != null) {
               db.prepare("UPDATE member_activity SET stalled_at = NULL WHERE run = ? AND member = ?").run(run2, st.member);
               moved = true;

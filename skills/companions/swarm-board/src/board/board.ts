@@ -1068,7 +1068,13 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     // D31, D35, D45: waiting is the open call that runs the board's own `wait`, while the board holds the member's wait; any
     // other open call (a browser's wait_for, a test run) is work, even with a background listener held
     if (open && heldSince != null && Number(a.open_wait) === 1) return { member, state: "waiting", doing: open, since: Number(a.open_since) };
-    if (open && t - Number(a.open_since) < BUSY_MAX_MS) return { member, state: "busy", doing: open, since: Number(a.open_since) };
+    // busy for as long as the call is open, its true state; past BUSY_MAX_MS its reason says so, and the orchestrator is
+    // told by the stalled check, since a call that long may be hung (swarm-relay D46)
+    if (open) {
+      const since = Number(a.open_since);
+      const long = t - since >= BUSY_MAX_MS;
+      return { member, state: "busy", doing: open, since, ...(long ? { reason: `busy ${Math.floor((t - since) / 60000)} min in one call, link ${link.connected ? "alive" : "down"}; it may be hung` } : {}) };
+    }
     const last = a.last_tool == null ? null : String(a.last_tool);
     const progressed = progressAtOf(p, run, a);
     if (t - progressed < Number(run.stall_ms ?? STALL_MS_DEFAULT)) return { member, state: "working", doing: open ?? last, since: progressed };
@@ -1582,7 +1588,9 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
             continue;
           }
           // D36: stalled needs no progress AND the link alive; a member whose link is down is gone, or about to be
-          if (st.state !== "quiet" || r.paused != null || !presence(st.member).connected) {
+          // D46: a call open past BUSY_MAX_MS is told as stalled too, the member still busy
+          const longCall = st.state === "busy" && st.since != null && t - st.since >= BUSY_MAX_MS;
+          if ((st.state !== "quiet" && !longCall) || r.paused != null || !presence(st.member).connected) {
             if (a.stalled_at != null) {
               db.prepare("UPDATE member_activity SET stalled_at = NULL WHERE run = ? AND member = ?").run(run, st.member);
               moved = true;

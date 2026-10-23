@@ -70,8 +70,11 @@ waits: in the foreground; a seat runs on the plugin's
 - **Four events reach you alone**; no member is woken by them, and `stalled` and `idle` never
   fire while the run is paused. Each ends on the step it asks for.
   - **`stalled <member>`**: that member's transcript has not grown for the run's threshold and
-    it is in no board wait and no tool call under 15 min (`quiet`), its reason given; once, then
-    every 15 min while it lasts. It owes a move it is not making: read the thread, then mention it with what you need.
+    it is in no board wait and no tool call (`quiet`), or it has been in one tool call for 15 min
+    (still `busy`: the call may be hung), its reason given; once, then every 15 min while it lasts.
+    Quiet, it owes a move it is not making: read the thread, then mention it with what you need.
+    Busy that long: judge from the call it names whether it can still return; if not, message it
+    directly.
     A member quiet because its turn ended on a background task is not woken by that task: tell
     it what to do (*Interrupt*).
   - **`gone <member>`**: its agent finished without `end`, or its link has been lost 30 s; once.

@@ -92,18 +92,23 @@ test("an activity updates the member's member_activity row and adds a token read
   assert.equal(board.memberStates(run.id, at(base, 0)).some((s) => s.member === "b"), false);
 });
 
-test("states: growing → working; an open call → busy with its tool and start, up to 15 min; silence → quiet", () => {
+test("states: growing → working; an open call → busy with its tool and start, for as long as it is open; past 15 min it stays busy, says so, and is told to the orchestrator as stalled (D46)", () => {
   const { run } = setup();
   const base = Date.now() + 60_000;
   board.recordActivity(run.id, "a", act({ grewAt: base }), at(base, 0));
   assert.equal(stateOf(run.id, "a", at(base, 4)).state, "working");
   board.recordActivity(run.id, "a", act({ grewAt: base, openTool: { name: "Bash", target: "npm test", since: base }, lastTool: "Bash npm test" }), at(base, 1));
   const busy = stateOf(run.id, "a", at(base, 600));
-  assert.deepEqual([busy.state, busy.doing, busy.since], ["busy", "Bash npm test", base]);
+  assert.deepEqual([busy.state, busy.doing, busy.since, busy.reason], ["busy", "Bash npm test", base, undefined]);
   board.livenessTick(run.id, at(base, 15 * 60), presence);
   const over = stateOf(run.id, "a", at(base, 15 * 60));
-  assert.equal(over.state, "quiet");
-  assert.equal(over.reason, "no progress for 900s, link alive; last Bash npm test (open 15 min)");
+  assert.deepEqual([over.state, over.reason], ["busy", "busy 15 min in one call, link alive; it may be hung"]);
+  const stalled = events("stalled");
+  assert.equal(stalled.length, 1);
+  assert.match(stalled[0].body, /^stalled idea\/a: busy 15 min in one call, link alive; it may be hung/);
+  // the call returns, the transcript grows: working again
+  board.recordActivity(run.id, "a", act({ grewAt: base + 16 * 60_000, lastTool: "Bash npm test" }), at(base, 16 * 60));
+  assert.equal(stateOf(run.id, "a", at(base, 16 * 60)).state, "working");
 });
 
 test("states: a foreground wait (its open call opened before the held wait began) → waiting; a background wait --mentions held while working → not waiting (D31, D35)", async () => {

@@ -90,7 +90,7 @@ export const NO_TRANSCRIPT_MS = 30 * 1000;
 export const STALL_MS_DEFAULT = 60000;
 /** Readings older than this are pruned. */
 export const READINGS_KEPT_MS = 10 * 60 * 1000;
-/** A tool call open longer than this no longer makes its member `busy`: it is `quiet` (S21). */
+/** A tool call open longer than this keeps its member `busy`, and the orchestrator is told it may be hung (stalled, D46). */
 export const BUSY_MAX_MS = 15 * 60 * 1000;
 /** `stalled <member>` is told again after this, while the member stays `quiet` (D11). */
 export const STALLED_AGAIN_MS = 15 * 60 * 1000;
