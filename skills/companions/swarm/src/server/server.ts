@@ -6,7 +6,7 @@ import http from "node:http";
 import path from "node:path";
 import { WebSocketServer, type WebSocket } from "ws";
 import { openBoard, type Board, type Presence } from "../board/board.ts";
-import { RPC_METHODS, bundleVersion, decode, encode, serverStateFile, type Call, type Frame, type Hello, type RpcMethod, type ServerState } from "../wire.ts";
+import { RPC_METHODS, bundleVersion, decode, encode, liveStartLockHolder, serverLockHolder, serverStartLock, serverStateFile, type Call, type Frame, type Hello, type RpcMethod, type ServerState } from "../wire.ts";
 
 /** A resent call is answered from this cache for this long (D4). */
 const RESULT_CACHE_MS = 10 * 60 * 1000;
@@ -28,7 +28,56 @@ type Speaker = { socket: WebSocket; member: Hello["member"] | null; lastPong: nu
 /** A call running or answered, keyed by its id, whatever connection sent it. */
 type CallRecord = { speaker: Speaker; answer: string | null; answeredAt: number; cancelWait: AbortController | null };
 
-export async function startBoardServer(opts: { dataRoot: string; host?: string; port?: number; now?: () => Date }): Promise<{ url: string; close(): Promise<void> }> {
+type ServerOptions = { dataRoot: string; host?: string; port?: number; now?: () => Date };
+
+/** Starts the board server of `opts.dataRoot`, its start lock taken first (D40): while another live
+ *  server holds it, this one refuses to start; a lock left by a dead process is replaced. */
+export async function startBoardServer(opts: ServerOptions): Promise<{ url: string; close(): Promise<void> }> {
+  await takeStartLock(opts.dataRoot);
+  try {
+    return await runBoardServer(opts);
+  } catch (e) {
+    releaseStartLock(opts.dataRoot);
+    throw e;
+  }
+}
+
+/** How often, and how many times, a start lock found empty (its taker mid-write) is read again. */
+const LOCK_READ_RETRY_MS = 50;
+const LOCK_READ_RETRIES = 20;
+
+/** Takes `dataRoot`'s start lock for this process (D40); throws while a live server holds it. */
+async function takeStartLock(dataRoot: string): Promise<void> {
+  fs.mkdirSync(dataRoot, { recursive: true });
+  const lock = serverStartLock(dataRoot);
+  for (let emptyReads = 0; ; ) {
+    try {
+      // exclusive create: of the servers racing on one data home, one takes it (D40)
+      fs.writeFileSync(lock, String(process.pid), { flag: "wx" });
+      return;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+    }
+    const holder = serverLockHolder(dataRoot);
+    // a server of this process restarting on the same data home (the tests' in-process servers)
+    if (holder === process.pid) return;
+    if (holder !== null && liveStartLockHolder(dataRoot) === holder) throw new Error(`swarm: a board server already runs on this data home (pid ${holder})`);
+    if (holder === null && ++emptyReads <= LOCK_READ_RETRIES) {
+      await new Promise((r) => setTimeout(r, LOCK_READ_RETRY_MS));
+      continue;
+    }
+    // its holder is dead, or it never got a pid: stale, replaced
+    fs.rmSync(lock, { force: true });
+    emptyReads = 0;
+  }
+}
+
+/** Removes the start lock if this process holds it. */
+function releaseStartLock(dataRoot: string): void {
+  if (serverLockHolder(dataRoot) === process.pid) fs.rmSync(serverStartLock(dataRoot), { force: true });
+}
+
+async function runBoardServer(opts: ServerOptions): Promise<{ url: string; close(): Promise<void> }> {
   const host = opts.host ?? "127.0.0.1";
   const now = opts.now ?? (() => new Date());
   const board: Board = await openBoard(path.join(opts.dataRoot, "swarm.sqlite"));
@@ -228,6 +277,7 @@ export async function startBoardServer(opts: { dataRoot: string; host?: string; 
         const written = JSON.parse(fs.readFileSync(stateFile, "utf8")) as ServerState;
         if (written.pid === state.pid && written.port === state.port) fs.rmSync(stateFile);
       } catch {}
+      releaseStartLock(opts.dataRoot);
       closedListeners.forEach((l) => l());
     })());
   const closedListeners: (() => void)[] = [];
@@ -259,6 +309,9 @@ export async function stopBoardServer(dataRoot: string): Promise<boolean> {
     if (!res.ok) throw new Error(`refused ${res.status}`);
   } catch {
     fs.rmSync(file, { force: true });
+    // and the start lock its dead server left (D40)
+    const holder = serverLockHolder(dataRoot);
+    if (holder !== null && liveStartLockHolder(dataRoot) === null) fs.rmSync(serverStartLock(dataRoot), { force: true });
     return false;
   }
   for (let i = 0; i < 100 && fs.existsSync(file); i++) await new Promise((r) => setTimeout(r, 50));

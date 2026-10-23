@@ -6,7 +6,7 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import type { Board, RunId } from "../board/board.ts";
-import { RPC_METHODS, bundleVersion, decode, encode, serverStateFile, type Frame, type RpcMethod, type ServerState } from "../wire.ts";
+import { RPC_METHODS, bundleVersion, decode, encode, liveStartLockHolder, serverStateFile, type Frame, type RpcMethod, type ServerState } from "../wire.ts";
 import { linkPipe } from "../link/link.ts";
 import type { Binding } from "../link/transcripts.ts";
 
@@ -63,22 +63,27 @@ export async function ensureServer(dataRoot: string, swarmEntry: string = entry(
     } catch {}
     for (const until = Date.now() + START_TIMEOUT_MS; isAlive(found.pid) && Date.now() < until; ) await pause(START_POLL_MS);
   }
-  let log: number | "ignore" = "ignore";
-  try {
-    fs.mkdirSync(dataRoot, { recursive: true });
-    fs.writeFileSync(serverLog(dataRoot), "");
-    log = fs.openSync(serverLog(dataRoot), "a");
-  } catch {}
-  const child = spawn(process.execPath, [swarmEntry, "serve"], { detached: true, stdio: ["ignore", log, log], windowsHide: true, env: homeEnv(dataRoot) });
+  // D40: a live process holding the start lock is a server starting or running; never a second one
+  const startedElsewhere = (): boolean => liveStartLockHolder(dataRoot) !== null;
   let exited: string | null = null;
-  child.on("exit", (code, signal) => (exited = signal ? `it was killed by ${signal}` : `it exited with code ${code}`));
-  child.on("error", (e) => (exited = e.message));
-  child.unref();
-  if (typeof log === "number") fs.closeSync(log);
+  if (!startedElsewhere()) {
+    let log: number | "ignore" = "ignore";
+    try {
+      fs.mkdirSync(dataRoot, { recursive: true });
+      fs.writeFileSync(serverLog(dataRoot), "");
+      log = fs.openSync(serverLog(dataRoot), "a");
+    } catch {}
+    const child = spawn(process.execPath, [swarmEntry, "serve"], { detached: true, stdio: ["ignore", log, log], windowsHide: true, env: homeEnv(dataRoot) });
+    child.on("exit", (code, signal) => (exited = signal ? `it was killed by ${signal}` : `it exited with code ${code}`));
+    child.on("error", (e) => (exited = e.message));
+    child.unref();
+    if (typeof log === "number") fs.closeSync(log);
+  }
   for (const until = Date.now() + START_TIMEOUT_MS; Date.now() < until; ) {
     const s = readServerState(dataRoot);
     if (s && isCurrent(s, swarmEntry)) return s;
-    if (exited) break;
+    // ours exited: lost the start lock to another server (wait for that one), or crashed
+    if (exited && !startedElsewhere()) break;
     await pause(START_POLL_MS);
   }
   let said = "";

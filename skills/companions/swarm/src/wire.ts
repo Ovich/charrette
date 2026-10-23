@@ -125,3 +125,49 @@ export type ServerState = { pid: number; port: number; secret: string; version: 
 export function serverStateFile(dataRoot: string): string {
   return path.join(dataRoot, "swarm-server.json");
 }
+
+/** The lock a starting server takes beside its state file and holds while it runs, its pid inside
+ *  (swarm-relay D40): one server per data home. */
+export function serverStartLock(dataRoot: string): string {
+  return path.join(dataRoot, "swarm-server.lock");
+}
+
+/** The pid holding `dataRoot`'s start lock; null when none holds it or the file cannot be read. */
+export function serverLockHolder(dataRoot: string): number | null {
+  try {
+    const pid = Number(fs.readFileSync(serverStartLock(dataRoot), "utf8").trim());
+    return Number.isInteger(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+/** How long a start lock's holder may go without writing the state file before its lock is taken for
+ *  stale: its pid reused by another process, or a server stuck starting. */
+const START_LOCK_GRACE_MS = 15_000;
+
+/** The server process holding `dataRoot`'s start lock, starting or running (D40); null when the lock is
+ *  free or stale: its holder dead, or the lock past its grace with no state file naming its holder. */
+export function liveStartLockHolder(dataRoot: string): number | null {
+  const holder = serverLockHolder(dataRoot);
+  if (holder === null || !isAlive(holder)) return null;
+  try {
+    if ((JSON.parse(fs.readFileSync(serverStateFile(dataRoot), "utf8")) as ServerState).pid === holder) return holder;
+  } catch {}
+  try {
+    return Date.now() - fs.statSync(serverStartLock(dataRoot)).mtimeMs < START_LOCK_GRACE_MS ? holder : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether `pid` names a live process. */
+export function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    // EPERM: it lives, owned by someone else
+    return (e as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
