@@ -48,7 +48,7 @@ $A open "$F" --tag <topic>
 - **Fix metadata with `update`.** `aiview.sqlite` is the tool's to write, and scratch files stay unregistered.
 - **Mockups are self-contained HTML**, per the `design-prototype` skill.
 - **A workbench is one HTML page, its data optionally in a sidecar `<stem>/` beside it, read only through the frame's bridge, per the `create-workbench` skill**; a trace is a workbench. `move` carries the sidecar with the page.
-- **A `swarm` document is the project's board**, `swarm.swarm.json` holding `{ repos }`, written by `swarm open`; aiview draws the board from swarm's store, served by its own server. One per project, no group, first in the sidebar.
+- **A `swarm` document is the project's board**, `swarm.swarm.json` holding `{ repos }`, written by `swarm open`; aiview draws the board through swarm's `client/reader.ts`, a client of swarm's board server, and never opens swarm's store. One per project, no group, first in the sidebar.
 
 ## Publishing before the work is done
 

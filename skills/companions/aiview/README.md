@@ -2,10 +2,10 @@
 
 Local document viewer with a central index. Renders Markdown (GFM + mermaid), HTML
 mockups (sandboxed iframe with viewport presets), PDFs (native browser viewer) and the
-project's swarm board (drawn from swarm's store) at `http://localhost:4321`, live-reloads
+project's swarm board (read from swarm's board server) at `http://localhost:4321`, live-reloads
 on save, and keeps an index of every document it has been given (path, project, title,
 kind, tags, group, start time) so earlier work is one click away. It is the one page and
-the one server of the collection: swarm has none of its own.
+the one document server of the collection; swarm's own board server serves no page.
 
 One npm package: a React + TypeScript + Tailwind + shadcn-style UI (`app/`, built to
 `dist/`), a small plain-Node server (the documents' API routes, the board's
