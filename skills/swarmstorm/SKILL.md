@@ -93,7 +93,7 @@ date, or a recipe):
   own first frame checked before any seat is dispatched.
 - **Every seat at once on the plugin's `seat-runner` agent** (`subagent_type:
   "charrette:seat-runner"`, no `isolation`), at its row's effort, web or MCP tools only when its
-  evidence lists them; its transcript registered at once (`slice <id> --transcript`).
+  evidence lists them.
 - **The brief**:
 
 ```markdown

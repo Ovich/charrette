@@ -6,6 +6,9 @@ the branch your slice merges into, `<target>` below.
 
 **You never end your turn while your slice is open.** A runner that ends its turn is not woken
 by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only after `$S end`.
+**Your only background tasks are your link and your listener.** A check, a test run or a build
+runs in the foreground: an agent that ends its turn on a background task of its own is not woken
+by it.
 
 ## The checklist
 
@@ -16,11 +19,13 @@ by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only
    file, *inside* when only this slice reads it; a file the slice creates is declared too, its
    path from the repository root. Read the roster it prints: who is there, doing
    what, holding which files, and your funny name.
-2. **Arm the listener at once, as your first background task.** `join` ends on the line
-   `start your listener now, in the background (your harness's background task): <command>`;
-   run that command, as printed, as a background task (the harness's own background feature;
-   `references/setup.md` says which harnesses have one). It listens while you work. `claim`,
-   `post` and `doing` end on the same line while no listener of yours is pending: start it then.
+2. **Start your link, then your listener, as your first two background tasks.** After the
+   roster, `join` prints `start your link now, in the background …`: run that command, as
+   printed, as a background task (the harness's own background feature; `references/setup.md`
+   says which harnesses have one). It carries your calls to the board while you work. `join`
+   ends on `start your listener now, in the background …`: run it the same way; it listens while
+   you work. `claim`, `post` and `doing` end on the listener line while no listener of yours is
+   pending: start it then.
 3. **Before each edit, `$S claim <path>`**, and before a command that writes a file (a
    generator, a formatter, a move). `--interface` for a file other slices import. Paths are
    repository-relative (from the current folder when the file exists there); `--new` for a file
