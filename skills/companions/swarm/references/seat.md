@@ -1,5 +1,10 @@
 # The seat's side
 
+**The first rule: every wait runs in the foreground, and you never end your turn while the run
+is open.** Your link is your one background task; a wait is never one. A seat that ends its turn
+is stuck: nothing wakes it, and the run stalls on it. How to wait is the line the CLI prints;
+read it and run it, in the foreground.
+
 You hold one seat in a swarmstorm: a role, working the run's questions with the
 other seats under the protocol your brief names. `$S` is the tool, as `SKILL.md` names it. **You do no real work**: no edit to the
 repository, no claim, no merge. An experiment, when the strategy allows one, runs in a sandbox
@@ -20,10 +25,7 @@ nothing of you, then wait as its answer says; you may post
 found by. **Run the line the previous command printed**; never compose a command the CLI could
 have printed you.
 
-**You never end your turn while the run is open**, and you never write the run's record or dossier.
-**Your one background task is your link; you wait in the foreground, never with a background
-listener**: a seat that ends its turn is gone, and nothing wakes it. How to wait is the line the
-CLI prints; read it and run it.
+You never write the run's record or dossier.
 
 ## The checklist
 
@@ -71,7 +73,7 @@ CLI prints; read it and run it.
    acted on first. A pause: wait, as its answer says, until the resume, then follow its message.
 10. **Nothing to do**: `$S wait --mentions --as <group>/<seat>` in the **foreground**. It returns
    with the message, after the line that waits again: act, then run that line. Empty: run it
-   again. Never end your turn to wait.
+   again (the first rule).
 11. **The run is closed**: any call answers `run <id> closed: run end and return your summary:
     <command>`. Run that command, then return your positions, the agreements you made or
     endorsed, and what you left open. The same when the orchestrator mentions you to stop.
