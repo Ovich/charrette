@@ -12,7 +12,7 @@ Agent skills that settle what gets built before code is written. They sharpen th
 
 Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Charrette brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
 
-Twenty-four skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
+Twenty-seven skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
 
 ## The loop
 
@@ -24,15 +24,21 @@ flowchart LR
   B["brainstorm<br/>a board"] --> P
   DM["deepen-module<br/>a module document"] --> P
   RM["roadmap<br/>the next slot"] --> P
-  P["write-plan<br/>one document, written while interviewing"] --> WS["write-slice<br/>one document per slice, at its phase's open"]
-  WS --> E["execute-plan<br/>seats on the swarm board, phase by phase"]
-  E --> R["pr-review"]
+  P["write-plan<br/>one document, written while interviewing"] -->|"until ready"| CR["cold-read<br/>a fresh agent reads the plan"]
+  CR --> PH
+  subgraph E["execute-plan · on the swarm board"]
+    PH["a phase opens"] --> WS["write-slice<br/>one slice per seat"]
+    WS --> S["seats work at once<br/>each merges its own"]
+    S --> VS["validator<br/>when the mandate asks"]
+    VS -->|"next phase cut from its verdict"| PH
+  end
+  E -->|"the plan's pull request"| R["pr-review"]
   E -.->|"recommended"| V["validate-delivery<br/>with the person, live"]
   V --> R
   R --> M["merge"]
 ```
 
-A plan starts from whatever exists: an idea said in chat, a board, an agreed module, the roadmap's next slot. `interview` resolves the decisions along the way and `write-diagrams` draws them. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it. The executor orchestrates on the swarm board, phase by phase: each slice goes to a fresh seat that first shapes the code around it, then does it. When the project has a verify skill, a subagent judges each delivery's product quality alone, as its quality owner: done as specified, usable, finished. When the plan has delivered something a person looks at, its close recommends `validate-delivery`: the same verify process walked with the person, who guides it and decides, the agent proposing what to check and changing what they ask for.
+A plan starts from whatever exists: an idea said in chat, a board, an agreed module, the roadmap's next slot. `interview` resolves the decisions along the way and `write-diagrams` draws them. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it. The executor orchestrates on the swarm board, phase by phase: each phase's slices are written as it opens, and each goes to a fresh seat that first shapes the code around it, then does it. When the mandate asks, a validator seat running the project's verify skill judges each phase's delivery's product quality alone, as its quality owner: done as specified, usable, finished. When the plan has delivered something a person looks at, its close recommends `validate-delivery`: the same verify process walked with the person, who guides it and decides, the agent proposing what to check and changing what they ask for.
 
 ## Iterate the loop
 
@@ -126,7 +132,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 
 | Skill | Use case | Example ask |
 |---|---|---|
-| [interview](skills/interview/SKILL.md) | A design object has decisions nobody has resolved, or you want to be questioned about one until it is understood the same way | *"Interview me about this plan."* Decisions walked in dependency order, the codebase read before you are asked, a recommendation on every question. Every claim about a tool or a practice is researched from its sources; very small proofs of concept with the libraries, when you say yes to them. |
+| [interview](skills/interview/SKILL.md) | A design object has decisions nobody has resolved, or you want to be questioned about one until it is understood the same way | *"Interview me about this plan."* Decisions walked in dependency order, the codebase read before you are asked, a recommendation on every question. Every claim about a tool or a practice is researched from its sources; very small proofs of concept with the libraries, when you say yes to them. A short mode of three questions at most when the full interview is declined. |
 | [swarmstorm](skills/swarmstorm/SKILL.md) | A swarm of role seats should work a topic for you, under a protocol you approve | *"Run a swarmstorm brainstorm on onboarding."* The agent recommends a protocol from what you want done, or a custom one, and you adjust its phases, its seats and each role. Seats post ideas blind, build on them, pre-mortem the options; debate the questions to decisions, a skeptic endorsing; or draft a text and read it as its readers would. A protocol or template a project keeps for itself (a cover letter, say) is its own `swarmstorm-<name>` skill, in the project. Each run has its record; a topic keeps one dossier across its runs. |
 | [whiteboard-defense](skills/whiteboard-defense/SKILL.md) | A system has shipped and you want to be able to explain and defend it to anyone who pulls you aside | *"Whiteboard me on the sync engine."* Hard questions on the system and on its stack, one at a time, open-book: you go read, come back, get pushed. A defense report with the gaps, the reading that closes them, the decisions an agent made without you, and the architecture leads the questions turned up. |
 
@@ -151,7 +157,8 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 
 | Skill | Use case | Example ask |
 |---|---|---|
-| [write-plan](skills/plan/write-plan/SKILL.md) | Something non-trivial is about to be built and its plan has to be written | *"Write the plan for per-user rate limiting."* One document, written while interviewing: why, before and after, the deep modules, the flows, the failure modes, the slices with their tracker, and the mandate you give the orchestrator. No code until it is approved. |
+| [write-plan](skills/plan/write-plan/SKILL.md) | Something non-trivial is about to be built and its plan has to be written | *"Write the plan for per-user rate limiting."* One document, written while interviewing: why, before and after, the deep modules, the flows, the failure modes, the phases with their tracker, and the mandate you give the orchestrator (seats, phases, a validator). A cold reader checks it can be carried out from the document alone; the decisions the agent took by default are put to you at approval. No code until it is approved. |
+| [cold-read](skills/plan/cold-read/SKILL.md) | Dispatched by write-plan before the mandate | An agent that was not in the conversation reads the plan and says what it would build, its questions, and ready or not ready, until the plan carries everything. |
 | [write-slice](skills/plan/write-slice/SKILL.md) | A plan's increment has to be cut into slices, or a slice of an approved plan needs the document an agent will carry it out from | *"Write the slice document for SL12."* One plan node in, its document out: the decisions quoted, the modules table, the cases to test when the mandate has tests, the environment facts the first command trips on. |
 
 ### Execute
@@ -167,7 +174,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 
 | Skill | Use case | Example ask |
 |---|---|---|
-| [verification-skill-create](skills/verify/verification-skill-create/SKILL.md) | An agent should judge, alone, the product quality of what is delivered (done as specified, usable, finished) before a person sees it, and the project has no verification skill yet | *"Create the verification skill for this app."* The consumer, the interface, the harness and where the specification lives read from the repository. A project-local `verify-<app>` skill that opens on a role prompt written for the product (its quality owner, wearing its product owner, its first-time consumer, its editor, its skeptic, its surface's roles and its domain's), with the tooling to reach, drive and observe every part, fast and easy for an agent; the navigation map drawn in aiview, hidden parts included; proven by one complete quality pass. The agent that runs it owns it: it keeps the skill, its scripts and its map true as the application moves. orchestrate-plan offers it when a plan's mandate is asked. |
+| [verification-skill-create](skills/verify/verification-skill-create/SKILL.md) | An agent should judge, alone, the product quality of what is delivered (done as specified, usable, finished) before a person sees it, and the project has no verifier for that focus yet | *"Create the verification skill for this app."* Four decisions settled with you through an interview: the focus (what is judged, through what), the inputs and their defaults, the experts, the feature to prove it on; the rest read from the repository. A project-local `verify-<app>-<focus>` skill, one per focus, that opens on a role prompt making the agent the product's quality owner seen through those experts, with the tooling to reach, drive and observe every part; a project skill that already runs the app is shared by every verifier. Every pass judges the scope it is given and names its inputs; findings travel as a table to the orchestrator. Proven by one complete quality pass; the agent that runs it keeps it true as the application moves. orchestrate-plan offers it when a plan's mandate is asked. |
 | [validate-delivery](skills/verify/validate-delivery/SKILL.md) | A plan has delivered and you want to go over it with the agent, live, before moving on | *"Let's walk what we delivered together."* Runs the project's verify skill part by part, with you judging and deciding; what you want changed is changed and shown at once. Refuses to start without a verify skill and proposes creating one. execute-plan recommends it at its close. |
 
 ### Workbench
