@@ -225,6 +225,9 @@
 .board .state.gone i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint-foreground); }
 .board .agent-strip .card.gone { opacity: .55; box-shadow: none; background: var(--surface); }
 .board .agent-strip .card:has(.activity) .doing { -webkit-line-clamp: 1; }
+.board .state.stalled { color: var(--amber); font-weight: 600; }
+.board .state.stalled i { background: var(--amber); }
+.board .card .ages { display: block; margin-top: 2px; font: 11px ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted-foreground); white-space: nowrap; }
 .board .card .activity { display: block; margin-top: 2px; font: 11px ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .board .claims-row { flex: none; border-top: 1px solid var(--border); padding: 6px 0 0; }
 .board .claims-row[data-expanded="true"] { max-height: 30vh; overflow-y: auto; }
