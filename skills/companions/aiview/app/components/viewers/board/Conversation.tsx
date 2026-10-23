@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { hhmm, type Item } from "../../../lib/board/view.ts";
-import { AgentMark, RichText, RunnerName } from "./chips.tsx";
+import { AgentLabel, AgentMark, RichText } from "./chips.tsx";
 import { PostBody } from "./PostBody.tsx";
 
 type Said = Exclude<Item, { kind: "event" | "phase" }>;
@@ -35,7 +35,7 @@ function SaidItem({ item, fresh, seqs }: { item: Said; fresh: boolean; seqs: Rea
       {!item.joined && <AgentMark name={item.from} />}
       {!item.joined && (
         <div className="head">
-          <RunnerName name={item.from} />
+          <AgentLabel name={item.from} />
           {item.word && <TipWord word={item.word} tip={item.tip} className="what" />}
         </div>
       )}
@@ -53,7 +53,7 @@ function BoardEventLine({ item, fresh }: { item: BoardEventItem; fresh: boolean 
         {hhmm(item.at)}
       </span>
       <div className="head">
-        <RunnerName name={item.from} />
+        <AgentLabel name={item.from} />
       </div>
       {/* the text below its author, as a message's (D8) */}
       <div className="text">

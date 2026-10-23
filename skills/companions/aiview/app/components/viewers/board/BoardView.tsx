@@ -31,29 +31,6 @@ import { Conversation } from "./Conversation.tsx";
 import { TipLayer } from "./Tip.tsx";
 import "./board.css";
 
-/** The repositories a swarm document's file names (D6): `{ repos: [...] }`, or a pre-merge
- *  `{ url }` read for its `?repo=` values; null when the file names none. */
-export function boardReposOf(content: string): string[] | null {
-  let parsed: { repos?: unknown; url?: unknown } | null;
-  try {
-    parsed = JSON.parse(content) as { repos?: unknown; url?: unknown } | null;
-  } catch {
-    return null;
-  }
-  if (Array.isArray(parsed?.repos)) {
-    const repos = parsed.repos.filter((r): r is string => typeof r === "string" && r !== "");
-    if (repos.length > 0) return repos;
-  }
-  if (typeof parsed?.url === "string") {
-    try {
-      const repos = new URL(parsed.url).searchParams.getAll("repo").filter(Boolean);
-      if (repos.length > 0) return repos;
-    } catch {
-      /* not a URL: names nothing */
-    }
-  }
-  return null;
-}
 
 const NONE = new Set<never>();
 const ALL: Pick = { run: null, follow: null };

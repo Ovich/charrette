@@ -46,10 +46,11 @@ const tabOf = (title: string) => tabs().getByText(title).closest("button")!;
 
 // ── RunTabs ────────────────────────────────────────────────────────────────────────
 
-test("the tab row: Archive with its count, then each open run with its code, title and slices done/total, a brainstorm its seats; no closed run, no All (SL10)", () => {
+test("the tab row: the Archive icon, then each open run with its code, title and slices done/total, a brainstorm its seats; no closed run, no All (SL10)", () => {
   show([APP], null);
   const names = tabs().getAllByRole("button").map((b) => b.textContent);
-  expect(names[0]).toBe(`Archive${CLOSED.length}`);
+  expect(names[0]).toBe("");
+  expect(tabs().getAllByRole("button")[0].getAttribute("aria-label")).toBe("Archive");
   expect(tabs().queryByText("All")).toBeNull();
   // the run tabs, then the Analytics pill drawn beside the merge lock at the row's end (SL4)
   // a brainstorm's slice rows are seats, never slices to merge: never "0/1"
@@ -189,13 +190,14 @@ test("under a closed run, its members as they ended, a card still followed", () 
   expect(cards[1].getAttribute("aria-pressed")).toBe("true");
 });
 
-test("under a picked run, its members, orchestrator first, each read code then nick", () => {
+test("under a picked run, its members, orchestrator first, each its mark then its nick, the code·slice its tooltip", () => {
   show([APP], 1);
   const cards = within(strip()!).getAllByRole("button");
-  expect(cards[0].textContent).toContain("RT·orchestrator");
+  expect(cards[0].querySelector('[data-component="AgentMark"]')?.textContent).toBe("OR");
+  expect(cards[0].querySelector('[data-component="AgentLabel"]')?.getAttribute("title")).toBe("RT·orchestrator");
   expect(cards[0].textContent).toContain(NICKS["refresh-tokens/orchestrator"]);
   expect(cards[0].classList.contains("orch")).toBe(true);
-  expect(cards.map((c) => c.querySelector(".pc")?.textContent)).toEqual(cards.map(() => "RT·"));
+  expect(cards.every((c) => c.querySelector('[data-component="RunnerTag"]') === null)).toBe(true);
   expect(cards.some((c) => c.textContent?.includes("Sleepy Otter"))).toBe(true);
 });
 

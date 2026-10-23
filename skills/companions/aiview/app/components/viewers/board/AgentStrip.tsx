@@ -4,7 +4,7 @@
 import { useContext, useEffect, useState, type CSSProperties } from "react";
 import type { Liveness, SnapshotRunner } from "../../../../../swarm-board/src/client/reader.ts";
 import { hhmm, ORCHESTRATOR } from "../../../lib/board/view.ts";
-import { NicksContext, RunnerName } from "./chips.tsx";
+import { AgentLabel, AgentMark, NicksContext } from "./chips.tsx";
 
 /** A member's activity as the server computes it (swarm-relay#D9, #D20), its two ages' instants included (swarm-relay#D38). */
 type MemberActivity = Liveness;
@@ -91,7 +91,8 @@ function AgentCard({ p, hue, followed, onFollow, now }: { p: SnapshotRunner; hue
       data-component="AgentCard"
     >
       <span className="top">
-        <RunnerName name={p.runner} />
+        <AgentMark name={p.runner} />
+        <AgentLabel name={p.runner} role={false} />
         <span className={`state ${status.className}`}>
           <i />
           {status.text}
@@ -139,7 +140,10 @@ function AgentRow({ p, hue, onFollow, now }: { p: SnapshotRunner; hue: number; o
       title={p.doing}
       data-component="AgentRow"
     >
-      <RunnerName name={p.runner} plan={false} />
+      <span className="rname">
+        <AgentMark name={p.runner} />
+        <AgentLabel name={p.runner} role={false} />
+      </span>
       <span className="rslice">
         {!!p.unread && <span className="unread" data-component="UnreadCount">{p.unread} unread</span>}
         {p.title || p.slice}

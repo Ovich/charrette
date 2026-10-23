@@ -625,3 +625,34 @@ test("plan check: warns on unconfirmed agent defaults, never fails the run", () 
   assert.match(run("plan", "check", ok).stdout, /ok\s+approved, 1 decisions, 1 agent default\(s\), all confirmed/);
   assert.match(run("plan", "check", write("docs/JOBS/r.plan.md", head("draft"))).stdout, /to list at approval: D1/);
 });
+
+test("board --repo adds the repository to the project's board once, makes the project active and prints the /board link", () => {
+  assert.equal(run("project", "add", "p", "--path", toolRoot).status, 0);
+  const first = run("board", "--repo", "C:/r/one/.git", "--project", "p", "--port", "0", "--json");
+  try {
+    assert.equal(first.status, 0, first.stderr);
+    const out = JSON.parse(first.stdout) as { project: string; repos: string[]; url: string };
+    assert.equal(out.project, "p");
+    assert.deepEqual(out.repos, ["C:/r/one/.git"]);
+    assert.match(out.url, /^http:\/\/localhost:\d+\/board$/);
+    const again = JSON.parse(run("board", "--repo", "C:/r/one/.git", "--project", "p", "--json").stdout) as { repos: string[] };
+    assert.deepEqual(again.repos, ["C:/r/one/.git"]);
+    const second = JSON.parse(run("board", "--repo", "C:/r/two/.git", "--project", "p", "--json").stdout) as { repos: string[] };
+    assert.deepEqual(second.repos, ["C:/r/one/.git", "C:/r/two/.git"]);
+    assert.equal((JSON.parse(run("status", "--json").stdout) as { project: string }).project, "p");
+    // no document stands for the board
+    assert.deepEqual(JSON.parse(run("list", "--all", "--json").stdout), []);
+  } finally {
+    stopServer();
+  }
+});
+
+test("board with no project for the directory and none named exits 1 saying how to declare one", () => {
+  const r = spawnSync(process.execPath, [CLI, "board", "--repo", "C:/r/.git"], {
+    encoding: "utf8",
+    cwd: os.tmpdir(),
+    env: { ...process.env, AIVIEW_ROOT: toolRoot, SWARMSTORM_HOME: toolRoot },
+  });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /no aiview project for .*aiview project add/);
+});

@@ -89,7 +89,7 @@ date, or a recipe):
 - **Open the run** as the `swarm-board` skill's orchestrator side says: kind from the protocol, group
   the topic, one seat per strategy row, each seat's `link` the dossier; the record created and
   indexed before the dispatch.
-- **A recording** starts before the joins, on this run's own tab (`#doc=<id>&run=<run>`), its
+- **A recording** starts before the joins, on this run's own tab (`/board#run=<run>`), its
   own first frame checked before any seat is dispatched.
 - **Every seat at once on the plugin's `brainswarm-seat` agent** (`subagent_type:
   "swarmstorm:brainswarm-seat"`, no `isolation`), at its row's effort, web or MCP tools only when its

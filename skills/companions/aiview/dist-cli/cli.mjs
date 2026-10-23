@@ -139,6 +139,23 @@ function findToolRoot() {
     dir = parent;
   }
 }
+function boardReposInText(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  if (Array.isArray(parsed.repos)) return [...new Set(parsed.repos.filter((x) => typeof x === "string"))];
+  if (typeof parsed.url === "string") {
+    try {
+      return [...new Set(new URL(parsed.url).searchParams.getAll("repo"))];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
 function openIndex(dbPath = SQLITE_PATH, root = STORE_ROOT) {
   if (dbPath === SQLITE_PATH) {
     ensureHome();
@@ -171,6 +188,19 @@ function openIndex(dbPath = SQLITE_PATH, root = STORE_ROOT) {
     "CREATE TABLE IF NOT EXISTS projects (slug TEXT PRIMARY KEY, title TEXT, paths TEXT NOT NULL DEFAULT '[]')"
   );
   db.exec("CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+  const projectCols = db.prepare("PRAGMA table_info(projects)").all().map((c) => c.name);
+  if (!projectCols.includes("board_repos")) db.exec("ALTER TABLE projects ADD COLUMN board_repos TEXT NOT NULL DEFAULT '[]'");
+  const boardReposOf = (slug) => {
+    const row = db.prepare("SELECT board_repos FROM projects WHERE slug = ?").get(slug);
+    return row ? JSON.parse(row.board_repos) : [];
+  };
+  const addRepo = (slug, repo) => {
+    db.prepare("INSERT INTO projects (slug, title, paths) VALUES (?, NULL, '[]') ON CONFLICT(slug) DO NOTHING").run(slug);
+    const repos = boardReposOf(slug);
+    if (!repos.includes(repo)) repos.push(repo);
+    db.prepare("UPDATE projects SET board_repos = ? WHERE slug = ?").run(JSON.stringify(repos), slug);
+    return repos;
+  };
   db.exec(`
     CREATE TABLE IF NOT EXISTS pending (
       id INTEGER PRIMARY KEY,
@@ -181,6 +211,16 @@ function openIndex(dbPath = SQLITE_PATH, root = STORE_ROOT) {
     )
   `);
   db.exec("DROP TABLE IF EXISTS revisions");
+  for (const row of db.prepare("SELECT id, file_path, project FROM documents WHERE kind = 'swarm'").all()) {
+    let text = "";
+    try {
+      text = fs3.readFileSync(toAbs(row.file_path, root), "utf8");
+    } catch {
+    }
+    for (const repo of boardReposInText(text)) addRepo(row.project, repo);
+    db.prepare("DELETE FROM pending WHERE document_id = ?").run(row.id);
+    db.prepare("DELETE FROM documents WHERE id = ?").run(row.id);
+  }
   const parse2 = (row) => ({
     ...row,
     tags: JSON.parse(row.tags),
@@ -306,6 +346,12 @@ function openIndex(dbPath = SQLITE_PATH, root = STORE_ROOT) {
       return db.prepare("SELECT * FROM groups ORDER BY slug").all();
     },
     upsertGroup,
+    boardRepos(slug) {
+      return boardReposOf(slug);
+    },
+    addBoardRepo(slug, repo) {
+      return addRepo(slug, repo);
+    },
     allProjects() {
       return db.prepare("SELECT * FROM projects ORDER BY slug").all().map(parseProject);
     },
@@ -9725,6 +9771,10 @@ function startServer(index, { port, open, startDoc, toolRoot = TOOL_ROOT, writeS
       });
       return;
     }
+    if (p === "/api/project-board") {
+      const slug = url.searchParams.get("project") || index.activeProject();
+      return json(res, { project: slug, repos: slug === ALL_PROJECTS ? [] : index.boardRepos(slug) });
+    }
     if (p === "/api/pin" && req.method === "POST") {
       let body = "";
       req.on("data", (c) => {
@@ -10373,6 +10423,7 @@ var USAGE = [
   "  tracker check <file|#id>                 # a plan's tracker judged against itself; exit 1 if anything disagrees",
   "  tracker sync <file|#id>                  # rewrite the class lines from the glyphs, the one place a step's state is written twice",
   "  plan check <file|#id>                    # a plan's approval against its decisions: warns on agent defaults never confirmed; always exit 0",
+  "  board [--repo <path>] [--project <slug>] [--open]   # the project's board page: its repositories, a repository added; prints the link",
   "  init                                     # create the data home; report where everything lives"
 ].join("\n");
 var registerOpts = () => ({
@@ -10414,7 +10465,7 @@ function notifyPendingChanged(documentId) {
 function notifyIndexChanged() {
   postToServer("/api/index-changed", {});
 }
-var MUTATES_INDEX = /* @__PURE__ */ new Set(["add", "open", "update", "remove", "move", "project"]);
+var MUTATES_INDEX = /* @__PURE__ */ new Set(["add", "open", "update", "remove", "move", "project", "board"]);
 var docLine = (d) => `#${d.id}  ${d.kind} [${d.tags.join(", ")}]${d.group_slug ? `  group:${d.group_slug}` : ""}  started ${d.created_at}  ${d.title}`;
 var emit = (json, human) => {
   if (asJson) console.log(JSON.stringify(json));
@@ -10922,6 +10973,35 @@ function cmdOpen() {
   }
   emit({ id: d.id, url, server: readServerStatus() }, url);
 }
+function cmdBoard() {
+  const index = openIndex();
+  try {
+    const slug = args.flag("--project") ?? projectForCwd(process.cwd(), index.allProjects())?.slug ?? null;
+    if (!slug) {
+      console.error(`no aiview project for ${process.cwd()}: declare one with aiview project add <slug> --path <dir>, or pass --project`);
+      process.exit(1);
+    }
+    const repo = args.flag("--repo");
+    if (repo === void 0 && !index.allProjects().some((p) => p.slug === slug)) {
+      console.error(`no such project: ${slug}`);
+      process.exit(1);
+    }
+    const repos = repo === void 0 ? index.boardRepos(slug) : index.addBoardRepo(slug, repo);
+    setActive(index, slug);
+    ensureDist();
+    const url = `http://localhost:${portOfInstalledServer()}/board`;
+    if (args.has("--open")) {
+      const [c, a] = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
+      try {
+        spawn3(c, a, { detached: true, stdio: "ignore" }).unref();
+      } catch {
+      }
+    }
+    emit({ project: slug, repos, url, server: readServerStatus() }, [url, ...repos.map((x) => `  ${x}`)].join("\n"));
+  } finally {
+    index.close();
+  }
+}
 async function cmdServe() {
   if (args.has("--detach")) {
     ensureDist();
@@ -11138,6 +11218,9 @@ switch (args.verb) {
     break;
   case "serve":
     await cmdServe();
+    break;
+  case "board":
+    cmdBoard();
     break;
   default:
     console.error(USAGE);

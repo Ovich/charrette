@@ -60,6 +60,7 @@ const USAGE = [
   "  tracker check <file|#id>                 # a plan's tracker judged against itself; exit 1 if anything disagrees",
   "  tracker sync <file|#id>                  # rewrite the class lines from the glyphs, the one place a step's state is written twice",
   "  plan check <file|#id>                    # a plan's approval against its decisions: warns on agent defaults never confirmed; always exit 0",
+  "  board [--repo <path>] [--project <slug>] [--open]   # the project's board page: its repositories, a repository added; prints the link",
   "  init                                     # create the data home; report where everything lives",
 ].join("\n");
 
@@ -119,7 +120,7 @@ function notifyIndexChanged(): void {
 }
 
 /** Verbs that change what the sidebar should be showing. */
-const MUTATES_INDEX = new Set(["add", "open", "update", "remove", "move", "project"]);
+const MUTATES_INDEX = new Set(["add", "open", "update", "remove", "move", "project", "board"]);
 
 const docLine = (d: Document): string =>
   `#${d.id}  ${d.kind} [${d.tags.join(", ")}]${d.group_slug ? `  group:${d.group_slug}` : ""}  started ${d.created_at}  ${d.title}`;
@@ -709,6 +710,39 @@ function cmdOpen(): void {
   emit({ id: d.id, url, server: readServerStatus() }, url);
 }
 
+/** The project's board, aiview's /board page: `--repo` adds a repository to it (what
+ *  `swarm open` does), bare reads it. The project is --project, else the one claiming this
+ *  directory. Like `open`, it makes that project the active one, so the link shows its board. */
+function cmdBoard(): void {
+  const index = openIndex();
+  try {
+    const slug = args.flag("--project") ?? projectForCwd(process.cwd(), index.allProjects())?.slug ?? null;
+    if (!slug) {
+      console.error(`no aiview project for ${process.cwd()}: declare one with aiview project add <slug> --path <dir>, or pass --project`);
+      process.exit(1);
+    }
+    const repo = args.flag("--repo");
+    if (repo === undefined && !index.allProjects().some((p) => p.slug === slug)) {
+      console.error(`no such project: ${slug}`);
+      process.exit(1);
+    }
+    const repos = repo === undefined ? index.boardRepos(slug) : index.addBoardRepo(slug, repo);
+    setActive(index, slug);
+    ensureDist();
+    const url = `http://localhost:${portOfInstalledServer()}/board`;
+    if (args.has("--open")) {
+      const [c, a] =
+        process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
+      try {
+        spawn(c, a as string[], { detached: true, stdio: "ignore" }).unref();
+      } catch {}
+    }
+    emit({ project: slug, repos, url, server: readServerStatus() }, [url, ...repos.map((x) => `  ${x}`)].join("\n"));
+  } finally {
+    index.close();
+  }
+}
+
 async function cmdServe(): Promise<void> {
   if (args.has("--detach")) {
     ensureDist();
@@ -942,6 +976,9 @@ switch (args.verb) {
     break;
   case "serve":
     await cmdServe();
+    break;
+  case "board":
+    cmdBoard();
     break;
   default:
     console.error(USAGE);

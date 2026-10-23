@@ -69,6 +69,7 @@ export function RunTabs({
       <button
         className="run menu"
         aria-label="Archive"
+        title={`Archive: ${closedCount} closed runs`}
         aria-expanded={menuOpen}
         onClick={(e) => {
           e.stopPropagation();
@@ -78,8 +79,6 @@ export function RunTabs({
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
           <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
         </svg>
-        <span className="t">Archive</span>
-        {closedCount > 0 && <span className="n">{closedCount}</span>}
       </button>
       {tabs.map((t) => (
         <RunTabButton key={t.run} tab={t} picked={!analytics && pick === t.run} onPick={() => onPick(t.run)} />

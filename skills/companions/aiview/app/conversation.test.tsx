@@ -132,10 +132,12 @@ test("a message carrying a mermaid fence shows it as a diagram in the conversati
   expect(screen.getByText("the flow")).toBeTruthy();
 });
 
-test("a member reads code first, then nick (D10); the agreement word names the other member so", () => {
+test("a member reads its mark, then its nick and role, code·slice on hover; the agreement word names the other member by code and nick", () => {
   const { li } = show();
   const agreed = li(/S1 the top/);
-  expect(agreed.querySelector('[data-component="RunnerTag"]')?.textContent).toBe("AL·S2");
+  expect(agreed.querySelector('[data-component="AgentMark"]')?.textContent).toBe("S2");
+  expect(agreed.querySelector('[data-component="AgentLabel"]')?.getAttribute("title")).toBe("AL·S2");
+  expect(agreed.querySelector('[data-component="RunnerTag"]')).toBeNull();
   expect(screen.getByText("✔ agreed with AL·S1 Sleepy Otter")).toBeTruthy();
 });
 
@@ -200,7 +202,7 @@ test("a board event's text sits below its author line, as a message's does", () 
   const event = li(/merged abc/);
   const head = event.querySelector(":scope > .head")!;
   const text = event.querySelector(":scope > .text")!;
-  expect(head.querySelector('[data-component="RunnerTag"]')).not.toBeNull();
+  expect(head.querySelector('[data-component="AgentLabel"]')).not.toBeNull();
   expect(head.contains(text)).toBe(false);
   expect(head.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(ruleOf(boardCss(), ".board .event .text")).toContain("grid-column: 2");

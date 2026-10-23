@@ -96,6 +96,26 @@ export interface RegisterOptions {
   project?: string;
 }
 
+/** The repositories a board document's text names: `{ repos }`, or a pre-merge `{ url }`'s
+ *  `?repo=` values; [] when it names none or cannot be read. */
+export function boardReposInText(text: string): string[] {
+  let parsed: { repos?: unknown; url?: unknown };
+  try {
+    parsed = JSON.parse(text) as { repos?: unknown; url?: unknown };
+  } catch {
+    return [];
+  }
+  if (Array.isArray(parsed.repos)) return [...new Set(parsed.repos.filter((x): x is string => typeof x === "string"))];
+  if (typeof parsed.url === "string") {
+    try {
+      return [...new Set(new URL(parsed.url).searchParams.getAll("repo"))];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 /** `*` means All projects: no scope. */
 export const ALL_PROJECTS = "*";
 
@@ -136,6 +156,10 @@ export interface Index {
   /** Create the group if new; a non-empty title also renames it. */
   upsertGroup(slug: string, title?: string): Group;
   allProjects(): Project[];
+  /** The repositories the project's board reads, in the order they were added. */
+  boardRepos(slug: string): string[];
+  /** Adds a repository to the project's board (the project is created if new); returns the list. */
+  addBoardRepo(slug: string, repo: string): string[];
   /** Create the project if new; a non-empty title renames it, paths are merged in. */
   upsertProject(slug: string, patch?: { title?: string; addPaths?: string[] }): Project;
   /** Refused while documents still reference it: `documents` reports how many. */
@@ -190,6 +214,19 @@ export function openIndex(dbPath: string = SQLITE_PATH, root: string = STORE_ROO
     "CREATE TABLE IF NOT EXISTS projects (slug TEXT PRIMARY KEY, title TEXT, paths TEXT NOT NULL DEFAULT '[]')",
   );
   db.exec("CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+  const projectCols = (db.prepare("PRAGMA table_info(projects)").all() as { name: string }[]).map((c) => c.name);
+  if (!projectCols.includes("board_repos")) db.exec("ALTER TABLE projects ADD COLUMN board_repos TEXT NOT NULL DEFAULT '[]'");
+  const boardReposOf = (slug: string): string[] => {
+    const row = db.prepare("SELECT board_repos FROM projects WHERE slug = ?").get(slug) as { board_repos: string } | undefined;
+    return row ? (JSON.parse(row.board_repos) as string[]) : [];
+  };
+  const addRepo = (slug: string, repo: string): string[] => {
+    db.prepare("INSERT INTO projects (slug, title, paths) VALUES (?, NULL, '[]') ON CONFLICT(slug) DO NOTHING").run(slug);
+    const repos = boardReposOf(slug);
+    if (!repos.includes(repo)) repos.push(repo);
+    db.prepare("UPDATE projects SET board_repos = ? WHERE slug = ?").run(JSON.stringify(repos), slug);
+    return repos;
+  };
   // Work still running behind a document the reader can already open. Deliberately the
   // only ephemeral state in the index: a row exists exactly while the work is pending,
   // and finishing means deleting it, so nothing accumulates and nothing needs cleaning.
@@ -205,6 +242,25 @@ export function openIndex(dbPath: string = SQLITE_PATH, root: string = STORE_ROO
     )
   `);
   db.exec("DROP TABLE IF EXISTS revisions");
+
+  // The board is aiview's /board page, no longer a document: a project's `swarm` document
+  // (`swarm.swarm.json` { repos }, or a pre-merge { url }) gives its repositories to the
+  // project and leaves the index. Its file stays on disk; nothing reads it again.
+  for (const row of db.prepare("SELECT id, file_path, project FROM documents WHERE kind = 'swarm'").all() as {
+    id: number;
+    file_path: string;
+    project: string;
+  }[]) {
+    let text = "";
+    try {
+      text = fs.readFileSync(toAbs(row.file_path, root), "utf8");
+    } catch {
+      // a missing file gives no repository; the row leaves all the same
+    }
+    for (const repo of boardReposInText(text)) addRepo(row.project, repo);
+    db.prepare("DELETE FROM pending WHERE document_id = ?").run(row.id);
+    db.prepare("DELETE FROM documents WHERE id = ?").run(row.id);
+  }
 
   const parse = (row: Row): Document => ({
     ...row,
@@ -356,6 +412,14 @@ export function openIndex(dbPath: string = SQLITE_PATH, root: string = STORE_ROO
     },
 
     upsertGroup,
+
+    boardRepos(slug) {
+      return boardReposOf(slug);
+    },
+
+    addBoardRepo(slug, repo) {
+      return addRepo(slug, repo);
+    },
 
     allProjects() {
       return (db.prepare("SELECT * FROM projects ORDER BY slug").all() as unknown as ProjectRow[]).map(parseProject);

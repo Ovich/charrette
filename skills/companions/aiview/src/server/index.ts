@@ -166,6 +166,11 @@ export function startServer(
       });
       return;
     }
+    // The board page's source: the repositories the project's board reads (the active project by default).
+    if (p === "/api/project-board") {
+      const slug = url.searchParams.get("project") || index.activeProject();
+      return json(res, { project: slug, repos: slug === ALL_PROJECTS ? [] : index.boardRepos(slug) });
+    }
     // Pinning is the person's, from the viewer: the index stores it, every tab hears it.
     if (p === "/api/pin" && req.method === "POST") {
       let body = "";

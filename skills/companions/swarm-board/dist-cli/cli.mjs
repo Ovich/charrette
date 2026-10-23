@@ -5016,7 +5016,7 @@ var require_websocket = __commonJS({
     var tls = __require("tls");
     var { randomBytes, createHash } = __require("crypto");
     var { Duplex, Readable } = __require("stream");
-    var { URL: URL2 } = __require("url");
+    var { URL } = __require("url");
     var PerMessageDeflate = require_permessage_deflate();
     var Receiver2 = require_receiver();
     var Sender2 = require_sender();
@@ -5506,11 +5506,11 @@ var require_websocket = __commonJS({
         );
       }
       let parsedUrl;
-      if (address instanceof URL2) {
+      if (address instanceof URL) {
         parsedUrl = address;
       } else {
         try {
-          parsedUrl = new URL2(address);
+          parsedUrl = new URL(address);
         } catch (e) {
           throw new SyntaxError(`Invalid URL: ${address}`);
         }
@@ -5647,7 +5647,7 @@ var require_websocket = __commonJS({
           req.abort();
           let addr;
           try {
-            addr = new URL2(location, address);
+            addr = new URL(location, address);
           } catch (e) {
             const err = new SyntaxError(`Invalid URL: ${location}`);
             emitErrorAndClose(websocket, err);
@@ -7549,7 +7549,7 @@ ${m.answer}` : ""}`;
 // src/cli/index.ts
 init_mentions();
 
-// src/cli/aiview-document.ts
+// src/cli/aiview-board.ts
 import { spawnSync } from "node:child_process";
 import fs7 from "node:fs";
 import path6 from "node:path";
@@ -7566,31 +7566,7 @@ var callAiview = (launcher, cwd, argv) => {
     return { ok: false, error: `aiview ${argv[0]}: unreadable output ${r.stdout.trim()}` };
   }
 };
-var BOARD_DOCUMENT_FILE = "swarm.swarm.json";
-var boardReposFor = (current, repo) => {
-  const repos = reposInDocument(current);
-  return repos.includes(repo) ? repos : [...repos, repo];
-};
-function reposInDocument(text) {
-  if (text === null) return [];
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return [];
-  }
-  const named = Array.isArray(parsed.repos) ? parsed.repos.filter((r) => typeof r === "string") : typeof parsed.url === "string" ? reposInPreMergeUrl(parsed.url) : [];
-  return [...new Set(named)];
-}
-var reposInPreMergeUrl = (url) => {
-  try {
-    return new URL(url).searchParams.getAll("repo");
-  } catch {
-    return [];
-  }
-};
-var boardDocumentText = (repos) => JSON.stringify({ repos }, null, 2) + "\n";
-function registerBoardDocument(input) {
+function registerBoard(input) {
   const launcher = aiviewLauncher(input.toolRoot);
   if (!launcher) return { registered: false, reason: "aiview not found" };
   const aiview = (argv) => callAiview(launcher, input.cwd, argv);
@@ -7598,36 +7574,10 @@ function registerBoardDocument(input) {
   if (!status.ok) return { registered: false, reason: status.error };
   const project = status.out.cwdProject;
   if (!project) return { registered: false, reason: `no aiview project for ${input.cwd}` };
-  const where = aiview(["path", BOARD_DOCUMENT_FILE, "--project", project]);
-  if (!where.ok) return { registered: false, reason: where.error };
-  const file = where.out.path;
-  const existing = readDocumentText(file);
-  const text = boardDocumentText(boardReposFor(existing, input.repo));
-  if (text !== existing) {
-    fs7.mkdirSync(path6.dirname(file), { recursive: true });
-    fs7.writeFileSync(file, text);
-  }
-  const opened = aiview(existing === null ? ["open", file, "--kind", "swarm"] : ["open", file]);
-  if (!opened.ok) return { registered: false, reason: opened.error };
-  const retired = retireOtherSwarmDocuments(aiview, project, file);
-  if (!retired.ok) return { registered: false, reason: retired.error };
-  return { registered: true, url: opened.out.url, file, retired: retired.files };
-}
-function readDocumentText(file) {
-  try {
-    return fs7.readFileSync(file, "utf8");
-  } catch {
-    return null;
-  }
-}
-function retireOtherSwarmDocuments(aiview, project, board2) {
-  const listed = aiview(["list", "--kind", "swarm", "--project", project]);
-  if (!listed.ok) return listed;
-  const others = listed.out.filter((d) => path6.resolve(d.abs_path ?? d.file_path) !== path6.resolve(board2));
-  if (!others.length) return { ok: true, files: [] };
-  const removed = aiview(["remove", ...others.map((d) => `#${d.id}`)]);
-  if (!removed.ok) return removed;
-  return { ok: true, files: others.map((d) => d.file_path) };
+  const board2 = aiview(["board", "--repo", input.repo, "--project", project]);
+  if (!board2.ok) return { registered: false, reason: board2.error };
+  const out = board2.out;
+  return { registered: true, url: out.url, repos: out.repos };
 }
 
 // src/cli/unclaimed.ts
@@ -8081,7 +8031,7 @@ ${USAGE}`);
         ...stallMs !== void 0 ? { stallMs } : {}
       });
       const link = startLinkLine({ name: `${run2.group}/orchestrator`, run: run2.id });
-      const doc = registerBoardDocument({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run2.repo });
+      const doc = registerBoard({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run2.repo });
       if (!doc.registered) {
         console.error(`swarm: ${doc.reason}: the run is open; its board is read in aiview once aiview is installed and knows this project`);
         emit({ run: run2.id, repo: run2.repo, kind: run2.kind, group: run2.group, plan: run2.plan, url: null, link }, [String(run2.id), link].join("\n"));

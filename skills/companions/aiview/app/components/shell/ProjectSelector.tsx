@@ -37,7 +37,7 @@ export function ProjectSelector({
   const slugs = Object.keys(projects).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   const count = (slug: string) => (slug === ALL_PROJECTS ? docs.length : docs.filter((d) => d.project === slug).length);
   const label = (slug: string) => (slug === ALL_PROJECTS ? "All projects" : (projects[slug] ?? slug));
-  const rows = [...slugs, ALL_PROJECTS].filter((s) => !find || label(s).toLowerCase().includes(find.toLowerCase()));
+  const rows = slugs.filter((s) => !find || label(s).toLowerCase().includes(find.toLowerCase()));
 
   useEffect(() => {
     if (!open) return;

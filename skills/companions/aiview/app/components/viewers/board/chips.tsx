@@ -46,6 +46,20 @@ export function RunnerName({ name, plan = true }: { name: string; plan?: boolean
   );
 }
 
+/** An agent beside its mark: its funny name, then its role in grey ("Dizzy Yak  orchestrator").
+ *  The mark carries the run's colour and the short role, so no chip repeats them; the full
+ *  "RT·S3" is the tooltip. With no name, the role alone. */
+export function AgentLabel({ name, role = true }: { name: string; role?: boolean }) {
+  const nick = useContext(NicksContext).get(name);
+  const { code, slice } = runnerLabel(name);
+  return (
+    <span className="alabel" data-component="AgentLabel" title={`${code}·${slice}`}>
+      {nick ? <span className="nick">{nick}</span> : <span className="nick">{slice}</span>}
+      {nick && role && <span className="role">{slice}</span>}
+    </span>
+  );
+}
+
 /** A flag's chip: FLAG in the danger colour, glowing (static under reduced motion). */
 export function FlagChip() {
   return (

@@ -249,3 +249,30 @@ test("pin: a document starts unpinned, pins and unpins, and keeps its pin when r
   assert.equal(index.get(d.id)!.pinned, false);
   assert.equal(index.setPinned(9999, true), false);
 });
+
+test("boardReposInText: { repos }, a pre-merge { url }'s ?repo=, nothing for anything else", async () => {
+  const { boardReposInText } = await import("../src/core/db.ts");
+  assert.deepEqual(boardReposInText(JSON.stringify({ repos: ["/a/.git", "/b/.git", "/a/.git"] })), ["/a/.git", "/b/.git"]);
+  assert.deepEqual(boardReposInText(JSON.stringify({ url: "http://h:4322/?repo=%2Fa%2F.git&repo=%2Fb%2F.git&run=7" })), ["/a/.git", "/b/.git"]);
+  assert.deepEqual(boardReposInText(JSON.stringify({ run: "7" })), []);
+  assert.deepEqual(boardReposInText("not json"), []);
+});
+
+test("migration: a project's swarm document gives its repositories to the project's board and leaves the index", () => {
+  const board = write("docs/swarm.swarm.json", JSON.stringify({ repos: ["/r/one/.git", "/r/two/.git"] }));
+  const plan = write("docs/a.plan.md", "# A plan\n");
+  const b = index.register(board, { project: "p" });
+  index.register(plan, { project: "p" });
+  assert.equal(b.kind, "swarm");
+  index.close();
+  index = openIndex(path.join(tmp, "test.sqlite"), root);
+  assert.deepEqual(index.boardRepos("p"), ["/r/one/.git", "/r/two/.git"]);
+  assert.deepEqual(index.all().map((d) => d.kind), ["plan"]);
+  assert.ok(fs.existsSync(board), "the file stays on disk");
+  // a second open finds nothing to migrate and keeps the list
+  index.close();
+  index = openIndex(path.join(tmp, "test.sqlite"), root);
+  assert.deepEqual(index.boardRepos("p"), ["/r/one/.git", "/r/two/.git"]);
+  assert.deepEqual(index.addBoardRepo("p", "/r/one/.git"), ["/r/one/.git", "/r/two/.git"]);
+  assert.deepEqual(index.addBoardRepo("p", "/r/three/.git"), ["/r/one/.git", "/r/two/.git", "/r/three/.git"]);
+});

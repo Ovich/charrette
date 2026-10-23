@@ -41,3 +41,10 @@ export async function setPinned(id: number, pinned: boolean): Promise<void> {
   });
   if (!r.ok) throw new Error(`POST /api/pin: ${r.status}`);
 }
+
+/** The repositories a project's board reads: the board page's source. */
+export async function fetchProjectBoard(project: string): Promise<string[]> {
+  const r = await fetch(`/api/project-board?project=${encodeURIComponent(project)}`);
+  if (!r.ok) throw new Error(`GET /api/project-board: ${r.status}`);
+  return ((await r.json()) as { repos: string[] }).repos;
+}

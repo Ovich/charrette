@@ -14,7 +14,7 @@ export const docActivity = (d: DocumentWithState): string => d.updated_at ?? d.l
  *  - members inside a group read oldest-first (the board that started it on top)
  *  - every entry sorts by its most recently changed member, newest first — so the
  *    group holding the latest document is on top
- *  - a swarm document (the project's board) comes before all of them, whatever its age */
+ *  - a swarm document (a board file not yet migrated to the /board page) comes first, whatever its age */
 export function sidebarEntries(
   docs: DocumentWithState[],
   groups: Record<string, string>,

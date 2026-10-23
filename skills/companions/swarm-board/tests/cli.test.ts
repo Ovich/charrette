@@ -87,48 +87,39 @@ test("open then join prints the roster", () => {
   assert.match(r.stdout, /review-tool\/orchestrator/);
 });
 
-/** A stand-in for aiview's CLI over an index in `<toolRoot>/index.json`: `status` answers project
- *  `p`, `path` a file in `<toolRoot>/docs`, `open` registers (the same id on a second open), `list`
- *  and `remove` read and change the index; every call's argv is logged. */
-const fakeAiview = (): { launcher: string; log: string; index: string } => {
+/** A stand-in for aiview's CLI: `status` answers project `p`, `board --repo` adds the repository to
+ *  the project's board in `<toolRoot>/boards.json` and answers the /board link; every call's argv is logged. */
+const fakeAiview = (): { launcher: string; log: string; boards: string } => {
   const launcher = path.join(toolRoot, "fake-aiview.mjs");
   const log = path.join(toolRoot, "aiview.log");
-  const index = path.join(toolRoot, "index.json");
-  fs.writeFileSync(index, "[]");
+  const boards = path.join(toolRoot, "boards.json");
+  fs.writeFileSync(boards, "{}");
   fs.writeFileSync(
     launcher,
-    `import fs from "node:fs"; import path from "node:path";
+    `import fs from "node:fs";
 const argv = process.argv.slice(2).filter((a) => a !== "--json");
-const [verb, arg] = argv;
+const [verb] = argv;
 fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)) + "\\n");
-const indexFile = ${JSON.stringify(index)};
-const docs = JSON.parse(fs.readFileSync(indexFile, "utf8"));
-const kindOf = (f) => path.basename(f).split(".").slice(-2, -1)[0];
+const file = ${JSON.stringify(boards)};
+const all = JSON.parse(fs.readFileSync(file, "utf8"));
+const flag = (n) => argv[argv.indexOf(n) + 1];
 if (verb === "status") console.log(JSON.stringify({ cwdProject: "p" }));
-else if (verb === "path") { const dir = path.join(${JSON.stringify(toolRoot)}, "docs"); fs.mkdirSync(dir, { recursive: true }); console.log(JSON.stringify({ path: path.join(dir, arg), dir, project: "p" })); }
-else if (verb === "open") {
-  let d = docs.find((x) => x.file_path === arg);
-  if (!d) { d = { id: docs.reduce((m, x) => Math.max(m, x.id), 6) + 1, file_path: arg, kind: kindOf(arg), project: "p" }; docs.push(d); fs.writeFileSync(indexFile, JSON.stringify(docs)); }
-  console.log(JSON.stringify({ id: d.id, url: "http://localhost:4321/#doc=" + d.id }));
-}
-// as the real aiview: file_path relative to its data home, abs_path absolute
-else if (verb === "list") console.log(JSON.stringify(docs.filter((d) => d.kind === argv[argv.indexOf("--kind") + 1]).map((d) => ({ ...d, file_path: path.relative(${JSON.stringify(toolRoot)}, d.file_path), abs_path: d.file_path }))));
-else if (verb === "remove") {
-  const ids = argv.slice(1).map((r) => Number(r.replace("#", "")));
-  fs.writeFileSync(indexFile, JSON.stringify(docs.filter((d) => !ids.includes(d.id))));
-  console.log(JSON.stringify({ removed: docs.filter((d) => ids.includes(d.id)) }));
+else if (verb === "board") {
+  const project = flag("--project");
+  const repos = all[project] ?? [];
+  if (!repos.includes(flag("--repo"))) repos.push(flag("--repo"));
+  all[project] = repos;
+  fs.writeFileSync(file, JSON.stringify(all));
+  console.log(JSON.stringify({ project, repos, url: "http://localhost:4321/board" }));
 }
 else process.exit(1);
 `,
   );
-  return { launcher, log, index };
+  return { launcher, log, boards };
 };
 
 const aiviewCalls = (log: string): string[][] => fs.readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
-const boardFile = () => path.join(toolRoot, "docs", "swarm.swarm.json");
-const boardDocument = (): unknown => JSON.parse(fs.readFileSync(boardFile(), "utf8"));
-const boardRepos = (): string[] => (boardDocument() as { repos: string[] }).repos;
-const indexed = (index: string) => JSON.parse(fs.readFileSync(index, "utf8")) as { file_path: string; kind: string }[];
+const boardRepos = (boards: string): string[] => (JSON.parse(fs.readFileSync(boards, "utf8")) as Record<string, string[]>).p ?? [];
 
 const openWith = (aiview: string, cwd = repo) => {
   const slices = path.join(toolRoot, "s.json");
@@ -140,34 +131,20 @@ const openWith = (aiview: string, cwd = repo) => {
   });
 };
 
-test("open writes repos and registers the board: the project's board document { repos }, registered with no group (D17, D30, D6)", () => {
-  const { launcher, log } = fakeAiview();
+test("open adds the run's repository to the project's board page and prints its link; no document is written", () => {
+  const { launcher, log, boards } = fakeAiview();
   const r = openWith(launcher);
   assert.equal(r.status, 0, r.stderr);
   const out = JSON.parse(r.stdout) as { url: string; repo: string };
-  assert.equal(out.url, "http://localhost:4321/#doc=7");
-  assert.deepEqual(boardDocument(), { repos: [out.repo] });
+  assert.equal(out.url, "http://localhost:4321/board");
+  assert.deepEqual(boardRepos(boards), [out.repo]);
   const calls = aiviewCalls(log);
-  assert.deepEqual(calls.find((c) => c[0] === "path"), ["path", "swarm.swarm.json", "--project", "p", "--json"]);
-  assert.deepEqual(calls.find((c) => c[0] === "open"), ["open", boardFile(), "--kind", "swarm", "--json"]);
+  assert.deepEqual(calls.find((c) => c[0] === "board"), ["board", "--repo", out.repo, "--project", "p", "--json"]);
+  assert.equal(calls.some((c) => c[0] === "open" || c[0] === "path"), false);
 });
 
-test("a second open in the same repository writes nothing new and prints the same document", () => {
-  const { launcher, index } = fakeAiview();
-  const first = JSON.parse(openWith(launcher).stdout) as { url: string };
-  const before = fs.readFileSync(boardFile(), "utf8");
-  const mtime = fs.statSync(boardFile()).mtimeMs;
-  const second = openWith(launcher);
-  assert.equal(second.status, 0, second.stderr);
-  assert.equal((JSON.parse(second.stdout) as { url: string }).url, first.url);
-  assert.equal(fs.readFileSync(boardFile(), "utf8"), before);
-  assert.equal(fs.statSync(boardFile()).mtimeMs, mtime);
-  assert.deepEqual(fs.readdirSync(path.join(toolRoot, "docs")), ["swarm.swarm.json"]);
-  assert.equal(indexed(index).length, 1);
-});
-
-test("a second repository is added to repos once; still one document (D39, D6)", () => {
-  const { launcher, index } = fakeAiview();
+test("a second repository joins the same board once; reopening either adds nothing", () => {
+  const { launcher, boards } = fakeAiview();
   const first = JSON.parse(openWith(launcher).stdout) as { url: string; repo: string };
   const other = path.join(toolRoot, "other");
   fs.mkdirSync(other);
@@ -178,42 +155,9 @@ test("a second repository is added to repos once; still one document (D39, D6)",
   const second = JSON.parse(r.stdout) as { url: string; repo: string };
   assert.notEqual(second.repo, first.repo);
   assert.equal(second.url, first.url);
-  assert.deepEqual(boardRepos(), [first.repo, second.repo]);
-  // once: a further open from either repository names neither again
   assert.equal(openWith(launcher, other).status, 0);
   assert.equal(openWith(launcher).status, 0);
-  assert.deepEqual(boardRepos(), [first.repo, second.repo]);
-  assert.equal(indexed(index).length, 1);
-});
-
-test("a pre-merge url file is rewritten as repos, its ?repo= values kept first (D6)", () => {
-  const { launcher, log } = fakeAiview();
-  const earlier = path.join(toolRoot, "earlier-repo");
-  fs.mkdirSync(path.join(toolRoot, "docs"), { recursive: true });
-  const old = new URL("http://localhost:4322/");
-  old.searchParams.append("repo", earlier);
-  fs.writeFileSync(boardFile(), JSON.stringify({ url: old.toString() }, null, 2) + "\n");
-  const r = openWith(launcher);
-  assert.equal(r.status, 0, r.stderr);
-  const out = JSON.parse(r.stdout) as { repo: string };
-  assert.deepEqual(boardDocument(), { repos: [earlier, out.repo] });
-  // an existing file is registered again without a kind, as before
-  assert.deepEqual(aiviewCalls(log).find((c) => c[0] === "open"), ["open", boardFile(), "--json"]);
-  // a pre-merge file already naming this repository is rewritten all the same
-  fs.writeFileSync(boardFile(), JSON.stringify({ url: `http://localhost:4322/?repo=${encodeURIComponent(out.repo)}` }) + "\n");
-  assert.equal(openWith(launcher).status, 0);
-  assert.deepEqual(boardDocument(), { repos: [out.repo] });
-});
-
-test("open retires the per-run swarm documents of earlier runs from the index", () => {
-  const { launcher, log, index } = fakeAiview();
-  const old = path.join(toolRoot, "docs", "2026-10-01-review-tool-run-3.swarm.json");
-  const plan = path.join(toolRoot, "docs", "a.plan.md");
-  fs.writeFileSync(index, JSON.stringify([{ id: 3, file_path: old, kind: "swarm", project: "p" }, { id: 4, file_path: plan, kind: "plan", project: "p" }]));
-  const r = openWith(launcher);
-  assert.equal(r.status, 0, r.stderr);
-  assert.ok(aiviewCalls(log).some((c) => c[0] === "remove" && c.includes("#3")));
-  assert.deepEqual(indexed(index).map((d) => d.file_path).sort(), [plan, boardFile()].sort());
+  assert.deepEqual(boardRepos(boards), [first.repo, second.repo]);
 });
 
 test("open without aiview opens the run and exits 0, printing no URL and saying the board is read in aiview once installed (D13)", async () => {
@@ -796,13 +740,6 @@ test("--help prints the core verbs, --help code the claim and merge verbs; no ve
   assert.equal(none.status, 1);
   assert.match(none.stderr, /^  endorse /m);
   assert.doesNotMatch(none.stderr, /^  claim /m);
-});
-
-test("open keeps the project's board in aiview's index, aiview listing paths relative to its data home (SL10 trial)", () => {
-  const { launcher, index } = fakeAiview();
-  const r = openWith(launcher);
-  assert.equal(r.status, 0, r.stderr);
-  assert.deepEqual(indexed(index).map((d) => d.file_path), [boardFile()]);
 });
 
 // SL12: subscriptions (D59) and slices added mid-run (D60)

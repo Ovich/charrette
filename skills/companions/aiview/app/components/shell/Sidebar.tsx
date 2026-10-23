@@ -102,8 +102,8 @@ export function Sidebar({
   version,
   currentId,
   onOpen,
-  onEmptyBoard,
-  emptyBoard = false,
+  onBoard,
+  boardShown = false,
   documentsShown = false,
   onDocuments,
 }: {
@@ -117,18 +117,16 @@ export function Sidebar({
   onOpen: (id: number) => void;
   /** Kept for callers; the project is picked in the top bar. */
   onPickProject?: (slug: string) => void;
-  /** Board picked where the project has none. */
-  onEmptyBoard?: () => void;
-  /** The empty board is what is shown. */
-  emptyBoard?: boolean;
+  /** The Board page is asked for. */
+  onBoard?: () => void;
+  /** The Board page is what is shown. */
+  boardShown?: boolean;
   /** The Documents page is what is shown. */
   documentsShown?: boolean;
   onDocuments?: () => void;
 }) {
   const scoped = activeProject !== ALL_PROJECTS;
   const inScope = docs.filter((d) => !scoped || d.project === activeProject);
-  const board = inScope.find((d) => d.kind === "swarm");
-  const onBoard = !documentsShown && (emptyBoard || (board !== undefined && board.id === currentId));
   const listed = inScope.filter((d) => d.kind !== "swarm").length;
 
   const [kept, setKept] = useState(readKept);
@@ -194,10 +192,9 @@ export function Sidebar({
             component="BoardNav"
             icon={<BoardIcon />}
             label="Board"
-            count={board ? undefined : "none"}
-            active={onBoard}
-            title={board ? "The project's swarm board" : "No board yet: swarm open creates it"}
-            onClick={go(() => (board ? onOpen(board.id) : onEmptyBoard?.()))}
+            active={boardShown}
+            title="The project's swarm board"
+            onClick={go(() => onBoard?.())}
           />
           <NavItem
             component="DocumentsNav"
@@ -207,7 +204,7 @@ export function Sidebar({
             active={documentsShown}
             onClick={go(() => onDocuments?.())}
           />
-          <PinnedNav docs={inScope} currentId={documentsShown ? null : currentId} onOpen={(id) => go(() => onOpen(id))()} folded={!open} />
+          <PinnedNav docs={inScope} currentId={documentsShown || boardShown ? null : currentId} onOpen={(id) => go(() => onOpen(id))()} folded={!open} />
         </nav>
 
         <div data-component="SidebarFooter" className="flex h-10 shrink-0 items-center gap-1.5 border-t border-border px-4 text-[12px] text-muted-foreground">

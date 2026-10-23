@@ -11,7 +11,7 @@ import { bindingOf, connectBoard, linkVerbArgs, type BoardMember, type Connected
 import { parseArgs } from "./args.ts";
 import { fullText, seqLine } from "./format.ts";
 import { nameHandle, unmatchedMentions } from "../board/mentions.ts";
-import { registerBoardDocument } from "./aiview-document.ts";
+import { registerBoard } from "./aiview-board.ts";
 import { unclaimedLines } from "./unclaimed.ts";
 import { git, worktreeHolding } from "./git.ts";
 import { conflictsOf, headReflogLength } from "./conflicts.ts";
@@ -498,8 +498,8 @@ async function main(): Promise<void> {
       });
       // the orchestrator's link, from now on how its verbs reach the board (D29), started by its agent (D32)
       const link = startLinkLine({ name: `${run.group}/orchestrator`, run: run.id });
-      // the person watches the project's board in aiview, pinned first (plan D17, D30, D39)
-      const doc = registerBoardDocument({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run.repo });
+      // the person watches the project's board on aiview's /board page
+      const doc = registerBoard({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run.repo });
       if (!doc.registered) {
         // the run is open all the same; swarm has no page of its own (companions-merge D13)
         console.error(`swarm: ${doc.reason}: the run is open; its board is read in aiview once aiview is installed and knows this project`);

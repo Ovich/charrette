@@ -436,7 +436,7 @@ describe("MockupFrame modes", () => {
   });
 });
 
-describe("swarm document", () => {
+describe("the board page", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   // aiview's own routes stood in for: /api/board answers an empty board of the repository asked
@@ -464,10 +464,10 @@ describe("swarm document", () => {
     return { fetchMock, streams };
   };
 
-  test("a swarm document renders the board natively, from aiview's own routes; nothing framed", async () => {
+  test("the board page renders the project's board natively, from aiview's own routes; nothing framed", async () => {
     const { fetchMock, streams } = standInBoard();
-    const { SwarmDocumentView } = await import("./App.tsx");
-    render(<SwarmDocumentView content={JSON.stringify({ repos: [REPO, "C:/repos/two/.git"] })} />);
+    const { BoardPage } = await import("./App.tsx");
+    render(<BoardPage repos={[REPO, "C:/repos/two/.git"]} />);
     expect(await screen.findByText("No run on one yet.")).toBeTruthy();
     expect(document.querySelector('[data-component="BoardView"]')!.getAttribute("data-state")).toBe("no run yet");
     expect(fetchMock.mock.calls[0][0]).toBe(`/api/board?repo=${encodeURIComponent(REPO)}`);
@@ -475,38 +475,12 @@ describe("swarm document", () => {
     expect(document.querySelector("iframe")).toBeNull();
   });
 
-  test("a pre-merge { url } document gives the board the repositories of its ?repo= (D6)", async () => {
+  test("a project with no repository on its board: No board yet, and nothing asked", async () => {
     const { fetchMock } = standInBoard();
-    const { SwarmDocumentView } = await import("./App.tsx");
-    const url = `http://127.0.0.1:4322/?repo=${encodeURIComponent(REPO)}&repo=${encodeURIComponent("C:/repos/two/.git")}`;
-    render(<SwarmDocumentView content={JSON.stringify({ url })} />);
-    expect(await screen.findByText("No run on one yet.")).toBeTruthy();
-    expect(fetchMock.mock.calls[0][0]).toBe(`/api/board?repo=${encodeURIComponent(REPO)}`);
-  });
-
-  test("a document naming no repository says so, and asks nothing", async () => {
-    const { fetchMock } = standInBoard();
-    const { SwarmDocumentView } = await import("./App.tsx");
-    render(<SwarmDocumentView content={JSON.stringify({ run: "7" })} />);
-    expect(screen.getByText("This board names no repository.")).toBeTruthy();
+    const { BoardPage } = await import("./App.tsx");
+    render(<BoardPage repos={[]} />);
+    expect(screen.getByText("No board yet")).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  test("boardReposOf reads repos", async () => {
-    const { boardReposOf } = await import("./components/viewers/board/BoardView.tsx");
-    expect(boardReposOf(JSON.stringify({ repos: ["/a/.git", "/b/.git"] }))).toEqual(["/a/.git", "/b/.git"]);
-  });
-
-  test("boardReposOf reads a pre-merge url", async () => {
-    const { boardReposOf } = await import("./components/viewers/board/BoardView.tsx");
-    expect(boardReposOf(JSON.stringify({ url: "http://127.0.0.1:4322/?repo=%2Fa%2F.git&repo=%2Fb%2F.git&run=7" }))).toEqual(["/a/.git", "/b/.git"]);
-  });
-
-  test("boardReposOf null for neither", async () => {
-    const { boardReposOf } = await import("./components/viewers/board/BoardView.tsx");
-    expect(boardReposOf(JSON.stringify({ run: "7" }))).toBeNull();
-    expect(boardReposOf(JSON.stringify({ repos: [], url: "http://h/run/7" }))).toBeNull();
-    expect(boardReposOf("not json")).toBeNull();
   });
 
   // jsdom resolves no stylesheet: the seam is board.css's source, read from disk
@@ -514,8 +488,8 @@ describe("swarm document", () => {
 
   test("the board takes aiview's theme: no toggle of its own, no ?theme=, no token of aiview's redefined (D12)", async () => {
     standInBoard();
-    const { SwarmDocumentView } = await import("./App.tsx");
-    render(<SwarmDocumentView content={JSON.stringify({ repos: [REPO] })} />);
+    const { BoardPage } = await import("./App.tsx");
+    render(<BoardPage repos={[REPO]} />);
     await screen.findByText("No run on one yet.");
     expect(document.querySelector('[data-component$="ThemeToggle"]')).toBeNull();
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
