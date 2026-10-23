@@ -62,7 +62,7 @@ verbs and their answers are the runner side's, `references/runner.md`.
 
 **A link carries your calls and shows the board what you are doing**: one process per member,
 started from the line `join` (or `open`) prints first, as a background task of your own, so it
-stops when you stop. It finds your session's transcript itself; nobody names one. The board reads
+stops when you stop. It finds your session's record itself; you pass it nothing. The board reads
 from it your state: `working`, `busy` (a tool call open), `waiting` (in a foreground board wait;
 a background listener is not waiting), `quiet` (none of these, with its reason) or `gone`
 (finished without `end`, or its link lost 30 s). `status` and `roster` show it. What a
