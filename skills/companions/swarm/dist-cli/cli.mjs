@@ -47,6 +47,97 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
+// src/board/home.ts
+import os from "node:os";
+import path from "node:path";
+var DATA_ROOT, SQLITE_PATH;
+var init_home = __esm({
+  "src/board/home.ts"() {
+    "use strict";
+    DATA_ROOT = process.env.CHARRETTE_HOME ? path.resolve(process.env.CHARRETTE_HOME) : path.join(os.homedir(), "charrette_appdata");
+    SQLITE_PATH = path.join(DATA_ROOT, "swarm.sqlite");
+  }
+});
+
+// src/board/mentions.ts
+function planCode(plan) {
+  const words = plan.split(/[-_\s.]+/).filter((w) => w && !/^\d+$/.test(w));
+  if (words.length === 0) return plan.slice(0, 2).toUpperCase();
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+function parseMentions(body, senderPlan, plans, names) {
+  const out = /* @__PURE__ */ new Set();
+  for (const m of body.matchAll(MENTION)) {
+    const token = m[1].replace(/[.\-]+$/, "");
+    const named = names?.get(token.toLowerCase());
+    if (named) {
+      out.add(named);
+    } else if (token.includes("/")) {
+      const [plan, slice] = token.split("/");
+      out.add(`${plan}/${slice === "all" ? "*" : slice}`);
+    } else if (token.includes("\xB7")) {
+      const [code, slice] = token.split("\xB7");
+      for (const plan of plans) if (planCode(plan) === code.toUpperCase()) out.add(`${plan}/${slice === "all" ? "*" : slice}`);
+    } else if (token === "swarm") {
+      out.add(`${senderPlan}/*`);
+    } else if (token === "all") {
+      continue;
+    } else if (isCodeShaped(token) && plansOfCode(token, plans).length) {
+      for (const plan of plansOfCode(token, plans)) out.add(`${plan}/*`);
+    } else {
+      out.add(`${senderPlan}/${token}`);
+    }
+  }
+  return [...out];
+}
+function unmatchedMentions(body, senderPlan, plans, names) {
+  const handleOf = new Map([...names ?? /* @__PURE__ */ new Map()].map(([handle, runner]) => [runner, handle]));
+  const members = /* @__PURE__ */ new Set([...handleOf.keys(), ...[senderPlan, ...plans].map((p) => `${p}/orchestrator`)]);
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const m of body.matchAll(MENTION)) {
+    const token = m[1].replace(/[.\-]+$/, "");
+    if (seen.has(token)) continue;
+    seen.add(token);
+    if (names?.has(token.toLowerCase())) continue;
+    if (token === "all") {
+      out.push({ name: token, closest: ["swarm"] });
+      continue;
+    }
+    const targets = parseMentions(`@${token}`, senderPlan, plans, names);
+    if (targets.length && targets.every((t) => t.endsWith("/*") || members.has(t))) continue;
+    if (isCodeShaped(token)) {
+      const codes = [...new Set(plans.map(planCode))];
+      out.push({ name: token, closest: codes.sort((a, b) => editDistance(token.toUpperCase(), a) - editDistance(token.toUpperCase(), b)).slice(0, 3) });
+      continue;
+    }
+    const wanted = token.split(/[/·]/).pop().toLowerCase();
+    const gap = (member) => Math.min(editDistance(wanted, member.slice(member.lastIndexOf("/") + 1).toLowerCase()), editDistance(wanted, handleOf.get(member) ?? member));
+    out.push({ name: token, closest: [...members].sort((a, b) => gap(a) - gap(b)).slice(0, 3) });
+  }
+  return out;
+}
+var isCodeShaped, plansOfCode, MENTION, nameHandle, editDistance;
+var init_mentions = __esm({
+  "src/board/mentions.ts"() {
+    "use strict";
+    isCodeShaped = (token) => /^[A-Za-z]{2}$/.test(token);
+    plansOfCode = (code, plans) => plans.filter((plan) => planCode(plan) === code.toUpperCase());
+    MENTION = /(?<![\w@])@([A-Za-z0-9][\w.\-]*(?:[\/·][A-Za-z0-9][\w.\-]*)?)/g;
+    nameHandle = (nick) => nick.replace(/\s+/g, "").toLowerCase();
+    editDistance = (a, b) => {
+      let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+      for (let i = 1; i <= a.length; i++) {
+        const row = [i];
+        for (let j = 1; j <= b.length; j++) row.push(Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)));
+        prev = row;
+      }
+      return prev[b.length];
+    };
+  }
+});
+
 // src/board/kinds.ts
 function profileOf(kind) {
   const profile = PROFILES[kind];
@@ -186,91 +277,983 @@ var init_events = __esm({
   }
 });
 
-// src/board/home.ts
-import os from "node:os";
-import path from "node:path";
-var DATA_ROOT, SQLITE_PATH;
-var init_home = __esm({
-  "src/board/home.ts"() {
+// src/board/claims.ts
+function claimsOf(deps) {
+  const { db, transaction, bump, now, lastSeq, participantById, isLive, insertMessage, relPath, fold, slashes, doingOf } = deps;
+  const clearFlags = () => {
+    db.prepare("DELETE FROM flags WHERE NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = flags.repo AND c.path = flags.path)").run();
+    db.prepare(
+      `DELETE FROM notices WHERE NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = notices.repo AND c.path = notices.path AND c.participant = notices.participant)
+         OR NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = notices.repo AND c.path = notices.path AND c.participant = notices.other)`
+    ).run();
+  };
+  const holdersOf = (repo, rel) => db.prepare("SELECT participant, kind, since_seq FROM claims WHERE repo = ? AND path = ? ORDER BY rowid").all(repo, rel).map((r) => ({ participant: Number(r.participant), kind: String(r.kind), since: Number(r.since_seq) })).filter((c) => isLive(c.participant));
+  const hold = (p, rel, kind) => transaction(() => {
+    const r = db.prepare(
+      `INSERT INTO claims (repo, path, participant, kind, since_seq) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT (repo, path, participant) DO UPDATE SET kind = excluded.kind WHERE claims.kind = 'inside' AND excluded.kind = 'interface'`
+    ).run(p.repo, rel, p.id, kind, lastSeq());
+    db.prepare(
+      `INSERT INTO claim_log (repo, path, participant, kind) VALUES (?, ?, ?, ?)
+         ON CONFLICT (repo, path, participant) DO UPDATE SET kind = 'interface' WHERE excluded.kind = 'interface'`
+    ).run(p.repo, rel, p.id, kind);
+    if (Number(r.changes) === 0) return false;
+    bump(p.repo);
+    return true;
+  });
+  const take = (p, rel, kind) => transaction(() => {
+    const held = holdersOf(p.repo, rel).filter((c) => c.participant !== p.id);
+    if (held.length) return { held, taken: false };
+    return { held, taken: hold(p, rel, kind) };
+  });
+  const hasPostedAbout = (p, rel, holders) => {
+    const since = Math.min(...holders.map((h) => h.since));
+    const rows = db.prepare("SELECT seq, body, about, mentions FROM messages WHERE repo = ? AND author = ? AND seq > ? AND kind != 'event' AND by_board = 0").all(p.repo, p.id, since);
+    const base = rel.split("/").pop();
+    const names = (r) => {
+      const about = r.about == null ? "" : fold(slashes(String(r.about)));
+      const f = fold(rel);
+      if (about && (about === f || f.endsWith(`/${about}`))) return true;
+      const body = fold(String(r.body));
+      return body.includes(f) || body.includes(fold(base));
+    };
+    const told = rows.filter(names).map((r) => ({ seq: Number(r.seq), mentions: JSON.parse(String(r.mentions)) }));
+    return holders.every((h) => {
+      const o = participantById(h.participant);
+      return told.some((r) => r.seq > h.since && (r.mentions.includes(o.name) || r.mentions.includes(`${o.plan}/*`)));
+    });
+  };
+  const recordShares = (me, rel, people) => {
+    const share = db.prepare("INSERT OR IGNORE INTO shares (repo, path, participant, other, seq) VALUES (?, ?, ?, ?, ?)");
+    for (const o of people) share.run(me.repo, rel, me.id, o.id, lastSeq());
+  };
+  const noticeOf = (me, rel, people) => {
+    const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
+    const fresh = people.filter((o) => Number(told.run(me.repo, rel, me.id, o.id).changes) > 0);
+    return fresh.length ? fresh.map((o) => `${rel} is also held by ${o.name}: ${doingOf(o.id)}`).join("; ") : null;
+  };
+  const releaseAll = (id) => {
+    const owner = db.prepare("SELECT r.repo FROM participants p JOIN runs r ON r.id = p.run WHERE p.id = ?").get(id);
+    const claims = Number(db.prepare("DELETE FROM claims WHERE participant = ?").run(id).changes);
+    const locks = Number(db.prepare("DELETE FROM merge_locks WHERE participant = ?").run(id).changes);
+    db.prepare("DELETE FROM claim_requests WHERE participant = ?").run(id);
+    clearFlags();
+    if (owner && claims + locks > 0) bump(String(owner.repo));
+  };
+  const takeLockWaiters = (repo) => {
+    const rows = db.prepare("SELECT participant FROM lock_waiters WHERE repo = ? ORDER BY rowid").all(repo);
+    db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(repo);
+    return rows.map((r) => Number(r.participant)).filter(isLive).map((id) => participantById(id).name);
+  };
+  const openTurn = (p) => db.prepare(
+    `SELECT rowid AS id, granted_at FROM lock_requests t WHERE participant = ? AND merged_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM call_log c WHERE c.participant = t.participant AND c.verb = 'end' AND c.at >= t.asked_at)
+         ORDER BY rowid DESC LIMIT 1`
+  ).get(p.id);
+  const grantTurn = (p, at, anew) => {
+    const turn = openTurn(p);
+    if (turn && turn.granted_at == null) db.prepare("UPDATE lock_requests SET granted_at = ? WHERE rowid = ?").run(at, Number(turn.id));
+    else if (!turn || anew) db.prepare("INSERT INTO lock_requests (repo, participant, asked_at, granted_at) VALUES (?, ?, ?, ?)").run(p.repo, p.id, at, at);
+  };
+  const declared = (id) => JSON.parse(String(db.prepare("SELECT files FROM participants WHERE id = ?").get(id).files));
+  return {
+    clearFlags,
+    releaseAll,
+    lockWaitersFreedBy(p) {
+      const held = db.prepare("SELECT 1 FROM merge_locks WHERE repo = ? AND participant = ?").get(p.repo, p.id) !== void 0;
+      return held ? takeLockWaiters(p.repo).filter((n) => n !== p.name) : [];
+    },
+    claimByPost(me, m) {
+      if (m.kind !== "msg" && m.kind !== "agreement" || !m.about) return null;
+      const about = fold(relPath(me.repo, m.about) ?? slashes(m.about));
+      return transaction(() => {
+        const asked = db.prepare("SELECT path, kind FROM claim_requests WHERE repo = ? AND participant = ?").all(me.repo, me.id).find((r) => {
+          const x = fold(String(r.path));
+          return x === about || x.endsWith(`/${about}`);
+        });
+        if (!asked) return null;
+        const rel = String(asked.path);
+        const others = holdersOf(me.repo, rel).filter((c) => c.participant !== me.id);
+        if (!others.length || !hasPostedAbout(me, rel, others)) return null;
+        hold(me, rel, String(asked.kind) === "interface" ? "interface" : "inside");
+        db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
+        const people = others.map((c) => participantById(c.participant));
+        recordShares(me, rel, people);
+        return { path: rel, sharedWith: people.map((o) => o.name) };
+      });
+    },
+    claimDeclared(p, files) {
+      transaction(() => {
+        for (const f of files) {
+          const rel = relPath(p.repo, f.path);
+          if (rel) take(p, rel, f.interface ? "interface" : "inside");
+        }
+      });
+    },
+    askedAbout(me, author, m) {
+      const about = fold(relPath(me.repo, m.about) ?? slashes(m.about));
+      const mine = db.prepare("SELECT path FROM claims WHERE repo = ? AND participant = ? AND since_seq < ?").all(me.repo, me.id, m.seq);
+      const rel = mine.map((r) => String(r.path)).find((x) => fold(x) === about || fold(x).endsWith(`/${about}`));
+      if (!rel) return null;
+      const theirs = db.prepare("SELECT 1 FROM claims WHERE repo = ? AND path = ? AND participant = ? AND since_seq < ?").get(me.repo, rel, author, m.seq);
+      return theirs ? null : rel;
+    },
+    heldInOtherRun(p, rel) {
+      const f = fold(rel);
+      const rows = db.prepare("SELECT l.path FROM claim_log l JOIN participants q ON q.id = l.participant WHERE l.repo = ? AND q.run != ?").all(p.repo, p.run);
+      return rows.some((r) => {
+        const x = fold(String(r.path));
+        return x === f || x.endsWith(`/${f}`);
+      });
+    },
+    holds(p, about) {
+      const f = fold(relPath(p.repo, about) ?? slashes(about));
+      if (!f) return false;
+      const rows = db.prepare("SELECT path FROM claims WHERE repo = ? AND participant = ?").all(p.repo, p.id);
+      return rows.some((r) => {
+        const x = fold(String(r.path));
+        return x === f || x.endsWith(`/${f}`);
+      });
+    },
+    checkEdit(me, file, opts = {}) {
+      const kind = opts.interface ? "interface" : "inside";
+      const rel = relPath(me.repo, file);
+      if (!rel) return { allowed: true, sharedWith: [], notice: null };
+      return transaction(() => {
+        const all = holdersOf(me.repo, rel);
+        const others = all.filter((c) => c.participant !== me.id);
+        if (!others.length) {
+          hold(me, rel, kind);
+          return { allowed: true, sharedWith: [], notice: null };
+        }
+        const people = others.map((c) => participantById(c.participant));
+        if (!all.some((c) => c.participant === me.id)) {
+          if (!hasPostedAbout(me, rel, others)) {
+            db.prepare(
+              `INSERT INTO claim_requests (repo, path, participant, kind) VALUES (?, ?, ?, ?)
+               ON CONFLICT (repo, path, participant) DO UPDATE SET kind = CASE WHEN claim_requests.kind = 'interface' THEN 'interface' ELSE excluded.kind END`
+            ).run(me.repo, rel, me.id, kind);
+            const who = people.map((o) => `${o.name} (${o.nick}: ${doingOf(o.id)})`).join(", ");
+            const at = people.map((o) => `@${o.name}`).join(" ");
+            return {
+              allowed: false,
+              refusal: `${rel} is also held by ${who}. You may share it, but first tell ${people.length > 1 ? "them" : "its holder"} what you change in it: \`swarm post "${at} \u2026" --about ${rel}\`; ${people.length > 1 ? "they answer" : "its holder answers"} with an agreement on who changes what (\`swarm agree \u2026 --about ${rel}\`), and that agreement goes. Claim again once posted; do not wait for the agreement.`
+            };
+          }
+        }
+        hold(me, rel, kind);
+        db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
+        recordShares(me, rel, people);
+        const sharedWith = people.map((o) => ({ runner: o.name, doing: doingOf(o.id) }));
+        return { allowed: true, sharedWith, notice: noticeOf(me, rel, people) };
+      });
+    },
+    reconcileWrites(me, changed) {
+      const flags = [];
+      return transaction(() => {
+        const flag = db.prepare("INSERT OR IGNORE INTO flags (repo, path, participant) VALUES (?, ?, ?)");
+        const posted = db.prepare("INSERT OR IGNORE INTO flag_posts (repo, path, participant, holder) VALUES (?, ?, ?, ?)");
+        for (const file of changed) {
+          const rel = relPath(me.repo, file);
+          if (!rel) continue;
+          if (holdersOf(me.repo, rel).some((c) => c.participant === me.id)) {
+            take(me, rel, "inside");
+            continue;
+          }
+          const { held: others, taken } = take(me, rel, "inside");
+          if (taken || others.length) flag.run(me.repo, rel, me.id);
+          if (!others.length) continue;
+          const holder = participantById(others[0].participant);
+          if (Number(posted.run(me.repo, rel, me.id, holder.id).changes) === 0) continue;
+          const m = insertMessage(
+            me,
+            `@${holder.name} @${me.name} flag: ${me.name} wrote ${rel} outside its claim; ${holder.name} holds it. Settle it here.`,
+            rel,
+            "event",
+            [holder.name, me.name],
+            { event: EVENTS.flag.name }
+          );
+          flags.push({ path: rel, holder: holder.name, seq: m.seq });
+        }
+        return flags;
+      });
+    },
+    release(me, file) {
+      const rel = relPath(me.repo, file);
+      if (!rel) return;
+      transaction(() => {
+        const r = db.prepare("DELETE FROM claims WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
+        if (Number(r.changes) === 0) return;
+        clearFlags();
+        bump(me.repo);
+      });
+    },
+    lockMerge(me, onto, reflogMark) {
+      return transaction(() => {
+        const r = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo);
+        if (r && Number(r.participant) !== me.id && isLive(Number(r.participant))) {
+          db.prepare("INSERT OR IGNORE INTO lock_waiters (repo, participant) VALUES (?, ?)").run(me.repo, me.id);
+          const turn = openTurn(me);
+          if (turn && turn.granted_at == null) db.prepare("UPDATE lock_requests SET refused = refused + 1 WHERE rowid = ?").run(Number(turn.id));
+          else db.prepare("INSERT INTO lock_requests (repo, participant, asked_at, refused) VALUES (?, ?, ?, 1)").run(me.repo, me.id, now());
+          return { granted: false, holder: participantById(Number(r.participant)).name };
+        }
+        if (r && Number(r.participant) === me.id) {
+          if (onto) db.prepare("UPDATE merge_locks SET onto = ? WHERE repo = ?").run(onto, me.repo);
+          grantTurn(me, String(db.prepare("SELECT at FROM merge_locks WHERE repo = ?").get(me.repo).at), false);
+          return { granted: true };
+        }
+        db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(me.repo);
+        const at = now();
+        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at, onto, reflog_mark) VALUES (?, ?, ?, ?, ?)").run(me.repo, me.id, at, onto ?? null, reflogMark ?? null);
+        grantTurn(me, at, true);
+        bump(me.repo);
+        return { granted: true };
+      });
+    },
+    heldMergeLock(me) {
+      const r = db.prepare("SELECT at, onto, reflog_mark FROM merge_locks WHERE repo = ? AND participant = ?").get(me.repo, me.id);
+      return r ? { grantedAt: String(r.at), onto: r.onto == null ? null : String(r.onto), reflogMark: r.reflog_mark == null ? null : Number(r.reflog_mark) } : null;
+    },
+    merged(me, sha, files, conflicts) {
+      const rels = [...new Set(files.map((f) => relPath(me.repo, f)).filter((x) => x !== null))];
+      const conflicted = conflicts && "files" in conflicts ? new Set(conflicts.files.map((f) => fold(slashes(f)))) : null;
+      const wanted = new Set(rels);
+      const told = /* @__PURE__ */ new Set();
+      const iface = /* @__PURE__ */ new Set();
+      const sharers = [];
+      let waiters = [];
+      let onto = null;
+      transaction(() => {
+        transaction(() => {
+          const lock = db.prepare("SELECT participant, onto FROM merge_locks WHERE repo = ?").get(me.repo);
+          if (lock && Number(lock.participant) !== me.id && isLive(Number(lock.participant))) {
+            throw new Error(`the merge lock is held by ${participantById(Number(lock.participant)).name}, not ${me.name}`);
+          }
+          if (lock && Number(lock.participant) === me.id && lock.onto != null) onto = String(lock.onto);
+          db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
+          db.prepare("UPDATE participants SET merged = 1 WHERE id = ?").run(me.id);
+          const turn = openTurn(me);
+          if (turn) db.prepare("UPDATE lock_requests SET merged_at = ? WHERE rowid = ?").run(now(), Number(turn.id));
+          waiters = takeLockWaiters(me.repo).filter((n) => n !== me.name);
+        });
+        for (const rel of rels) {
+          for (const c of holdersOf(me.repo, rel)) {
+            if (c.kind === "interface") iface.add(rel);
+            if (c.participant !== me.id) told.add(participantById(c.participant).name);
+          }
+        }
+        const everyone = db.prepare("SELECT p.id, p.slice, r.plan FROM participants p JOIN runs r ON r.id = p.run WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL").all(me.repo);
+        for (const o of everyone) {
+          for (const f of declared(Number(o.id))) {
+            const rel = relPath(me.repo, f.path);
+            if (!rel || !wanted.has(rel)) continue;
+            if (f.interface) iface.add(rel);
+            if (Number(o.id) !== me.id) told.add(`${o.plan}/${o.slice}`);
+          }
+        }
+        const openPlans = db.prepare("SELECT DISTINCT plan, kind FROM runs WHERE repo = ? AND state = 'open'").all(me.repo).filter((r) => profileOf(String(r.kind)).claims).map((r) => String(r.plan));
+        const all = iface.size ? openPlans.map((plan) => `${plan}/*`) : [];
+        const lines = [`merged ${sha}${onto ? ` into ${onto}` : ""}: rebase your branch onto it.`];
+        if (told.size) lines.push(`${[...told].map((n) => `@${n}`).join(" ")}: you hold or declared a file it changed.`);
+        if (iface.size) lines.push(`@swarm interface changed: ${[...iface].join(", ")}.`);
+        if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);
+        lines.push(`files: ${rels.join(", ") || "-"}`);
+        for (const rel of rels) {
+          if (conflicted && !conflicted.has(fold(rel))) continue;
+          const ids = new Set(holdersOf(me.repo, rel).map((c) => c.participant));
+          const held = db.prepare("SELECT l.participant FROM claim_log l JOIN participants p ON p.id = l.participant WHERE l.repo = ? AND l.path = ? AND p.run = ? ORDER BY l.rowid").all(me.repo, rel, me.run);
+          for (const r of held) ids.add(Number(r.participant));
+          ids.delete(me.id);
+          for (const id of ids) sharers.push({ path: rel, runner: participantById(id).name });
+        }
+        const meta = { rebase: [...told], tell: [...new Set(sharers.map((o) => o.runner))] };
+        insertMessage(me, lines.join("\n"), null, "event", [.../* @__PURE__ */ new Set([...told, ...waiters, ...all])], { event: EVENTS.merged.name, meta });
+        db.prepare("INSERT INTO merges (participant, run, sha, at, files, conflicts) VALUES (?, ?, ?, ?, ?, ?)").run(
+          me.id,
+          me.run,
+          sha,
+          now(),
+          JSON.stringify(rels),
+          conflicts && "files" in conflicts ? JSON.stringify(conflicts.files.map(slashes)) : null
+        );
+      });
+      return sharers;
+    }
+  };
+}
+var init_claims = __esm({
+  "src/board/claims.ts"() {
     "use strict";
-    DATA_ROOT = process.env.CHARRETTE_HOME ? path.resolve(process.env.CHARRETTE_HOME) : path.join(os.homedir(), "charrette_appdata");
-    SQLITE_PATH = path.join(DATA_ROOT, "swarm.sqlite");
+    init_events();
+    init_kinds();
   }
 });
 
-// src/wire.ts
-import crypto from "node:crypto";
-import fs from "node:fs";
-import path2 from "node:path";
-function encode(f) {
-  return JSON.stringify(f);
+// src/board/stats.ts
+function distinctFlags(messages) {
+  const seen = /* @__PURE__ */ new Set();
+  return messages.filter((m) => {
+    if (!isBoardFlag(m)) return false;
+    const [, path9 = m.about ?? "", holder = ""] = String(m.body).match(FLAG_BODY) ?? [];
+    const key = JSON.stringify([Number(m.author), foldPath(String(path9)), holder]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
-function decode(text) {
-  const f = JSON.parse(text);
-  const type = f && typeof f === "object" ? f.type : void 0;
-  if (typeof type !== "string" || !FRAME_TYPES.has(type)) throw new Error(`unknown frame type: ${String(type)}`);
-  return f;
+function periodStart(since) {
+  if (since === void 0) return null;
+  const days = since.match(/^(\d+)d$/);
+  const at = days ? Date.now() - Number(days[1]) * DAY_MS : Date.parse(since);
+  if (Number.isNaN(at)) throw new Error(`since takes <n>d or an ISO time, got ${since}`);
+  return new Date(at).toISOString();
 }
-function bundleVersion(entry2 = process.argv[1] ?? "") {
-  const file = path2.resolve(entry2);
-  let v = versionsByEntry.get(file);
-  if (v === void 0) {
-    v = crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex").slice(0, 16);
-    versionsByEntry.set(file, v);
+function percentile(values, p) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)];
+}
+function sumKnown(values) {
+  const known = values.filter((v) => typeof v === "number");
+  return known.length ? known.reduce((a, b) => a + b, 0) : null;
+}
+function timeline(joined, over, calls, turns, silentAfterMs) {
+  if (!(over > joined)) return [];
+  const exact = [];
+  for (const t of turns) {
+    if (t.refused > 0) exact.push({ from: t.asked, to: t.granted ?? t.over, what: "waiting" });
+    if (t.granted !== null) exact.push({ from: t.granted, to: t.merged ?? t.over, what: "merging" });
   }
-  return v;
+  const points = [joined, ...calls.filter((c) => c > joined && c < over), over].sort((a, b) => a - b);
+  const silent = [];
+  for (let i = 1; i < points.length; i++) if (points[i] - points[i - 1] > silentAfterMs) silent.push({ from: points[i - 1], to: points[i], what: "silent" });
+  const clip = (t) => Math.min(over, Math.max(joined, t));
+  const bounds = [.../* @__PURE__ */ new Set([joined, over, ...[...exact, ...silent].flatMap((s) => [clip(s.from), clip(s.to)])])].sort((a, b) => a - b);
+  const inside = (spans, what, at) => spans.some((s) => s.what === what && s.from <= at && at < s.to);
+  const out = [];
+  for (let i = 1; i < bounds.length; i++) {
+    const from = bounds[i - 1];
+    const to = bounds[i];
+    const mid = (from + to) / 2;
+    const what = inside(exact, "merging", mid) ? "merging" : inside(exact, "waiting", mid) ? "waiting" : inside(silent, "silent", mid) ? "silent" : "working";
+    const last = out[out.length - 1];
+    if (last && last.what === what && ms(last.to) === from) last.to = iso(to);
+    else out.push({ from: iso(from), to: iso(to), what, inferred: what === "working" || what === "silent" });
+  }
+  return out;
 }
-function serverStateFile(dataRoot) {
-  return path2.join(dataRoot, "swarm-server.json");
+function estimatedTimeline(joined, over, mergedAt) {
+  if (!(over > joined)) return [];
+  const merges = mergedAt.filter((t) => t > joined && t <= over).sort((a, b) => a - b);
+  const working = { from: iso(joined), to: iso(merges[0] ?? over), what: "working", inferred: true };
+  return [working, ...merges.map((t) => ({ from: iso(t), to: iso(t), what: "merging", inferred: true }))];
 }
-var RPC_METHODS, FRAME_TYPES, versionsByEntry;
-var init_wire = __esm({
-  "src/wire.ts"() {
+function mergesFromEvents(messages) {
+  return messages.filter((m) => m.kind === "event" && (m.event === "merged" || m.event == null && MERGED_BODY.test(String(m.body)))).map((m) => {
+    const line = String(m.body).match(FILES_LINE)?.[1].trim();
+    const files = line === void 0 ? null : line === "-" ? [] : line.split(", ").map((f) => f.trim()).filter(Boolean);
+    return { participant: Number(m.author), at: ms(m.at), files, conflicts: null };
+  });
+}
+function computeRun(db, r, now, silentAfterMs) {
+  const id = Number(r.id);
+  const repo = String(r.repo);
+  const kind = profileOf(String(r.kind ?? "plan")).kind;
+  const openedAt = String(r.opened_at);
+  const closedAt = r.closed_at == null ? null : String(r.closed_at);
+  const runOver = closedAt ? ms(closedAt) : now;
+  const since = db.prepare("SELECT value FROM settings WHERE name = ?").get(RECORDS_SINCE);
+  const recorded = since !== void 0 && ms(openedAt) >= ms(since.value);
+  const sharesSince = db.prepare("SELECT value FROM settings WHERE name = ?").get(SHARES_SINCE);
+  const sharesRecorded = sharesSince !== void 0 && ms(openedAt) >= ms(sharesSince.value);
+  const people = db.prepare("SELECT * FROM participants WHERE run = ? ORDER BY id").all(id);
+  const ids = people.map((p) => Number(p.id));
+  const marks = ids.map(() => "?").join(", ") || "NULL";
+  const nameOf = (p) => `${r.plan}/${p.slice}`;
+  const messages = db.prepare(`SELECT * FROM messages WHERE run = ? OR (run IS NULL AND author IN (${marks})) ORDER BY seq`).all(id, ...ids);
+  const merges = recorded ? db.prepare("SELECT * FROM merges WHERE run = ? ORDER BY rowid").all(id) : [];
+  const claimLog = db.prepare(`SELECT path, participant, kind FROM claim_log WHERE participant IN (${marks}) ORDER BY rowid`).all(...ids);
+  const shares = db.prepare(`SELECT path, participant, other FROM shares WHERE participant IN (${marks}) AND other IN (${marks})`).all(...ids, ...ids);
+  const orchestrators = new Set(people.filter((p) => String(p.slice) === ORCHESTRATOR).map((p) => Number(p.id)));
+  const conflictedOf = (m) => m.conflicts == null ? null : JSON.parse(String(m.conflicts));
+  const mergesRead = recorded ? merges.map((m) => ({ participant: Number(m.participant), at: ms(m.at), files: JSON.parse(String(m.files)), conflicts: conflictedOf(m) })) : mergesFromEvents(messages);
+  const mergeTimesOf = (pid) => mergesRead.filter((m) => m.participant === pid).map((m) => m.at);
+  const grants = recorded ? db.prepare(
+    `SELECT t.participant, t.asked_at, t.granted_at, p.slice, r.plan FROM lock_requests t
+             LEFT JOIN participants p ON p.id = t.participant LEFT JOIN runs r ON r.id = p.run
+           WHERE t.repo = ? AND t.granted_at IS NOT NULL ORDER BY t.granted_at`
+  ).all(repo) : [];
+  const lockWaitsMs = [];
+  const boardFlags = distinctFlags(messages);
+  const racesLost = [];
+  const members = people.map((p) => {
+    const pid = Number(p.id);
+    const joined = ms(p.joined_at);
+    const over = Math.min(p.ended_at == null ? runOver : ms(p.ended_at), Math.max(now, joined));
+    const calls = recorded ? db.prepare("SELECT at, verb FROM call_log WHERE participant = ? ORDER BY at").all(pid) : [];
+    const endCalls = calls.filter((c) => c.verb === "end").map((c) => ms(c.at));
+    const turns = recorded ? db.prepare("SELECT * FROM lock_requests WHERE participant = ? ORDER BY rowid").all(pid).map((t) => {
+      const asked = ms(t.asked_at);
+      const merged = t.merged_at == null ? null : ms(t.merged_at);
+      return {
+        asked,
+        granted: t.granted_at == null ? null : ms(t.granted_at),
+        merged,
+        refused: Number(t.refused),
+        // a turn without a merge is closed by the member's next end call (D25), else by its end
+        over: merged ?? endCalls.find((e) => e >= asked) ?? over
+      };
+    }) : [];
+    const memberMarks = [];
+    let lost = 0;
+    let waitedMs = null;
+    for (const t of turns) {
+      if (t.granted !== null) lockWaitsMs.push(t.granted - t.asked);
+      if (t.refused === 0) continue;
+      const until = t.granted ?? t.over;
+      for (const g of grants) {
+        const at = ms(g.granted_at);
+        if (Number(g.participant) === pid || !(ms(g.asked_at) > t.asked) || !(at > t.asked && at < until)) continue;
+        lost++;
+        waitedMs = Math.max(waitedMs ?? 0, at - t.asked);
+        const winner = g.slice == null ? "a member" : `${g.plan}/${g.slice}`;
+        memberMarks.push({ at: iso(at), what: "race", note: `the merge lock went to ${winner}, who asked later` });
+      }
+    }
+    if (lost) racesLost.push({ member: nameOf(p), lost, waitedMs });
+    const own = messages.filter((m) => Number(m.author) === pid);
+    const posts = own.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
+    const flagged = boardFlags.filter((m) => Number(m.author) === pid);
+    for (const m of [...own.filter((x) => x.kind === "agreement"), ...flagged]) {
+      memberMarks.push({
+        at: String(m.at),
+        what: m.kind === "agreement" ? "agreement" : "flag",
+        seq: Number(m.seq),
+        ...m.about != null ? { path: String(m.about) } : {},
+        note: firstLine(String(m.body))
+      });
+    }
+    for (const m of mergesRead.filter((x) => x.participant === pid)) {
+      for (const f of m.conflicts ?? []) memberMarks.push({ at: iso(m.at), what: "conflict", path: f, note: `the rebase met a conflict in ${f}` });
+    }
+    memberMarks.sort((a, b) => ms(a.at) - ms(b.at));
+    return {
+      member: nameOf(p),
+      nick: p.nick == null ? String(p.slice) : String(p.nick),
+      slice: String(p.slice),
+      joined: String(p.joined_at),
+      ended: p.ended_at == null ? null : String(p.ended_at),
+      intervals: recorded ? timeline(joined, over, calls.map((c) => ms(c.at)), turns, silentAfterMs) : estimatedTimeline(joined, over, mergeTimesOf(pid)),
+      marks: memberMarks,
+      posts: posts.length,
+      postTimes: posts.map((m) => String(m.at)),
+      claims: claimLog.filter((c) => Number(c.participant) === pid).length,
+      flags: flagged.length,
+      unsourced: posts.filter((m) => !SOURCE.test(String(m.body))).length,
+      // read from its spans and marks once they are whole, below (D40)
+      waitingMs: null,
+      agreementsMade: null,
+      endorsed: null,
+      objections: null,
+      estimated: !recorded
+    };
+  });
+  const firstMerge = mergesRead.length ? Math.min(...mergesRead.map((m) => m.at)) : null;
+  const length = runOver - ms(openedAt);
+  const base = {
+    run: id,
+    kind,
+    code: planCode(String(r.plan)),
+    title: String(r.title),
+    openedAt,
+    closedAt,
+    lengthMs: Number.isNaN(length) ? null : length,
+    recorded,
+    firstMergeAtMs: firstMerge === null ? null : firstMerge - ms(openedAt),
+    racesLost: recorded ? racesLost.reduce((n, x) => n + (x.lost ?? 0), 0) : null,
+    members
+  };
+  if (kind === "brainstorm") {
+    const { brainstorm, marksOf, unsourcedOf } = debateOf(db, id, people.filter((p) => !orchestrators.has(Number(p.id))), messages);
+    members.forEach((m, i) => {
+      const pid = Number(people[i].id);
+      m.marks = [...m.marks, ...marksOf.get(pid) ?? []].sort((a, b) => ms(a.at) - ms(b.at));
+      m.unsourced = unsourcedOf.get(pid) ?? 0;
+    });
+    return { ...base, brainstorm };
+  }
+  if (kind !== "plan") return base;
+  const sliceMembers = people.filter((p) => !orchestrators.has(Number(p.id)));
+  const timesMs = sliceMembers.flatMap((p) => {
+    const mergedAt = mergeTimesOf(Number(p.id));
+    const end = mergedAt.length ? Math.min(...mergedAt) : p.ended_at == null ? null : ms(p.ended_at);
+    return end === null ? [] : [end - ms(p.joined_at)];
+  });
+  const sliceCount = Number(db.prepare("SELECT COUNT(*) AS n FROM slices WHERE run = ?").get(id).n);
+  const addedMidRun = messages.filter((m) => m.kind === "event" && orchestrators.has(Number(m.author)) && /^added \S+: /.test(String(m.body))).length;
+  const holdersByPath = /* @__PURE__ */ new Map();
+  for (const c of claimLog) {
+    const key = foldPath(String(c.path));
+    const entry2 = holdersByPath.get(key) ?? { path: String(c.path), holders: [] };
+    if (!entry2.holders.includes(Number(c.participant))) entry2.holders.push(Number(c.participant));
+    holdersByPath.set(key, entry2);
+  }
+  const sharersOf = (path9) => new Set(shares.filter((sh) => foldPath(String(sh.path)) === foldPath(path9)).flatMap((sh) => [Number(sh.participant), Number(sh.other)]));
+  const byId = new Map(people.map((p) => [Number(p.id), p]));
+  const membershipOf = (pid) => {
+    const p = byId.get(pid);
+    return { from: ms(p.joined_at), to: p.ended_at == null ? runOver : ms(p.ended_at) };
+  };
+  const membersTogether = (a, b) => {
+    const x = membershipOf(a);
+    const y = membershipOf(b);
+    return x.from < y.to && y.from < x.to;
+  };
+  const claimersTogether = (claimers) => claimers.filter((h) => claimers.some((o) => o !== h && membersTogether(h, o)));
+  const namesPath = (m, path9) => {
+    if (aboutNames(m.about, path9)) return true;
+    const body = foldPath(String(m.body));
+    return body.includes(foldPath(path9)) || body.includes(foldPath(path9.split("/").pop()));
+  };
+  const said = messages.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
+  const interfaceClaims = claimLog.filter((c) => c.kind === "interface");
+  const perFile = [];
+  let everyHolderTold = 0;
+  let agreed = 0;
+  let agreedBeforeMerge = 0;
+  for (const { path: path9, holders: everyHolder } of holdersByPath.values()) {
+    const sharers = sharersOf(path9);
+    const holders = sharesRecorded ? everyHolder.filter((h) => sharers.has(h)) : claimersTogether(everyHolder);
+    if (holders.length < 2) continue;
+    const tellTimes = [];
+    let told = true;
+    for (let i = 1; i < holders.length; i++) {
+      const tells = said.filter((m) => Number(m.author) === holders[i] && namesPath(m, path9));
+      tellTimes.push(...tells.map((m) => ms(m.at)));
+      const mentioned = (e) => tells.some((m) => {
+        const named = JSON.parse(String(m.mentions));
+        return named.includes(nameOf(byId.get(e))) || named.includes(`${r.plan}/*`);
+      });
+      if (!holders.slice(0, i).every(mentioned)) told = false;
+    }
+    const sharedAt = tellTimes.length ? Math.min(...tellTimes) : null;
+    const agreement = messages.find((m) => m.kind === "agreement" && aboutNames(m.about, path9));
+    const mergedWith = mergesRead.filter((m) => m.files ? m.files.some((f) => foldPath(f) === foldPath(path9)) : holders.includes(m.participant));
+    const firstMergeOfPath = mergedWith.length ? Math.min(...mergedWith.map((m) => m.at)) : null;
+    if (told) {
+      everyHolderTold++;
+      if (agreement) {
+        agreed++;
+        if (firstMergeOfPath === null || ms(agreement.at) < firstMergeOfPath) agreedBeforeMerge++;
+      }
+    }
+    const met = mergedWith.map((m) => m.conflicts);
+    const conflict = !recorded ? null : met.some((c) => c?.some((f) => foldPath(f) === foldPath(path9))) ? true : met.some((c) => c === null) ? null : false;
+    const declaredInterface = holders.some(
+      (h) => JSON.parse(String(byId.get(h).files ?? "[]")).some((d) => d.interface === true && aboutNames(d.path, path9))
+    );
+    const claimedInterface = interfaceClaims.some((c) => holders.includes(Number(c.participant)) && foldPath(String(c.path)) === foldPath(path9));
+    perFile.push({
+      path: path9,
+      holders: holders.map((h) => nameOf(byId.get(h))),
+      interface: declaredInterface || claimedInterface,
+      told,
+      agreement: agreement ? Number(agreement.seq) : null,
+      // below 0: agreed before the tell (D46)
+      agreedAfterMs: agreement && sharedAt !== null ? ms(agreement.at) - sharedAt : null,
+      conflict
+    });
+  }
+  let known = 0;
+  let inShared = 0;
+  let unknownMerges = 0;
+  for (const m of merges) {
+    const files = conflictedOf(m);
+    if (files === null) {
+      unknownMerges++;
+      continue;
+    }
+    known += files.length;
+    inShared += files.filter((f) => claimLog.some((c) => Number(c.participant) !== Number(m.participant) && foldPath(String(c.path)) === foldPath(f))).length;
+  }
+  const mergedSlices = recorded ? new Set(merges.map((m) => Number(m.participant)).filter((pid) => !orchestrators.has(pid))).size : sliceMembers.filter((p) => Number(p.merged ?? 0) === 1).length;
+  return {
+    ...base,
+    plan: {
+      slices: { merged: mergedSlices, of: sliceCount, addedMidRun, timesMs, timesEstimated: !recorded },
+      lock: { waitsMs: lockWaitsMs, racesLost },
+      shared: { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge, perFile, estimated: !sharesRecorded },
+      flags: boardFlags.length,
+      conflicts: recorded ? { known, inShared, unknownMerges } : { known: null, inShared: null, unknownMerges: null }
+    }
+  };
+}
+function skepticOf(db, run2, seats) {
+  const seated = (slice) => new Set(seats.filter((p) => String(p.slice) === slice).map((p) => Number(p.id)));
+  const named = seated(SKEPTIC);
+  if (named.size) return named;
+  const rows = db.prepare("SELECT id, on_events FROM slices WHERE run = ? AND on_events IS NOT NULL ORDER BY ord").all(run2);
+  const subscribesToAgreement = (row) => JSON.parse(String(row.on_events)).flatMap((e) => e.split(",")).some((e) => e.trim().replace(/^(any|main):/, "") === "agreement");
+  const subscribed = rows.find(subscribesToAgreement);
+  return subscribed ? seated(String(subscribed.id)) : /* @__PURE__ */ new Set();
+}
+function debateOf(db, run2, seats, messages) {
+  const skeptic = skepticOf(db, run2, seats);
+  const seatIds = new Set(seats.map((p) => Number(p.id)));
+  const questionOf = (m) => {
+    const about = m.about == null ? "" : String(m.about).trim();
+    return QUESTION.test(about) ? about : null;
+  };
+  const spoken = (m) => Number(m.by_board ?? 0) === 0 && (m.kind === "msg" || m.kind === "urgent" || m.kind === "agreement");
+  const bySeq = new Map(messages.map((m) => [Number(m.seq), m]));
+  const endorsements = [];
+  const skepticEndorsedAt = /* @__PURE__ */ new Map();
+  for (const m of messages) {
+    if (m.kind !== "endorsement" || m.endorses == null) continue;
+    const agreement = bySeq.get(Number(m.endorses));
+    const question = agreement && agreement.kind === "agreement" ? questionOf(agreement) : null;
+    if (question === null) continue;
+    endorsements.push({ endorsement: m, question });
+    if (skeptic.has(Number(m.author)) && !skepticEndorsedAt.has(Number(m.endorses))) skepticEndorsedAt.set(Number(m.endorses), Number(m.seq));
+  }
+  const endorsedSeqs = new Set(skepticEndorsedAt.keys());
+  const skepticEndorsements = endorsements.filter(({ endorsement }) => skeptic.has(Number(endorsement.author)));
+  const endorsedBefore = (agreementSeq, seq) => (skepticEndorsedAt.get(agreementSeq) ?? Infinity) < seq;
+  const outcomeOf = /* @__PURE__ */ new Map();
+  for (const m of messages) {
+    const q = questionOf(m);
+    if (q !== null && m.kind === "agreement" && endorsedSeqs.has(Number(m.seq)) && !outcomeOf.has(q)) outcomeOf.set(q, m);
+  }
+  const questions = /* @__PURE__ */ new Map();
+  const marksOf = /* @__PURE__ */ new Map();
+  const unsourcedOf = /* @__PURE__ */ new Map();
+  const mark = (pid, x) => void marksOf.set(pid, [...marksOf.get(pid) ?? [], x]);
+  const lastAgreementOn = /* @__PURE__ */ new Map();
+  let agreements = 0;
+  let sourced = 0;
+  let claims = 0;
+  for (const m of messages) {
+    const q = questionOf(m);
+    if (q === null || !spoken(m)) continue;
+    const author = Number(m.author);
+    const question = questions.get(q) ?? { id: q, firstPost: String(m.at), outcome: null, exchanges: 0 };
+    questions.set(q, question);
+    const outcome = outcomeOf.get(q);
+    const beforeOutcome = !outcome || Number(m.seq) < Number(outcome.seq);
+    if (beforeOutcome && seatIds.has(author)) question.exchanges = (question.exchanges ?? 0) + 1;
+    if (m.kind === "agreement") {
+      agreements++;
+      lastAgreementOn.set(q, m);
+      continue;
+    }
+    if (beforeOutcome) {
+      claims++;
+      if (SOURCE.test(String(m.body))) sourced++;
+      else unsourcedOf.set(author, (unsourcedOf.get(author) ?? 0) + 1);
+    }
+    const last = lastAgreementOn.get(q);
+    if (skeptic.has(author) && last && Number(last.author) !== author && !endorsedBefore(Number(last.seq), Number(m.seq))) {
+      mark(author, { at: String(m.at), what: "objected", seq: Number(m.seq), path: q, note: `objects to #${last.seq}: ${firstLine(String(m.body))}` });
+    }
+  }
+  for (const { endorsement, question } of endorsements) {
+    mark(Number(endorsement.author), { at: String(endorsement.at), what: "endorsed", seq: Number(endorsement.seq), path: question, note: `endorses #${endorsement.endorses}` });
+  }
+  for (const [q, outcome] of outcomeOf) {
+    const question = questions.get(q);
+    if (question) question.outcome = { at: String(outcome.at), seq: Number(outcome.seq), kind: "agreed" };
+  }
+  return {
+    brainstorm: {
+      questions: [...questions.values()].sort((a, b) => ms(a.firstPost) - ms(b.firstPost)),
+      agreements,
+      endorsed: skepticEndorsements.length,
+      claimsWithSource: { n: sourced, of: claims, inferred: true }
+    },
+    marksOf,
+    unsourcedOf
+  };
+}
+function withMemberFigures(run2) {
+  const debated = run2.brainstorm !== void 0;
+  const marked = (m, what) => m.marks.filter((x) => x.what === what).length;
+  const lengthOf = (i) => ms(i.to) - ms(i.from);
+  const members = run2.members.map((m) => ({
+    ...m,
+    waitingMs: m.waitingMs ?? (run2.recorded ? m.intervals.filter((i) => i.what === "waiting").reduce((n, i) => n + lengthOf(i), 0) : null),
+    agreementsMade: m.agreementsMade ?? marked(m, "agreement"),
+    endorsed: m.endorsed ?? (debated ? marked(m, "endorsed") : null),
+    objections: m.objections ?? (debated ? marked(m, "objected") : null),
+    // a summary from before the events were read (D45) reads its member as not estimated
+    estimated: m.estimated ?? false
+  }));
+  const plan = run2.plan && {
+    ...run2.plan,
+    slices: slicesOfSummary(run2.plan.slices),
+    shared: {
+      ...run2.plan.shared,
+      estimated: run2.plan.shared.estimated ?? false,
+      // a summary from before `told` (D46) reads each file told, as its list read it
+      perFile: run2.plan.shared.perFile.map((f) => ({ ...f, told: f.told ?? true }))
+    }
+  };
+  return { ...run2, members, ...plan ? { plan } : {} };
+}
+function slicesOfSummary(slices) {
+  const { estimated, ...rest } = slices;
+  return { ...rest, timesEstimated: slices.timesEstimated ?? estimated ?? false };
+}
+function summarize(db, run2, silentAfterMs) {
+  const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run2);
+  if (!r) throw new Error(`no run ${run2}`);
+  return withMemberFigures(computeRun(db, r, Date.now(), silentAfterMs));
+}
+function totalsOf(runs) {
+  const plans = runs.flatMap((r) => r.plan ? [r.plan] : []);
+  const recorded = runs.filter((r) => r.recorded);
+  const recordedPlans = recorded.flatMap((r) => r.plan ? [r.plan] : []);
+  const silentOf = (r) => r.members.filter((m) => m.intervals.some((i) => i.what === "silent")).length;
+  const times = plans.flatMap((p) => p.slices.timesMs);
+  const waits = recordedPlans.flatMap((p) => p.lock.waitsMs);
+  const bins = [...WAIT_BINS_MS, Infinity].map((upper, i) => waits.filter((w) => w >= (WAIT_BINS_MS[i - 1] ?? 0) && w < upper).length);
+  const shared = (pick) => sumKnown(plans.map((p) => pick(p.shared)));
+  const files = shared((s) => s.files);
+  const agreed = shared((s) => s.agreed);
+  const series = (figure) => runs.map((r) => r.recorded ? figure(r) : null);
+  const everyRun = (figure) => runs.map(figure);
+  return {
+    runs: runs.length,
+    byKind: { plan: runs.filter((r) => r.kind === "plan").length, brainstorm: runs.filter((r) => r.kind === "brainstorm").length },
+    notRecorded: runs.length - recorded.length,
+    members: runs.length ? runs.reduce((n, r) => n + r.members.length, 0) : null,
+    silentMembers: sumKnown(recorded.map(silentOf)),
+    slices: {
+      merged: sumKnown(plans.map((p) => p.slices.merged)),
+      of: sumKnown(plans.map((p) => p.slices.of)),
+      p50Ms: percentile(times, 0.5),
+      p90Ms: percentile(times, 0.9),
+      timesEstimatedRuns: plans.filter((p) => p.slices.timesEstimated).length
+    },
+    // merges: the lock turns granted, each one merge's wait
+    lockWait: { merges: recordedPlans.length ? waits.length : null, p50Ms: percentile(waits, 0.5), p90Ms: percentile(waits, 0.9), bins: recordedPlans.length ? bins : [] },
+    shared: {
+      files,
+      everyHolderTold: shared((s) => s.everyHolderTold),
+      agreed,
+      agreedBeforeMerge: shared((s) => s.agreedBeforeMerge),
+      withoutAgreement: files === null || agreed === null ? null : files - agreed,
+      estimatedRuns: plans.filter((p) => p.shared.estimated).length
+    },
+    flags: sumKnown(plans.map((p) => p.flags)),
+    runsWithoutFlag: plans.length ? plans.filter((p) => p.flags === 0).length : null,
+    conflicts: {
+      known: sumKnown(plans.map((p) => p.conflicts.known)),
+      inShared: sumKnown(plans.map((p) => p.conflicts.inShared)),
+      unknownMerges: sumKnown(plans.map((p) => p.conflicts.unknownMerges))
+    },
+    brainstorm: brainstormTotalsOf(runs),
+    series: {
+      slicesMerged: everyRun((r) => r.plan?.slices.merged ?? null),
+      sliceTimeP50: everyRun((r) => r.plan ? percentile(r.plan.slices.timesMs, 0.5) : null),
+      lockWaitP50: series((r) => r.plan ? percentile(r.plan.lock.waitsMs, 0.5) : null),
+      sharedAgreed: everyRun((r) => r.plan?.shared.agreed ?? null),
+      // flags come from the board's messages, kept for a run before the records too (D43)
+      flags: everyRun((r) => r.plan?.flags ?? null),
+      conflicts: series((r) => r.plan?.conflicts.known ?? null),
+      silentMembers: series(silentOf)
+    }
+  };
+}
+function brainstormTotalsOf(runs) {
+  const debated = runs.flatMap((r) => r.brainstorm ? [{ run: r, debate: r.brainstorm }] : []);
+  const questions = debated.flatMap((d) => d.debate.questions);
+  const settled = questions.filter((q) => q.outcome !== null);
+  const objectedOf = (r, q) => q.outcome !== null && r.members.some((m) => m.marks.some((x) => x.what === "objected" && x.path === q.id && x.seq !== void 0 && x.seq < q.outcome.seq));
+  const n = sumKnown(debated.map((d) => d.debate.claimsWithSource.n));
+  const of = sumKnown(debated.map((d) => d.debate.claimsWithSource.of));
+  const silentSeatsOf = (r) => r.members.filter((m) => m.slice !== ORCHESTRATOR && m.intervals.some((i) => i.what === "silent")).length;
+  const brainstorms = runs.filter((r) => r.kind === "brainstorm");
+  return {
+    notRecorded: brainstorms.length ? brainstorms.filter((r) => !r.recorded).length : null,
+    questionsSettled: debated.length ? settled.length : null,
+    questions: debated.length ? questions.length : null,
+    exchangesMedian: percentile(settled.flatMap((q) => q.exchanges === null ? [] : [q.exchanges]), 0.5),
+    objectedThenAgreed: debated.length ? debated.reduce((k, d) => k + d.debate.questions.filter((q) => objectedOf(d.run, q)).length, 0) : null,
+    sourcedShare: n === null || !of ? null : n / of,
+    claimsWithSource: { n, of },
+    silentSeats: sumKnown(debated.filter((d) => d.run.recorded).map((d) => silentSeatsOf(d.run)))
+  };
+}
+function filesAcross(runs) {
+  const byPath = /* @__PURE__ */ new Map();
+  for (const r of runs) {
+    for (const f of r.plan?.shared.perFile ?? []) {
+      const key = foldPath(f.path);
+      const entry2 = byPath.get(key) ?? { path: f.path, perRun: [] };
+      entry2.perRun.push({ run: r.run, holders: f.holders, agreed: f.agreement !== null, conflict: f.conflict, interface: f.interface ?? null });
+      byPath.set(key, entry2);
+    }
+  }
+  return [...byPath.values()].map(({ path: path9, perRun }) => ({
+    path: path9,
+    runs: perRun.map((x) => x.run),
+    holders: new Set(perRun.flatMap((x) => x.holders)).size,
+    agreements: perRun.filter((x) => x.agreed).length,
+    conflicts: perRun.every((x) => x.conflict === null) ? null : perRun.filter((x) => x.conflict === true).length,
+    // the runs in which a holder declared or claimed it an interface; null when none knows (summaries from before D37)
+    declaredInterface: perRun.every((x) => x.interface === null) ? null : perRun.filter((x) => x.interface === true).length,
+    perRun: perRun.map((x) => ({ run: x.run, holders: x.holders.length, conflict: x.conflict }))
+  })).sort((a, b) => b.runs.length - a.runs.length || a.path.localeCompare(b.path));
+}
+function statsOf(db, scope, silentAfterMs) {
+  for (const k of scope.kinds ?? []) profileOf(k);
+  const start = periodStart(scope.since);
+  const where = ["repo = ?", KEPT];
+  const params = [scope.repo];
+  if (scope.run !== void 0) {
+    where.push("id = ?");
+    params.push(scope.run);
+  }
+  if (scope.kinds?.length) {
+    where.push(`kind IN (${scope.kinds.map(() => "?").join(", ")})`);
+    params.push(...scope.kinds);
+  }
+  if (scope.closedOnly) where.push("state = 'closed'");
+  if (start) {
+    where.push("(state = 'open' OR closed_at >= ?)");
+    params.push(start);
+  }
+  db.exec("BEGIN");
+  try {
+    if (scope.run !== void 0 && !db.prepare(`SELECT 1 FROM runs WHERE id = ? AND repo = ? AND ${KEPT}`).get(scope.run, scope.repo)) {
+      throw new Error(`no run ${scope.run}`);
+    }
+    const rows = db.prepare(`SELECT * FROM runs WHERE ${where.join(" AND ")} ORDER BY opened_at, id`).all(...params);
+    const stored = db.prepare("SELECT body FROM run_stats WHERE run = ?");
+    const now = Date.now();
+    const runs = rows.map((r) => {
+      const row = stored.get(Number(r.id));
+      return withMemberFigures(row ? JSON.parse(String(row.body)) : computeRun(db, r, now, silentAfterMs));
+    });
+    return { scope, runs, totals: totalsOf(runs), files: filesAcross(runs), silentAfterMs };
+  } finally {
+    db.exec("COMMIT");
+  }
+}
+var DAY_MS, MINUTE_MS, CASELESS, foldPath, RECORDS_SINCE, SHARES_SINCE, ORCHESTRATOR, SKEPTIC, QUESTION, FLAG_BODY, isBoardFlag, SOURCE, WAIT_BINS_MS, ms, iso, firstLine, aboutNames, MERGED_BODY, FILES_LINE, KEPT;
+var init_stats = __esm({
+  "src/board/stats.ts"() {
     "use strict";
-    RPC_METHODS = [
-      "openRun",
-      "setSliceState",
-      "addSlice",
-      "closeRun",
-      "phase",
-      "currentPhase",
-      "pause",
-      "resume",
-      "pausedOf",
-      "done",
-      "phaseProgress",
-      "lastActivity",
-      "owedPhase",
-      "setting",
-      "runs",
-      "join",
-      "participant",
-      "identify",
-      "setDoing",
-      "subscribe",
-      "unsubscribe",
-      "end",
-      "roster",
-      "endedMembers",
-      "heldBy",
-      "post",
-      "endorse",
-      "read",
-      "thread",
-      "deliver",
-      "wait",
-      "checkEdit",
-      "reconcileWrites",
-      "release",
-      "lockMerge",
-      "merged",
-      "heldMergeLock",
-      "stats",
-      "repos",
-      "snapshot"
+    init_kinds();
+    init_mentions();
+    DAY_MS = 24 * 60 * 60 * 1e3;
+    MINUTE_MS = 60 * 1e3;
+    CASELESS = process.platform === "win32";
+    foldPath = (p) => CASELESS ? p.toLowerCase() : p;
+    RECORDS_SINCE = "records-since";
+    SHARES_SINCE = "shares-since";
+    ORCHESTRATOR = "orchestrator";
+    SKEPTIC = "skeptic";
+    QUESTION = /^D\d+$/;
+    FLAG_BODY = /flag:\s*\S+\s+wrote\s+(\S+)\s+outside its claim(?:;\s*(\S+)\s+holds it)?/;
+    isBoardFlag = (m) => Number(m.by_board ?? 0) === 1 && (m.event === "flag" || m.event == null && FLAG_BODY.test(String(m.body)));
+    SOURCE = /[\w./\\-]+\.\w+:\d+|#\d+|https?:\/\/\S+/;
+    WAIT_BINS_MS = [1, 2, 5, 10].map((m) => m * MINUTE_MS);
+    ms = (at) => Date.parse(String(at));
+    iso = (t) => new Date(t).toISOString();
+    firstLine = (body) => body.split(/\r?\n/)[0].slice(0, 120);
+    aboutNames = (about, path9) => {
+      if (about == null) return false;
+      const a = foldPath(String(about).replace(/\\/g, "/"));
+      const f = foldPath(path9);
+      return a === f || f.endsWith(`/${a}`);
+    };
+    MERGED_BODY = /^merged \S+/;
+    FILES_LINE = /^files: (.*)$/m;
+    KEPT = "(pruned_at IS NULL OR id IN (SELECT run FROM run_stats))";
+  }
+});
+
+// src/board/names.ts
+function funnyName(taken, random = Math.random) {
+  const used = new Set([...taken].map((t) => t.toLowerCase()));
+  const pick = (xs) => xs[Math.floor(random() * xs.length) % xs.length];
+  const free = ADJECTIVES.flatMap((a) => ANIMALS.map((b) => `${a} ${b}`)).filter((n) => !used.has(n.toLowerCase()));
+  if (free.length) return pick(free);
+  for (let i = 2; ; i++) {
+    const n = `${pick(ADJECTIVES)} ${pick(ANIMALS)} ${i}`;
+    if (!used.has(n.toLowerCase())) return n;
+  }
+}
+var ADJECTIVES, ANIMALS;
+var init_names = __esm({
+  "src/board/names.ts"() {
+    "use strict";
+    ADJECTIVES = [
+      "Sleepy",
+      "Grumpy",
+      "Brave",
+      "Clumsy",
+      "Dizzy",
+      "Fuzzy",
+      "Gentle",
+      "Hasty",
+      "Jolly",
+      "Lucky",
+      "Mighty",
+      "Nimble",
+      "Plucky",
+      "Quiet",
+      "Rusty",
+      "Sneaky",
+      "Tidy",
+      "Witty",
+      "Zesty",
+      "Bouncy",
+      "Cheeky",
+      "Dapper",
+      "Eager",
+      "Fancy",
+      "Giddy",
+      "Humble",
+      "Lofty",
+      "Merry",
+      "Peppy",
+      "Snappy"
     ];
-    FRAME_TYPES = /* @__PURE__ */ new Set(["hello", "call", "cancel", "activity", "bye", "subscribe", "welcome", "result", "refused", "changed"]);
-    versionsByEntry = /* @__PURE__ */ new Map();
+    ANIMALS = [
+      "Otter",
+      "Badger",
+      "Walrus",
+      "Penguin",
+      "Llama",
+      "Ferret",
+      "Puffin",
+      "Wombat",
+      "Gecko",
+      "Moose",
+      "Panda",
+      "Lemur",
+      "Narwhal",
+      "Hedgehog",
+      "Koala",
+      "Yak",
+      "Toucan",
+      "Beaver",
+      "Platypus",
+      "Raccoon",
+      "Alpaca",
+      "Bison",
+      "Capybara",
+      "Dingo",
+      "Emu",
+      "Flamingo",
+      "Gibbon",
+      "Heron",
+      "Ibis",
+      "Jackal"
+    ];
   }
 });
 
@@ -321,82 +1304,1480 @@ var init_liveness = __esm({
   }
 });
 
-// src/board/mentions.ts
-function planCode(plan) {
-  const words = plan.split(/[-_\s.]+/).filter((w) => w && !/^\d+$/.test(w));
-  if (words.length === 0) return plan.slice(0, 2).toUpperCase();
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return (words[0][0] + words[1][0]).toUpperCase();
+// src/board/board.ts
+import fs from "node:fs";
+import path2 from "node:path";
+function messageLine(m) {
+  const first = m.body.split(/\r?\n/)[0];
+  const text = first.length > LINE_WIDTH ? `${first.slice(0, LINE_WIDTH - 1)}\u2026` : first;
+  const kind = m.kind === "msg" ? "" : ` (${m.kind})`;
+  const about = m.about ? ` about ${m.about}` : "";
+  return `#${m.seq} ${m.from}${kind}${about}: ${text}`;
 }
-function parseMentions(body, senderPlan, plans, names) {
-  const out = /* @__PURE__ */ new Set();
-  for (const m of body.matchAll(MENTION)) {
-    const token = m[1].replace(/[.\-]+$/, "");
-    const named = names?.get(token.toLowerCase());
-    if (named) {
-      out.add(named);
-    } else if (token.includes("/")) {
-      const [plan, slice] = token.split("/");
-      out.add(`${plan}/${slice === "all" ? "*" : slice}`);
-    } else if (token.includes("\xB7")) {
-      const [code, slice] = token.split("\xB7");
-      for (const plan of plans) if (planCode(plan) === code.toUpperCase()) out.add(`${plan}/${slice === "all" ? "*" : slice}`);
-    } else if (token === "swarm") {
-      out.add(`${senderPlan}/*`);
-    } else if (token === "all") {
-      continue;
-    } else if (isCodeShaped(token) && plansOfCode(token, plans).length) {
-      for (const plan of plansOfCode(token, plans)) out.add(`${plan}/*`);
-    } else {
-      out.add(`${senderPlan}/${token}`);
-    }
+async function openBoard(dbPath = SQLITE_PATH) {
+  process.removeAllListeners("warning");
+  process.on("warning", (w) => {
+    if (w.name !== "ExperimentalWarning") console.warn(w);
+  });
+  const { DatabaseSync } = await import("node:sqlite");
+  fs.mkdirSync(path2.dirname(dbPath), { recursive: true });
+  const db = new DatabaseSync(dbPath, { timeout: 5e3 });
+  const recordsAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'call_log'").get() === void 0;
+  const sharesAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'shares'").get() === void 0;
+  db.exec(`
+    PRAGMA journal_mode = DELETE;
+    -- Several CLI processes write, and aiview reads, concurrently; without a busy timeout a
+    -- concurrent verb fails outright with SQLITE_BUSY.
+    PRAGMA busy_timeout = 5000;
+    CREATE TABLE IF NOT EXISTS runs (
+      id INTEGER PRIMARY KEY,
+      repo TEXT NOT NULL,
+      plan TEXT NOT NULL,
+      title TEXT NOT NULL,
+      state TEXT NOT NULL DEFAULT 'open',
+      opened_at TEXT NOT NULL,
+      closed_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS slices (
+      run INTEGER NOT NULL,
+      id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      blockers TEXT NOT NULL DEFAULT '[]',
+      state TEXT NOT NULL DEFAULT 'ready',
+      ord INTEGER NOT NULL,
+      PRIMARY KEY (run, id)
+    );
+    CREATE TABLE IF NOT EXISTS participants (
+      id INTEGER PRIMARY KEY,
+      run INTEGER NOT NULL,
+      slice TEXT NOT NULL,
+      worktree TEXT,
+      doing TEXT NOT NULL DEFAULT '',
+      files TEXT NOT NULL DEFAULT '[]',
+      since_seq INTEGER NOT NULL DEFAULT 0,
+      joined_at TEXT NOT NULL,
+      ended_at TEXT,
+      last_call TEXT,
+      UNIQUE (run, slice)
+    );
+    CREATE TABLE IF NOT EXISTS messages (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT,
+      repo TEXT NOT NULL,
+      author INTEGER NOT NULL,
+      body TEXT NOT NULL,
+      about TEXT,
+      kind TEXT NOT NULL DEFAULT 'msg',
+      mentions TEXT NOT NULL DEFAULT '[]',
+      at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS messages_repo ON messages (repo, seq);
+    CREATE TABLE IF NOT EXISTS deliveries (
+      participant INTEGER NOT NULL,
+      seq INTEGER NOT NULL,
+      PRIMARY KEY (participant, seq)
+    );
+    -- claims are global by repository-relative path, across every run on a repository (D12, D20);
+    -- a path may have several holders (D40). since_seq: the thread's last seq when it was claimed
+    CREATE TABLE IF NOT EXISTS claims (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'inside',
+      since_seq INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (repo, path, participant)
+    );
+    -- every claim made, kept past its release: who held a path during a run (D63), and whether as an
+    -- interface: widened to 'interface' when the claim is made or widened so, never narrowed (D42)
+    CREATE TABLE IF NOT EXISTS claim_log (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'inside',
+      PRIMARY KEY (repo, path, participant)
+    );
+    -- a claim granted beside a live holder of the path, kept past both claims' release: who held a path
+    -- at the same time as whom during a run, from the seq it began (D39); append-only, deleted with its run
+    CREATE TABLE IF NOT EXISTS shares (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      other INTEGER NOT NULL,
+      seq INTEGER NOT NULL,
+      PRIMARY KEY (repo, path, participant, other)
+    );
+    -- a holder of a shared path already told of another holder (D41): once per runner and path
+    CREATE TABLE IF NOT EXISTS notices (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      other INTEGER NOT NULL,
+      PRIMARY KEY (repo, path, participant, other)
+    );
+    CREATE TABLE IF NOT EXISTS merge_locks (
+      repo TEXT PRIMARY KEY,
+      participant INTEGER NOT NULL,
+      at TEXT NOT NULL
+    );
+    -- a runner refused the merge lock since its holder took it: mentioned when it is released (D65)
+    CREATE TABLE IF NOT EXISTS lock_waiters (
+      repo TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      PRIMARY KEY (repo, participant)
+    );
+    -- a path written outside its writer's claim, by reconcileWrites; lives while a claim on it does (D39)
+    CREATE TABLE IF NOT EXISTS flags (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      PRIMARY KEY (repo, path, participant)
+    );
+    -- a claim refused as held: the post that settles it claims it (D7)
+    CREATE TABLE IF NOT EXISTS claim_requests (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      PRIMARY KEY (repo, path, participant)
+    );
+    -- a flag posted, once per writer, path and holder (D8)
+    CREATE TABLE IF NOT EXISTS flag_posts (
+      repo TEXT NOT NULL,
+      path TEXT NOT NULL,
+      participant INTEGER NOT NULL,
+      holder INTEGER NOT NULL,
+      PRIMARY KEY (repo, path, participant, holder)
+    );
+    -- a version per repository, moved by every write: what onChange compares (D39)
+    CREATE TABLE IF NOT EXISTS changes (
+      repo TEXT PRIMARY KEY,
+      version INTEGER NOT NULL
+    );
+    -- one row per merge, written by merged, deleted with its run by prune (D25): files and conflicts JSON, conflicts NULL for unknown
+    CREATE TABLE IF NOT EXISTS merges (
+      participant INTEGER NOT NULL,
+      run INTEGER NOT NULL,
+      sha TEXT NOT NULL,
+      at TEXT NOT NULL,
+      files TEXT NOT NULL,
+      conflicts TEXT
+    );
+    CREATE INDEX IF NOT EXISTS merges_run ON merges (run);
+    -- one row per counted call, written by countCall in the verb's transaction (D25); deleted with its run
+    CREATE TABLE IF NOT EXISTS call_log (participant INTEGER NOT NULL, at TEXT NOT NULL, verb TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS call_log_by_participant ON call_log (participant, at);
+    -- one row per merge-lock turn: asked, granted, merged; refused counts the refusals (D25); deleted with its run
+    CREATE TABLE IF NOT EXISTS lock_requests (repo TEXT NOT NULL, participant INTEGER NOT NULL, asked_at TEXT NOT NULL,
+      granted_at TEXT, merged_at TEXT, refused INTEGER NOT NULL DEFAULT 0);
+    CREATE INDEX IF NOT EXISTS lock_requests_by_participant ON lock_requests (participant, asked_at);
+    -- a closed run's figures, RunStats JSON, written once at close or by prune first; never pruned (D20, D21)
+    CREATE TABLE IF NOT EXISTS run_stats (run INTEGER PRIMARY KEY, repo TEXT NOT NULL, kind TEXT NOT NULL,
+      closed_at TEXT NOT NULL, body TEXT NOT NULL);
+    -- board settings (D32): retention-days; the board's own last-upkeep (D16)
+    CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
+    -- the identities and hook_seen tables, left in stores from before D58, are no longer read or written
+    -- a member done with a phase, once per run, member and phase; a phase opened again clears its rows
+    CREATE TABLE IF NOT EXISTS phase_done (run INTEGER NOT NULL, participant INTEGER NOT NULL, phase TEXT NOT NULL, at TEXT NOT NULL,
+      PRIMARY KEY (run, participant, phase));
+    -- a member's transcript (member: its seat id, or orchestrator) and where its token counter stands
+    CREATE TABLE IF NOT EXISTS transcripts (run INTEGER NOT NULL, member TEXT NOT NULL, path TEXT NOT NULL, adapter TEXT,
+      offset INTEGER NOT NULL DEFAULT 0, tokens INTEGER NOT NULL DEFAULT 0, readable INTEGER NOT NULL DEFAULT 0,
+      read_at TEXT, moved_at TEXT, PRIMARY KEY (run, member));
+    -- the poller's readings, pruned past READINGS_KEPT_MS
+    CREATE TABLE IF NOT EXISTS token_readings (run INTEGER NOT NULL, member TEXT NOT NULL, t TEXT NOT NULL, tokens INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS token_readings_by_run ON token_readings (run, t);
+    -- a liveness warning posted, once per member and condition (none, unreadable); a good read clears unreadable
+    CREATE TABLE IF NOT EXISTS liveness_warned (run INTEGER NOT NULL, member TEXT NOT NULL, cond TEXT NOT NULL, PRIMARY KEY (run, member, cond));
+    -- a member's latest activity, from its link's frames (swarm-relay D9); stalled_at: the last stalled told of it (D11)
+    CREATE TABLE IF NOT EXISTS member_activity (
+      run INTEGER NOT NULL, member TEXT NOT NULL,
+      grew_at INTEGER, tokens INTEGER NOT NULL DEFAULT 0, context INTEGER,
+      open_tool TEXT, open_target TEXT, open_since INTEGER, last_tool TEXT,
+      finished INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL, stalled_at INTEGER,
+      PRIMARY KEY (run, member));
+    -- a member's link as the server last saw it: connected, else lost since lost_at (ms epoch); swarm-relay D37
+    CREATE TABLE IF NOT EXISTS member_links (
+      run INTEGER NOT NULL, member TEXT NOT NULL, connected INTEGER NOT NULL, lost_at INTEGER,
+      PRIMARY KEY (run, member));
+  `);
+  if (recordsAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(RECORDS_SINCE2, (/* @__PURE__ */ new Date()).toISOString());
+  if (sharesAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(SHARES_SINCE2, (/* @__PURE__ */ new Date()).toISOString());
+  const upkeep = (table, column, ddl) => {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+    if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  };
+  upkeep("participants", "worktree", "worktree TEXT");
+  upkeep("claim_log", "kind", "kind TEXT NOT NULL DEFAULT 'inside'");
+  upkeep("participants", "last_call", "last_call TEXT");
+  upkeep("participants", "calls", "calls INTEGER NOT NULL DEFAULT 0");
+  upkeep("participants", "waiting", "waiting INTEGER NOT NULL DEFAULT 0");
+  upkeep("participants", "listening", "listening INTEGER NOT NULL DEFAULT 0");
+  upkeep("participants", "nick", "nick TEXT");
+  upkeep("participants", "wait_gen", "wait_gen INTEGER NOT NULL DEFAULT 0");
+  upkeep("participants", "merged", "merged INTEGER NOT NULL DEFAULT 0");
+  upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
+  upkeep("runs", "link", "link TEXT");
+  upkeep("messages", "meta", "meta TEXT");
+  upkeep("merge_locks", "onto", "onto TEXT");
+  upkeep("merge_locks", "reflog_mark", "reflog_mark INTEGER");
+  upkeep("slices", "link", "link TEXT");
+  upkeep("runs", "kind", "kind TEXT NOT NULL DEFAULT 'plan'");
+  upkeep("messages", "run", "run INTEGER");
+  upkeep("messages", "endorses", "endorses INTEGER");
+  upkeep("runs", "stale_flagged", "stale_flagged INTEGER NOT NULL DEFAULT 0");
+  upkeep("participants", "progress_at", "progress_at TEXT");
+  upkeep("participants", "quiet_flagged", "quiet_flagged INTEGER NOT NULL DEFAULT 0");
+  upkeep("runs", "pruned_at", "pruned_at TEXT");
+  upkeep("messages", "event", "event TEXT");
+  upkeep("participants", "subs", "subs TEXT NOT NULL DEFAULT '[]'");
+  upkeep("slices", "on_events", "on_events TEXT");
+  upkeep("runs", "phase", "phase TEXT");
+  upkeep("runs", "phase_text", "phase_text TEXT");
+  upkeep("runs", "paused", "paused TEXT");
+  upkeep("runs", "resumed_at", "resumed_at TEXT");
+  upkeep("runs", "stall_ms", `stall_ms INTEGER NOT NULL DEFAULT ${STALL_MS_DEFAULT}`);
+  upkeep("runs", "stall_posts", "stall_posts INTEGER NOT NULL DEFAULT 0");
+  db.exec("CREATE INDEX IF NOT EXISTS messages_channel ON messages (repo, run, seq)");
+  const claimKey = db.prepare("PRAGMA table_info(claims)").all().find((c) => c.name === "participant");
+  if (claimKey && claimKey.pk === 0) {
+    db.exec(`
+      BEGIN;
+      ALTER TABLE claims RENAME TO claims_before_d40;
+      CREATE TABLE claims (
+        repo TEXT NOT NULL,
+        path TEXT NOT NULL,
+        participant INTEGER NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'inside',
+        since_seq INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (repo, path, participant)
+      );
+      INSERT INTO claims (repo, path, participant, kind) SELECT repo, path, participant, kind FROM claims_before_d40;
+      DROP TABLE claims_before_d40;
+      COMMIT;
+    `);
   }
-  return [...out];
-}
-function unmatchedMentions(body, senderPlan, plans, names) {
-  const handleOf = new Map([...names ?? /* @__PURE__ */ new Map()].map(([handle, runner]) => [runner, handle]));
-  const members = /* @__PURE__ */ new Set([...handleOf.keys(), ...[senderPlan, ...plans].map((p) => `${p}/orchestrator`)]);
-  const out = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const m of body.matchAll(MENTION)) {
-    const token = m[1].replace(/[.\-]+$/, "");
-    if (seen.has(token)) continue;
-    seen.add(token);
-    if (names?.has(token.toLowerCase())) continue;
-    if (token === "all") {
-      out.push({ name: token, closest: ["swarm"] });
-      continue;
-    }
-    const targets = parseMentions(`@${token}`, senderPlan, plans, names);
-    if (targets.length && targets.every((t) => t.endsWith("/*") || members.has(t))) continue;
-    if (isCodeShaped(token)) {
-      const codes = [...new Set(plans.map(planCode))];
-      out.push({ name: token, closest: codes.sort((a, b) => editDistance(token.toUpperCase(), a) - editDistance(token.toUpperCase(), b)).slice(0, 3) });
-      continue;
-    }
-    const wanted = token.split(/[/·]/).pop().toLowerCase();
-    const gap = (member) => Math.min(editDistance(wanted, member.slice(member.lastIndexOf("/") + 1).toLowerCase()), editDistance(wanted, handleOf.get(member) ?? member));
-    out.push({ name: token, closest: [...members].sort((a, b) => gap(a) - gap(b)).slice(0, 3) });
-  }
-  return out;
-}
-var isCodeShaped, plansOfCode, MENTION, nameHandle, editDistance;
-var init_mentions = __esm({
-  "src/board/mentions.ts"() {
-    "use strict";
-    isCodeShaped = (token) => /^[A-Za-z]{2}$/.test(token);
-    plansOfCode = (code, plans) => plans.filter((plan) => planCode(plan) === code.toUpperCase());
-    MENTION = /(?<![\w@])@([A-Za-z0-9][\w.\-]*(?:[\/·][A-Za-z0-9][\w.\-]*)?)/g;
-    nameHandle = (nick) => nick.replace(/\s+/g, "").toLowerCase();
-    editDistance = (a, b) => {
-      let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
-      for (let i = 1; i <= a.length; i++) {
-        const row = [i];
-        for (let j = 1; j <= b.length; j++) row.push(Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)));
-        prev = row;
+  const localWakers = /* @__PURE__ */ new Set();
+  const touch = () => {
+    for (const wake of [...localWakers]) queueMicrotask(wake);
+  };
+  const now = () => (/* @__PURE__ */ new Date()).toISOString();
+  let depth = 0;
+  let dirty = false;
+  const transaction = (fn) => {
+    if (depth > 0) return fn();
+    db.exec("BEGIN IMMEDIATE");
+    depth++;
+    let ok = false;
+    try {
+      const out = fn();
+      db.exec("COMMIT");
+      ok = true;
+      return out;
+    } catch (e) {
+      db.exec("ROLLBACK");
+      throw e;
+    } finally {
+      depth--;
+      if (dirty) {
+        dirty = false;
+        if (ok) touch();
       }
-      return prev[b.length];
+    }
+  };
+  const bump = (repo) => {
+    db.prepare("INSERT INTO changes (repo, version) VALUES (?, 1) ON CONFLICT (repo) DO UPDATE SET version = version + 1").run(repo);
+    if (depth > 0) dirty = true;
+    else touch();
+  };
+  const runRow = (id) => {
+    const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(id);
+    if (!r) throw new Error(`unknown run ${id}`);
+    return r;
+  };
+  const phaseOf = (r) => r.phase == null ? null : { name: String(r.phase), text: String(r.phase_text ?? "") };
+  const toRun = (r) => ({
+    phase: phaseOf(r),
+    paused: r.paused == null ? null : String(r.paused),
+    id: Number(r.id),
+    repo: String(r.repo),
+    kind: profileOf(String(r.kind ?? "plan")).kind,
+    plan: String(r.plan),
+    group: String(r.plan),
+    title: String(r.title),
+    link: r.link == null ? null : String(r.link),
+    state: r.state === "closed" ? "closed" : "open",
+    slices: db.prepare("SELECT * FROM slices WHERE run = ? ORDER BY ord").all(Number(r.id)).map((s) => ({
+      id: String(s.id),
+      title: String(s.title),
+      link: s.link == null ? null : String(s.link),
+      blockers: JSON.parse(String(s.blockers)),
+      state: String(s.state)
+    }))
+  });
+  const nickOf = (r) => r.nick == null ? String(r.slice) : String(r.nick);
+  const unusedNick = (repo) => {
+    const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL`).all(repo);
+    return funnyName(rows.map(nickOf));
+  };
+  const subsOf = (r) => JSON.parse(String(r.subs ?? "[]")).map((x) => ({ event: x.event, scope: x.scope === "run" ? "run" : "any" }));
+  const PARTICIPANT_SQL = `SELECT p.*, r.repo, r.plan, r.kind FROM participants p JOIN runs r ON r.id = p.run`;
+  const toParticipant = (r) => ({
+    id: Number(r.id),
+    run: Number(r.run),
+    repo: String(r.repo),
+    kind: profileOf(String(r.kind ?? "plan")).kind,
+    plan: String(r.plan),
+    slice: String(r.slice),
+    name: `${r.plan}/${r.slice}`,
+    nick: nickOf(r),
+    ended: r.ended_at != null,
+    worktree: r.worktree == null ? null : String(r.worktree),
+    listening: Number(r.listening) === 1,
+    subscriptions: subsOf(r)
+  });
+  const participantById = (id) => toParticipant(db.prepare(`${PARTICIPANT_SQL} WHERE p.id = ?`).get(id));
+  const toMessage = (r) => {
+    const author = participantById(Number(r.author));
+    return {
+      seq: Number(r.seq),
+      repo: String(r.repo),
+      from: author.name,
+      body: String(r.body),
+      about: r.about == null ? null : String(r.about),
+      kind: String(r.kind),
+      mentions: JSON.parse(String(r.mentions)),
+      at: String(r.at),
+      // an old main row (null) is labelled with its author's run (plan D13)
+      run: r.run == null ? author.run : Number(r.run),
+      endorses: r.endorses == null ? null : Number(r.endorses),
+      event: r.event == null || !Object.hasOwn(EVENTS, String(r.event)) ? null : String(r.event),
+      meta: r.meta == null ? null : JSON.parse(String(r.meta))
     };
+  };
+  const lastSeq = () => Number(db.prepare("SELECT COALESCE(MAX(seq), 0) AS s FROM messages").get().s);
+  const openPlans = (repo) => db.prepare("SELECT DISTINCT plan FROM runs WHERE repo = ? AND state = 'open'").all(repo).map((r) => String(r.plan));
+  const activeNames = (repo) => {
+    const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL AND p.slice != '${ORCHESTRATOR2}'`).all(repo);
+    return new Map(rows.map((r) => [nameHandle(nickOf(r)), `${r.plan}/${r.slice}`]));
+  };
+  const insertMessage = (p, body, about, kind, named, extra = {}) => {
+    const mentions2 = named ?? (kind === "event" ? [] : parseMentions(body, p.plan, openPlans(p.repo), activeNames(p.repo)));
+    const run2 = p.run;
+    if (runRow(run2).state === "closed") throw new Error(`run ${run2} is closed`);
+    const r = db.prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at, by_board, run, endorses, event, meta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(p.repo, p.id, body, about, kind, JSON.stringify(mentions2), now(), named ? 1 : 0, run2, extra.endorses ?? null, extra.event ?? null, extra.meta ? JSON.stringify(extra.meta) : null);
+    const seq = Number(r.lastInsertRowid);
+    bump(p.repo);
+    return board2.read(seq);
+  };
+  const gated = (p, verb) => {
+    if (!profileOf(p.kind).claims) throw new Error(`${verb}: a ${p.kind} run has no claims`);
+    return p;
+  };
+  const live = (p) => {
+    const fresh = participantById(p.id);
+    if (fresh.ended) throw new Error(`runner ${p.name} has ended`);
+    return fresh;
+  };
+  const isLive = (id) => db.prepare("SELECT 1 FROM participants p JOIN runs r ON r.id = p.run WHERE p.id = ? AND p.ended_at IS NULL AND r.state = 'open'").get(id) !== void 0;
+  const fold = (s) => CASELESS2 ? s.toLowerCase() : s;
+  const slashes = (rel) => rel.split(/[\\/]+/).filter((x) => x && x !== ".").join("/");
+  const roots = (repo) => {
+    const out = /* @__PURE__ */ new Set();
+    if (path2.basename(repo).toLowerCase() === ".git") out.add(path2.resolve(path2.dirname(repo)));
+    const rows = db.prepare("SELECT DISTINCT p.worktree FROM participants p JOIN runs r ON r.id = p.run WHERE r.repo = ? AND p.worktree IS NOT NULL").all(repo);
+    for (const r of rows) out.add(path2.resolve(String(r.worktree)));
+    return [...out].sort((a, b) => b.length - a.length);
+  };
+  const relPath = (repo, file) => {
+    if (!path2.isAbsolute(file) && !file.startsWith("/")) return slashes(file) || null;
+    const abs = fold(path2.resolve(file));
+    for (const root of roots(repo)) {
+      const r = fold(root);
+      if (abs.startsWith(r.endsWith(path2.sep) ? r : r + path2.sep)) return slashes(path2.resolve(file).slice(root.length)) || null;
+    }
+    return null;
+  };
+  const doingOf = (id) => String(db.prepare("SELECT doing FROM participants WHERE id = ?").get(id).doing) || "no note";
+  const claims = claimsOf({ db, transaction, bump, now, lastSeq, participantById, isLive, insertMessage, relPath, fold, slashes, doingOf });
+  const deliverTo = (p, fromWait, mentionsOnly = false) => {
+    const me = participantById(p.id);
+    const named = (m) => mentions(m, me) || (m.kind === "agreement" || m.kind === "endorsement") && m.about != null && claims.holds(me, m.about);
+    const whole = profileOf(me.kind).wholeThread;
+    const ownPost = (m) => whole && m.run === me.run && m.kind !== "event";
+    const messages = transaction(() => {
+      const unseen = db.prepare(
+        `SELECT m.* FROM messages m
+           WHERE m.repo = ? AND m.seq > ? AND (m.author != ? OR m.event IN (${TO_AUTHOR}))
+             AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.participant = ? AND d.seq = m.seq)
+           ORDER BY m.seq`
+      ).all(me.repo, Number(db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id).since_seq), me.id, me.id);
+      const woken = (r) => named(toMessage(r)) || wakes(toMessage(r), me, me.subscriptions);
+      const heard = unseen.filter((r) => toMessage(r).run === me.run || woken(r));
+      const rows = !mentionsOnly ? heard : !heard.some(woken) || !whole ? heard.filter(woken) : heard.filter((r) => woken(r) || ownPost(toMessage(r)));
+      const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
+      for (const r of rows) mark.run(me.id, Number(r.seq));
+      const at = now();
+      db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(at, me.id);
+      if (fromWait) {
+        const last = db.prepare("SELECT MAX(at) AS at FROM call_log WHERE participant = ?").get(me.id);
+        if (last.at == null || Date.parse(at) - Date.parse(String(last.at)) >= WAIT_LOG_EVERY_MS) {
+          db.prepare("INSERT INTO call_log (participant, at, verb) VALUES (?, ?, 'deliver')").run(me.id, at);
+        }
+      }
+      if (!fromWait) {
+        const r = db.prepare("UPDATE participants SET waiting = 0 WHERE id = ? AND waiting = 1").run(me.id);
+        if (Number(r.changes) > 0) bump(me.repo);
+      }
+      return rows.map((r) => {
+        const m = toMessage(r);
+        const rel = r.by_board || m.kind !== "msg" || !m.about || !named(m) ? null : claims.askedAbout(me, Number(r.author), m);
+        return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}` } : m;
+      });
+    });
+    const full = (m) => named(m) || mentionsOnly && wakes(m, me, me.subscriptions) || ownPost(m);
+    return {
+      full: messages.filter(full),
+      lines: messages.filter((m) => !full(m)).map(messageLine)
+    };
+  };
+  const retentionDays = () => {
+    const r = db.prepare("SELECT value FROM settings WHERE name = 'retention-days'").get();
+    return r ? Number(r.value) : RETENTION_DEFAULT_DAYS;
+  };
+  const retentionCutoff = (at) => new Date(at.getTime() - retentionDays() * DAY_MS2).toISOString();
+  const listedRuns = () => db.prepare("SELECT * FROM runs WHERE pruned_at IS NULL AND (state = 'open' OR (state = 'closed' AND closed_at >= ?)) ORDER BY id").all(retentionCutoff(/* @__PURE__ */ new Date()));
+  const runSummary = (r) => {
+    const id = Number(r.id);
+    const count = (sql) => Number(db.prepare(sql).get(id).n);
+    const open = r.state === "open";
+    return {
+      run: id,
+      kind: profileOf(String(r.kind ?? "plan")).kind,
+      plan: String(r.plan),
+      group: String(r.plan),
+      code: planCode(String(r.plan)),
+      title: String(r.title),
+      link: r.link == null ? null : String(r.link),
+      open,
+      runners: open ? count(`SELECT COUNT(*) AS n FROM participants WHERE run = ? AND slice != '${ORCHESTRATOR2}' AND ended_at IS NULL`) : 0,
+      done: count("SELECT COUNT(*) AS n FROM slices WHERE run = ? AND state = 'done'"),
+      of: count("SELECT COUNT(*) AS n FROM slices WHERE run = ?"),
+      phase: phaseOf(r),
+      progress: progressOf(id, r.phase == null ? null : String(r.phase)),
+      stallMs: Number(r.stall_ms ?? STALL_MS_DEFAULT)
+    };
+  };
+  const repoName = (repo) => {
+    const base = path2.basename(repo);
+    return base.toLowerCase() === ".git" ? path2.basename(path2.dirname(repo)) : base.replace(/\.git$/i, "");
+  };
+  const listeners = /* @__PURE__ */ new Set();
+  let watching = null;
+  let versions = /* @__PURE__ */ new Map();
+  const readVersions = () => new Map(db.prepare("SELECT repo, version FROM changes").all().map((r) => [String(r.repo), Number(r.version)]));
+  const insertSlice = (run2, s, ord) => {
+    if (s.on) parseSubscriptions(s.on);
+    db.prepare("INSERT INTO slices (run, id, title, blockers, link, ord, on_events) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+      run2,
+      s.id,
+      s.title,
+      JSON.stringify(s.blockers ?? []),
+      s.link ?? null,
+      ord,
+      s.on ? JSON.stringify(s.on) : null
+    );
+  };
+  const setSubs = (p, subs) => {
+    db.prepare("UPDATE participants SET subs = ? WHERE id = ?").run(JSON.stringify(subs), p.id);
+    bump(p.repo);
+    return subs;
+  };
+  const sameSub = (a, b) => a.event === b.event && a.scope === b.scope;
+  const idleSince = /* @__PURE__ */ new Map();
+  const presenceOf = /* @__PURE__ */ new Map();
+  const noPresence = () => ({ connected: false, lostAt: null });
+  const heldWaits = /* @__PURE__ */ new Map();
+  const orchestratorIn = (run2) => participantById(Number(db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, ORCHESTRATOR2).id));
+  const activityOf = (run2, member) => db.prepare("SELECT * FROM member_activity WHERE run = ? AND member = ?").get(run2, member);
+  const progressAtOf = (p, run2, a) => Math.max(
+    a?.grew_at == null ? 0 : Number(a.grew_at),
+    p.progress_at == null ? 0 : Date.parse(String(p.progress_at)),
+    Date.parse(String(p.joined_at)),
+    run2.resumed_at == null ? 0 : Date.parse(String(run2.resumed_at))
+  );
+  const stateOf = (p, run2, t, presence) => {
+    const member = String(p.slice);
+    const a = activityOf(Number(run2.id), member);
+    const heldSince = heldWaits.get(Number(p.id)) ?? null;
+    const inWait = heldSince != null;
+    if (a && Number(a.finished) === 1) return { member, state: "gone", doing: null, since: Number(a.at), reason: "its agent finished without end" };
+    const link = presence(member);
+    if (!link.connected && link.lostAt != null && t - link.lostAt >= LINK_LOST_MS) return { member, state: "gone", doing: null, since: link.lostAt, reason: "its link was lost" };
+    if (!a) {
+      if (inWait) return { member, state: "waiting", doing: null, since: null };
+      const joined = Date.parse(String(p.joined_at));
+      return { member, state: "quiet", doing: null, since: joined, reason: t - joined >= NO_TRANSCRIPT_MS ? "no transcript found" : "no activity yet" };
+    }
+    const open = a.open_tool == null ? null : `${a.open_tool} ${String(a.open_target ?? "")}`.trim();
+    if (open && heldSince != null && Number(a.open_since) <= heldSince) return { member, state: "waiting", doing: open, since: Number(a.open_since) };
+    if (open && t - Number(a.open_since) < BUSY_MAX_MS) return { member, state: "busy", doing: open, since: Number(a.open_since) };
+    const last = a.last_tool == null ? null : String(a.last_tool);
+    const progressed = progressAtOf(p, run2, a);
+    if (t - progressed < Number(run2.stall_ms ?? STALL_MS_DEFAULT)) return { member, state: "working", doing: open ?? last, since: progressed };
+    const lastCall = open ? `${open} (open ${Math.floor((t - Number(a.open_since)) / 6e4)} min)` : last;
+    const reason = `no progress for ${Math.floor((t - progressed) / 1e3)}s, link ${link.connected ? "alive" : "down"}${lastCall ? `; last ${lastCall}` : ""}`;
+    return { member, state: "quiet", doing: open ?? last, since: progressed, reason };
+  };
+  const statesOf = (run2, t) => {
+    const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run2);
+    if (!r) return /* @__PURE__ */ new Map();
+    const presence = presenceOf.get(run2) ?? noPresence;
+    const live2 = db.prepare("SELECT * FROM participants WHERE run = ? AND ended_at IS NULL ORDER BY id").all(run2);
+    return new Map(live2.map((p) => [String(p.slice), stateOf(p, r, t, presence)]));
+  };
+  const livenessOf = (run2, st, t) => {
+    if (!st) return void 0;
+    const a = activityOf(run2, st.member);
+    const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run2);
+    const p = db.prepare("SELECT * FROM participants WHERE run = ? AND slice = ?").get(run2, st.member);
+    const link = (presenceOf.get(run2) ?? noPresence)(st.member);
+    const { member: _, ...state } = st;
+    return {
+      ...state,
+      tokens: a ? Number(a.tokens) : null,
+      movedAt: a?.grew_at == null ? null : new Date(Number(a.grew_at)).toISOString(),
+      // D38: the two ages, since its last progress and since its last sign of life
+      progressAt: progressAtOf(p, r, a),
+      aliveAt: link.connected ? t : link.lostAt
+    };
+  };
+  const agesOf = (l) => ({ progressAt: l?.progressAt ?? null, aliveAt: l?.aliveAt ?? null });
+  const progressOf = (run2, phase) => {
+    if (phase == null) return null;
+    const rows = db.prepare(
+      `SELECT (SELECT r.plan FROM runs r WHERE r.id = p.run) AS plan, p.slice, p.ended_at, EXISTS (SELECT 1 FROM phase_done d WHERE d.run = p.run AND d.participant = p.id AND d.phase = ?) AS done,
+           EXISTS (SELECT 1 FROM liveness_warned w WHERE w.run = p.run AND w.member = p.slice AND w.cond = 'gone') AS gone
+         FROM participants p WHERE p.run = ? AND p.slice != '${ORCHESTRATOR2}'`
+    ).all(phase, run2);
+    const live2 = rows.filter((r) => Number(r.done) === 1 || r.ended_at == null);
+    const gone = live2.filter((r) => Number(r.done) !== 1 && Number(r.gone) === 1);
+    const counted2 = live2.filter((r) => !gone.includes(r));
+    return { phase, done: counted2.filter((r) => Number(r.done) === 1).length, of: counted2.length, gone: gone.map((r) => `${r.plan}/${r.slice}`) };
+  };
+  const allDoneOnce = (author, progress) => {
+    if (!(progress.of > 0 && progress.done === progress.of)) return false;
+    if (Number(db.prepare("INSERT OR IGNORE INTO liveness_warned (run, member, cond) VALUES (?, ?, ?)").run(author.run, ORCHESTRATOR2, `all-done ${progress.phase}`).changes) !== 1) return false;
+    insertMessage(author, `all done ${progress.phase}: every member is done (${progress.done}/${progress.of})${goneSuffix(progress.gone)}; open the next phase`, null, "event", [`${author.plan}/${ORCHESTRATOR2}`], {
+      event: EVENTS["all-done"].name,
+      meta: { phase: progress.phase }
+    });
+    return true;
+  };
+  const storeRunStats = (run2) => {
+    const body = summarize(db, run2, STALE_MS);
+    const r = runRow(run2);
+    db.prepare("INSERT OR REPLACE INTO run_stats (run, repo, kind, closed_at, body) VALUES (?, ?, ?, ?, ?)").run(run2, String(r.repo), body.kind, String(r.closed_at), JSON.stringify(body));
+  };
+  const board2 = {
+    openRun({ repo, kind = "plan", group, title, link, seats, transcript, stallMs }) {
+      const profile = profileOf(kind);
+      if (stallMs !== void 0 && !(Number.isInteger(stallMs) && stallMs > 0)) throw new Error(`the stall threshold takes a positive whole number of ms, got ${stallMs}`);
+      const id = transaction(() => {
+        const r = db.prepare("INSERT INTO runs (repo, kind, plan, title, link, opened_at, stall_ms) VALUES (?, ?, ?, ?, ?, ?, ?)").run(repo, profile.kind, group, title, link ?? null, now(), stallMs ?? STALL_MS_DEFAULT);
+        const run2 = Number(r.lastInsertRowid);
+        seats.forEach((s, i) => insertSlice(run2, s, i));
+        const orchestrator = db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at, subs, nick) VALUES (?, ?, ?, ?, ?, ?)").run(
+          run2,
+          ORCHESTRATOR2,
+          lastSeq(),
+          now(),
+          JSON.stringify(profile.defaults.orchestrator),
+          unusedNick(repo)
+        );
+        insertMessage(participantById(Number(orchestrator.lastInsertRowid)), `run ${run2} opened: ${profile.kind} ${group}, ${title}`, null, "event", void 0, {
+          event: EVENTS.opened.name
+        });
+        bump(repo);
+        return run2;
+      });
+      return toRun(runRow(id));
+    },
+    setSliceState(run2, slice, state) {
+      runRow(run2);
+      if (!SLICE_STATES.has(state)) throw new Error(`unknown slice state ${state}`);
+      transaction(() => {
+        const r = db.prepare("UPDATE slices SET state = ? WHERE run = ? AND id = ?").run(state, run2, slice);
+        if (Number(r.changes) === 0) throw new Error(`unknown slice ${slice} in run ${run2}`);
+        bump(String(runRow(run2).repo));
+        if (state !== "done") return;
+        const p = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, slice);
+        if (p) claims.releaseAll(Number(p.id));
+      });
+    },
+    addSlice(run2, spec) {
+      const r = runRow(run2);
+      if (r.state !== "open") throw new Error(`run ${run2} is closed`);
+      if (spec.id === ORCHESTRATOR2) throw new Error(`"${ORCHESTRATOR2}" is not a slice`);
+      return transaction(() => {
+        const ids = db.prepare("SELECT id FROM slices WHERE run = ?").all(run2).map((x) => String(x.id));
+        if (ids.includes(spec.id)) throw new Error(`slice ${spec.id} is already in run ${run2}`);
+        const unknown = (spec.blockers ?? []).filter((b) => !ids.includes(b));
+        if (unknown.length) throw new Error(`unknown blocker ${unknown.join(", ")} in run ${run2}`);
+        const ord = Number(db.prepare("SELECT COALESCE(MAX(ord), -1) AS o FROM slices WHERE run = ?").get(run2).o) + 1;
+        insertSlice(run2, spec, ord);
+        const orchestrator = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, ORCHESTRATOR2);
+        insertMessage(participantById(Number(orchestrator.id)), `added ${spec.id}: ${spec.title}`, null, "event");
+        return toRun(runRow(run2)).slices.find((x) => x.id === spec.id);
+      });
+    },
+    closeRun(run2) {
+      runRow(run2);
+      transaction(() => {
+        const author = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, ORCHESTRATOR2) ?? db.prepare("SELECT id FROM participants WHERE run = ? ORDER BY id LIMIT 1").get(run2);
+        if (author) insertMessage(participantById(Number(author.id)), `run ${run2} closed`, null, "event", void 0, { event: EVENTS.closed.name });
+        db.prepare("UPDATE runs SET state = 'closed', closed_at = ? WHERE id = ?").run(now(), run2);
+        bump(String(runRow(run2).repo));
+        db.prepare("UPDATE participants SET ended_at = COALESCE(ended_at, ?) WHERE run = ?").run(now(), run2);
+        try {
+          storeRunStats(run2);
+        } catch {
+        }
+        for (const p of db.prepare("SELECT id FROM participants WHERE run = ?").all(run2)) claims.releaseAll(Number(p.id));
+      });
+    },
+    prune(at = /* @__PURE__ */ new Date()) {
+      return transaction(() => {
+        const cutoff = retentionCutoff(at);
+        const expired = db.prepare("SELECT id, repo FROM runs WHERE state = 'closed' AND closed_at < ? AND pruned_at IS NULL").all(cutoff).filter((r) => {
+          if (db.prepare("SELECT 1 FROM run_stats WHERE run = ?").get(Number(r.id))) return true;
+          try {
+            storeRunStats(Number(r.id));
+            return true;
+          } catch {
+            return false;
+          }
+        });
+        const touched = new Set(expired.map((r) => String(r.repo)));
+        const runIds = expired.map((r) => Number(r.id));
+        const inExpired = runIds.length ? `run IN (${runIds.join(", ")})` : "0";
+        const doomed = db.prepare(
+          `SELECT seq, repo FROM messages WHERE ${inExpired}
+               OR (run IS NULL AND at < ? AND kind != 'agreement'
+                   AND NOT (kind = 'endorsement' AND endorses IN (SELECT seq FROM messages WHERE run IS NULL AND kind = 'agreement')))`
+        ).all(cutoff);
+        const dropDeliveries = db.prepare("DELETE FROM deliveries WHERE seq = ?");
+        const dropMessage = db.prepare("DELETE FROM messages WHERE seq = ?");
+        for (const m of doomed) {
+          dropDeliveries.run(Number(m.seq));
+          dropMessage.run(Number(m.seq));
+          touched.add(String(m.repo));
+        }
+        for (const run2 of runIds) {
+          for (const r of db.prepare("SELECT id FROM participants WHERE run = ?").all(run2)) {
+            const id = Number(r.id);
+            for (const table of ["claim_log", "shares", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries", "claim_requests", "flag_posts", "call_log", "lock_requests"]) {
+              db.prepare(`DELETE FROM ${table} WHERE participant = ?`).run(id);
+            }
+            db.prepare("DELETE FROM notices WHERE other = ?").run(id);
+            db.prepare("DELETE FROM shares WHERE other = ?").run(id);
+            if (!db.prepare("SELECT 1 FROM messages WHERE author = ? LIMIT 1").get(id)) db.prepare("DELETE FROM participants WHERE id = ?").run(id);
+          }
+          db.prepare("DELETE FROM slices WHERE run = ?").run(run2);
+          db.prepare("DELETE FROM merges WHERE run = ?").run(run2);
+          for (const table of ["phase_done", "transcripts", "token_readings", "liveness_warned", "member_activity", "member_links"]) db.prepare(`DELETE FROM ${table} WHERE run = ?`).run(run2);
+          db.prepare("UPDATE runs SET pruned_at = ? WHERE id = ?").run(at.toISOString(), run2);
+        }
+        for (const repo of touched) bump(repo);
+        return { messages: doomed.length, runs: runIds.length };
+      });
+    },
+    setting(name, value) {
+      if (name !== "retention-days") throw new Error(`unknown setting ${name}`);
+      if (value !== void 0) {
+        if (!Number.isInteger(value) || value < 1) throw new Error(`${name} takes a positive whole number of days, got ${value}`);
+        db.prepare("INSERT INTO settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value").run(name, String(value));
+      }
+      return retentionDays();
+    },
+    upkeepIfDue(at = /* @__PURE__ */ new Date()) {
+      const due = () => {
+        const r = db.prepare("SELECT value FROM settings WHERE name = ?").get(LAST_UPKEEP);
+        return !(at.getTime() - Date.parse(String(r?.value)) < UPKEEP_EVERY_MS);
+      };
+      if (!due()) return false;
+      const recorded = transaction(() => {
+        if (!due()) return false;
+        db.prepare("INSERT INTO settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value").run(LAST_UPKEEP, at.toISOString());
+        return true;
+      });
+      if (!recorded) return false;
+      board2.prune(at);
+      board2.flagStale(at);
+      return true;
+    },
+    flagStale(at = /* @__PURE__ */ new Date()) {
+      const silentBefore = at.getTime() - STALE_MS;
+      return transaction(() => {
+        const quiet = db.prepare("SELECT p.id, p.last_call, p.joined_at FROM participants p JOIN runs r ON r.id = p.run WHERE r.state = 'open' AND r.paused IS NULL AND p.slice = ? AND p.ended_at IS NULL AND p.quiet_flagged = 0").all(ORCHESTRATOR2);
+        for (const o of quiet) {
+          const silentSince = Date.parse(String(o.last_call ?? o.joined_at));
+          if (silentSince >= silentBefore) continue;
+          const minutes = Math.floor((at.getTime() - silentSince) / 6e4);
+          insertMessage(participantById(Number(o.id)), `quiet ${minutes} min`, null, "event", [], { event: EVENTS.quiet.name });
+          db.prepare("UPDATE participants SET quiet_flagged = 1 WHERE id = ?").run(Number(o.id));
+        }
+        const flagged = [];
+        for (const r of db.prepare("SELECT id, plan FROM runs WHERE state = 'open' AND paused IS NULL AND stale_flagged = 0 ORDER BY id").all()) {
+          const id = Number(r.id);
+          const members = db.prepare("SELECT id, slice, last_call, joined_at FROM participants WHERE run = ? AND ended_at IS NULL").all(id);
+          if (!members.length || members.some((m) => Date.parse(String(m.last_call ?? m.joined_at)) >= silentBefore)) continue;
+          const author = members.find((m) => String(m.slice) === ORCHESTRATOR2) ?? members[0];
+          const group = String(r.plan);
+          insertMessage(participantById(Number(author.id)), `run ${id} (${group}) is stale: every member silent; close it or dispatch again`, null, "event", [`${group}/${ORCHESTRATOR2}`], {
+            event: EVENTS.stale.name
+          });
+          db.prepare("UPDATE runs SET stale_flagged = 1 WHERE id = ?").run(id);
+          flagged.push(id);
+        }
+        return flagged;
+      });
+    },
+    runs() {
+      return db.prepare("SELECT * FROM runs WHERE state = 'open' ORDER BY id").all().map(toRun);
+    },
+    join({ run: run2, slice, doing, files, worktree, on }) {
+      const r = runRow(run2);
+      if (r.state !== "open") throw new Error(`run ${run2} is closed`);
+      if (slice === ORCHESTRATOR2) throw new Error(`"${ORCHESTRATOR2}" is not a slice`);
+      const profile = profileOf(String(r.kind ?? "plan"));
+      if (files.length && !profile.claims) throw new Error(`join: a ${profile.kind} run has no claims`);
+      const where = worktree && profile.worktree ? path2.resolve(worktree) : null;
+      return transaction(() => {
+        const id = transaction(() => {
+          const existing = db.prepare("SELECT id, nick FROM participants WHERE run = ? AND slice = ?").get(run2, slice);
+          const seatRow = db.prepare("SELECT on_events FROM slices WHERE run = ? AND id = ?").get(run2, slice);
+          const seatOn = seatRow?.on_events != null ? parseSubscriptions(JSON.parse(String(seatRow.on_events))) : null;
+          const subs = JSON.stringify(on ?? seatOn ?? profile.defaults.member);
+          const fresh = () => unusedNick(String(r.repo));
+          if (existing) {
+            db.prepare("UPDATE participants SET doing = ?, files = ?, worktree = ?, ended_at = NULL, merged = 0, subs = ?, nick = COALESCE(nick, ?) WHERE id = ?").run(
+              doing,
+              JSON.stringify(files),
+              where,
+              subs,
+              existing.nick == null ? fresh() : null,
+              Number(existing.id)
+            );
+            return Number(existing.id);
+          }
+          const ins = db.prepare("INSERT INTO participants (run, slice, worktree, doing, files, since_seq, joined_at, nick, subs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(run2, slice, where, doing, JSON.stringify(files), lastSeq(), now(), fresh(), subs);
+          return Number(ins.lastInsertRowid);
+        });
+        const runner = participantById(id);
+        claims.claimDeclared(runner, files);
+        insertMessage(runner, `joined: ${doing}`, null, "event", void 0, { event: EVENTS.joined.name });
+        return { runner, roster: board2.roster(runner.repo) };
+      });
+    },
+    participant(name) {
+      const i = name.lastIndexOf("/");
+      if (i <= 0) return null;
+      const plan = name.slice(0, i);
+      const slice = name.slice(i + 1);
+      const r = db.prepare(`${PARTICIPANT_SQL} WHERE r.plan = ? AND p.slice = ? ORDER BY (r.state = 'open') DESC, r.id DESC LIMIT 1`).get(plan, slice);
+      return r ? toParticipant(r) : null;
+    },
+    identify({ worktree }) {
+      if (!worktree) return null;
+      const here = fold(path2.resolve(worktree));
+      const rows = db.prepare(`${PARTICIPANT_SQL} WHERE p.worktree IS NOT NULL AND p.ended_at IS NULL AND r.state = 'open'`).all().filter(
+        (r) => {
+          const root = fold(String(r.worktree));
+          return here === root || here.startsWith(root.endsWith(path2.sep) ? root : root + path2.sep);
+        }
+      );
+      if (!rows.length) return null;
+      const deepest = Math.max(...rows.map((r) => String(r.worktree).length));
+      const best = rows.filter((r) => String(r.worktree).length === deepest);
+      return best.length === 1 ? toParticipant(best[0]) : null;
+    },
+    setDoing(p, doing) {
+      const fresh = live(p);
+      db.prepare("UPDATE participants SET doing = ? WHERE id = ?").run(doing, fresh.id);
+      insertMessage(fresh, `doing: ${doing}`, null, "event");
+    },
+    subscribe(p, subs) {
+      const fresh = live(p);
+      return setSubs(fresh, [...fresh.subscriptions, ...subs.filter((s) => !fresh.subscriptions.some((o) => sameSub(o, s)))]);
+    },
+    unsubscribe(p, subs) {
+      const fresh = live(p);
+      return setSubs(fresh, fresh.subscriptions.filter((o) => !subs.some((s) => sameSub(o, s))));
+    },
+    end(p) {
+      const fresh = live(p);
+      transaction(() => {
+        const waiters = claims.lockWaitersFreedBy(fresh);
+        const ended = { event: EVENTS.ended.name };
+        if (waiters.length) insertMessage(fresh, `ended
+the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event", waiters, ended);
+        else insertMessage(fresh, "ended", null, "event", void 0, ended);
+        db.prepare("UPDATE participants SET ended_at = ?, doing = CASE merged WHEN 1 THEN 'merged and ended' ELSE 'ended' END WHERE id = ?").run(now(), fresh.id);
+        claims.releaseAll(fresh.id);
+      });
+    },
+    phase(p, name, text) {
+      const fresh = live(p);
+      if (fresh.slice !== ORCHESTRATOR2) throw new Error(`phase: only the orchestrator opens a phase; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR2}`);
+      if (!PHASE_NAME.test(name)) throw new Error(`phase: a phase name is one word, got ${JSON.stringify(name)}`);
+      const said = text.trim();
+      if (!said) throw new Error(`phase ${name}: what does it ask?`);
+      if (runRow(fresh.run).state !== "open") throw new Error(`run ${fresh.run} is closed`);
+      return transaction(() => {
+        db.prepare("UPDATE runs SET phase = ?, phase_text = ? WHERE id = ?").run(name, said, fresh.run);
+        db.prepare("DELETE FROM phase_done WHERE run = ? AND phase = ?").run(fresh.run, name);
+        db.prepare("DELETE FROM liveness_warned WHERE run = ? AND member = ? AND cond = ?").run(fresh.run, ORCHESTRATOR2, `all-done ${name}`);
+        return insertMessage(fresh, `phase ${name}: ${said}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.phase.name, meta: { phase: name } });
+      });
+    },
+    currentPhase(run2) {
+      return phaseOf(runRow(run2));
+    },
+    pause(p, text = "") {
+      const fresh = live(p);
+      if (fresh.slice !== ORCHESTRATOR2) throw new Error(`pause: only the orchestrator pauses its run; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR2}`);
+      const r = runRow(fresh.run);
+      if (r.state !== "open") throw new Error(`run ${fresh.run} is closed`);
+      if (r.paused != null) throw new Error(`run ${fresh.run} is already paused`);
+      const said = text.trim();
+      return transaction(() => {
+        db.prepare("UPDATE runs SET paused = ? WHERE id = ?").run(said, fresh.run);
+        return insertMessage(fresh, `pause: stop where you are and wait for the resume${said ? `: ${said}` : ""}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.pause.name });
+      });
+    },
+    resume(p, text = "") {
+      const fresh = live(p);
+      if (fresh.slice !== ORCHESTRATOR2) throw new Error(`resume: only the orchestrator resumes its run; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR2}`);
+      const r = runRow(fresh.run);
+      if (r.state !== "open") throw new Error(`run ${fresh.run} is closed`);
+      if (r.paused == null) throw new Error(`run ${fresh.run} is not paused`);
+      const said = text.trim();
+      return transaction(() => {
+        db.prepare("UPDATE runs SET paused = NULL, resumed_at = ?, stall_posts = 0 WHERE id = ?").run(now(), fresh.run);
+        return insertMessage(fresh, `resume: continue${said ? `: ${said}` : ""}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.resume.name });
+      });
+    },
+    pausedOf(run2) {
+      const r = runRow(run2);
+      return r.paused == null ? null : String(r.paused);
+    },
+    done(p, name) {
+      const fresh = live(p);
+      if (fresh.slice === ORCHESTRATOR2) throw new Error("done: the orchestrator opens phases; a member runs done");
+      const current = phaseOf(runRow(fresh.run));
+      if (!current) throw new Error(`done ${name}: no phase is open in run ${fresh.run}`);
+      if (current.name !== name) throw new Error(`done ${name}: the current phase is ${current.name}`);
+      return transaction(() => {
+        const added = Number(db.prepare("INSERT OR IGNORE INTO phase_done (run, participant, phase, at) VALUES (?, ?, ?, ?)").run(fresh.run, fresh.id, name, now()).changes) > 0;
+        const progress = progressOf(fresh.run, name);
+        const all = progress.of > 0 && progress.done === progress.of;
+        if (!added) return { progress, all, already: true, message: null };
+        const orch = `${fresh.plan}/${ORCHESTRATOR2}`;
+        const message = insertMessage(fresh, `done ${name} (${progress.done}/${progress.of})${goneSuffix(progress.gone)}`, null, "event", [orch], { event: EVENTS.done.name, meta: { phase: name } });
+        allDoneOnce(fresh, progress);
+        return { progress, all, already: false, message };
+      });
+    },
+    lastActivity(run2) {
+      const r = runRow(run2);
+      const row = db.prepare("SELECT MAX(COALESCE(p.last_call, p.joined_at)) AS calls, (SELECT MAX(m.at) FROM messages m JOIN participants q ON q.id = m.author WHERE q.run = ?) AS posts FROM participants p WHERE p.run = ?").get(run2, run2);
+      return [String(r.opened_at), row?.calls, row?.posts].filter((v) => typeof v === "string").sort().at(-1);
+    },
+    phaseProgress(run2) {
+      const r = runRow(run2);
+      return progressOf(run2, r.phase == null ? null : String(r.phase));
+    },
+    owedPhase(p) {
+      const row = db.prepare("SELECT id, run, slice, ended_at FROM participants WHERE id = ?").get(p.id);
+      if (!row || row.ended_at != null || String(row.slice) === ORCHESTRATOR2) return null;
+      const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(Number(row.run));
+      const current = r && r.state === "open" ? phaseOf(r) : null;
+      if (!current) return null;
+      const done = db.prepare("SELECT 1 FROM phase_done WHERE run = ? AND participant = ? AND phase = ?").get(Number(row.run), Number(row.id), current.name);
+      return done ? null : current;
+    },
+    recordActivity(run2, member, act, at) {
+      const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run2);
+      if (!r || r.state !== "open") return;
+      if (!db.prepare("SELECT 1 FROM participants WHERE run = ? AND slice = ? AND ended_at IS NULL").get(run2, member)) return;
+      transaction(() => {
+        const o = act.openTool;
+        db.prepare(
+          `INSERT INTO member_activity (run, member, grew_at, tokens, context, open_tool, open_target, open_since, last_tool, finished, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (run, member) DO UPDATE SET grew_at = excluded.grew_at, tokens = excluded.tokens, context = excluded.context, open_tool = excluded.open_tool,
+             open_target = excluded.open_target, open_since = excluded.open_since, last_tool = excluded.last_tool, finished = excluded.finished, at = excluded.at`
+        ).run(run2, member, act.grewAt, act.tokens, act.context, o?.name ?? null, o?.target ?? null, o?.since ?? null, act.lastTool, act.finished ? 1 : 0, at.getTime());
+        db.prepare("INSERT INTO token_readings (run, member, t, tokens) VALUES (?, ?, ?, ?)").run(run2, member, at.toISOString(), act.tokens);
+        bump(String(r.repo));
+      });
+    },
+    memberStates(run2, at) {
+      return [...statesOf(run2, at.getTime()).values()];
+    },
+    livenessTick(run2, at, presence) {
+      const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run2);
+      if (!r || r.state !== "open") {
+        presenceOf.delete(run2);
+        idleSince.delete(run2);
+        return false;
+      }
+      presenceOf.set(run2, presence);
+      const t = at.getTime();
+      transaction(() => {
+        db.prepare("DELETE FROM token_readings WHERE run = ? AND t < ?").run(run2, new Date(t - READINGS_KEPT_MS).toISOString());
+        const states = statesOf(run2, t);
+        const others = [...states.values()].filter((st) => st.member !== ORCHESTRATOR2);
+        const orch = orchestratorIn(run2);
+        let progress = progressOf(run2, r.phase == null ? null : String(r.phase));
+        let where = progress ? `phase ${progress.phase} ${progressText(progress)}` : "no phase open";
+        let moved = false;
+        for (const st of others) {
+          if (st.state !== "gone") db.prepare("DELETE FROM liveness_warned WHERE run = ? AND member = ? AND cond = 'gone'").run(run2, st.member);
+          else if (Number(db.prepare("INSERT OR IGNORE INTO liveness_warned (run, member, cond) VALUES (?, ?, 'gone')").run(run2, st.member).changes) === 1) {
+            insertMessage(orch, `gone ${orch.plan}/${st.member}: ${st.reason}`, null, "event", [orch.name], { event: EVENTS.gone.name });
+          }
+          const a = activityOf(run2, st.member);
+          if (!a) {
+            const p = db.prepare("SELECT joined_at FROM participants WHERE run = ? AND slice = ? AND ended_at IS NULL").get(run2, st.member);
+            if (p && t - Date.parse(String(p.joined_at)) >= NO_TRANSCRIPT_MS) {
+              const warned = db.prepare("INSERT OR IGNORE INTO liveness_warned (run, member, cond) VALUES (?, ?, 'none')").run(run2, st.member);
+              if (Number(warned.changes) === 1)
+                insertMessage(orch, `no transcript found for ${orch.plan}/${st.member}: its state is presence only`, null, "event", [orch.name], { event: EVENTS.liveness.name });
+            }
+            continue;
+          }
+          if (st.state !== "quiet" || r.paused != null || !presence(st.member).connected) {
+            if (a.stalled_at != null) {
+              db.prepare("UPDATE member_activity SET stalled_at = NULL WHERE run = ? AND member = ?").run(run2, st.member);
+              moved = true;
+            }
+            continue;
+          }
+          if (a.stalled_at != null && t - Number(a.stalled_at) < STALLED_AGAIN_MS) continue;
+          insertMessage(orch, `stalled ${orch.plan}/${st.member}: ${st.reason}; ${where}`, null, "event", [orch.name], { event: EVENTS.stalled.name });
+          db.prepare("UPDATE member_activity SET stalled_at = ? WHERE run = ? AND member = ?").run(t, run2, st.member);
+        }
+        progress = progressOf(run2, r.phase == null ? null : String(r.phase));
+        where = progress ? `phase ${progress.phase} ${progressText(progress)}` : "no phase open";
+        if (progress?.gone.length) allDoneOnce(orch, progress);
+        const gone = others.filter((st) => st.state === "gone").map((st) => `${orch.plan}/${st.member}`);
+        const present = others.filter((st) => st.state !== "gone");
+        const allWaiting = r.paused == null && present.length > 0 && present.every((st) => st.state === "waiting");
+        if (!allWaiting) idleSince.delete(run2);
+        else {
+          const idle = idleSince.get(run2) ?? { since: t, postedAt: null };
+          idleSince.set(run2, idle);
+          const held = t - idle.since;
+          if (idle.postedAt == null || t - idle.postedAt >= IDLE_MS) {
+            idle.postedAt = t;
+            insertMessage(orch, `idle ${Math.floor(held / 1e3)}s: every member is waiting${goneSuffix(gone)}; ${where}`, null, "event", [orch.name], { event: EVENTS.idle.name });
+          }
+        }
+        if (moved) bump(String(r.repo));
+      });
+      return true;
+    },
+    endedMembers(repo) {
+      const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NOT NULL`).all(repo);
+      return [...new Set(rows.map((r) => `${r.plan}/${r.slice}`))];
+    },
+    heldBy(p) {
+      return db.prepare("SELECT path FROM claims WHERE participant = ?").all(p.id).map((r) => String(r.path));
+    },
+    roster(repo) {
+      const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL ORDER BY r.id, p.id`).all(repo);
+      const t = Date.now();
+      const cutoff = t - STALE_MS;
+      const statesByRun = /* @__PURE__ */ new Map();
+      const stateIn = (run2, member) => {
+        if (!statesByRun.has(run2)) statesByRun.set(run2, statesOf(run2, t));
+        return statesByRun.get(run2).get(member);
+      };
+      return rows.map((r) => ({
+        name: `${r.plan}/${r.slice}`,
+        nick: nickOf(r),
+        run: Number(r.run),
+        plan: String(r.plan),
+        slice: String(r.slice),
+        doing: String(r.doing),
+        files: JSON.parse(String(r.files)),
+        stale: Date.parse(String(r.last_call ?? r.joined_at)) < cutoff,
+        subscriptions: subsOf(r),
+        worktree: r.worktree == null ? null : String(r.worktree),
+        state: stateIn(Number(r.run), String(r.slice))?.state ?? "working",
+        activity: stateIn(Number(r.run), String(r.slice))?.doing ?? null,
+        ...agesOf(livenessOf(Number(r.run), stateIn(Number(r.run), String(r.slice)), t))
+      }));
+    },
+    post(p, body, opts = {}) {
+      const fresh = live(p);
+      const m = insertMessage(fresh, body, opts.about ?? null, opts.kind ?? "msg");
+      const claimed = profileOf(fresh.kind).claims ? claims.claimByPost(fresh, m) : null;
+      return claimed ? { ...m, claimed } : m;
+    },
+    endorse(p, seq) {
+      const fresh = live(p);
+      const r = db.prepare("SELECT * FROM messages WHERE seq = ?").get(seq);
+      if (!r) throw new Error(`unknown message #${seq}`);
+      if (r.kind !== "agreement") throw new Error(`#${seq} is not an agreement`);
+      if (Number(r.author) === fresh.id) throw new Error(`#${seq} is your own agreement`);
+      const author = participantById(Number(r.author));
+      const about = r.about == null ? null : String(r.about);
+      return insertMessage(fresh, `endorses #${seq}`, about, "endorsement", [author.name], { endorses: seq });
+    },
+    thread(p, name) {
+      const fresh = participantById(p.id);
+      const phase = name ?? phaseOf(runRow(fresh.run))?.name;
+      if (!phase) return [];
+      const opened = db.prepare("SELECT MAX(seq) AS s FROM messages WHERE run = ? AND event = ? AND json_extract(meta, '$.phase') = ?").get(fresh.run, EVENTS.phase.name, phase);
+      if (opened.s == null) throw new Error(`thread: phase ${phase} was never opened in run ${fresh.run}`);
+      const next = db.prepare("SELECT MIN(seq) AS s FROM messages WHERE run = ? AND event = ? AND seq > ?").get(fresh.run, EVENTS.phase.name, Number(opened.s));
+      return db.prepare("SELECT * FROM messages WHERE run = ? AND seq > ? AND seq < ? AND kind != 'event' ORDER BY seq").all(fresh.run, Number(opened.s), next.s == null ? Number.MAX_SAFE_INTEGER : Number(next.s)).map(toMessage);
+    },
+    read(seq) {
+      const r = db.prepare("SELECT * FROM messages WHERE seq = ?").get(seq);
+      if (!r) throw new Error(`unknown message #${seq}`);
+      return toMessage(r);
+    },
+    deliver(p) {
+      return deliverTo(p, false);
+    },
+    wait(p, opts = {}) {
+      const { timeoutMs, mentionsOnly = false, signal: abort } = opts;
+      const column = mentionsOnly ? "listening" : "waiting";
+      const gen = transaction(() => {
+        const me = participantById(p.id);
+        db.prepare("UPDATE participants SET wait_gen = wait_gen + 1, waiting = ?, listening = ? WHERE id = ?").run(mentionsOnly ? 0 : 1, mentionsOnly ? 1 : 0, me.id);
+        bump(me.repo);
+        return Number(db.prepare("SELECT wait_gen FROM participants WHERE id = ?").get(me.id).wait_gen);
+      });
+      const current = () => Number(db.prepare("SELECT wait_gen FROM participants WHERE id = ?").get(p.id).wait_gen) === gen;
+      const held = Date.now();
+      heldWaits.set(p.id, held);
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        let poll;
+        let timer;
+        const finish = (d) => {
+          if (settled) return;
+          settled = true;
+          localWakers.delete(check);
+          abort?.removeEventListener("abort", onAbort);
+          clearInterval(poll);
+          clearTimeout(timer);
+          if (heldWaits.get(p.id) === held) heldWaits.delete(p.id);
+          try {
+            transaction(() => {
+              const r = db.prepare(`UPDATE participants SET ${column} = 0 WHERE id = ? AND wait_gen = ? AND ${column} = 1`).run(p.id, gen);
+              if (Number(r.changes) > 0) bump(participantById(p.id).repo);
+            });
+          } catch {
+          }
+          if (d instanceof Error) reject(d);
+          else resolve(d);
+        };
+        const check = () => {
+          if (settled) return;
+          try {
+            if (participantById(p.id).ended) return finish({ full: [], lines: [] });
+            const d = transaction(() => current() ? deliverTo(p, true, mentionsOnly) : null);
+            if (!d) return finish({ full: [], lines: [], superseded: true });
+            if (d.full.length || d.lines.length) finish(d);
+          } catch (e) {
+            finish(e);
+          }
+        };
+        const onAbort = () => finish({ full: [], lines: [] });
+        if (abort?.aborted) return onAbort();
+        abort?.addEventListener("abort", onAbort);
+        localWakers.add(check);
+        poll = setInterval(check, WAIT_POLL_MS);
+        if (timeoutMs !== void 0) timer = setTimeout(() => finish({ full: [], lines: [] }), timeoutMs);
+        check();
+      });
+    },
+    checkEdit(p, file, opts = {}) {
+      return claims.checkEdit(gated(live(p), "claim"), file, opts);
+    },
+    reconcileWrites(p, changed) {
+      return claims.reconcileWrites(gated(live(p), "reconcile"), changed);
+    },
+    release(p, file) {
+      claims.release(gated(live(p), "release"), file);
+    },
+    lockMerge(p, onto, reflogMark) {
+      return claims.lockMerge(gated(live(p), "merge-lock"), onto, reflogMark);
+    },
+    merged(p, sha, files, conflicts) {
+      return claims.merged(gated(live(p), "merged"), sha, files, conflicts);
+    },
+    heldMergeLock(p) {
+      return claims.heldMergeLock(p);
+    },
+    stats(scope) {
+      return statsOf(db, scope, STALE_MS);
+    },
+    repos() {
+      const byRepo = /* @__PURE__ */ new Map();
+      for (const r of listedRuns()) {
+        const list = byRepo.get(String(r.repo)) ?? [];
+        list.push(runSummary(r));
+        byRepo.set(String(r.repo), list);
+      }
+      const latest = (runs) => Math.max(...runs.map((x) => x.run));
+      return [...byRepo.entries()].map(([repo, runs]) => ({ repo, name: repoName(repo), runs })).sort((a, b) => Number(b.runs.some((x) => x.open)) - Number(a.runs.some((x) => x.open)) || latest(b.runs) - latest(a.runs));
+    },
+    snapshot(repo) {
+      const runRows = listedRuns().filter((r) => r.repo === repo);
+      if (!runRows.length) throw new Error(`no repository ${repo}`);
+      const runIds = runRows.map((r) => Number(r.id));
+      const marks = runIds.map(() => "?").join(", ");
+      const lockRow = db.prepare("SELECT participant, at FROM merge_locks WHERE repo = ?").get(repo);
+      const lockHolder = lockRow && isLive(Number(lockRow.participant)) ? Number(lockRow.participant) : null;
+      const sliceRows = db.prepare(`SELECT * FROM slices WHERE run IN (${marks}) ORDER BY run, ord`).all(...runIds);
+      const sliceOf = new Map(sliceRows.map((s) => [`${s.run}/${s.id}`, s]));
+      const people = db.prepare(`${PARTICIPANT_SQL} WHERE p.run IN (${marks}) ORDER BY p.run, p.id`).all(...runIds);
+      const runOpen = new Map(runRows.map((r) => [Number(r.id), r.state === "open"]));
+      const t = Date.now();
+      const statesByRun = /* @__PURE__ */ new Map();
+      const stateIn = (run2, member) => {
+        if (!statesByRun.has(run2)) statesByRun.set(run2, statesOf(run2, t));
+        return statesByRun.get(run2).get(member);
+      };
+      const cutoff = t - STALE_MS;
+      const claimsOf2 = db.prepare("SELECT path, kind FROM claims WHERE participant = ? ORDER BY rowid");
+      const live2 = db.prepare("SELECT c.path, c.kind, c.participant, p.slice, r.plan FROM claims c JOIN participants p ON p.id = c.participant JOIN runs r ON r.id = p.run WHERE c.repo = ? ORDER BY c.rowid").all(repo).filter((c) => isLive(Number(c.participant)));
+      const files = /* @__PURE__ */ new Map();
+      for (const c of live2) {
+        const f = files.get(String(c.path)) ?? { path: String(c.path), holders: [], interface: false };
+        f.holders.push(`${c.plan}/${c.slice}`);
+        f.interface ||= c.kind === "interface";
+        files.set(f.path, f);
+      }
+      const everClaimed = db.prepare("SELECT 1 FROM claim_log WHERE repo = ? AND path = ? AND participant = ?");
+      for (const r of people) {
+        if (String(r.slice) === ORCHESTRATOR2 || !isLive(Number(r.id))) continue;
+        const name = `${r.plan}/${r.slice}`;
+        for (const d of JSON.parse(String(r.files))) {
+          const f = files.get(relPath(repo, d.path) ?? d.path);
+          if (f && !f.holders.includes(name) && !everClaimed.get(repo, f.path, Number(r.id))) f.holders.push(name);
+        }
+      }
+      const sharedBy = (path9, id) => live2.some((c) => String(c.path) === path9 && Number(c.participant) !== id);
+      const roster = people.map((r) => {
+        const id = Number(r.id);
+        const slice = String(r.slice);
+        const orchestrator = slice === ORCHESTRATOR2;
+        const s = sliceOf.get(`${r.run}/${slice}`);
+        const ended = r.ended_at != null;
+        const state = orchestrator ? runOpen.get(Number(r.run)) ? "watching" : "done" : s?.state === "done" ? "done" : ended ? "ended" : lockHolder === id ? "merging" : Number(r.waiting) === 1 ? "waiting" : "working";
+        return {
+          run: Number(r.run),
+          runner: `${r.plan}/${slice}`,
+          nick: nickOf(r),
+          plan: String(r.plan),
+          slice,
+          title: orchestrator ? "" : String(s?.title ?? slice),
+          doing: String(r.doing),
+          state,
+          stale: !ended && !orchestrator && Date.parse(String(r.last_call ?? r.joined_at)) < cutoff,
+          files: claimsOf2.all(id).map((c) => ({ path: String(c.path), interface: c.kind === "interface", shared: sharedBy(String(c.path), id) })),
+          joined: String(r.joined_at),
+          ended: r.ended_at == null ? null : String(r.ended_at),
+          calls: Number(r.calls ?? 0),
+          listening: !ended && Number(r.listening) === 1,
+          on: subsOf(r).map((x) => formatSubscriptions([x])),
+          lastCall: String(r.last_call ?? r.joined_at),
+          liveness: ended ? void 0 : livenessOf(Number(r.run), stateIn(Number(r.run), slice), t)
+        };
+      });
+      const events = db.prepare("SELECT * FROM (SELECT * FROM messages WHERE repo = ? ORDER BY seq DESC LIMIT ?) ORDER BY seq").all(repo, EVENTS_SHOWN).map((r) => {
+        const m = toMessage(r);
+        return {
+          seq: m.seq,
+          at: m.at,
+          kind: m.kind,
+          from: m.from,
+          body: m.body,
+          about: m.about,
+          run: m.run,
+          channel: m.run,
+          event: m.event,
+          mentions: m.mentions,
+          meta: m.meta ?? null
+        };
+      });
+      const nameOf = new Map(people.map((r) => [`${r.run}/${r.slice}`, `${r.plan}/${r.slice}`]));
+      const queues = {};
+      for (const run2 of runRows) {
+        queues[String(run2.plan)] = sliceRows.filter((s) => Number(s.run) === Number(run2.id)).map((s) => ({
+          slice: String(s.id),
+          title: String(s.title),
+          link: s.link == null ? null : String(s.link),
+          state: String(s.state),
+          blockers: JSON.parse(String(s.blockers)),
+          runner: nameOf.get(`${run2.id}/${s.id}`) ?? null
+        }));
+      }
+      const flags = db.prepare("SELECT f.path, p.slice, r.plan FROM flags f JOIN participants p ON p.id = f.participant JOIN runs r ON r.id = p.run WHERE f.repo = ? ORDER BY f.rowid").all(repo).map((f) => ({ path: String(f.path), runner: `${f.plan}/${f.slice}` }));
+      const lockHistory = db.prepare("SELECT t.asked_at, t.granted_at, t.merged_at, t.refused, p.slice, r.plan FROM lock_requests t JOIN participants p ON p.id = t.participant JOIN runs r ON r.id = p.run WHERE t.repo = ? ORDER BY t.asked_at DESC, t.rowid DESC LIMIT 50").all(repo).map((t2) => ({
+        runner: `${t2.plan}/${t2.slice}`,
+        askedAt: String(t2.asked_at),
+        grantedAt: t2.granted_at == null ? null : String(t2.granted_at),
+        mergedAt: t2.merged_at == null ? null : String(t2.merged_at),
+        refused: Number(t2.refused)
+      }));
+      return {
+        repo,
+        name: repoName(repo),
+        runs: runRows.map(runSummary),
+        lockHistory,
+        lock: lockHolder !== null ? { holder: participantById(lockHolder).name, since: String(lockRow.at) } : null,
+        roster,
+        events,
+        queues,
+        files: [...files.values()],
+        flags
+      };
+    },
+    onChange(listener) {
+      listeners.add(listener);
+      if (!watching) {
+        versions = readVersions();
+        const check = () => {
+          let next;
+          try {
+            next = readVersions();
+          } catch {
+            return;
+          }
+          const moved = [...next].filter(([repo, v]) => versions.get(repo) !== v).map(([repo]) => repo);
+          versions = next;
+          for (const repo of moved) for (const l of [...listeners]) l(repo);
+        };
+        localWakers.add(check);
+        const poll = setInterval(check, WAIT_POLL_MS);
+        poll.unref?.();
+        watching = { close: () => (localWakers.delete(check), clearInterval(poll)) };
+      }
+      return () => {
+        listeners.delete(listener);
+        if (!listeners.size && watching) {
+          watching.close();
+          watching = null;
+        }
+      };
+    },
+    recordLink(run2, member, link) {
+      db.prepare("INSERT OR REPLACE INTO member_links (run, member, connected, lost_at) VALUES (?, ?, ?, ?)").run(run2, member, link.connected ? 1 : 0, link.lostAt);
+    },
+    savedLinks() {
+      return db.prepare("SELECT * FROM member_links").all().map((r) => ({
+        run: Number(r.run),
+        member: String(r.member),
+        connected: Number(r.connected) === 1,
+        lostAt: r.lost_at == null ? null : Number(r.lost_at)
+      }));
+    },
+    close() {
+      watching?.close();
+      watching = null;
+      listeners.clear();
+      db.close();
+    }
+  };
+  const PROGRESS_VERBS = /* @__PURE__ */ new Set(["post", "done", "setDoing", "endorse", "merged"]);
+  const countCall = (p, verb) => {
+    const at = now();
+    db.prepare("UPDATE participants SET calls = calls + 1, last_call = ? WHERE id = ?").run(at, p.id);
+    if (PROGRESS_VERBS.has(verb)) db.prepare("UPDATE participants SET progress_at = ? WHERE id = ?").run(at, p.id);
+    db.prepare("INSERT INTO call_log (participant, at, verb) VALUES (?, ?, ?)").run(p.id, at, verb);
+    db.prepare("UPDATE runs SET stale_flagged = 0 WHERE id = ? AND stale_flagged = 1").run(p.run);
+    if (Number(db.prepare("UPDATE participants SET quiet_flagged = 0 WHERE id = ? AND quiet_flagged = 1").run(p.id).changes) > 0 && runRow(p.run).state === "open")
+      insertMessage(participantById(p.id), "back", null, "event", [], { event: EVENTS.back.name });
+    bump(participantById(p.id).repo);
+  };
+  const counted = (name, verb) => (p, ...rest) => transaction(() => {
+    const out = verb(p, ...rest);
+    countCall(p, name);
+    return out;
+  });
+  board2.setDoing = counted("setDoing", board2.setDoing);
+  board2.subscribe = counted("subscribe", board2.subscribe);
+  board2.unsubscribe = counted("unsubscribe", board2.unsubscribe);
+  board2.end = counted("end", board2.end);
+  board2.post = counted("post", board2.post);
+  board2.phase = counted("phase", board2.phase);
+  board2.pause = counted("pause", board2.pause);
+  board2.resume = counted("resume", board2.resume);
+  board2.done = counted("done", board2.done);
+  board2.endorse = counted("endorse", board2.endorse);
+  board2.deliver = counted("deliver", board2.deliver);
+  board2.wait = counted("wait", board2.wait);
+  board2.checkEdit = counted("checkEdit", board2.checkEdit);
+  board2.release = counted("release", board2.release);
+  board2.lockMerge = counted("lockMerge", board2.lockMerge);
+  board2.merged = counted("merged", board2.merged);
+  const read = board2.read;
+  board2.read = (seq, by) => {
+    const m = read(seq);
+    if (by) transaction(() => countCall(by, "read"));
+    return m;
+  };
+  return board2;
+}
+var progressText, goneSuffix, PHASE_NAME, SLICE_STATES, TO_AUTHOR, ORCHESTRATOR2, WAIT_POLL_MS, LINE_WIDTH, STALE_MS, WAIT_LOG_EVERY_MS, UPKEEP_EVERY_MS, LAST_UPKEEP, RECORDS_SINCE2, SHARES_SINCE2, RETENTION_DEFAULT_DAYS, DAY_MS2, EVENTS_SHOWN, CASELESS2;
+var init_board = __esm({
+  "src/board/board.ts"() {
+    "use strict";
+    init_home();
+    init_mentions();
+    init_claims();
+    init_stats();
+    init_kinds();
+    init_events();
+    init_names();
+    init_liveness();
+    progressText = (p) => `${p.done}/${p.of} done${p.gone.length ? `, ${p.gone.length} gone` : ""}`;
+    goneSuffix = (gone) => gone.length ? ` (${gone.length} gone: ${gone.join(", ")})` : "";
+    PHASE_NAME = /^[\w.-]+$/;
+    SLICE_STATES = /* @__PURE__ */ new Set(["ready", "running", "done", "blocked"]);
+    TO_AUTHOR = Object.values(EVENTS).filter((e) => e.toAuthor).map((e) => `'${e.name}'`).join(", ");
+    ORCHESTRATOR2 = "orchestrator";
+    WAIT_POLL_MS = 1e3;
+    LINE_WIDTH = 100;
+    STALE_MS = 10 * 60 * 1e3;
+    WAIT_LOG_EVERY_MS = 60 * 1e3;
+    UPKEEP_EVERY_MS = 5 * 60 * 1e3;
+    LAST_UPKEEP = "last-upkeep";
+    RECORDS_SINCE2 = "records-since";
+    SHARES_SINCE2 = "shares-since";
+    RETENTION_DEFAULT_DAYS = 30;
+    DAY_MS2 = 24 * 60 * 60 * 1e3;
+    EVENTS_SHOWN = 500;
+    CASELESS2 = process.platform === "win32";
+  }
+});
+
+// src/wire.ts
+import crypto from "node:crypto";
+import fs2 from "node:fs";
+import path3 from "node:path";
+function encode(f) {
+  return JSON.stringify(f);
+}
+function decode(text) {
+  const f = JSON.parse(text);
+  const type = f && typeof f === "object" ? f.type : void 0;
+  if (typeof type !== "string" || !FRAME_TYPES.has(type)) throw new Error(`unknown frame type: ${String(type)}`);
+  return f;
+}
+function bundleVersion(entry2 = process.argv[1] ?? "") {
+  const file = path3.resolve(entry2);
+  let v = versionsByEntry.get(file);
+  if (v === void 0) {
+    v = crypto.createHash("sha256").update(fs2.readFileSync(file)).digest("hex").slice(0, 16);
+    versionsByEntry.set(file, v);
+  }
+  return v;
+}
+function serverStateFile(dataRoot) {
+  return path3.join(dataRoot, "swarm-server.json");
+}
+function serverLogFile(dataRoot) {
+  return path3.join(dataRoot, "swarm-server.log");
+}
+function serverStartLock(dataRoot) {
+  return path3.join(dataRoot, "swarm-server.lock");
+}
+function serverLockHolder(dataRoot) {
+  try {
+    const pid = Number(fs2.readFileSync(serverStartLock(dataRoot), "utf8").trim());
+    return Number.isInteger(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+function liveStartLockHolder(dataRoot) {
+  const holder = serverLockHolder(dataRoot);
+  if (holder === null || !isAlive(holder)) return null;
+  try {
+    if (JSON.parse(fs2.readFileSync(serverStateFile(dataRoot), "utf8")).pid === holder) return holder;
+  } catch {
+  }
+  try {
+    return Date.now() - fs2.statSync(serverStartLock(dataRoot)).mtimeMs < START_LOCK_GRACE_MS ? holder : null;
+  } catch {
+    return null;
+  }
+}
+function isAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+}
+var RPC_METHODS, FRAME_TYPES, versionsByEntry, SERVER_STARTER_ENV, START_LOCK_GRACE_MS;
+var init_wire = __esm({
+  "src/wire.ts"() {
+    "use strict";
+    RPC_METHODS = [
+      "openRun",
+      "setSliceState",
+      "addSlice",
+      "closeRun",
+      "phase",
+      "currentPhase",
+      "pause",
+      "resume",
+      "pausedOf",
+      "done",
+      "phaseProgress",
+      "lastActivity",
+      "owedPhase",
+      "setting",
+      "runs",
+      "join",
+      "participant",
+      "identify",
+      "setDoing",
+      "subscribe",
+      "unsubscribe",
+      "end",
+      "roster",
+      "endedMembers",
+      "heldBy",
+      "post",
+      "endorse",
+      "read",
+      "thread",
+      "deliver",
+      "wait",
+      "checkEdit",
+      "reconcileWrites",
+      "release",
+      "lockMerge",
+      "merged",
+      "heldMergeLock",
+      "stats",
+      "repos",
+      "snapshot"
+    ];
+    FRAME_TYPES = /* @__PURE__ */ new Set(["hello", "call", "cancel", "activity", "bye", "subscribe", "welcome", "result", "refused", "changed"]);
+    versionsByEntry = /* @__PURE__ */ new Map();
+    SERVER_STARTER_ENV = "SWARM_SERVER_STARTER";
+    START_LOCK_GRACE_MS = 15e3;
   }
 });
 
@@ -4020,2293 +6401,6 @@ var init_wrapper = __esm({
   }
 });
 
-// src/board/claims.ts
-function claimsOf(deps) {
-  const { db, transaction, bump, now, lastSeq, participantById, isLive, insertMessage, relPath, fold, slashes, doingOf } = deps;
-  const clearFlags = () => {
-    db.prepare("DELETE FROM flags WHERE NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = flags.repo AND c.path = flags.path)").run();
-    db.prepare(
-      `DELETE FROM notices WHERE NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = notices.repo AND c.path = notices.path AND c.participant = notices.participant)
-         OR NOT EXISTS (SELECT 1 FROM claims c WHERE c.repo = notices.repo AND c.path = notices.path AND c.participant = notices.other)`
-    ).run();
-  };
-  const holdersOf = (repo, rel) => db.prepare("SELECT participant, kind, since_seq FROM claims WHERE repo = ? AND path = ? ORDER BY rowid").all(repo, rel).map((r) => ({ participant: Number(r.participant), kind: String(r.kind), since: Number(r.since_seq) })).filter((c) => isLive(c.participant));
-  const hold = (p, rel, kind) => transaction(() => {
-    const r = db.prepare(
-      `INSERT INTO claims (repo, path, participant, kind, since_seq) VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT (repo, path, participant) DO UPDATE SET kind = excluded.kind WHERE claims.kind = 'inside' AND excluded.kind = 'interface'`
-    ).run(p.repo, rel, p.id, kind, lastSeq());
-    db.prepare(
-      `INSERT INTO claim_log (repo, path, participant, kind) VALUES (?, ?, ?, ?)
-         ON CONFLICT (repo, path, participant) DO UPDATE SET kind = 'interface' WHERE excluded.kind = 'interface'`
-    ).run(p.repo, rel, p.id, kind);
-    if (Number(r.changes) === 0) return false;
-    bump(p.repo);
-    return true;
-  });
-  const take = (p, rel, kind) => transaction(() => {
-    const held = holdersOf(p.repo, rel).filter((c) => c.participant !== p.id);
-    if (held.length) return { held, taken: false };
-    return { held, taken: hold(p, rel, kind) };
-  });
-  const hasPostedAbout = (p, rel, holders) => {
-    const since = Math.min(...holders.map((h) => h.since));
-    const rows = db.prepare("SELECT seq, body, about, mentions FROM messages WHERE repo = ? AND author = ? AND seq > ? AND kind != 'event' AND by_board = 0").all(p.repo, p.id, since);
-    const base = rel.split("/").pop();
-    const names = (r) => {
-      const about = r.about == null ? "" : fold(slashes(String(r.about)));
-      const f = fold(rel);
-      if (about && (about === f || f.endsWith(`/${about}`))) return true;
-      const body = fold(String(r.body));
-      return body.includes(f) || body.includes(fold(base));
-    };
-    const told = rows.filter(names).map((r) => ({ seq: Number(r.seq), mentions: JSON.parse(String(r.mentions)) }));
-    return holders.every((h) => {
-      const o = participantById(h.participant);
-      return told.some((r) => r.seq > h.since && (r.mentions.includes(o.name) || r.mentions.includes(`${o.plan}/*`)));
-    });
-  };
-  const recordShares = (me, rel, people) => {
-    const share = db.prepare("INSERT OR IGNORE INTO shares (repo, path, participant, other, seq) VALUES (?, ?, ?, ?, ?)");
-    for (const o of people) share.run(me.repo, rel, me.id, o.id, lastSeq());
-  };
-  const noticeOf = (me, rel, people) => {
-    const told = db.prepare("INSERT OR IGNORE INTO notices (repo, path, participant, other) VALUES (?, ?, ?, ?)");
-    const fresh = people.filter((o) => Number(told.run(me.repo, rel, me.id, o.id).changes) > 0);
-    return fresh.length ? fresh.map((o) => `${rel} is also held by ${o.name}: ${doingOf(o.id)}`).join("; ") : null;
-  };
-  const releaseAll = (id) => {
-    const owner = db.prepare("SELECT r.repo FROM participants p JOIN runs r ON r.id = p.run WHERE p.id = ?").get(id);
-    const claims = Number(db.prepare("DELETE FROM claims WHERE participant = ?").run(id).changes);
-    const locks = Number(db.prepare("DELETE FROM merge_locks WHERE participant = ?").run(id).changes);
-    db.prepare("DELETE FROM claim_requests WHERE participant = ?").run(id);
-    clearFlags();
-    if (owner && claims + locks > 0) bump(String(owner.repo));
-  };
-  const takeLockWaiters = (repo) => {
-    const rows = db.prepare("SELECT participant FROM lock_waiters WHERE repo = ? ORDER BY rowid").all(repo);
-    db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(repo);
-    return rows.map((r) => Number(r.participant)).filter(isLive).map((id) => participantById(id).name);
-  };
-  const openTurn = (p) => db.prepare(
-    `SELECT rowid AS id, granted_at FROM lock_requests t WHERE participant = ? AND merged_at IS NULL
-           AND NOT EXISTS (SELECT 1 FROM call_log c WHERE c.participant = t.participant AND c.verb = 'end' AND c.at >= t.asked_at)
-         ORDER BY rowid DESC LIMIT 1`
-  ).get(p.id);
-  const grantTurn = (p, at, anew) => {
-    const turn = openTurn(p);
-    if (turn && turn.granted_at == null) db.prepare("UPDATE lock_requests SET granted_at = ? WHERE rowid = ?").run(at, Number(turn.id));
-    else if (!turn || anew) db.prepare("INSERT INTO lock_requests (repo, participant, asked_at, granted_at) VALUES (?, ?, ?, ?)").run(p.repo, p.id, at, at);
-  };
-  const declared = (id) => JSON.parse(String(db.prepare("SELECT files FROM participants WHERE id = ?").get(id).files));
-  return {
-    clearFlags,
-    releaseAll,
-    lockWaitersFreedBy(p) {
-      const held = db.prepare("SELECT 1 FROM merge_locks WHERE repo = ? AND participant = ?").get(p.repo, p.id) !== void 0;
-      return held ? takeLockWaiters(p.repo).filter((n) => n !== p.name) : [];
-    },
-    claimByPost(me, m) {
-      if (m.kind !== "msg" && m.kind !== "agreement" || !m.about) return null;
-      const about = fold(relPath(me.repo, m.about) ?? slashes(m.about));
-      return transaction(() => {
-        const asked = db.prepare("SELECT path, kind FROM claim_requests WHERE repo = ? AND participant = ?").all(me.repo, me.id).find((r) => {
-          const x = fold(String(r.path));
-          return x === about || x.endsWith(`/${about}`);
-        });
-        if (!asked) return null;
-        const rel = String(asked.path);
-        const others = holdersOf(me.repo, rel).filter((c) => c.participant !== me.id);
-        if (!others.length || !hasPostedAbout(me, rel, others)) return null;
-        hold(me, rel, String(asked.kind) === "interface" ? "interface" : "inside");
-        db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
-        const people = others.map((c) => participantById(c.participant));
-        recordShares(me, rel, people);
-        return { path: rel, sharedWith: people.map((o) => o.name) };
-      });
-    },
-    claimDeclared(p, files) {
-      transaction(() => {
-        for (const f of files) {
-          const rel = relPath(p.repo, f.path);
-          if (rel) take(p, rel, f.interface ? "interface" : "inside");
-        }
-      });
-    },
-    askedAbout(me, author, m) {
-      const about = fold(relPath(me.repo, m.about) ?? slashes(m.about));
-      const mine = db.prepare("SELECT path FROM claims WHERE repo = ? AND participant = ? AND since_seq < ?").all(me.repo, me.id, m.seq);
-      const rel = mine.map((r) => String(r.path)).find((x) => fold(x) === about || fold(x).endsWith(`/${about}`));
-      if (!rel) return null;
-      const theirs = db.prepare("SELECT 1 FROM claims WHERE repo = ? AND path = ? AND participant = ? AND since_seq < ?").get(me.repo, rel, author, m.seq);
-      return theirs ? null : rel;
-    },
-    heldInOtherRun(p, rel) {
-      const f = fold(rel);
-      const rows = db.prepare("SELECT l.path FROM claim_log l JOIN participants q ON q.id = l.participant WHERE l.repo = ? AND q.run != ?").all(p.repo, p.run);
-      return rows.some((r) => {
-        const x = fold(String(r.path));
-        return x === f || x.endsWith(`/${f}`);
-      });
-    },
-    holds(p, about) {
-      const f = fold(relPath(p.repo, about) ?? slashes(about));
-      if (!f) return false;
-      const rows = db.prepare("SELECT path FROM claims WHERE repo = ? AND participant = ?").all(p.repo, p.id);
-      return rows.some((r) => {
-        const x = fold(String(r.path));
-        return x === f || x.endsWith(`/${f}`);
-      });
-    },
-    checkEdit(me, file, opts = {}) {
-      const kind = opts.interface ? "interface" : "inside";
-      const rel = relPath(me.repo, file);
-      if (!rel) return { allowed: true, sharedWith: [], notice: null };
-      return transaction(() => {
-        const all = holdersOf(me.repo, rel);
-        const others = all.filter((c) => c.participant !== me.id);
-        if (!others.length) {
-          hold(me, rel, kind);
-          return { allowed: true, sharedWith: [], notice: null };
-        }
-        const people = others.map((c) => participantById(c.participant));
-        if (!all.some((c) => c.participant === me.id)) {
-          if (!hasPostedAbout(me, rel, others)) {
-            db.prepare(
-              `INSERT INTO claim_requests (repo, path, participant, kind) VALUES (?, ?, ?, ?)
-               ON CONFLICT (repo, path, participant) DO UPDATE SET kind = CASE WHEN claim_requests.kind = 'interface' THEN 'interface' ELSE excluded.kind END`
-            ).run(me.repo, rel, me.id, kind);
-            const who = people.map((o) => `${o.name} (${o.nick}: ${doingOf(o.id)})`).join(", ");
-            const at = people.map((o) => `@${o.name}`).join(" ");
-            return {
-              allowed: false,
-              refusal: `${rel} is also held by ${who}. You may share it, but first tell ${people.length > 1 ? "them" : "its holder"} what you change in it: \`swarm post "${at} \u2026" --about ${rel}\`; ${people.length > 1 ? "they answer" : "its holder answers"} with an agreement on who changes what (\`swarm agree \u2026 --about ${rel}\`), and that agreement goes. Claim again once posted; do not wait for the agreement.`
-            };
-          }
-        }
-        hold(me, rel, kind);
-        db.prepare("DELETE FROM claim_requests WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
-        recordShares(me, rel, people);
-        const sharedWith = people.map((o) => ({ runner: o.name, doing: doingOf(o.id) }));
-        return { allowed: true, sharedWith, notice: noticeOf(me, rel, people) };
-      });
-    },
-    reconcileWrites(me, changed) {
-      const flags = [];
-      return transaction(() => {
-        const flag = db.prepare("INSERT OR IGNORE INTO flags (repo, path, participant) VALUES (?, ?, ?)");
-        const posted = db.prepare("INSERT OR IGNORE INTO flag_posts (repo, path, participant, holder) VALUES (?, ?, ?, ?)");
-        for (const file of changed) {
-          const rel = relPath(me.repo, file);
-          if (!rel) continue;
-          if (holdersOf(me.repo, rel).some((c) => c.participant === me.id)) {
-            take(me, rel, "inside");
-            continue;
-          }
-          const { held: others, taken } = take(me, rel, "inside");
-          if (taken || others.length) flag.run(me.repo, rel, me.id);
-          if (!others.length) continue;
-          const holder = participantById(others[0].participant);
-          if (Number(posted.run(me.repo, rel, me.id, holder.id).changes) === 0) continue;
-          const m = insertMessage(
-            me,
-            `@${holder.name} @${me.name} flag: ${me.name} wrote ${rel} outside its claim; ${holder.name} holds it. Settle it here.`,
-            rel,
-            "event",
-            [holder.name, me.name],
-            { event: EVENTS.flag.name }
-          );
-          flags.push({ path: rel, holder: holder.name, seq: m.seq });
-        }
-        return flags;
-      });
-    },
-    release(me, file) {
-      const rel = relPath(me.repo, file);
-      if (!rel) return;
-      transaction(() => {
-        const r = db.prepare("DELETE FROM claims WHERE repo = ? AND path = ? AND participant = ?").run(me.repo, rel, me.id);
-        if (Number(r.changes) === 0) return;
-        clearFlags();
-        bump(me.repo);
-      });
-    },
-    lockMerge(me, onto, reflogMark) {
-      return transaction(() => {
-        const r = db.prepare("SELECT participant FROM merge_locks WHERE repo = ?").get(me.repo);
-        if (r && Number(r.participant) !== me.id && isLive(Number(r.participant))) {
-          db.prepare("INSERT OR IGNORE INTO lock_waiters (repo, participant) VALUES (?, ?)").run(me.repo, me.id);
-          const turn = openTurn(me);
-          if (turn && turn.granted_at == null) db.prepare("UPDATE lock_requests SET refused = refused + 1 WHERE rowid = ?").run(Number(turn.id));
-          else db.prepare("INSERT INTO lock_requests (repo, participant, asked_at, refused) VALUES (?, ?, ?, 1)").run(me.repo, me.id, now());
-          return { granted: false, holder: participantById(Number(r.participant)).name };
-        }
-        if (r && Number(r.participant) === me.id) {
-          if (onto) db.prepare("UPDATE merge_locks SET onto = ? WHERE repo = ?").run(onto, me.repo);
-          grantTurn(me, String(db.prepare("SELECT at FROM merge_locks WHERE repo = ?").get(me.repo).at), false);
-          return { granted: true };
-        }
-        db.prepare("DELETE FROM lock_waiters WHERE repo = ?").run(me.repo);
-        const at = now();
-        db.prepare("INSERT OR REPLACE INTO merge_locks (repo, participant, at, onto, reflog_mark) VALUES (?, ?, ?, ?, ?)").run(me.repo, me.id, at, onto ?? null, reflogMark ?? null);
-        grantTurn(me, at, true);
-        bump(me.repo);
-        return { granted: true };
-      });
-    },
-    heldMergeLock(me) {
-      const r = db.prepare("SELECT at, onto, reflog_mark FROM merge_locks WHERE repo = ? AND participant = ?").get(me.repo, me.id);
-      return r ? { grantedAt: String(r.at), onto: r.onto == null ? null : String(r.onto), reflogMark: r.reflog_mark == null ? null : Number(r.reflog_mark) } : null;
-    },
-    merged(me, sha, files, conflicts) {
-      const rels = [...new Set(files.map((f) => relPath(me.repo, f)).filter((x) => x !== null))];
-      const conflicted = conflicts && "files" in conflicts ? new Set(conflicts.files.map((f) => fold(slashes(f)))) : null;
-      const wanted = new Set(rels);
-      const told = /* @__PURE__ */ new Set();
-      const iface = /* @__PURE__ */ new Set();
-      const sharers = [];
-      let waiters = [];
-      let onto = null;
-      transaction(() => {
-        transaction(() => {
-          const lock = db.prepare("SELECT participant, onto FROM merge_locks WHERE repo = ?").get(me.repo);
-          if (lock && Number(lock.participant) !== me.id && isLive(Number(lock.participant))) {
-            throw new Error(`the merge lock is held by ${participantById(Number(lock.participant)).name}, not ${me.name}`);
-          }
-          if (lock && Number(lock.participant) === me.id && lock.onto != null) onto = String(lock.onto);
-          db.prepare("DELETE FROM merge_locks WHERE repo = ?").run(me.repo);
-          db.prepare("UPDATE participants SET merged = 1 WHERE id = ?").run(me.id);
-          const turn = openTurn(me);
-          if (turn) db.prepare("UPDATE lock_requests SET merged_at = ? WHERE rowid = ?").run(now(), Number(turn.id));
-          waiters = takeLockWaiters(me.repo).filter((n) => n !== me.name);
-        });
-        for (const rel of rels) {
-          for (const c of holdersOf(me.repo, rel)) {
-            if (c.kind === "interface") iface.add(rel);
-            if (c.participant !== me.id) told.add(participantById(c.participant).name);
-          }
-        }
-        const everyone = db.prepare("SELECT p.id, p.slice, r.plan FROM participants p JOIN runs r ON r.id = p.run WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL").all(me.repo);
-        for (const o of everyone) {
-          for (const f of declared(Number(o.id))) {
-            const rel = relPath(me.repo, f.path);
-            if (!rel || !wanted.has(rel)) continue;
-            if (f.interface) iface.add(rel);
-            if (Number(o.id) !== me.id) told.add(`${o.plan}/${o.slice}`);
-          }
-        }
-        const openPlans = db.prepare("SELECT DISTINCT plan, kind FROM runs WHERE repo = ? AND state = 'open'").all(me.repo).filter((r) => profileOf(String(r.kind)).claims).map((r) => String(r.plan));
-        const all = iface.size ? openPlans.map((plan) => `${plan}/*`) : [];
-        const lines = [`merged ${sha}${onto ? ` into ${onto}` : ""}: rebase your branch onto it.`];
-        if (told.size) lines.push(`${[...told].map((n) => `@${n}`).join(" ")}: you hold or declared a file it changed.`);
-        if (iface.size) lines.push(`@swarm interface changed: ${[...iface].join(", ")}.`);
-        if (waiters.length) lines.push(`the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`);
-        lines.push(`files: ${rels.join(", ") || "-"}`);
-        for (const rel of rels) {
-          if (conflicted && !conflicted.has(fold(rel))) continue;
-          const ids = new Set(holdersOf(me.repo, rel).map((c) => c.participant));
-          const held = db.prepare("SELECT l.participant FROM claim_log l JOIN participants p ON p.id = l.participant WHERE l.repo = ? AND l.path = ? AND p.run = ? ORDER BY l.rowid").all(me.repo, rel, me.run);
-          for (const r of held) ids.add(Number(r.participant));
-          ids.delete(me.id);
-          for (const id of ids) sharers.push({ path: rel, runner: participantById(id).name });
-        }
-        const meta = { rebase: [...told], tell: [...new Set(sharers.map((o) => o.runner))] };
-        insertMessage(me, lines.join("\n"), null, "event", [.../* @__PURE__ */ new Set([...told, ...waiters, ...all])], { event: EVENTS.merged.name, meta });
-        db.prepare("INSERT INTO merges (participant, run, sha, at, files, conflicts) VALUES (?, ?, ?, ?, ?, ?)").run(
-          me.id,
-          me.run,
-          sha,
-          now(),
-          JSON.stringify(rels),
-          conflicts && "files" in conflicts ? JSON.stringify(conflicts.files.map(slashes)) : null
-        );
-      });
-      return sharers;
-    }
-  };
-}
-var init_claims = __esm({
-  "src/board/claims.ts"() {
-    "use strict";
-    init_events();
-    init_kinds();
-  }
-});
-
-// src/board/stats.ts
-function distinctFlags(messages) {
-  const seen = /* @__PURE__ */ new Set();
-  return messages.filter((m) => {
-    if (!isBoardFlag(m)) return false;
-    const [, path10 = m.about ?? "", holder = ""] = String(m.body).match(FLAG_BODY) ?? [];
-    const key = JSON.stringify([Number(m.author), foldPath(String(path10)), holder]);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-function periodStart(since) {
-  if (since === void 0) return null;
-  const days = since.match(/^(\d+)d$/);
-  const at = days ? Date.now() - Number(days[1]) * DAY_MS : Date.parse(since);
-  if (Number.isNaN(at)) throw new Error(`since takes <n>d or an ISO time, got ${since}`);
-  return new Date(at).toISOString();
-}
-function percentile(values, p) {
-  if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)];
-}
-function sumKnown(values) {
-  const known = values.filter((v) => typeof v === "number");
-  return known.length ? known.reduce((a, b) => a + b, 0) : null;
-}
-function timeline(joined, over, calls, turns, silentAfterMs) {
-  if (!(over > joined)) return [];
-  const exact = [];
-  for (const t of turns) {
-    if (t.refused > 0) exact.push({ from: t.asked, to: t.granted ?? t.over, what: "waiting" });
-    if (t.granted !== null) exact.push({ from: t.granted, to: t.merged ?? t.over, what: "merging" });
-  }
-  const points = [joined, ...calls.filter((c) => c > joined && c < over), over].sort((a, b) => a - b);
-  const silent = [];
-  for (let i = 1; i < points.length; i++) if (points[i] - points[i - 1] > silentAfterMs) silent.push({ from: points[i - 1], to: points[i], what: "silent" });
-  const clip = (t) => Math.min(over, Math.max(joined, t));
-  const bounds = [.../* @__PURE__ */ new Set([joined, over, ...[...exact, ...silent].flatMap((s) => [clip(s.from), clip(s.to)])])].sort((a, b) => a - b);
-  const inside = (spans, what, at) => spans.some((s) => s.what === what && s.from <= at && at < s.to);
-  const out = [];
-  for (let i = 1; i < bounds.length; i++) {
-    const from = bounds[i - 1];
-    const to = bounds[i];
-    const mid = (from + to) / 2;
-    const what = inside(exact, "merging", mid) ? "merging" : inside(exact, "waiting", mid) ? "waiting" : inside(silent, "silent", mid) ? "silent" : "working";
-    const last = out[out.length - 1];
-    if (last && last.what === what && ms(last.to) === from) last.to = iso(to);
-    else out.push({ from: iso(from), to: iso(to), what, inferred: what === "working" || what === "silent" });
-  }
-  return out;
-}
-function estimatedTimeline(joined, over, mergedAt) {
-  if (!(over > joined)) return [];
-  const merges = mergedAt.filter((t) => t > joined && t <= over).sort((a, b) => a - b);
-  const working = { from: iso(joined), to: iso(merges[0] ?? over), what: "working", inferred: true };
-  return [working, ...merges.map((t) => ({ from: iso(t), to: iso(t), what: "merging", inferred: true }))];
-}
-function mergesFromEvents(messages) {
-  return messages.filter((m) => m.kind === "event" && (m.event === "merged" || m.event == null && MERGED_BODY.test(String(m.body)))).map((m) => {
-    const line = String(m.body).match(FILES_LINE)?.[1].trim();
-    const files = line === void 0 ? null : line === "-" ? [] : line.split(", ").map((f) => f.trim()).filter(Boolean);
-    return { participant: Number(m.author), at: ms(m.at), files, conflicts: null };
-  });
-}
-function computeRun(db, r, now, silentAfterMs) {
-  const id = Number(r.id);
-  const repo = String(r.repo);
-  const kind = profileOf(String(r.kind ?? "plan")).kind;
-  const openedAt = String(r.opened_at);
-  const closedAt = r.closed_at == null ? null : String(r.closed_at);
-  const runOver = closedAt ? ms(closedAt) : now;
-  const since = db.prepare("SELECT value FROM settings WHERE name = ?").get(RECORDS_SINCE);
-  const recorded = since !== void 0 && ms(openedAt) >= ms(since.value);
-  const sharesSince = db.prepare("SELECT value FROM settings WHERE name = ?").get(SHARES_SINCE);
-  const sharesRecorded = sharesSince !== void 0 && ms(openedAt) >= ms(sharesSince.value);
-  const people = db.prepare("SELECT * FROM participants WHERE run = ? ORDER BY id").all(id);
-  const ids = people.map((p) => Number(p.id));
-  const marks = ids.map(() => "?").join(", ") || "NULL";
-  const nameOf = (p) => `${r.plan}/${p.slice}`;
-  const messages = db.prepare(`SELECT * FROM messages WHERE run = ? OR (run IS NULL AND author IN (${marks})) ORDER BY seq`).all(id, ...ids);
-  const merges = recorded ? db.prepare("SELECT * FROM merges WHERE run = ? ORDER BY rowid").all(id) : [];
-  const claimLog = db.prepare(`SELECT path, participant, kind FROM claim_log WHERE participant IN (${marks}) ORDER BY rowid`).all(...ids);
-  const shares = db.prepare(`SELECT path, participant, other FROM shares WHERE participant IN (${marks}) AND other IN (${marks})`).all(...ids, ...ids);
-  const orchestrators = new Set(people.filter((p) => String(p.slice) === ORCHESTRATOR).map((p) => Number(p.id)));
-  const conflictedOf = (m) => m.conflicts == null ? null : JSON.parse(String(m.conflicts));
-  const mergesRead = recorded ? merges.map((m) => ({ participant: Number(m.participant), at: ms(m.at), files: JSON.parse(String(m.files)), conflicts: conflictedOf(m) })) : mergesFromEvents(messages);
-  const mergeTimesOf = (pid) => mergesRead.filter((m) => m.participant === pid).map((m) => m.at);
-  const grants = recorded ? db.prepare(
-    `SELECT t.participant, t.asked_at, t.granted_at, p.slice, r.plan FROM lock_requests t
-             LEFT JOIN participants p ON p.id = t.participant LEFT JOIN runs r ON r.id = p.run
-           WHERE t.repo = ? AND t.granted_at IS NOT NULL ORDER BY t.granted_at`
-  ).all(repo) : [];
-  const lockWaitsMs = [];
-  const boardFlags = distinctFlags(messages);
-  const racesLost = [];
-  const members = people.map((p) => {
-    const pid = Number(p.id);
-    const joined = ms(p.joined_at);
-    const over = Math.min(p.ended_at == null ? runOver : ms(p.ended_at), Math.max(now, joined));
-    const calls = recorded ? db.prepare("SELECT at, verb FROM call_log WHERE participant = ? ORDER BY at").all(pid) : [];
-    const endCalls = calls.filter((c) => c.verb === "end").map((c) => ms(c.at));
-    const turns = recorded ? db.prepare("SELECT * FROM lock_requests WHERE participant = ? ORDER BY rowid").all(pid).map((t) => {
-      const asked = ms(t.asked_at);
-      const merged = t.merged_at == null ? null : ms(t.merged_at);
-      return {
-        asked,
-        granted: t.granted_at == null ? null : ms(t.granted_at),
-        merged,
-        refused: Number(t.refused),
-        // a turn without a merge is closed by the member's next end call (D25), else by its end
-        over: merged ?? endCalls.find((e) => e >= asked) ?? over
-      };
-    }) : [];
-    const memberMarks = [];
-    let lost = 0;
-    let waitedMs = null;
-    for (const t of turns) {
-      if (t.granted !== null) lockWaitsMs.push(t.granted - t.asked);
-      if (t.refused === 0) continue;
-      const until = t.granted ?? t.over;
-      for (const g of grants) {
-        const at = ms(g.granted_at);
-        if (Number(g.participant) === pid || !(ms(g.asked_at) > t.asked) || !(at > t.asked && at < until)) continue;
-        lost++;
-        waitedMs = Math.max(waitedMs ?? 0, at - t.asked);
-        const winner = g.slice == null ? "a member" : `${g.plan}/${g.slice}`;
-        memberMarks.push({ at: iso(at), what: "race", note: `the merge lock went to ${winner}, who asked later` });
-      }
-    }
-    if (lost) racesLost.push({ member: nameOf(p), lost, waitedMs });
-    const own = messages.filter((m) => Number(m.author) === pid);
-    const posts = own.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
-    const flagged = boardFlags.filter((m) => Number(m.author) === pid);
-    for (const m of [...own.filter((x) => x.kind === "agreement"), ...flagged]) {
-      memberMarks.push({
-        at: String(m.at),
-        what: m.kind === "agreement" ? "agreement" : "flag",
-        seq: Number(m.seq),
-        ...m.about != null ? { path: String(m.about) } : {},
-        note: firstLine(String(m.body))
-      });
-    }
-    for (const m of mergesRead.filter((x) => x.participant === pid)) {
-      for (const f of m.conflicts ?? []) memberMarks.push({ at: iso(m.at), what: "conflict", path: f, note: `the rebase met a conflict in ${f}` });
-    }
-    memberMarks.sort((a, b) => ms(a.at) - ms(b.at));
-    return {
-      member: nameOf(p),
-      nick: p.nick == null ? String(p.slice) : String(p.nick),
-      slice: String(p.slice),
-      joined: String(p.joined_at),
-      ended: p.ended_at == null ? null : String(p.ended_at),
-      intervals: recorded ? timeline(joined, over, calls.map((c) => ms(c.at)), turns, silentAfterMs) : estimatedTimeline(joined, over, mergeTimesOf(pid)),
-      marks: memberMarks,
-      posts: posts.length,
-      postTimes: posts.map((m) => String(m.at)),
-      claims: claimLog.filter((c) => Number(c.participant) === pid).length,
-      flags: flagged.length,
-      unsourced: posts.filter((m) => !SOURCE.test(String(m.body))).length,
-      // read from its spans and marks once they are whole, below (D40)
-      waitingMs: null,
-      agreementsMade: null,
-      endorsed: null,
-      objections: null,
-      estimated: !recorded
-    };
-  });
-  const firstMerge = mergesRead.length ? Math.min(...mergesRead.map((m) => m.at)) : null;
-  const length = runOver - ms(openedAt);
-  const base = {
-    run: id,
-    kind,
-    code: planCode(String(r.plan)),
-    title: String(r.title),
-    openedAt,
-    closedAt,
-    lengthMs: Number.isNaN(length) ? null : length,
-    recorded,
-    firstMergeAtMs: firstMerge === null ? null : firstMerge - ms(openedAt),
-    racesLost: recorded ? racesLost.reduce((n, x) => n + (x.lost ?? 0), 0) : null,
-    members
-  };
-  if (kind === "brainstorm") {
-    const { brainstorm, marksOf, unsourcedOf } = debateOf(db, id, people.filter((p) => !orchestrators.has(Number(p.id))), messages);
-    members.forEach((m, i) => {
-      const pid = Number(people[i].id);
-      m.marks = [...m.marks, ...marksOf.get(pid) ?? []].sort((a, b) => ms(a.at) - ms(b.at));
-      m.unsourced = unsourcedOf.get(pid) ?? 0;
-    });
-    return { ...base, brainstorm };
-  }
-  if (kind !== "plan") return base;
-  const sliceMembers = people.filter((p) => !orchestrators.has(Number(p.id)));
-  const timesMs = sliceMembers.flatMap((p) => {
-    const mergedAt = mergeTimesOf(Number(p.id));
-    const end = mergedAt.length ? Math.min(...mergedAt) : p.ended_at == null ? null : ms(p.ended_at);
-    return end === null ? [] : [end - ms(p.joined_at)];
-  });
-  const sliceCount = Number(db.prepare("SELECT COUNT(*) AS n FROM slices WHERE run = ?").get(id).n);
-  const addedMidRun = messages.filter((m) => m.kind === "event" && orchestrators.has(Number(m.author)) && /^added \S+: /.test(String(m.body))).length;
-  const holdersByPath = /* @__PURE__ */ new Map();
-  for (const c of claimLog) {
-    const key = foldPath(String(c.path));
-    const entry2 = holdersByPath.get(key) ?? { path: String(c.path), holders: [] };
-    if (!entry2.holders.includes(Number(c.participant))) entry2.holders.push(Number(c.participant));
-    holdersByPath.set(key, entry2);
-  }
-  const sharersOf = (path10) => new Set(shares.filter((sh) => foldPath(String(sh.path)) === foldPath(path10)).flatMap((sh) => [Number(sh.participant), Number(sh.other)]));
-  const byId = new Map(people.map((p) => [Number(p.id), p]));
-  const membershipOf = (pid) => {
-    const p = byId.get(pid);
-    return { from: ms(p.joined_at), to: p.ended_at == null ? runOver : ms(p.ended_at) };
-  };
-  const membersTogether = (a, b) => {
-    const x = membershipOf(a);
-    const y = membershipOf(b);
-    return x.from < y.to && y.from < x.to;
-  };
-  const claimersTogether = (claimers) => claimers.filter((h) => claimers.some((o) => o !== h && membersTogether(h, o)));
-  const namesPath = (m, path10) => {
-    if (aboutNames(m.about, path10)) return true;
-    const body = foldPath(String(m.body));
-    return body.includes(foldPath(path10)) || body.includes(foldPath(path10.split("/").pop()));
-  };
-  const said = messages.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
-  const interfaceClaims = claimLog.filter((c) => c.kind === "interface");
-  const perFile = [];
-  let everyHolderTold = 0;
-  let agreed = 0;
-  let agreedBeforeMerge = 0;
-  for (const { path: path10, holders: everyHolder } of holdersByPath.values()) {
-    const sharers = sharersOf(path10);
-    const holders = sharesRecorded ? everyHolder.filter((h) => sharers.has(h)) : claimersTogether(everyHolder);
-    if (holders.length < 2) continue;
-    const tellTimes = [];
-    let told = true;
-    for (let i = 1; i < holders.length; i++) {
-      const tells = said.filter((m) => Number(m.author) === holders[i] && namesPath(m, path10));
-      tellTimes.push(...tells.map((m) => ms(m.at)));
-      const mentioned = (e) => tells.some((m) => {
-        const named = JSON.parse(String(m.mentions));
-        return named.includes(nameOf(byId.get(e))) || named.includes(`${r.plan}/*`);
-      });
-      if (!holders.slice(0, i).every(mentioned)) told = false;
-    }
-    const sharedAt = tellTimes.length ? Math.min(...tellTimes) : null;
-    const agreement = messages.find((m) => m.kind === "agreement" && aboutNames(m.about, path10));
-    const mergedWith = mergesRead.filter((m) => m.files ? m.files.some((f) => foldPath(f) === foldPath(path10)) : holders.includes(m.participant));
-    const firstMergeOfPath = mergedWith.length ? Math.min(...mergedWith.map((m) => m.at)) : null;
-    if (told) {
-      everyHolderTold++;
-      if (agreement) {
-        agreed++;
-        if (firstMergeOfPath === null || ms(agreement.at) < firstMergeOfPath) agreedBeforeMerge++;
-      }
-    }
-    const met = mergedWith.map((m) => m.conflicts);
-    const conflict = !recorded ? null : met.some((c) => c?.some((f) => foldPath(f) === foldPath(path10))) ? true : met.some((c) => c === null) ? null : false;
-    const declaredInterface = holders.some(
-      (h) => JSON.parse(String(byId.get(h).files ?? "[]")).some((d) => d.interface === true && aboutNames(d.path, path10))
-    );
-    const claimedInterface = interfaceClaims.some((c) => holders.includes(Number(c.participant)) && foldPath(String(c.path)) === foldPath(path10));
-    perFile.push({
-      path: path10,
-      holders: holders.map((h) => nameOf(byId.get(h))),
-      interface: declaredInterface || claimedInterface,
-      told,
-      agreement: agreement ? Number(agreement.seq) : null,
-      // below 0: agreed before the tell (D46)
-      agreedAfterMs: agreement && sharedAt !== null ? ms(agreement.at) - sharedAt : null,
-      conflict
-    });
-  }
-  let known = 0;
-  let inShared = 0;
-  let unknownMerges = 0;
-  for (const m of merges) {
-    const files = conflictedOf(m);
-    if (files === null) {
-      unknownMerges++;
-      continue;
-    }
-    known += files.length;
-    inShared += files.filter((f) => claimLog.some((c) => Number(c.participant) !== Number(m.participant) && foldPath(String(c.path)) === foldPath(f))).length;
-  }
-  const mergedSlices = recorded ? new Set(merges.map((m) => Number(m.participant)).filter((pid) => !orchestrators.has(pid))).size : sliceMembers.filter((p) => Number(p.merged ?? 0) === 1).length;
-  return {
-    ...base,
-    plan: {
-      slices: { merged: mergedSlices, of: sliceCount, addedMidRun, timesMs, timesEstimated: !recorded },
-      lock: { waitsMs: lockWaitsMs, racesLost },
-      shared: { files: perFile.length, everyHolderTold, agreed, agreedBeforeMerge, perFile, estimated: !sharesRecorded },
-      flags: boardFlags.length,
-      conflicts: recorded ? { known, inShared, unknownMerges } : { known: null, inShared: null, unknownMerges: null }
-    }
-  };
-}
-function skepticOf(db, run2, seats) {
-  const seated = (slice) => new Set(seats.filter((p) => String(p.slice) === slice).map((p) => Number(p.id)));
-  const named = seated(SKEPTIC);
-  if (named.size) return named;
-  const rows = db.prepare("SELECT id, on_events FROM slices WHERE run = ? AND on_events IS NOT NULL ORDER BY ord").all(run2);
-  const subscribesToAgreement = (row) => JSON.parse(String(row.on_events)).flatMap((e) => e.split(",")).some((e) => e.trim().replace(/^(any|main):/, "") === "agreement");
-  const subscribed = rows.find(subscribesToAgreement);
-  return subscribed ? seated(String(subscribed.id)) : /* @__PURE__ */ new Set();
-}
-function debateOf(db, run2, seats, messages) {
-  const skeptic = skepticOf(db, run2, seats);
-  const seatIds = new Set(seats.map((p) => Number(p.id)));
-  const questionOf = (m) => {
-    const about = m.about == null ? "" : String(m.about).trim();
-    return QUESTION.test(about) ? about : null;
-  };
-  const spoken = (m) => Number(m.by_board ?? 0) === 0 && (m.kind === "msg" || m.kind === "urgent" || m.kind === "agreement");
-  const bySeq = new Map(messages.map((m) => [Number(m.seq), m]));
-  const endorsements = [];
-  const skepticEndorsedAt = /* @__PURE__ */ new Map();
-  for (const m of messages) {
-    if (m.kind !== "endorsement" || m.endorses == null) continue;
-    const agreement = bySeq.get(Number(m.endorses));
-    const question = agreement && agreement.kind === "agreement" ? questionOf(agreement) : null;
-    if (question === null) continue;
-    endorsements.push({ endorsement: m, question });
-    if (skeptic.has(Number(m.author)) && !skepticEndorsedAt.has(Number(m.endorses))) skepticEndorsedAt.set(Number(m.endorses), Number(m.seq));
-  }
-  const endorsedSeqs = new Set(skepticEndorsedAt.keys());
-  const skepticEndorsements = endorsements.filter(({ endorsement }) => skeptic.has(Number(endorsement.author)));
-  const endorsedBefore = (agreementSeq, seq) => (skepticEndorsedAt.get(agreementSeq) ?? Infinity) < seq;
-  const outcomeOf = /* @__PURE__ */ new Map();
-  for (const m of messages) {
-    const q = questionOf(m);
-    if (q !== null && m.kind === "agreement" && endorsedSeqs.has(Number(m.seq)) && !outcomeOf.has(q)) outcomeOf.set(q, m);
-  }
-  const questions = /* @__PURE__ */ new Map();
-  const marksOf = /* @__PURE__ */ new Map();
-  const unsourcedOf = /* @__PURE__ */ new Map();
-  const mark = (pid, x) => void marksOf.set(pid, [...marksOf.get(pid) ?? [], x]);
-  const lastAgreementOn = /* @__PURE__ */ new Map();
-  let agreements = 0;
-  let sourced = 0;
-  let claims = 0;
-  for (const m of messages) {
-    const q = questionOf(m);
-    if (q === null || !spoken(m)) continue;
-    const author = Number(m.author);
-    const question = questions.get(q) ?? { id: q, firstPost: String(m.at), outcome: null, exchanges: 0 };
-    questions.set(q, question);
-    const outcome = outcomeOf.get(q);
-    const beforeOutcome = !outcome || Number(m.seq) < Number(outcome.seq);
-    if (beforeOutcome && seatIds.has(author)) question.exchanges = (question.exchanges ?? 0) + 1;
-    if (m.kind === "agreement") {
-      agreements++;
-      lastAgreementOn.set(q, m);
-      continue;
-    }
-    if (beforeOutcome) {
-      claims++;
-      if (SOURCE.test(String(m.body))) sourced++;
-      else unsourcedOf.set(author, (unsourcedOf.get(author) ?? 0) + 1);
-    }
-    const last = lastAgreementOn.get(q);
-    if (skeptic.has(author) && last && Number(last.author) !== author && !endorsedBefore(Number(last.seq), Number(m.seq))) {
-      mark(author, { at: String(m.at), what: "objected", seq: Number(m.seq), path: q, note: `objects to #${last.seq}: ${firstLine(String(m.body))}` });
-    }
-  }
-  for (const { endorsement, question } of endorsements) {
-    mark(Number(endorsement.author), { at: String(endorsement.at), what: "endorsed", seq: Number(endorsement.seq), path: question, note: `endorses #${endorsement.endorses}` });
-  }
-  for (const [q, outcome] of outcomeOf) {
-    const question = questions.get(q);
-    if (question) question.outcome = { at: String(outcome.at), seq: Number(outcome.seq), kind: "agreed" };
-  }
-  return {
-    brainstorm: {
-      questions: [...questions.values()].sort((a, b) => ms(a.firstPost) - ms(b.firstPost)),
-      agreements,
-      endorsed: skepticEndorsements.length,
-      claimsWithSource: { n: sourced, of: claims, inferred: true }
-    },
-    marksOf,
-    unsourcedOf
-  };
-}
-function withMemberFigures(run2) {
-  const debated = run2.brainstorm !== void 0;
-  const marked = (m, what) => m.marks.filter((x) => x.what === what).length;
-  const lengthOf = (i) => ms(i.to) - ms(i.from);
-  const members = run2.members.map((m) => ({
-    ...m,
-    waitingMs: m.waitingMs ?? (run2.recorded ? m.intervals.filter((i) => i.what === "waiting").reduce((n, i) => n + lengthOf(i), 0) : null),
-    agreementsMade: m.agreementsMade ?? marked(m, "agreement"),
-    endorsed: m.endorsed ?? (debated ? marked(m, "endorsed") : null),
-    objections: m.objections ?? (debated ? marked(m, "objected") : null),
-    // a summary from before the events were read (D45) reads its member as not estimated
-    estimated: m.estimated ?? false
-  }));
-  const plan = run2.plan && {
-    ...run2.plan,
-    slices: slicesOfSummary(run2.plan.slices),
-    shared: {
-      ...run2.plan.shared,
-      estimated: run2.plan.shared.estimated ?? false,
-      // a summary from before `told` (D46) reads each file told, as its list read it
-      perFile: run2.plan.shared.perFile.map((f) => ({ ...f, told: f.told ?? true }))
-    }
-  };
-  return { ...run2, members, ...plan ? { plan } : {} };
-}
-function slicesOfSummary(slices) {
-  const { estimated, ...rest } = slices;
-  return { ...rest, timesEstimated: slices.timesEstimated ?? estimated ?? false };
-}
-function summarize(db, run2, silentAfterMs) {
-  const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run2);
-  if (!r) throw new Error(`no run ${run2}`);
-  return withMemberFigures(computeRun(db, r, Date.now(), silentAfterMs));
-}
-function totalsOf(runs) {
-  const plans = runs.flatMap((r) => r.plan ? [r.plan] : []);
-  const recorded = runs.filter((r) => r.recorded);
-  const recordedPlans = recorded.flatMap((r) => r.plan ? [r.plan] : []);
-  const silentOf = (r) => r.members.filter((m) => m.intervals.some((i) => i.what === "silent")).length;
-  const times = plans.flatMap((p) => p.slices.timesMs);
-  const waits = recordedPlans.flatMap((p) => p.lock.waitsMs);
-  const bins = [...WAIT_BINS_MS, Infinity].map((upper, i) => waits.filter((w) => w >= (WAIT_BINS_MS[i - 1] ?? 0) && w < upper).length);
-  const shared = (pick) => sumKnown(plans.map((p) => pick(p.shared)));
-  const files = shared((s) => s.files);
-  const agreed = shared((s) => s.agreed);
-  const series = (figure) => runs.map((r) => r.recorded ? figure(r) : null);
-  const everyRun = (figure) => runs.map(figure);
-  return {
-    runs: runs.length,
-    byKind: { plan: runs.filter((r) => r.kind === "plan").length, brainstorm: runs.filter((r) => r.kind === "brainstorm").length },
-    notRecorded: runs.length - recorded.length,
-    members: runs.length ? runs.reduce((n, r) => n + r.members.length, 0) : null,
-    silentMembers: sumKnown(recorded.map(silentOf)),
-    slices: {
-      merged: sumKnown(plans.map((p) => p.slices.merged)),
-      of: sumKnown(plans.map((p) => p.slices.of)),
-      p50Ms: percentile(times, 0.5),
-      p90Ms: percentile(times, 0.9),
-      timesEstimatedRuns: plans.filter((p) => p.slices.timesEstimated).length
-    },
-    // merges: the lock turns granted, each one merge's wait
-    lockWait: { merges: recordedPlans.length ? waits.length : null, p50Ms: percentile(waits, 0.5), p90Ms: percentile(waits, 0.9), bins: recordedPlans.length ? bins : [] },
-    shared: {
-      files,
-      everyHolderTold: shared((s) => s.everyHolderTold),
-      agreed,
-      agreedBeforeMerge: shared((s) => s.agreedBeforeMerge),
-      withoutAgreement: files === null || agreed === null ? null : files - agreed,
-      estimatedRuns: plans.filter((p) => p.shared.estimated).length
-    },
-    flags: sumKnown(plans.map((p) => p.flags)),
-    runsWithoutFlag: plans.length ? plans.filter((p) => p.flags === 0).length : null,
-    conflicts: {
-      known: sumKnown(plans.map((p) => p.conflicts.known)),
-      inShared: sumKnown(plans.map((p) => p.conflicts.inShared)),
-      unknownMerges: sumKnown(plans.map((p) => p.conflicts.unknownMerges))
-    },
-    brainstorm: brainstormTotalsOf(runs),
-    series: {
-      slicesMerged: everyRun((r) => r.plan?.slices.merged ?? null),
-      sliceTimeP50: everyRun((r) => r.plan ? percentile(r.plan.slices.timesMs, 0.5) : null),
-      lockWaitP50: series((r) => r.plan ? percentile(r.plan.lock.waitsMs, 0.5) : null),
-      sharedAgreed: everyRun((r) => r.plan?.shared.agreed ?? null),
-      // flags come from the board's messages, kept for a run before the records too (D43)
-      flags: everyRun((r) => r.plan?.flags ?? null),
-      conflicts: series((r) => r.plan?.conflicts.known ?? null),
-      silentMembers: series(silentOf)
-    }
-  };
-}
-function brainstormTotalsOf(runs) {
-  const debated = runs.flatMap((r) => r.brainstorm ? [{ run: r, debate: r.brainstorm }] : []);
-  const questions = debated.flatMap((d) => d.debate.questions);
-  const settled = questions.filter((q) => q.outcome !== null);
-  const objectedOf = (r, q) => q.outcome !== null && r.members.some((m) => m.marks.some((x) => x.what === "objected" && x.path === q.id && x.seq !== void 0 && x.seq < q.outcome.seq));
-  const n = sumKnown(debated.map((d) => d.debate.claimsWithSource.n));
-  const of = sumKnown(debated.map((d) => d.debate.claimsWithSource.of));
-  const silentSeatsOf = (r) => r.members.filter((m) => m.slice !== ORCHESTRATOR && m.intervals.some((i) => i.what === "silent")).length;
-  const brainstorms = runs.filter((r) => r.kind === "brainstorm");
-  return {
-    notRecorded: brainstorms.length ? brainstorms.filter((r) => !r.recorded).length : null,
-    questionsSettled: debated.length ? settled.length : null,
-    questions: debated.length ? questions.length : null,
-    exchangesMedian: percentile(settled.flatMap((q) => q.exchanges === null ? [] : [q.exchanges]), 0.5),
-    objectedThenAgreed: debated.length ? debated.reduce((k, d) => k + d.debate.questions.filter((q) => objectedOf(d.run, q)).length, 0) : null,
-    sourcedShare: n === null || !of ? null : n / of,
-    claimsWithSource: { n, of },
-    silentSeats: sumKnown(debated.filter((d) => d.run.recorded).map((d) => silentSeatsOf(d.run)))
-  };
-}
-function filesAcross(runs) {
-  const byPath = /* @__PURE__ */ new Map();
-  for (const r of runs) {
-    for (const f of r.plan?.shared.perFile ?? []) {
-      const key = foldPath(f.path);
-      const entry2 = byPath.get(key) ?? { path: f.path, perRun: [] };
-      entry2.perRun.push({ run: r.run, holders: f.holders, agreed: f.agreement !== null, conflict: f.conflict, interface: f.interface ?? null });
-      byPath.set(key, entry2);
-    }
-  }
-  return [...byPath.values()].map(({ path: path10, perRun }) => ({
-    path: path10,
-    runs: perRun.map((x) => x.run),
-    holders: new Set(perRun.flatMap((x) => x.holders)).size,
-    agreements: perRun.filter((x) => x.agreed).length,
-    conflicts: perRun.every((x) => x.conflict === null) ? null : perRun.filter((x) => x.conflict === true).length,
-    // the runs in which a holder declared or claimed it an interface; null when none knows (summaries from before D37)
-    declaredInterface: perRun.every((x) => x.interface === null) ? null : perRun.filter((x) => x.interface === true).length,
-    perRun: perRun.map((x) => ({ run: x.run, holders: x.holders.length, conflict: x.conflict }))
-  })).sort((a, b) => b.runs.length - a.runs.length || a.path.localeCompare(b.path));
-}
-function statsOf(db, scope, silentAfterMs) {
-  for (const k of scope.kinds ?? []) profileOf(k);
-  const start = periodStart(scope.since);
-  const where = ["repo = ?", KEPT];
-  const params = [scope.repo];
-  if (scope.run !== void 0) {
-    where.push("id = ?");
-    params.push(scope.run);
-  }
-  if (scope.kinds?.length) {
-    where.push(`kind IN (${scope.kinds.map(() => "?").join(", ")})`);
-    params.push(...scope.kinds);
-  }
-  if (scope.closedOnly) where.push("state = 'closed'");
-  if (start) {
-    where.push("(state = 'open' OR closed_at >= ?)");
-    params.push(start);
-  }
-  db.exec("BEGIN");
-  try {
-    if (scope.run !== void 0 && !db.prepare(`SELECT 1 FROM runs WHERE id = ? AND repo = ? AND ${KEPT}`).get(scope.run, scope.repo)) {
-      throw new Error(`no run ${scope.run}`);
-    }
-    const rows = db.prepare(`SELECT * FROM runs WHERE ${where.join(" AND ")} ORDER BY opened_at, id`).all(...params);
-    const stored = db.prepare("SELECT body FROM run_stats WHERE run = ?");
-    const now = Date.now();
-    const runs = rows.map((r) => {
-      const row = stored.get(Number(r.id));
-      return withMemberFigures(row ? JSON.parse(String(row.body)) : computeRun(db, r, now, silentAfterMs));
-    });
-    return { scope, runs, totals: totalsOf(runs), files: filesAcross(runs), silentAfterMs };
-  } finally {
-    db.exec("COMMIT");
-  }
-}
-var DAY_MS, MINUTE_MS, CASELESS, foldPath, RECORDS_SINCE, SHARES_SINCE, ORCHESTRATOR, SKEPTIC, QUESTION, FLAG_BODY, isBoardFlag, SOURCE, WAIT_BINS_MS, ms, iso, firstLine, aboutNames, MERGED_BODY, FILES_LINE, KEPT;
-var init_stats = __esm({
-  "src/board/stats.ts"() {
-    "use strict";
-    init_kinds();
-    init_mentions();
-    DAY_MS = 24 * 60 * 60 * 1e3;
-    MINUTE_MS = 60 * 1e3;
-    CASELESS = process.platform === "win32";
-    foldPath = (p) => CASELESS ? p.toLowerCase() : p;
-    RECORDS_SINCE = "records-since";
-    SHARES_SINCE = "shares-since";
-    ORCHESTRATOR = "orchestrator";
-    SKEPTIC = "skeptic";
-    QUESTION = /^D\d+$/;
-    FLAG_BODY = /flag:\s*\S+\s+wrote\s+(\S+)\s+outside its claim(?:;\s*(\S+)\s+holds it)?/;
-    isBoardFlag = (m) => Number(m.by_board ?? 0) === 1 && (m.event === "flag" || m.event == null && FLAG_BODY.test(String(m.body)));
-    SOURCE = /[\w./\\-]+\.\w+:\d+|#\d+|https?:\/\/\S+/;
-    WAIT_BINS_MS = [1, 2, 5, 10].map((m) => m * MINUTE_MS);
-    ms = (at) => Date.parse(String(at));
-    iso = (t) => new Date(t).toISOString();
-    firstLine = (body) => body.split(/\r?\n/)[0].slice(0, 120);
-    aboutNames = (about, path10) => {
-      if (about == null) return false;
-      const a = foldPath(String(about).replace(/\\/g, "/"));
-      const f = foldPath(path10);
-      return a === f || f.endsWith(`/${a}`);
-    };
-    MERGED_BODY = /^merged \S+/;
-    FILES_LINE = /^files: (.*)$/m;
-    KEPT = "(pruned_at IS NULL OR id IN (SELECT run FROM run_stats))";
-  }
-});
-
-// src/board/names.ts
-function funnyName(taken, random = Math.random) {
-  const used = new Set([...taken].map((t) => t.toLowerCase()));
-  const pick = (xs) => xs[Math.floor(random() * xs.length) % xs.length];
-  const free = ADJECTIVES.flatMap((a) => ANIMALS.map((b) => `${a} ${b}`)).filter((n) => !used.has(n.toLowerCase()));
-  if (free.length) return pick(free);
-  for (let i = 2; ; i++) {
-    const n = `${pick(ADJECTIVES)} ${pick(ANIMALS)} ${i}`;
-    if (!used.has(n.toLowerCase())) return n;
-  }
-}
-var ADJECTIVES, ANIMALS;
-var init_names = __esm({
-  "src/board/names.ts"() {
-    "use strict";
-    ADJECTIVES = [
-      "Sleepy",
-      "Grumpy",
-      "Brave",
-      "Clumsy",
-      "Dizzy",
-      "Fuzzy",
-      "Gentle",
-      "Hasty",
-      "Jolly",
-      "Lucky",
-      "Mighty",
-      "Nimble",
-      "Plucky",
-      "Quiet",
-      "Rusty",
-      "Sneaky",
-      "Tidy",
-      "Witty",
-      "Zesty",
-      "Bouncy",
-      "Cheeky",
-      "Dapper",
-      "Eager",
-      "Fancy",
-      "Giddy",
-      "Humble",
-      "Lofty",
-      "Merry",
-      "Peppy",
-      "Snappy"
-    ];
-    ANIMALS = [
-      "Otter",
-      "Badger",
-      "Walrus",
-      "Penguin",
-      "Llama",
-      "Ferret",
-      "Puffin",
-      "Wombat",
-      "Gecko",
-      "Moose",
-      "Panda",
-      "Lemur",
-      "Narwhal",
-      "Hedgehog",
-      "Koala",
-      "Yak",
-      "Toucan",
-      "Beaver",
-      "Platypus",
-      "Raccoon",
-      "Alpaca",
-      "Bison",
-      "Capybara",
-      "Dingo",
-      "Emu",
-      "Flamingo",
-      "Gibbon",
-      "Heron",
-      "Ibis",
-      "Jackal"
-    ];
-  }
-});
-
-// src/board/board.ts
-import fs6 from "node:fs";
-import path7 from "node:path";
-function messageLine(m) {
-  const first = m.body.split(/\r?\n/)[0];
-  const text = first.length > LINE_WIDTH ? `${first.slice(0, LINE_WIDTH - 1)}\u2026` : first;
-  const kind = m.kind === "msg" ? "" : ` (${m.kind})`;
-  const about = m.about ? ` about ${m.about}` : "";
-  return `#${m.seq} ${m.from}${kind}${about}: ${text}`;
-}
-async function openBoard(dbPath = SQLITE_PATH) {
-  process.removeAllListeners("warning");
-  process.on("warning", (w) => {
-    if (w.name !== "ExperimentalWarning") console.warn(w);
-  });
-  const { DatabaseSync } = await import("node:sqlite");
-  fs6.mkdirSync(path7.dirname(dbPath), { recursive: true });
-  const db = new DatabaseSync(dbPath, { timeout: 5e3 });
-  const recordsAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'call_log'").get() === void 0;
-  const sharesAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'shares'").get() === void 0;
-  db.exec(`
-    PRAGMA journal_mode = DELETE;
-    -- Several CLI processes write, and aiview reads, concurrently; without a busy timeout a
-    -- concurrent verb fails outright with SQLITE_BUSY.
-    PRAGMA busy_timeout = 5000;
-    CREATE TABLE IF NOT EXISTS runs (
-      id INTEGER PRIMARY KEY,
-      repo TEXT NOT NULL,
-      plan TEXT NOT NULL,
-      title TEXT NOT NULL,
-      state TEXT NOT NULL DEFAULT 'open',
-      opened_at TEXT NOT NULL,
-      closed_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS slices (
-      run INTEGER NOT NULL,
-      id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      blockers TEXT NOT NULL DEFAULT '[]',
-      state TEXT NOT NULL DEFAULT 'ready',
-      ord INTEGER NOT NULL,
-      PRIMARY KEY (run, id)
-    );
-    CREATE TABLE IF NOT EXISTS participants (
-      id INTEGER PRIMARY KEY,
-      run INTEGER NOT NULL,
-      slice TEXT NOT NULL,
-      worktree TEXT,
-      doing TEXT NOT NULL DEFAULT '',
-      files TEXT NOT NULL DEFAULT '[]',
-      since_seq INTEGER NOT NULL DEFAULT 0,
-      joined_at TEXT NOT NULL,
-      ended_at TEXT,
-      last_call TEXT,
-      UNIQUE (run, slice)
-    );
-    CREATE TABLE IF NOT EXISTS messages (
-      seq INTEGER PRIMARY KEY AUTOINCREMENT,
-      repo TEXT NOT NULL,
-      author INTEGER NOT NULL,
-      body TEXT NOT NULL,
-      about TEXT,
-      kind TEXT NOT NULL DEFAULT 'msg',
-      mentions TEXT NOT NULL DEFAULT '[]',
-      at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS messages_repo ON messages (repo, seq);
-    CREATE TABLE IF NOT EXISTS deliveries (
-      participant INTEGER NOT NULL,
-      seq INTEGER NOT NULL,
-      PRIMARY KEY (participant, seq)
-    );
-    -- claims are global by repository-relative path, across every run on a repository (D12, D20);
-    -- a path may have several holders (D40). since_seq: the thread's last seq when it was claimed
-    CREATE TABLE IF NOT EXISTS claims (
-      repo TEXT NOT NULL,
-      path TEXT NOT NULL,
-      participant INTEGER NOT NULL,
-      kind TEXT NOT NULL DEFAULT 'inside',
-      since_seq INTEGER NOT NULL DEFAULT 0,
-      PRIMARY KEY (repo, path, participant)
-    );
-    -- every claim made, kept past its release: who held a path during a run (D63), and whether as an
-    -- interface: widened to 'interface' when the claim is made or widened so, never narrowed (D42)
-    CREATE TABLE IF NOT EXISTS claim_log (
-      repo TEXT NOT NULL,
-      path TEXT NOT NULL,
-      participant INTEGER NOT NULL,
-      kind TEXT NOT NULL DEFAULT 'inside',
-      PRIMARY KEY (repo, path, participant)
-    );
-    -- a claim granted beside a live holder of the path, kept past both claims' release: who held a path
-    -- at the same time as whom during a run, from the seq it began (D39); append-only, deleted with its run
-    CREATE TABLE IF NOT EXISTS shares (
-      repo TEXT NOT NULL,
-      path TEXT NOT NULL,
-      participant INTEGER NOT NULL,
-      other INTEGER NOT NULL,
-      seq INTEGER NOT NULL,
-      PRIMARY KEY (repo, path, participant, other)
-    );
-    -- a holder of a shared path already told of another holder (D41): once per runner and path
-    CREATE TABLE IF NOT EXISTS notices (
-      repo TEXT NOT NULL,
-      path TEXT NOT NULL,
-      participant INTEGER NOT NULL,
-      other INTEGER NOT NULL,
-      PRIMARY KEY (repo, path, participant, other)
-    );
-    CREATE TABLE IF NOT EXISTS merge_locks (
-      repo TEXT PRIMARY KEY,
-      participant INTEGER NOT NULL,
-      at TEXT NOT NULL
-    );
-    -- a runner refused the merge lock since its holder took it: mentioned when it is released (D65)
-    CREATE TABLE IF NOT EXISTS lock_waiters (
-      repo TEXT NOT NULL,
-      participant INTEGER NOT NULL,
-      PRIMARY KEY (repo, participant)
-    );
-    -- a path written outside its writer's claim, by reconcileWrites; lives while a claim on it does (D39)
-    CREATE TABLE IF NOT EXISTS flags (
-      repo TEXT NOT NULL,
-      path TEXT NOT NULL,
-      participant INTEGER NOT NULL,
-      PRIMARY KEY (repo, path, participant)
-    );
-    -- a claim refused as held: the post that settles it claims it (D7)
-    CREATE TABLE IF NOT EXISTS claim_requests (
-      repo TEXT NOT NULL,
-      path TEXT NOT NULL,
-      participant INTEGER NOT NULL,
-      kind TEXT NOT NULL,
-      PRIMARY KEY (repo, path, participant)
-    );
-    -- a flag posted, once per writer, path and holder (D8)
-    CREATE TABLE IF NOT EXISTS flag_posts (
-      repo TEXT NOT NULL,
-      path TEXT NOT NULL,
-      participant INTEGER NOT NULL,
-      holder INTEGER NOT NULL,
-      PRIMARY KEY (repo, path, participant, holder)
-    );
-    -- a version per repository, moved by every write: what onChange compares (D39)
-    CREATE TABLE IF NOT EXISTS changes (
-      repo TEXT PRIMARY KEY,
-      version INTEGER NOT NULL
-    );
-    -- one row per merge, written by merged, deleted with its run by prune (D25): files and conflicts JSON, conflicts NULL for unknown
-    CREATE TABLE IF NOT EXISTS merges (
-      participant INTEGER NOT NULL,
-      run INTEGER NOT NULL,
-      sha TEXT NOT NULL,
-      at TEXT NOT NULL,
-      files TEXT NOT NULL,
-      conflicts TEXT
-    );
-    CREATE INDEX IF NOT EXISTS merges_run ON merges (run);
-    -- one row per counted call, written by countCall in the verb's transaction (D25); deleted with its run
-    CREATE TABLE IF NOT EXISTS call_log (participant INTEGER NOT NULL, at TEXT NOT NULL, verb TEXT NOT NULL);
-    CREATE INDEX IF NOT EXISTS call_log_by_participant ON call_log (participant, at);
-    -- one row per merge-lock turn: asked, granted, merged; refused counts the refusals (D25); deleted with its run
-    CREATE TABLE IF NOT EXISTS lock_requests (repo TEXT NOT NULL, participant INTEGER NOT NULL, asked_at TEXT NOT NULL,
-      granted_at TEXT, merged_at TEXT, refused INTEGER NOT NULL DEFAULT 0);
-    CREATE INDEX IF NOT EXISTS lock_requests_by_participant ON lock_requests (participant, asked_at);
-    -- a closed run's figures, RunStats JSON, written once at close or by prune first; never pruned (D20, D21)
-    CREATE TABLE IF NOT EXISTS run_stats (run INTEGER PRIMARY KEY, repo TEXT NOT NULL, kind TEXT NOT NULL,
-      closed_at TEXT NOT NULL, body TEXT NOT NULL);
-    -- board settings (D32): retention-days; the board's own last-upkeep (D16)
-    CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
-    -- the identities and hook_seen tables, left in stores from before D58, are no longer read or written
-    -- a member done with a phase, once per run, member and phase; a phase opened again clears its rows
-    CREATE TABLE IF NOT EXISTS phase_done (run INTEGER NOT NULL, participant INTEGER NOT NULL, phase TEXT NOT NULL, at TEXT NOT NULL,
-      PRIMARY KEY (run, participant, phase));
-    -- a member's transcript (member: its seat id, or orchestrator) and where its token counter stands
-    CREATE TABLE IF NOT EXISTS transcripts (run INTEGER NOT NULL, member TEXT NOT NULL, path TEXT NOT NULL, adapter TEXT,
-      offset INTEGER NOT NULL DEFAULT 0, tokens INTEGER NOT NULL DEFAULT 0, readable INTEGER NOT NULL DEFAULT 0,
-      read_at TEXT, moved_at TEXT, PRIMARY KEY (run, member));
-    -- the poller's readings, pruned past READINGS_KEPT_MS
-    CREATE TABLE IF NOT EXISTS token_readings (run INTEGER NOT NULL, member TEXT NOT NULL, t TEXT NOT NULL, tokens INTEGER NOT NULL);
-    CREATE INDEX IF NOT EXISTS token_readings_by_run ON token_readings (run, t);
-    -- a liveness warning posted, once per member and condition (none, unreadable); a good read clears unreadable
-    CREATE TABLE IF NOT EXISTS liveness_warned (run INTEGER NOT NULL, member TEXT NOT NULL, cond TEXT NOT NULL, PRIMARY KEY (run, member, cond));
-    -- a member's latest activity, from its link's frames (swarm-relay D9); stalled_at: the last stalled told of it (D11)
-    CREATE TABLE IF NOT EXISTS member_activity (
-      run INTEGER NOT NULL, member TEXT NOT NULL,
-      grew_at INTEGER, tokens INTEGER NOT NULL DEFAULT 0, context INTEGER,
-      open_tool TEXT, open_target TEXT, open_since INTEGER, last_tool TEXT,
-      finished INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL, stalled_at INTEGER,
-      PRIMARY KEY (run, member));
-  `);
-  if (recordsAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(RECORDS_SINCE2, (/* @__PURE__ */ new Date()).toISOString());
-  if (sharesAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(SHARES_SINCE2, (/* @__PURE__ */ new Date()).toISOString());
-  const upkeep = (table, column, ddl) => {
-    const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
-    if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
-  };
-  upkeep("participants", "worktree", "worktree TEXT");
-  upkeep("claim_log", "kind", "kind TEXT NOT NULL DEFAULT 'inside'");
-  upkeep("participants", "last_call", "last_call TEXT");
-  upkeep("participants", "calls", "calls INTEGER NOT NULL DEFAULT 0");
-  upkeep("participants", "waiting", "waiting INTEGER NOT NULL DEFAULT 0");
-  upkeep("participants", "listening", "listening INTEGER NOT NULL DEFAULT 0");
-  upkeep("participants", "nick", "nick TEXT");
-  upkeep("participants", "wait_gen", "wait_gen INTEGER NOT NULL DEFAULT 0");
-  upkeep("participants", "merged", "merged INTEGER NOT NULL DEFAULT 0");
-  upkeep("messages", "by_board", "by_board INTEGER NOT NULL DEFAULT 0");
-  upkeep("runs", "link", "link TEXT");
-  upkeep("messages", "meta", "meta TEXT");
-  upkeep("merge_locks", "onto", "onto TEXT");
-  upkeep("merge_locks", "reflog_mark", "reflog_mark INTEGER");
-  upkeep("slices", "link", "link TEXT");
-  upkeep("runs", "kind", "kind TEXT NOT NULL DEFAULT 'plan'");
-  upkeep("messages", "run", "run INTEGER");
-  upkeep("messages", "endorses", "endorses INTEGER");
-  upkeep("runs", "stale_flagged", "stale_flagged INTEGER NOT NULL DEFAULT 0");
-  upkeep("participants", "quiet_flagged", "quiet_flagged INTEGER NOT NULL DEFAULT 0");
-  upkeep("runs", "pruned_at", "pruned_at TEXT");
-  upkeep("messages", "event", "event TEXT");
-  upkeep("participants", "subs", "subs TEXT NOT NULL DEFAULT '[]'");
-  upkeep("slices", "on_events", "on_events TEXT");
-  upkeep("runs", "phase", "phase TEXT");
-  upkeep("runs", "phase_text", "phase_text TEXT");
-  upkeep("runs", "paused", "paused TEXT");
-  upkeep("runs", "resumed_at", "resumed_at TEXT");
-  upkeep("runs", "stall_ms", `stall_ms INTEGER NOT NULL DEFAULT ${STALL_MS_DEFAULT}`);
-  upkeep("runs", "stall_posts", "stall_posts INTEGER NOT NULL DEFAULT 0");
-  db.exec("CREATE INDEX IF NOT EXISTS messages_channel ON messages (repo, run, seq)");
-  const claimKey = db.prepare("PRAGMA table_info(claims)").all().find((c) => c.name === "participant");
-  if (claimKey && claimKey.pk === 0) {
-    db.exec(`
-      BEGIN;
-      ALTER TABLE claims RENAME TO claims_before_d40;
-      CREATE TABLE claims (
-        repo TEXT NOT NULL,
-        path TEXT NOT NULL,
-        participant INTEGER NOT NULL,
-        kind TEXT NOT NULL DEFAULT 'inside',
-        since_seq INTEGER NOT NULL DEFAULT 0,
-        PRIMARY KEY (repo, path, participant)
-      );
-      INSERT INTO claims (repo, path, participant, kind) SELECT repo, path, participant, kind FROM claims_before_d40;
-      DROP TABLE claims_before_d40;
-      COMMIT;
-    `);
-  }
-  const localWakers = /* @__PURE__ */ new Set();
-  const touch = () => {
-    for (const wake of [...localWakers]) queueMicrotask(wake);
-  };
-  const now = () => (/* @__PURE__ */ new Date()).toISOString();
-  let depth = 0;
-  let dirty = false;
-  const transaction = (fn) => {
-    if (depth > 0) return fn();
-    db.exec("BEGIN IMMEDIATE");
-    depth++;
-    let ok = false;
-    try {
-      const out = fn();
-      db.exec("COMMIT");
-      ok = true;
-      return out;
-    } catch (e) {
-      db.exec("ROLLBACK");
-      throw e;
-    } finally {
-      depth--;
-      if (dirty) {
-        dirty = false;
-        if (ok) touch();
-      }
-    }
-  };
-  const bump = (repo) => {
-    db.prepare("INSERT INTO changes (repo, version) VALUES (?, 1) ON CONFLICT (repo) DO UPDATE SET version = version + 1").run(repo);
-    if (depth > 0) dirty = true;
-    else touch();
-  };
-  const runRow = (id) => {
-    const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(id);
-    if (!r) throw new Error(`unknown run ${id}`);
-    return r;
-  };
-  const phaseOf = (r) => r.phase == null ? null : { name: String(r.phase), text: String(r.phase_text ?? "") };
-  const toRun = (r) => ({
-    phase: phaseOf(r),
-    paused: r.paused == null ? null : String(r.paused),
-    id: Number(r.id),
-    repo: String(r.repo),
-    kind: profileOf(String(r.kind ?? "plan")).kind,
-    plan: String(r.plan),
-    group: String(r.plan),
-    title: String(r.title),
-    link: r.link == null ? null : String(r.link),
-    state: r.state === "closed" ? "closed" : "open",
-    slices: db.prepare("SELECT * FROM slices WHERE run = ? ORDER BY ord").all(Number(r.id)).map((s) => ({
-      id: String(s.id),
-      title: String(s.title),
-      link: s.link == null ? null : String(s.link),
-      blockers: JSON.parse(String(s.blockers)),
-      state: String(s.state)
-    }))
-  });
-  const nickOf = (r) => r.nick == null ? String(r.slice) : String(r.nick);
-  const unusedNick = (repo) => {
-    const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL`).all(repo);
-    return funnyName(rows.map(nickOf));
-  };
-  const subsOf = (r) => JSON.parse(String(r.subs ?? "[]")).map((x) => ({ event: x.event, scope: x.scope === "run" ? "run" : "any" }));
-  const PARTICIPANT_SQL = `SELECT p.*, r.repo, r.plan, r.kind FROM participants p JOIN runs r ON r.id = p.run`;
-  const toParticipant = (r) => ({
-    id: Number(r.id),
-    run: Number(r.run),
-    repo: String(r.repo),
-    kind: profileOf(String(r.kind ?? "plan")).kind,
-    plan: String(r.plan),
-    slice: String(r.slice),
-    name: `${r.plan}/${r.slice}`,
-    nick: nickOf(r),
-    ended: r.ended_at != null,
-    worktree: r.worktree == null ? null : String(r.worktree),
-    listening: Number(r.listening) === 1,
-    subscriptions: subsOf(r)
-  });
-  const participantById = (id) => toParticipant(db.prepare(`${PARTICIPANT_SQL} WHERE p.id = ?`).get(id));
-  const toMessage = (r) => {
-    const author = participantById(Number(r.author));
-    return {
-      seq: Number(r.seq),
-      repo: String(r.repo),
-      from: author.name,
-      body: String(r.body),
-      about: r.about == null ? null : String(r.about),
-      kind: String(r.kind),
-      mentions: JSON.parse(String(r.mentions)),
-      at: String(r.at),
-      // an old main row (null) is labelled with its author's run (plan D13)
-      run: r.run == null ? author.run : Number(r.run),
-      endorses: r.endorses == null ? null : Number(r.endorses),
-      event: r.event == null || !Object.hasOwn(EVENTS, String(r.event)) ? null : String(r.event),
-      meta: r.meta == null ? null : JSON.parse(String(r.meta))
-    };
-  };
-  const lastSeq = () => Number(db.prepare("SELECT COALESCE(MAX(seq), 0) AS s FROM messages").get().s);
-  const openPlans = (repo) => db.prepare("SELECT DISTINCT plan FROM runs WHERE repo = ? AND state = 'open'").all(repo).map((r) => String(r.plan));
-  const activeNames = (repo) => {
-    const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL AND p.slice != '${ORCHESTRATOR2}'`).all(repo);
-    return new Map(rows.map((r) => [nameHandle(nickOf(r)), `${r.plan}/${r.slice}`]));
-  };
-  const insertMessage = (p, body, about, kind, named, extra = {}) => {
-    const mentions2 = named ?? (kind === "event" ? [] : parseMentions(body, p.plan, openPlans(p.repo), activeNames(p.repo)));
-    const run2 = p.run;
-    if (runRow(run2).state === "closed") throw new Error(`run ${run2} is closed`);
-    const r = db.prepare("INSERT INTO messages (repo, author, body, about, kind, mentions, at, by_board, run, endorses, event, meta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(p.repo, p.id, body, about, kind, JSON.stringify(mentions2), now(), named ? 1 : 0, run2, extra.endorses ?? null, extra.event ?? null, extra.meta ? JSON.stringify(extra.meta) : null);
-    const seq = Number(r.lastInsertRowid);
-    bump(p.repo);
-    return board2.read(seq);
-  };
-  const gated = (p, verb) => {
-    if (!profileOf(p.kind).claims) throw new Error(`${verb}: a ${p.kind} run has no claims`);
-    return p;
-  };
-  const live = (p) => {
-    const fresh = participantById(p.id);
-    if (fresh.ended) throw new Error(`runner ${p.name} has ended`);
-    return fresh;
-  };
-  const isLive = (id) => db.prepare("SELECT 1 FROM participants p JOIN runs r ON r.id = p.run WHERE p.id = ? AND p.ended_at IS NULL AND r.state = 'open'").get(id) !== void 0;
-  const fold = (s) => CASELESS2 ? s.toLowerCase() : s;
-  const slashes = (rel) => rel.split(/[\\/]+/).filter((x) => x && x !== ".").join("/");
-  const roots = (repo) => {
-    const out = /* @__PURE__ */ new Set();
-    if (path7.basename(repo).toLowerCase() === ".git") out.add(path7.resolve(path7.dirname(repo)));
-    const rows = db.prepare("SELECT DISTINCT p.worktree FROM participants p JOIN runs r ON r.id = p.run WHERE r.repo = ? AND p.worktree IS NOT NULL").all(repo);
-    for (const r of rows) out.add(path7.resolve(String(r.worktree)));
-    return [...out].sort((a, b) => b.length - a.length);
-  };
-  const relPath = (repo, file) => {
-    if (!path7.isAbsolute(file) && !file.startsWith("/")) return slashes(file) || null;
-    const abs = fold(path7.resolve(file));
-    for (const root of roots(repo)) {
-      const r = fold(root);
-      if (abs.startsWith(r.endsWith(path7.sep) ? r : r + path7.sep)) return slashes(path7.resolve(file).slice(root.length)) || null;
-    }
-    return null;
-  };
-  const doingOf = (id) => String(db.prepare("SELECT doing FROM participants WHERE id = ?").get(id).doing) || "no note";
-  const claims = claimsOf({ db, transaction, bump, now, lastSeq, participantById, isLive, insertMessage, relPath, fold, slashes, doingOf });
-  const deliverTo = (p, fromWait, mentionsOnly = false) => {
-    const me = participantById(p.id);
-    const named = (m) => mentions(m, me) || (m.kind === "agreement" || m.kind === "endorsement") && m.about != null && claims.holds(me, m.about);
-    const whole = profileOf(me.kind).wholeThread;
-    const ownPost = (m) => whole && m.run === me.run && m.kind !== "event";
-    const messages = transaction(() => {
-      const unseen = db.prepare(
-        `SELECT m.* FROM messages m
-           WHERE m.repo = ? AND m.seq > ? AND (m.author != ? OR m.event IN (${TO_AUTHOR}))
-             AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.participant = ? AND d.seq = m.seq)
-           ORDER BY m.seq`
-      ).all(me.repo, Number(db.prepare("SELECT since_seq FROM participants WHERE id = ?").get(me.id).since_seq), me.id, me.id);
-      const woken = (r) => named(toMessage(r)) || wakes(toMessage(r), me, me.subscriptions);
-      const heard = unseen.filter((r) => toMessage(r).run === me.run || woken(r));
-      const rows = !mentionsOnly ? heard : !heard.some(woken) || !whole ? heard.filter(woken) : heard.filter((r) => woken(r) || ownPost(toMessage(r)));
-      const mark = db.prepare("INSERT INTO deliveries (participant, seq) VALUES (?, ?)");
-      for (const r of rows) mark.run(me.id, Number(r.seq));
-      const at = now();
-      db.prepare("UPDATE participants SET last_call = ? WHERE id = ?").run(at, me.id);
-      if (fromWait) {
-        const last = db.prepare("SELECT MAX(at) AS at FROM call_log WHERE participant = ?").get(me.id);
-        if (last.at == null || Date.parse(at) - Date.parse(String(last.at)) >= WAIT_LOG_EVERY_MS) {
-          db.prepare("INSERT INTO call_log (participant, at, verb) VALUES (?, ?, 'deliver')").run(me.id, at);
-        }
-      }
-      if (!fromWait) {
-        const r = db.prepare("UPDATE participants SET waiting = 0 WHERE id = ? AND waiting = 1").run(me.id);
-        if (Number(r.changes) > 0) bump(me.repo);
-      }
-      return rows.map((r) => {
-        const m = toMessage(r);
-        const rel = r.by_board || m.kind !== "msg" || !m.about || !named(m) ? null : claims.askedAbout(me, Number(r.author), m);
-        return rel ? { ...m, answer: `answer with an agreement on who changes what: swarm agree "<who changes what in ${rel}>" --about ${rel}` } : m;
-      });
-    });
-    const full = (m) => named(m) || mentionsOnly && wakes(m, me, me.subscriptions) || ownPost(m);
-    return {
-      full: messages.filter(full),
-      lines: messages.filter((m) => !full(m)).map(messageLine)
-    };
-  };
-  const retentionDays = () => {
-    const r = db.prepare("SELECT value FROM settings WHERE name = 'retention-days'").get();
-    return r ? Number(r.value) : RETENTION_DEFAULT_DAYS;
-  };
-  const retentionCutoff = (at) => new Date(at.getTime() - retentionDays() * DAY_MS2).toISOString();
-  const listedRuns = () => db.prepare("SELECT * FROM runs WHERE pruned_at IS NULL AND (state = 'open' OR (state = 'closed' AND closed_at >= ?)) ORDER BY id").all(retentionCutoff(/* @__PURE__ */ new Date()));
-  const runSummary = (r) => {
-    const id = Number(r.id);
-    const count = (sql) => Number(db.prepare(sql).get(id).n);
-    const open = r.state === "open";
-    return {
-      run: id,
-      kind: profileOf(String(r.kind ?? "plan")).kind,
-      plan: String(r.plan),
-      group: String(r.plan),
-      code: planCode(String(r.plan)),
-      title: String(r.title),
-      link: r.link == null ? null : String(r.link),
-      open,
-      runners: open ? count(`SELECT COUNT(*) AS n FROM participants WHERE run = ? AND slice != '${ORCHESTRATOR2}' AND ended_at IS NULL`) : 0,
-      done: count("SELECT COUNT(*) AS n FROM slices WHERE run = ? AND state = 'done'"),
-      of: count("SELECT COUNT(*) AS n FROM slices WHERE run = ?"),
-      phase: phaseOf(r),
-      progress: progressOf(id, r.phase == null ? null : String(r.phase)),
-      stallMs: Number(r.stall_ms ?? STALL_MS_DEFAULT)
-    };
-  };
-  const repoName = (repo) => {
-    const base = path7.basename(repo);
-    return base.toLowerCase() === ".git" ? path7.basename(path7.dirname(repo)) : base.replace(/\.git$/i, "");
-  };
-  const listeners = /* @__PURE__ */ new Set();
-  let watching = null;
-  let versions = /* @__PURE__ */ new Map();
-  const readVersions = () => new Map(db.prepare("SELECT repo, version FROM changes").all().map((r) => [String(r.repo), Number(r.version)]));
-  const insertSlice = (run2, s, ord) => {
-    if (s.on) parseSubscriptions(s.on);
-    db.prepare("INSERT INTO slices (run, id, title, blockers, link, ord, on_events) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
-      run2,
-      s.id,
-      s.title,
-      JSON.stringify(s.blockers ?? []),
-      s.link ?? null,
-      ord,
-      s.on ? JSON.stringify(s.on) : null
-    );
-  };
-  const setSubs = (p, subs) => {
-    db.prepare("UPDATE participants SET subs = ? WHERE id = ?").run(JSON.stringify(subs), p.id);
-    bump(p.repo);
-    return subs;
-  };
-  const sameSub = (a, b) => a.event === b.event && a.scope === b.scope;
-  const idleSince = /* @__PURE__ */ new Map();
-  const presenceOf = /* @__PURE__ */ new Map();
-  const noPresence = () => ({ connected: false, lostAt: null });
-  const goneTold = /* @__PURE__ */ new Set();
-  const orchestratorIn = (run2) => participantById(Number(db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, ORCHESTRATOR2).id));
-  const activityOf = (run2, member) => db.prepare("SELECT * FROM member_activity WHERE run = ? AND member = ?").get(run2, member);
-  const stateOf = (p, run2, t, presence) => {
-    const member = String(p.slice);
-    const a = activityOf(Number(run2.id), member);
-    const inWait = Number(p.waiting) === 1 || Number(p.listening) === 1;
-    if (a && Number(a.finished) === 1) return { member, state: "gone", doing: null, since: Number(a.at), reason: "its agent finished without end" };
-    const link = presence(member);
-    if (!link.connected && link.lostAt != null && t - link.lostAt >= LINK_LOST_MS) return { member, state: "gone", doing: null, since: link.lostAt, reason: "its link was lost" };
-    if (!a) {
-      if (inWait) return { member, state: "waiting", doing: null, since: null };
-      const joined = Date.parse(String(p.joined_at));
-      return { member, state: "quiet", doing: null, since: joined, reason: t - joined >= NO_TRANSCRIPT_MS ? "no transcript found" : "no activity yet" };
-    }
-    const open = a.open_tool == null ? null : `${a.open_tool} ${String(a.open_target ?? "")}`.trim();
-    if (open && inWait && /\bwait\b/.test(String(a.open_target ?? ""))) return { member, state: "waiting", doing: open, since: Number(a.open_since) };
-    if (open && t - Number(a.open_since) < BUSY_MAX_MS) return { member, state: "busy", doing: open, since: Number(a.open_since) };
-    const last = a.last_tool == null ? null : String(a.last_tool);
-    const grew = Math.max(a.grew_at == null ? Date.parse(String(p.joined_at)) : Number(a.grew_at), run2.resumed_at == null ? 0 : Date.parse(String(run2.resumed_at)));
-    if (t - grew < Number(run2.stall_ms ?? STALL_MS_DEFAULT)) return { member, state: "working", doing: open ?? last, since: grew };
-    const reason = open ? `${open} open ${Math.floor((t - Number(a.open_since)) / 6e4)} min` : `no output for ${Math.floor((t - grew) / 1e3)}s${last ? ` after ${last}` : ""}`;
-    return { member, state: "quiet", doing: open ?? last, since: grew, reason };
-  };
-  const statesOf = (run2, t) => {
-    const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run2);
-    if (!r) return /* @__PURE__ */ new Map();
-    const presence = presenceOf.get(run2) ?? noPresence;
-    const live2 = db.prepare("SELECT * FROM participants WHERE run = ? AND ended_at IS NULL ORDER BY id").all(run2);
-    return new Map(live2.map((p) => [String(p.slice), stateOf(p, r, t, presence)]));
-  };
-  const livenessOf = (run2, st) => {
-    if (!st) return void 0;
-    const a = activityOf(run2, st.member);
-    const { member: _, ...state } = st;
-    return { ...state, tokens: a ? Number(a.tokens) : null, movedAt: a?.grew_at == null ? null : new Date(Number(a.grew_at)).toISOString() };
-  };
-  const progressOf = (run2, phase) => {
-    if (phase == null) return null;
-    const rows = db.prepare(
-      `SELECT p.ended_at, EXISTS (SELECT 1 FROM phase_done d WHERE d.run = p.run AND d.participant = p.id AND d.phase = ?) AS done
-         FROM participants p WHERE p.run = ? AND p.slice != '${ORCHESTRATOR2}'`
-    ).all(phase, run2);
-    const counted2 = rows.filter((r) => Number(r.done) === 1 || r.ended_at == null);
-    return { phase, done: counted2.filter((r) => Number(r.done) === 1).length, of: counted2.length };
-  };
-  const storeRunStats = (run2) => {
-    const body = summarize(db, run2, STALE_MS);
-    const r = runRow(run2);
-    db.prepare("INSERT OR REPLACE INTO run_stats (run, repo, kind, closed_at, body) VALUES (?, ?, ?, ?, ?)").run(run2, String(r.repo), body.kind, String(r.closed_at), JSON.stringify(body));
-  };
-  const board2 = {
-    openRun({ repo, kind = "plan", group, title, link, seats, transcript, stallMs }) {
-      const profile = profileOf(kind);
-      if (stallMs !== void 0 && !(Number.isInteger(stallMs) && stallMs > 0)) throw new Error(`the stall threshold takes a positive whole number of ms, got ${stallMs}`);
-      const id = transaction(() => {
-        const r = db.prepare("INSERT INTO runs (repo, kind, plan, title, link, opened_at, stall_ms) VALUES (?, ?, ?, ?, ?, ?, ?)").run(repo, profile.kind, group, title, link ?? null, now(), stallMs ?? STALL_MS_DEFAULT);
-        const run2 = Number(r.lastInsertRowid);
-        seats.forEach((s, i) => insertSlice(run2, s, i));
-        const orchestrator = db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at, subs, nick) VALUES (?, ?, ?, ?, ?, ?)").run(
-          run2,
-          ORCHESTRATOR2,
-          lastSeq(),
-          now(),
-          JSON.stringify(profile.defaults.orchestrator),
-          unusedNick(repo)
-        );
-        insertMessage(participantById(Number(orchestrator.lastInsertRowid)), `run ${run2} opened: ${profile.kind} ${group}, ${title}`, null, "event", void 0, {
-          event: EVENTS.opened.name
-        });
-        bump(repo);
-        return run2;
-      });
-      return toRun(runRow(id));
-    },
-    setSliceState(run2, slice, state) {
-      runRow(run2);
-      if (!SLICE_STATES.has(state)) throw new Error(`unknown slice state ${state}`);
-      transaction(() => {
-        const r = db.prepare("UPDATE slices SET state = ? WHERE run = ? AND id = ?").run(state, run2, slice);
-        if (Number(r.changes) === 0) throw new Error(`unknown slice ${slice} in run ${run2}`);
-        bump(String(runRow(run2).repo));
-        if (state !== "done") return;
-        const p = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, slice);
-        if (p) claims.releaseAll(Number(p.id));
-      });
-    },
-    addSlice(run2, spec) {
-      const r = runRow(run2);
-      if (r.state !== "open") throw new Error(`run ${run2} is closed`);
-      if (spec.id === ORCHESTRATOR2) throw new Error(`"${ORCHESTRATOR2}" is not a slice`);
-      return transaction(() => {
-        const ids = db.prepare("SELECT id FROM slices WHERE run = ?").all(run2).map((x) => String(x.id));
-        if (ids.includes(spec.id)) throw new Error(`slice ${spec.id} is already in run ${run2}`);
-        const unknown = (spec.blockers ?? []).filter((b) => !ids.includes(b));
-        if (unknown.length) throw new Error(`unknown blocker ${unknown.join(", ")} in run ${run2}`);
-        const ord = Number(db.prepare("SELECT COALESCE(MAX(ord), -1) AS o FROM slices WHERE run = ?").get(run2).o) + 1;
-        insertSlice(run2, spec, ord);
-        const orchestrator = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, ORCHESTRATOR2);
-        insertMessage(participantById(Number(orchestrator.id)), `added ${spec.id}: ${spec.title}`, null, "event");
-        return toRun(runRow(run2)).slices.find((x) => x.id === spec.id);
-      });
-    },
-    closeRun(run2) {
-      runRow(run2);
-      transaction(() => {
-        const author = db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run2, ORCHESTRATOR2) ?? db.prepare("SELECT id FROM participants WHERE run = ? ORDER BY id LIMIT 1").get(run2);
-        if (author) insertMessage(participantById(Number(author.id)), `run ${run2} closed`, null, "event", void 0, { event: EVENTS.closed.name });
-        db.prepare("UPDATE runs SET state = 'closed', closed_at = ? WHERE id = ?").run(now(), run2);
-        bump(String(runRow(run2).repo));
-        db.prepare("UPDATE participants SET ended_at = COALESCE(ended_at, ?) WHERE run = ?").run(now(), run2);
-        try {
-          storeRunStats(run2);
-        } catch {
-        }
-        for (const p of db.prepare("SELECT id FROM participants WHERE run = ?").all(run2)) claims.releaseAll(Number(p.id));
-      });
-    },
-    prune(at = /* @__PURE__ */ new Date()) {
-      return transaction(() => {
-        const cutoff = retentionCutoff(at);
-        const expired = db.prepare("SELECT id, repo FROM runs WHERE state = 'closed' AND closed_at < ? AND pruned_at IS NULL").all(cutoff).filter((r) => {
-          if (db.prepare("SELECT 1 FROM run_stats WHERE run = ?").get(Number(r.id))) return true;
-          try {
-            storeRunStats(Number(r.id));
-            return true;
-          } catch {
-            return false;
-          }
-        });
-        const touched = new Set(expired.map((r) => String(r.repo)));
-        const runIds = expired.map((r) => Number(r.id));
-        const inExpired = runIds.length ? `run IN (${runIds.join(", ")})` : "0";
-        const doomed = db.prepare(
-          `SELECT seq, repo FROM messages WHERE ${inExpired}
-               OR (run IS NULL AND at < ? AND kind != 'agreement'
-                   AND NOT (kind = 'endorsement' AND endorses IN (SELECT seq FROM messages WHERE run IS NULL AND kind = 'agreement')))`
-        ).all(cutoff);
-        const dropDeliveries = db.prepare("DELETE FROM deliveries WHERE seq = ?");
-        const dropMessage = db.prepare("DELETE FROM messages WHERE seq = ?");
-        for (const m of doomed) {
-          dropDeliveries.run(Number(m.seq));
-          dropMessage.run(Number(m.seq));
-          touched.add(String(m.repo));
-        }
-        for (const run2 of runIds) {
-          for (const r of db.prepare("SELECT id FROM participants WHERE run = ?").all(run2)) {
-            const id = Number(r.id);
-            for (const table of ["claim_log", "shares", "notices", "flags", "claims", "lock_waiters", "merge_locks", "deliveries", "claim_requests", "flag_posts", "call_log", "lock_requests"]) {
-              db.prepare(`DELETE FROM ${table} WHERE participant = ?`).run(id);
-            }
-            db.prepare("DELETE FROM notices WHERE other = ?").run(id);
-            db.prepare("DELETE FROM shares WHERE other = ?").run(id);
-            if (!db.prepare("SELECT 1 FROM messages WHERE author = ? LIMIT 1").get(id)) db.prepare("DELETE FROM participants WHERE id = ?").run(id);
-          }
-          db.prepare("DELETE FROM slices WHERE run = ?").run(run2);
-          db.prepare("DELETE FROM merges WHERE run = ?").run(run2);
-          for (const table of ["phase_done", "transcripts", "token_readings", "liveness_warned", "member_activity"]) db.prepare(`DELETE FROM ${table} WHERE run = ?`).run(run2);
-          db.prepare("UPDATE runs SET pruned_at = ? WHERE id = ?").run(at.toISOString(), run2);
-        }
-        for (const repo of touched) bump(repo);
-        return { messages: doomed.length, runs: runIds.length };
-      });
-    },
-    setting(name, value) {
-      if (name !== "retention-days") throw new Error(`unknown setting ${name}`);
-      if (value !== void 0) {
-        if (!Number.isInteger(value) || value < 1) throw new Error(`${name} takes a positive whole number of days, got ${value}`);
-        db.prepare("INSERT INTO settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value").run(name, String(value));
-      }
-      return retentionDays();
-    },
-    upkeepIfDue(at = /* @__PURE__ */ new Date()) {
-      const due = () => {
-        const r = db.prepare("SELECT value FROM settings WHERE name = ?").get(LAST_UPKEEP);
-        return !(at.getTime() - Date.parse(String(r?.value)) < UPKEEP_EVERY_MS);
-      };
-      if (!due()) return false;
-      const recorded = transaction(() => {
-        if (!due()) return false;
-        db.prepare("INSERT INTO settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value").run(LAST_UPKEEP, at.toISOString());
-        return true;
-      });
-      if (!recorded) return false;
-      board2.prune(at);
-      board2.flagStale(at);
-      return true;
-    },
-    flagStale(at = /* @__PURE__ */ new Date()) {
-      const silentBefore = at.getTime() - STALE_MS;
-      return transaction(() => {
-        const quiet = db.prepare("SELECT p.id, p.last_call, p.joined_at FROM participants p JOIN runs r ON r.id = p.run WHERE r.state = 'open' AND r.paused IS NULL AND p.slice = ? AND p.ended_at IS NULL AND p.quiet_flagged = 0").all(ORCHESTRATOR2);
-        for (const o of quiet) {
-          const silentSince = Date.parse(String(o.last_call ?? o.joined_at));
-          if (silentSince >= silentBefore) continue;
-          const minutes = Math.floor((at.getTime() - silentSince) / 6e4);
-          insertMessage(participantById(Number(o.id)), `quiet ${minutes} min`, null, "event", [], { event: EVENTS.quiet.name });
-          db.prepare("UPDATE participants SET quiet_flagged = 1 WHERE id = ?").run(Number(o.id));
-        }
-        const flagged = [];
-        for (const r of db.prepare("SELECT id, plan FROM runs WHERE state = 'open' AND paused IS NULL AND stale_flagged = 0 ORDER BY id").all()) {
-          const id = Number(r.id);
-          const members = db.prepare("SELECT id, slice, last_call, joined_at FROM participants WHERE run = ? AND ended_at IS NULL").all(id);
-          if (!members.length || members.some((m) => Date.parse(String(m.last_call ?? m.joined_at)) >= silentBefore)) continue;
-          const author = members.find((m) => String(m.slice) === ORCHESTRATOR2) ?? members[0];
-          const group = String(r.plan);
-          insertMessage(participantById(Number(author.id)), `run ${id} (${group}) is stale: every member silent; close it or dispatch again`, null, "event", [`${group}/${ORCHESTRATOR2}`], {
-            event: EVENTS.stale.name
-          });
-          db.prepare("UPDATE runs SET stale_flagged = 1 WHERE id = ?").run(id);
-          flagged.push(id);
-        }
-        return flagged;
-      });
-    },
-    runs() {
-      return db.prepare("SELECT * FROM runs WHERE state = 'open' ORDER BY id").all().map(toRun);
-    },
-    join({ run: run2, slice, doing, files, worktree, on }) {
-      const r = runRow(run2);
-      if (r.state !== "open") throw new Error(`run ${run2} is closed`);
-      if (slice === ORCHESTRATOR2) throw new Error(`"${ORCHESTRATOR2}" is not a slice`);
-      const profile = profileOf(String(r.kind ?? "plan"));
-      if (files.length && !profile.claims) throw new Error(`join: a ${profile.kind} run has no claims`);
-      const where = worktree && profile.worktree ? path7.resolve(worktree) : null;
-      return transaction(() => {
-        const id = transaction(() => {
-          const existing = db.prepare("SELECT id, nick FROM participants WHERE run = ? AND slice = ?").get(run2, slice);
-          const seatRow = db.prepare("SELECT on_events FROM slices WHERE run = ? AND id = ?").get(run2, slice);
-          const seatOn = seatRow?.on_events != null ? parseSubscriptions(JSON.parse(String(seatRow.on_events))) : null;
-          const subs = JSON.stringify(on ?? seatOn ?? profile.defaults.member);
-          const fresh = () => unusedNick(String(r.repo));
-          if (existing) {
-            db.prepare("UPDATE participants SET doing = ?, files = ?, worktree = ?, ended_at = NULL, merged = 0, subs = ?, nick = COALESCE(nick, ?) WHERE id = ?").run(
-              doing,
-              JSON.stringify(files),
-              where,
-              subs,
-              existing.nick == null ? fresh() : null,
-              Number(existing.id)
-            );
-            return Number(existing.id);
-          }
-          const ins = db.prepare("INSERT INTO participants (run, slice, worktree, doing, files, since_seq, joined_at, nick, subs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(run2, slice, where, doing, JSON.stringify(files), lastSeq(), now(), fresh(), subs);
-          return Number(ins.lastInsertRowid);
-        });
-        const runner = participantById(id);
-        claims.claimDeclared(runner, files);
-        insertMessage(runner, `joined: ${doing}`, null, "event", void 0, { event: EVENTS.joined.name });
-        return { runner, roster: board2.roster(runner.repo) };
-      });
-    },
-    participant(name) {
-      const i = name.lastIndexOf("/");
-      if (i <= 0) return null;
-      const plan = name.slice(0, i);
-      const slice = name.slice(i + 1);
-      const r = db.prepare(`${PARTICIPANT_SQL} WHERE r.plan = ? AND p.slice = ? ORDER BY (r.state = 'open') DESC, r.id DESC LIMIT 1`).get(plan, slice);
-      return r ? toParticipant(r) : null;
-    },
-    identify({ worktree }) {
-      if (!worktree) return null;
-      const here = fold(path7.resolve(worktree));
-      const rows = db.prepare(`${PARTICIPANT_SQL} WHERE p.worktree IS NOT NULL AND p.ended_at IS NULL AND r.state = 'open'`).all().filter(
-        (r) => {
-          const root = fold(String(r.worktree));
-          return here === root || here.startsWith(root.endsWith(path7.sep) ? root : root + path7.sep);
-        }
-      );
-      if (!rows.length) return null;
-      const deepest = Math.max(...rows.map((r) => String(r.worktree).length));
-      const best = rows.filter((r) => String(r.worktree).length === deepest);
-      return best.length === 1 ? toParticipant(best[0]) : null;
-    },
-    setDoing(p, doing) {
-      const fresh = live(p);
-      db.prepare("UPDATE participants SET doing = ? WHERE id = ?").run(doing, fresh.id);
-      insertMessage(fresh, `doing: ${doing}`, null, "event");
-    },
-    subscribe(p, subs) {
-      const fresh = live(p);
-      return setSubs(fresh, [...fresh.subscriptions, ...subs.filter((s) => !fresh.subscriptions.some((o) => sameSub(o, s)))]);
-    },
-    unsubscribe(p, subs) {
-      const fresh = live(p);
-      return setSubs(fresh, fresh.subscriptions.filter((o) => !subs.some((s) => sameSub(o, s))));
-    },
-    end(p) {
-      const fresh = live(p);
-      transaction(() => {
-        const waiters = claims.lockWaitersFreedBy(fresh);
-        const ended = { event: EVENTS.ended.name };
-        if (waiters.length) insertMessage(fresh, `ended
-the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event", waiters, ended);
-        else insertMessage(fresh, "ended", null, "event", void 0, ended);
-        db.prepare("UPDATE participants SET ended_at = ?, doing = CASE merged WHEN 1 THEN 'merged and ended' ELSE 'ended' END WHERE id = ?").run(now(), fresh.id);
-        claims.releaseAll(fresh.id);
-      });
-    },
-    phase(p, name, text) {
-      const fresh = live(p);
-      if (fresh.slice !== ORCHESTRATOR2) throw new Error(`phase: only the orchestrator opens a phase; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR2}`);
-      if (!PHASE_NAME.test(name)) throw new Error(`phase: a phase name is one word, got ${JSON.stringify(name)}`);
-      const said = text.trim();
-      if (!said) throw new Error(`phase ${name}: what does it ask?`);
-      if (runRow(fresh.run).state !== "open") throw new Error(`run ${fresh.run} is closed`);
-      return transaction(() => {
-        db.prepare("UPDATE runs SET phase = ?, phase_text = ? WHERE id = ?").run(name, said, fresh.run);
-        db.prepare("DELETE FROM phase_done WHERE run = ? AND phase = ?").run(fresh.run, name);
-        return insertMessage(fresh, `phase ${name}: ${said}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.phase.name, meta: { phase: name } });
-      });
-    },
-    currentPhase(run2) {
-      return phaseOf(runRow(run2));
-    },
-    pause(p, text = "") {
-      const fresh = live(p);
-      if (fresh.slice !== ORCHESTRATOR2) throw new Error(`pause: only the orchestrator pauses its run; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR2}`);
-      const r = runRow(fresh.run);
-      if (r.state !== "open") throw new Error(`run ${fresh.run} is closed`);
-      if (r.paused != null) throw new Error(`run ${fresh.run} is already paused`);
-      const said = text.trim();
-      return transaction(() => {
-        db.prepare("UPDATE runs SET paused = ? WHERE id = ?").run(said, fresh.run);
-        return insertMessage(fresh, `pause: stop where you are and wait for the resume${said ? `: ${said}` : ""}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.pause.name });
-      });
-    },
-    resume(p, text = "") {
-      const fresh = live(p);
-      if (fresh.slice !== ORCHESTRATOR2) throw new Error(`resume: only the orchestrator resumes its run; ${fresh.name} is not ${fresh.plan}/${ORCHESTRATOR2}`);
-      const r = runRow(fresh.run);
-      if (r.state !== "open") throw new Error(`run ${fresh.run} is closed`);
-      if (r.paused == null) throw new Error(`run ${fresh.run} is not paused`);
-      const said = text.trim();
-      return transaction(() => {
-        db.prepare("UPDATE runs SET paused = NULL, resumed_at = ?, stall_posts = 0 WHERE id = ?").run(now(), fresh.run);
-        return insertMessage(fresh, `resume: continue${said ? `: ${said}` : ""}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.resume.name });
-      });
-    },
-    pausedOf(run2) {
-      const r = runRow(run2);
-      return r.paused == null ? null : String(r.paused);
-    },
-    done(p, name) {
-      const fresh = live(p);
-      if (fresh.slice === ORCHESTRATOR2) throw new Error("done: the orchestrator opens phases; a member runs done");
-      const current = phaseOf(runRow(fresh.run));
-      if (!current) throw new Error(`done ${name}: no phase is open in run ${fresh.run}`);
-      if (current.name !== name) throw new Error(`done ${name}: the current phase is ${current.name}`);
-      return transaction(() => {
-        const added = Number(db.prepare("INSERT OR IGNORE INTO phase_done (run, participant, phase, at) VALUES (?, ?, ?, ?)").run(fresh.run, fresh.id, name, now()).changes) > 0;
-        const progress = progressOf(fresh.run, name);
-        const all = progress.of > 0 && progress.done === progress.of;
-        if (!added) return { progress, all, already: true, message: null };
-        const orch = `${fresh.plan}/${ORCHESTRATOR2}`;
-        const message = insertMessage(fresh, `done ${name} (${progress.done}/${progress.of})`, null, "event", [orch], { event: EVENTS.done.name, meta: { phase: name } });
-        if (all)
-          insertMessage(fresh, `all done ${name}: every member is done (${progress.done}/${progress.of}); open the next phase`, null, "event", [orch], {
-            event: EVENTS["all-done"].name,
-            meta: { phase: name }
-          });
-        return { progress, all, already: false, message };
-      });
-    },
-    lastActivity(run2) {
-      const r = runRow(run2);
-      const row = db.prepare("SELECT MAX(COALESCE(p.last_call, p.joined_at)) AS calls, (SELECT MAX(m.at) FROM messages m JOIN participants q ON q.id = m.author WHERE q.run = ?) AS posts FROM participants p WHERE p.run = ?").get(run2, run2);
-      return [String(r.opened_at), row?.calls, row?.posts].filter((v) => typeof v === "string").sort().at(-1);
-    },
-    phaseProgress(run2) {
-      const r = runRow(run2);
-      return progressOf(run2, r.phase == null ? null : String(r.phase));
-    },
-    owedPhase(p) {
-      const row = db.prepare("SELECT id, run, slice, ended_at FROM participants WHERE id = ?").get(p.id);
-      if (!row || row.ended_at != null || String(row.slice) === ORCHESTRATOR2) return null;
-      const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(Number(row.run));
-      const current = r && r.state === "open" ? phaseOf(r) : null;
-      if (!current) return null;
-      const done = db.prepare("SELECT 1 FROM phase_done WHERE run = ? AND participant = ? AND phase = ?").get(Number(row.run), Number(row.id), current.name);
-      return done ? null : current;
-    },
-    recordActivity(run2, member, act, at) {
-      const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run2);
-      if (!r || r.state !== "open") return;
-      if (!db.prepare("SELECT 1 FROM participants WHERE run = ? AND slice = ? AND ended_at IS NULL").get(run2, member)) return;
-      transaction(() => {
-        const o = act.openTool;
-        db.prepare(
-          `INSERT INTO member_activity (run, member, grew_at, tokens, context, open_tool, open_target, open_since, last_tool, finished, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (run, member) DO UPDATE SET grew_at = excluded.grew_at, tokens = excluded.tokens, context = excluded.context, open_tool = excluded.open_tool,
-             open_target = excluded.open_target, open_since = excluded.open_since, last_tool = excluded.last_tool, finished = excluded.finished, at = excluded.at`
-        ).run(run2, member, act.grewAt, act.tokens, act.context, o?.name ?? null, o?.target ?? null, o?.since ?? null, act.lastTool, act.finished ? 1 : 0, at.getTime());
-        db.prepare("INSERT INTO token_readings (run, member, t, tokens) VALUES (?, ?, ?, ?)").run(run2, member, at.toISOString(), act.tokens);
-        bump(String(r.repo));
-      });
-    },
-    memberStates(run2, at) {
-      return [...statesOf(run2, at.getTime()).values()];
-    },
-    livenessTick(run2, at, presence) {
-      const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run2);
-      if (!r || r.state !== "open") {
-        presenceOf.delete(run2);
-        idleSince.delete(run2);
-        return false;
-      }
-      presenceOf.set(run2, presence);
-      const t = at.getTime();
-      transaction(() => {
-        db.prepare("DELETE FROM token_readings WHERE run = ? AND t < ?").run(run2, new Date(t - READINGS_KEPT_MS).toISOString());
-        const states = statesOf(run2, t);
-        const others = [...states.values()].filter((st) => st.member !== ORCHESTRATOR2);
-        const orch = orchestratorIn(run2);
-        const progress = progressOf(run2, r.phase == null ? null : String(r.phase));
-        const where = progress ? `phase ${progress.phase} ${progress.done}/${progress.of} done` : "no phase open";
-        let moved = false;
-        for (const st of others) {
-          const key = `${run2}/${st.member}`;
-          if (st.state !== "gone") goneTold.delete(key);
-          else if (!goneTold.has(key)) {
-            goneTold.add(key);
-            insertMessage(orch, `gone ${orch.plan}/${st.member}: ${st.reason}`, null, "event", [orch.name], { event: EVENTS.gone.name });
-          }
-          const a = activityOf(run2, st.member);
-          if (!a) {
-            const p = db.prepare("SELECT joined_at FROM participants WHERE run = ? AND slice = ? AND ended_at IS NULL").get(run2, st.member);
-            if (p && t - Date.parse(String(p.joined_at)) >= NO_TRANSCRIPT_MS) {
-              const warned = db.prepare("INSERT OR IGNORE INTO liveness_warned (run, member, cond) VALUES (?, ?, 'none')").run(run2, st.member);
-              if (Number(warned.changes) === 1)
-                insertMessage(orch, `no transcript found for ${orch.plan}/${st.member}: its state is presence only`, null, "event", [orch.name], { event: EVENTS.liveness.name });
-            }
-            continue;
-          }
-          if (st.state !== "quiet" || r.paused != null) {
-            if (a.stalled_at != null) {
-              db.prepare("UPDATE member_activity SET stalled_at = NULL WHERE run = ? AND member = ?").run(run2, st.member);
-              moved = true;
-            }
-            continue;
-          }
-          if (a.stalled_at != null && t - Number(a.stalled_at) < STALLED_AGAIN_MS) continue;
-          insertMessage(orch, `stalled ${orch.plan}/${st.member}: ${st.reason}; ${where}`, null, "event", [orch.name], { event: EVENTS.stalled.name });
-          db.prepare("UPDATE member_activity SET stalled_at = ? WHERE run = ? AND member = ?").run(t, run2, st.member);
-        }
-        const allWaiting = r.paused == null && others.length > 0 && others.every((st) => st.state === "waiting");
-        if (!allWaiting) idleSince.delete(run2);
-        else {
-          const idle = idleSince.get(run2) ?? { since: t, postedAt: null };
-          idleSince.set(run2, idle);
-          const held = t - idle.since;
-          if (idle.postedAt == null || t - idle.postedAt >= IDLE_MS) {
-            idle.postedAt = t;
-            insertMessage(orch, `idle ${Math.floor(held / 1e3)}s: every member is waiting; ${where}`, null, "event", [orch.name], { event: EVENTS.idle.name });
-          }
-        }
-        if (moved) bump(String(r.repo));
-      });
-      return true;
-    },
-    endedMembers(repo) {
-      const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NOT NULL`).all(repo);
-      return [...new Set(rows.map((r) => `${r.plan}/${r.slice}`))];
-    },
-    heldBy(p) {
-      return db.prepare("SELECT path FROM claims WHERE participant = ?").all(p.id).map((r) => String(r.path));
-    },
-    roster(repo) {
-      const rows = db.prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL ORDER BY r.id, p.id`).all(repo);
-      const cutoff = Date.now() - STALE_MS;
-      const statesByRun = /* @__PURE__ */ new Map();
-      const stateIn = (run2, member) => {
-        if (!statesByRun.has(run2)) statesByRun.set(run2, statesOf(run2, Date.now()));
-        return statesByRun.get(run2).get(member);
-      };
-      return rows.map((r) => ({
-        name: `${r.plan}/${r.slice}`,
-        nick: nickOf(r),
-        run: Number(r.run),
-        plan: String(r.plan),
-        slice: String(r.slice),
-        doing: String(r.doing),
-        files: JSON.parse(String(r.files)),
-        stale: Date.parse(String(r.last_call ?? r.joined_at)) < cutoff,
-        subscriptions: subsOf(r),
-        worktree: r.worktree == null ? null : String(r.worktree),
-        state: stateIn(Number(r.run), String(r.slice))?.state ?? "working",
-        activity: stateIn(Number(r.run), String(r.slice))?.doing ?? null
-      }));
-    },
-    post(p, body, opts = {}) {
-      const fresh = live(p);
-      const m = insertMessage(fresh, body, opts.about ?? null, opts.kind ?? "msg");
-      const claimed = profileOf(fresh.kind).claims ? claims.claimByPost(fresh, m) : null;
-      return claimed ? { ...m, claimed } : m;
-    },
-    endorse(p, seq) {
-      const fresh = live(p);
-      const r = db.prepare("SELECT * FROM messages WHERE seq = ?").get(seq);
-      if (!r) throw new Error(`unknown message #${seq}`);
-      if (r.kind !== "agreement") throw new Error(`#${seq} is not an agreement`);
-      if (Number(r.author) === fresh.id) throw new Error(`#${seq} is your own agreement`);
-      const author = participantById(Number(r.author));
-      const about = r.about == null ? null : String(r.about);
-      return insertMessage(fresh, `endorses #${seq}`, about, "endorsement", [author.name], { endorses: seq });
-    },
-    thread(p, name) {
-      const fresh = participantById(p.id);
-      const phase = name ?? phaseOf(runRow(fresh.run))?.name;
-      if (!phase) return [];
-      const opened = db.prepare("SELECT MAX(seq) AS s FROM messages WHERE run = ? AND event = ? AND json_extract(meta, '$.phase') = ?").get(fresh.run, EVENTS.phase.name, phase);
-      if (opened.s == null) throw new Error(`thread: phase ${phase} was never opened in run ${fresh.run}`);
-      const next = db.prepare("SELECT MIN(seq) AS s FROM messages WHERE run = ? AND event = ? AND seq > ?").get(fresh.run, EVENTS.phase.name, Number(opened.s));
-      return db.prepare("SELECT * FROM messages WHERE run = ? AND seq > ? AND seq < ? AND kind != 'event' ORDER BY seq").all(fresh.run, Number(opened.s), next.s == null ? Number.MAX_SAFE_INTEGER : Number(next.s)).map(toMessage);
-    },
-    read(seq) {
-      const r = db.prepare("SELECT * FROM messages WHERE seq = ?").get(seq);
-      if (!r) throw new Error(`unknown message #${seq}`);
-      return toMessage(r);
-    },
-    deliver(p) {
-      return deliverTo(p, false);
-    },
-    wait(p, opts = {}) {
-      const { timeoutMs, mentionsOnly = false, signal: abort } = opts;
-      const column = mentionsOnly ? "listening" : "waiting";
-      const gen = transaction(() => {
-        const me = participantById(p.id);
-        db.prepare("UPDATE participants SET wait_gen = wait_gen + 1, waiting = ?, listening = ? WHERE id = ?").run(mentionsOnly ? 0 : 1, mentionsOnly ? 1 : 0, me.id);
-        bump(me.repo);
-        return Number(db.prepare("SELECT wait_gen FROM participants WHERE id = ?").get(me.id).wait_gen);
-      });
-      const current = () => Number(db.prepare("SELECT wait_gen FROM participants WHERE id = ?").get(p.id).wait_gen) === gen;
-      return new Promise((resolve, reject) => {
-        let settled = false;
-        let poll;
-        let timer;
-        const finish = (d) => {
-          if (settled) return;
-          settled = true;
-          localWakers.delete(check);
-          abort?.removeEventListener("abort", onAbort);
-          clearInterval(poll);
-          clearTimeout(timer);
-          try {
-            transaction(() => {
-              const r = db.prepare(`UPDATE participants SET ${column} = 0 WHERE id = ? AND wait_gen = ? AND ${column} = 1`).run(p.id, gen);
-              if (Number(r.changes) > 0) bump(participantById(p.id).repo);
-            });
-          } catch {
-          }
-          if (d instanceof Error) reject(d);
-          else resolve(d);
-        };
-        const check = () => {
-          if (settled) return;
-          try {
-            if (participantById(p.id).ended) return finish({ full: [], lines: [] });
-            const d = transaction(() => current() ? deliverTo(p, true, mentionsOnly) : null);
-            if (!d) return finish({ full: [], lines: [], superseded: true });
-            if (d.full.length || d.lines.length) finish(d);
-          } catch (e) {
-            finish(e);
-          }
-        };
-        const onAbort = () => finish({ full: [], lines: [] });
-        if (abort?.aborted) return onAbort();
-        abort?.addEventListener("abort", onAbort);
-        localWakers.add(check);
-        poll = setInterval(check, WAIT_POLL_MS);
-        if (timeoutMs !== void 0) timer = setTimeout(() => finish({ full: [], lines: [] }), timeoutMs);
-        check();
-      });
-    },
-    checkEdit(p, file, opts = {}) {
-      return claims.checkEdit(gated(live(p), "claim"), file, opts);
-    },
-    reconcileWrites(p, changed) {
-      return claims.reconcileWrites(gated(live(p), "reconcile"), changed);
-    },
-    release(p, file) {
-      claims.release(gated(live(p), "release"), file);
-    },
-    lockMerge(p, onto, reflogMark) {
-      return claims.lockMerge(gated(live(p), "merge-lock"), onto, reflogMark);
-    },
-    merged(p, sha, files, conflicts) {
-      return claims.merged(gated(live(p), "merged"), sha, files, conflicts);
-    },
-    heldMergeLock(p) {
-      return claims.heldMergeLock(p);
-    },
-    stats(scope) {
-      return statsOf(db, scope, STALE_MS);
-    },
-    repos() {
-      const byRepo = /* @__PURE__ */ new Map();
-      for (const r of listedRuns()) {
-        const list = byRepo.get(String(r.repo)) ?? [];
-        list.push(runSummary(r));
-        byRepo.set(String(r.repo), list);
-      }
-      const latest = (runs) => Math.max(...runs.map((x) => x.run));
-      return [...byRepo.entries()].map(([repo, runs]) => ({ repo, name: repoName(repo), runs })).sort((a, b) => Number(b.runs.some((x) => x.open)) - Number(a.runs.some((x) => x.open)) || latest(b.runs) - latest(a.runs));
-    },
-    snapshot(repo) {
-      const runRows = listedRuns().filter((r) => r.repo === repo);
-      if (!runRows.length) throw new Error(`no repository ${repo}`);
-      const runIds = runRows.map((r) => Number(r.id));
-      const marks = runIds.map(() => "?").join(", ");
-      const lockRow = db.prepare("SELECT participant, at FROM merge_locks WHERE repo = ?").get(repo);
-      const lockHolder = lockRow && isLive(Number(lockRow.participant)) ? Number(lockRow.participant) : null;
-      const sliceRows = db.prepare(`SELECT * FROM slices WHERE run IN (${marks}) ORDER BY run, ord`).all(...runIds);
-      const sliceOf = new Map(sliceRows.map((s) => [`${s.run}/${s.id}`, s]));
-      const people = db.prepare(`${PARTICIPANT_SQL} WHERE p.run IN (${marks}) ORDER BY p.run, p.id`).all(...runIds);
-      const runOpen = new Map(runRows.map((r) => [Number(r.id), r.state === "open"]));
-      const statesByRun = /* @__PURE__ */ new Map();
-      const stateIn = (run2, member) => {
-        if (!statesByRun.has(run2)) statesByRun.set(run2, statesOf(run2, Date.now()));
-        return statesByRun.get(run2).get(member);
-      };
-      const cutoff = Date.now() - STALE_MS;
-      const claimsOf2 = db.prepare("SELECT path, kind FROM claims WHERE participant = ? ORDER BY rowid");
-      const live2 = db.prepare("SELECT c.path, c.kind, c.participant, p.slice, r.plan FROM claims c JOIN participants p ON p.id = c.participant JOIN runs r ON r.id = p.run WHERE c.repo = ? ORDER BY c.rowid").all(repo).filter((c) => isLive(Number(c.participant)));
-      const files = /* @__PURE__ */ new Map();
-      for (const c of live2) {
-        const f = files.get(String(c.path)) ?? { path: String(c.path), holders: [], interface: false };
-        f.holders.push(`${c.plan}/${c.slice}`);
-        f.interface ||= c.kind === "interface";
-        files.set(f.path, f);
-      }
-      const everClaimed = db.prepare("SELECT 1 FROM claim_log WHERE repo = ? AND path = ? AND participant = ?");
-      for (const r of people) {
-        if (String(r.slice) === ORCHESTRATOR2 || !isLive(Number(r.id))) continue;
-        const name = `${r.plan}/${r.slice}`;
-        for (const d of JSON.parse(String(r.files))) {
-          const f = files.get(relPath(repo, d.path) ?? d.path);
-          if (f && !f.holders.includes(name) && !everClaimed.get(repo, f.path, Number(r.id))) f.holders.push(name);
-        }
-      }
-      const sharedBy = (path10, id) => live2.some((c) => String(c.path) === path10 && Number(c.participant) !== id);
-      const roster = people.map((r) => {
-        const id = Number(r.id);
-        const slice = String(r.slice);
-        const orchestrator = slice === ORCHESTRATOR2;
-        const s = sliceOf.get(`${r.run}/${slice}`);
-        const ended = r.ended_at != null;
-        const state = orchestrator ? runOpen.get(Number(r.run)) ? "watching" : "done" : s?.state === "done" ? "done" : ended ? "ended" : lockHolder === id ? "merging" : Number(r.waiting) === 1 ? "waiting" : "working";
-        return {
-          run: Number(r.run),
-          runner: `${r.plan}/${slice}`,
-          nick: nickOf(r),
-          plan: String(r.plan),
-          slice,
-          title: orchestrator ? "" : String(s?.title ?? slice),
-          doing: String(r.doing),
-          state,
-          stale: !ended && !orchestrator && Date.parse(String(r.last_call ?? r.joined_at)) < cutoff,
-          files: claimsOf2.all(id).map((c) => ({ path: String(c.path), interface: c.kind === "interface", shared: sharedBy(String(c.path), id) })),
-          joined: String(r.joined_at),
-          ended: r.ended_at == null ? null : String(r.ended_at),
-          calls: Number(r.calls ?? 0),
-          listening: !ended && Number(r.listening) === 1,
-          on: subsOf(r).map((x) => formatSubscriptions([x])),
-          lastCall: String(r.last_call ?? r.joined_at),
-          liveness: ended ? void 0 : livenessOf(Number(r.run), stateIn(Number(r.run), slice))
-        };
-      });
-      const events = db.prepare("SELECT * FROM (SELECT * FROM messages WHERE repo = ? ORDER BY seq DESC LIMIT ?) ORDER BY seq").all(repo, EVENTS_SHOWN).map((r) => {
-        const m = toMessage(r);
-        return {
-          seq: m.seq,
-          at: m.at,
-          kind: m.kind,
-          from: m.from,
-          body: m.body,
-          about: m.about,
-          run: m.run,
-          channel: m.run,
-          event: m.event,
-          mentions: m.mentions,
-          meta: m.meta ?? null
-        };
-      });
-      const nameOf = new Map(people.map((r) => [`${r.run}/${r.slice}`, `${r.plan}/${r.slice}`]));
-      const queues = {};
-      for (const run2 of runRows) {
-        queues[String(run2.plan)] = sliceRows.filter((s) => Number(s.run) === Number(run2.id)).map((s) => ({
-          slice: String(s.id),
-          title: String(s.title),
-          link: s.link == null ? null : String(s.link),
-          state: String(s.state),
-          blockers: JSON.parse(String(s.blockers)),
-          runner: nameOf.get(`${run2.id}/${s.id}`) ?? null
-        }));
-      }
-      const flags = db.prepare("SELECT f.path, p.slice, r.plan FROM flags f JOIN participants p ON p.id = f.participant JOIN runs r ON r.id = p.run WHERE f.repo = ? ORDER BY f.rowid").all(repo).map((f) => ({ path: String(f.path), runner: `${f.plan}/${f.slice}` }));
-      const lockHistory = db.prepare("SELECT t.asked_at, t.granted_at, t.merged_at, t.refused, p.slice, r.plan FROM lock_requests t JOIN participants p ON p.id = t.participant JOIN runs r ON r.id = p.run WHERE t.repo = ? ORDER BY t.asked_at DESC, t.rowid DESC LIMIT 50").all(repo).map((t) => ({
-        runner: `${t.plan}/${t.slice}`,
-        askedAt: String(t.asked_at),
-        grantedAt: t.granted_at == null ? null : String(t.granted_at),
-        mergedAt: t.merged_at == null ? null : String(t.merged_at),
-        refused: Number(t.refused)
-      }));
-      return {
-        repo,
-        name: repoName(repo),
-        runs: runRows.map(runSummary),
-        lockHistory,
-        lock: lockHolder !== null ? { holder: participantById(lockHolder).name, since: String(lockRow.at) } : null,
-        roster,
-        events,
-        queues,
-        files: [...files.values()],
-        flags
-      };
-    },
-    onChange(listener) {
-      listeners.add(listener);
-      if (!watching) {
-        versions = readVersions();
-        const check = () => {
-          let next;
-          try {
-            next = readVersions();
-          } catch {
-            return;
-          }
-          const moved = [...next].filter(([repo, v]) => versions.get(repo) !== v).map(([repo]) => repo);
-          versions = next;
-          for (const repo of moved) for (const l of [...listeners]) l(repo);
-        };
-        localWakers.add(check);
-        const poll = setInterval(check, WAIT_POLL_MS);
-        poll.unref?.();
-        watching = { close: () => (localWakers.delete(check), clearInterval(poll)) };
-      }
-      return () => {
-        listeners.delete(listener);
-        if (!listeners.size && watching) {
-          watching.close();
-          watching = null;
-        }
-      };
-    },
-    close() {
-      watching?.close();
-      watching = null;
-      listeners.clear();
-      db.close();
-    }
-  };
-  const countCall = (p, verb) => {
-    const at = now();
-    db.prepare("UPDATE participants SET calls = calls + 1, last_call = ? WHERE id = ?").run(at, p.id);
-    db.prepare("INSERT INTO call_log (participant, at, verb) VALUES (?, ?, ?)").run(p.id, at, verb);
-    db.prepare("UPDATE runs SET stale_flagged = 0 WHERE id = ? AND stale_flagged = 1").run(p.run);
-    if (Number(db.prepare("UPDATE participants SET quiet_flagged = 0 WHERE id = ? AND quiet_flagged = 1").run(p.id).changes) > 0 && runRow(p.run).state === "open")
-      insertMessage(participantById(p.id), "back", null, "event", [], { event: EVENTS.back.name });
-    bump(participantById(p.id).repo);
-  };
-  const counted = (name, verb) => (p, ...rest) => transaction(() => {
-    const out = verb(p, ...rest);
-    countCall(p, name);
-    return out;
-  });
-  board2.setDoing = counted("setDoing", board2.setDoing);
-  board2.subscribe = counted("subscribe", board2.subscribe);
-  board2.unsubscribe = counted("unsubscribe", board2.unsubscribe);
-  board2.end = counted("end", board2.end);
-  board2.post = counted("post", board2.post);
-  board2.phase = counted("phase", board2.phase);
-  board2.pause = counted("pause", board2.pause);
-  board2.resume = counted("resume", board2.resume);
-  board2.done = counted("done", board2.done);
-  board2.endorse = counted("endorse", board2.endorse);
-  board2.deliver = counted("deliver", board2.deliver);
-  board2.wait = counted("wait", board2.wait);
-  board2.checkEdit = counted("checkEdit", board2.checkEdit);
-  board2.release = counted("release", board2.release);
-  board2.lockMerge = counted("lockMerge", board2.lockMerge);
-  board2.merged = counted("merged", board2.merged);
-  const read = board2.read;
-  board2.read = (seq, by) => {
-    const m = read(seq);
-    if (by) transaction(() => countCall(by, "read"));
-    return m;
-  };
-  return board2;
-}
-var PHASE_NAME, SLICE_STATES, TO_AUTHOR, ORCHESTRATOR2, WAIT_POLL_MS, LINE_WIDTH, STALE_MS, WAIT_LOG_EVERY_MS, UPKEEP_EVERY_MS, LAST_UPKEEP, RECORDS_SINCE2, SHARES_SINCE2, RETENTION_DEFAULT_DAYS, DAY_MS2, EVENTS_SHOWN, CASELESS2;
-var init_board = __esm({
-  "src/board/board.ts"() {
-    "use strict";
-    init_home();
-    init_mentions();
-    init_claims();
-    init_stats();
-    init_kinds();
-    init_events();
-    init_names();
-    init_liveness();
-    PHASE_NAME = /^[\w.-]+$/;
-    SLICE_STATES = /* @__PURE__ */ new Set(["ready", "running", "done", "blocked"]);
-    TO_AUTHOR = Object.values(EVENTS).filter((e) => e.toAuthor).map((e) => `'${e.name}'`).join(", ");
-    ORCHESTRATOR2 = "orchestrator";
-    WAIT_POLL_MS = 1e3;
-    LINE_WIDTH = 100;
-    STALE_MS = 10 * 60 * 1e3;
-    WAIT_LOG_EVERY_MS = 60 * 1e3;
-    UPKEEP_EVERY_MS = 5 * 60 * 1e3;
-    LAST_UPKEEP = "last-upkeep";
-    RECORDS_SINCE2 = "records-since";
-    SHARES_SINCE2 = "shares-since";
-    RETENTION_DEFAULT_DAYS = 30;
-    DAY_MS2 = 24 * 60 * 60 * 1e3;
-    EVENTS_SHOWN = 500;
-    CASELESS2 = process.platform === "win32";
-  }
-});
-
 // src/server/server.ts
 var server_exports = {};
 __export(server_exports, {
@@ -6317,22 +6411,92 @@ __export(server_exports, {
 import crypto4 from "node:crypto";
 import fs7 from "node:fs";
 import http from "node:http";
-import path8 from "node:path";
+import path7 from "node:path";
 async function startBoardServer(opts) {
+  logStart(opts.dataRoot);
+  await takeStartLock(opts.dataRoot);
+  try {
+    return await runBoardServer(opts);
+  } catch (e) {
+    releaseStartLock(opts.dataRoot);
+    throw e;
+  }
+}
+function logStart(dataRoot) {
+  fs7.mkdirSync(dataRoot, { recursive: true });
+  fs7.appendFileSync(serverLogFile(dataRoot), `serve: home ${path7.resolve(dataRoot)}, pid ${process.pid}, started by ${process.ppid} ${starterCommandLine()}
+`);
+}
+function starterCommandLine() {
+  const passed = process.env[SERVER_STARTER_ENV];
+  if (passed) return passed;
+  try {
+    const read = fs7.readFileSync(`/proc/${process.ppid}/cmdline`, "utf8").split("\0").filter(Boolean).join(" ");
+    if (read) return read;
+  } catch {
+  }
+  return "unknown";
+}
+async function takeStartLock(dataRoot) {
+  fs7.mkdirSync(dataRoot, { recursive: true });
+  const lock = serverStartLock(dataRoot);
+  for (let emptyReads = 0; ; ) {
+    try {
+      fs7.writeFileSync(lock, String(process.pid), { flag: "wx" });
+      return;
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+    }
+    const holder = serverLockHolder(dataRoot);
+    if (holder === process.pid) return;
+    if (holder !== null && liveStartLockHolder(dataRoot) === holder) throw new Error(`swarm: a board server already runs on this data home (pid ${holder})`);
+    if (holder === null && ++emptyReads <= LOCK_READ_RETRIES) {
+      await new Promise((r) => setTimeout(r, LOCK_READ_RETRY_MS));
+      continue;
+    }
+    await removeStaleStartLock(dataRoot, holder);
+    emptyReads = 0;
+  }
+}
+async function removeStaleStartLock(dataRoot, seen) {
+  const breaker = `${serverStartLock(dataRoot)}.break`;
+  try {
+    fs7.writeFileSync(breaker, String(process.pid), { flag: "wx" });
+  } catch (e) {
+    if (e.code !== "EEXIST") throw e;
+    try {
+      if (Date.now() - fs7.statSync(breaker).mtimeMs > BREAKER_STALE_MS) fs7.rmSync(breaker, { force: true });
+    } catch {
+    }
+    await new Promise((r) => setTimeout(r, LOCK_READ_RETRY_MS));
+    return;
+  }
+  try {
+    if (serverLockHolder(dataRoot) === seen) fs7.rmSync(serverStartLock(dataRoot), { force: true });
+  } finally {
+    fs7.rmSync(breaker, { force: true });
+  }
+}
+function releaseStartLock(dataRoot) {
+  if (serverLockHolder(dataRoot) === process.pid) fs7.rmSync(serverStartLock(dataRoot), { force: true });
+}
+async function runBoardServer(opts) {
   const host = opts.host ?? "127.0.0.1";
   const now = opts.now ?? (() => /* @__PURE__ */ new Date());
-  const board2 = await openBoard(path8.join(opts.dataRoot, "swarm.sqlite"));
+  const board2 = await openBoard(path7.join(opts.dataRoot, "swarm.sqlite"));
   const secret = crypto4.randomBytes(24).toString("hex");
   const version = bundleVersion();
   const speakers = /* @__PURE__ */ new Set();
   const calls = /* @__PURE__ */ new Map();
   const links = /* @__PURE__ */ new Map();
   const memberOf = (name) => name.slice(name.lastIndexOf("/") + 1);
-  const linked = (m, connected) => {
-    const run3 = links.get(m.run) ?? /* @__PURE__ */ new Map();
-    links.set(m.run, run3);
-    run3.set(memberOf(m.name), connected ? { connected: true, lostAt: null } : { connected: false, lostAt: now().getTime() });
+  const keepLink = (run3, member, link) => {
+    const members = links.get(run3) ?? /* @__PURE__ */ new Map();
+    links.set(run3, members);
+    members.set(member, link);
+    logged("recordLink", () => board2.recordLink(run3, member, link));
   };
+  const linked = (m, connected) => keepLink(m.run, memberOf(m.name), connected ? { connected: true, lostAt: null } : { connected: false, lostAt: now().getTime() });
   const presenceIn = (run3) => (member) => links.get(run3)?.get(member) ?? { connected: false, lostAt: null };
   const logged = (what, fn) => {
     try {
@@ -6341,6 +6505,9 @@ async function startBoardServer(opts) {
       console.error(`swarm server: ${what} failed: ${e.stack ?? e.message}`);
     }
   };
+  const startedAt = now().getTime();
+  for (const saved of board2.savedLinks())
+    keepLink(saved.run, saved.member, saved.connected ? { connected: false, lostAt: startedAt } : { connected: false, lostAt: saved.lostAt });
   const send = (s, f) => {
     if (s.socket.readyState === s.socket.OPEN) s.socket.send(encode(f));
   };
@@ -6486,6 +6653,7 @@ async function startBoardServer(opts) {
       if (written.pid === state.pid && written.port === state.port) fs7.rmSync(stateFile);
     } catch {
     }
+    releaseStartLock(opts.dataRoot);
     closedListeners.forEach((l) => l());
   })();
   const closedListeners = [];
@@ -6508,6 +6676,8 @@ async function stopBoardServer(dataRoot) {
     if (!res.ok) throw new Error(`refused ${res.status}`);
   } catch {
     fs7.rmSync(file, { force: true });
+    const holder = serverLockHolder(dataRoot);
+    if (holder !== null && liveStartLockHolder(dataRoot) === null) fs7.rmSync(serverStartLock(dataRoot), { force: true });
     return false;
   }
   for (let i = 0; i < 100 && fs7.existsSync(file); i++) await new Promise((r) => setTimeout(r, 50));
@@ -6528,7 +6698,7 @@ function listen(server, host, port) {
     });
   });
 }
-var RESULT_CACHE_MS, UPKEEP_LOOK_MS, PING_EVERY_MS, PONG_WITHIN_MS, STOP_PATH, SECRET_HEADER, CLOSE_GRACE_MS, CALLABLE, serversClosed;
+var RESULT_CACHE_MS, UPKEEP_LOOK_MS, PING_EVERY_MS, PONG_WITHIN_MS, STOP_PATH, SECRET_HEADER, CLOSE_GRACE_MS, CALLABLE, LOCK_READ_RETRY_MS, LOCK_READ_RETRIES, BREAKER_STALE_MS, serversClosed;
 var init_server = __esm({
   "src/server/server.ts"() {
     "use strict";
@@ -6543,39 +6713,42 @@ var init_server = __esm({
     SECRET_HEADER = "x-swarm-secret";
     CLOSE_GRACE_MS = 500;
     CALLABLE = new Set(RPC_METHODS);
+    LOCK_READ_RETRY_MS = 50;
+    LOCK_READ_RETRIES = 20;
+    BREAKER_STALE_MS = 5e3;
     serversClosed = /* @__PURE__ */ new Map();
   }
 });
 
 // src/cli/index.ts
+init_board();
 init_kinds();
 init_events();
 init_home();
 import { spawnSync as spawnSync3 } from "node:child_process";
 import fs8 from "node:fs";
-import path9 from "node:path";
+import path8 from "node:path";
 
 // src/client/remote.ts
 init_wire();
 import { spawn } from "node:child_process";
 import crypto3 from "node:crypto";
-import fs4 from "node:fs";
+import fs5 from "node:fs";
 import net2 from "node:net";
-import path5 from "node:path";
 
 // src/link/link.ts
 init_wire();
 import crypto2 from "node:crypto";
-import fs3 from "node:fs";
+import fs4 from "node:fs";
 import net from "node:net";
 import os3 from "node:os";
-import path4 from "node:path";
+import path5 from "node:path";
 
 // src/link/transcripts.ts
 init_liveness();
-import fs2 from "node:fs";
+import fs3 from "node:fs";
 import os2 from "node:os";
-import path3 from "node:path";
+import path4 from "node:path";
 var TARGET_CHARS = 50;
 var SEPARATORS = /* @__PURE__ */ new Set([";", "&&", "||", "|", "&", "\n"]);
 function shellWords(command) {
@@ -6643,7 +6816,7 @@ function commandRunsBinding(command, binding) {
 function transcriptRunsBinding(file, binding) {
   let text;
   try {
-    text = fs2.readFileSync(file, "utf8");
+    text = fs3.readFileSync(file, "utf8");
   } catch {
     return false;
   }
@@ -6667,7 +6840,7 @@ function transcriptRunsBinding(file, binding) {
 var metaFileOf = (transcript) => transcript.replace(/\.jsonl$/, ".meta.json");
 var mtimeOf = (file) => {
   try {
-    return fs2.statSync(file).mtimeMs;
+    return fs3.statSync(file).mtimeMs;
   } catch {
     return 0;
   }
@@ -6677,24 +6850,24 @@ var claudeCode = {
   locate(binding, env) {
     const session = env.CLAUDE_CODE_SESSION_ID;
     if (!session) return null;
-    const root = env.SWARM_TRANSCRIPTS_ROOT || path3.join(env.USERPROFILE || env.HOME || os2.homedir(), ".claude", "projects");
+    const root = env.SWARM_TRANSCRIPTS_ROOT || path4.join(env.USERPROFILE || env.HOME || os2.homedir(), ".claude", "projects");
     let projects;
     try {
-      projects = fs2.readdirSync(root);
+      projects = fs3.readdirSync(root);
     } catch {
       return null;
     }
     const candidates = [];
     for (const project of projects) {
-      const main2 = path3.join(root, project, `${session}.jsonl`);
-      if (fs2.existsSync(main2)) candidates.push(main2);
-      const subagents = path3.join(root, project, session, "subagents");
+      const main2 = path4.join(root, project, `${session}.jsonl`);
+      if (fs3.existsSync(main2)) candidates.push(main2);
+      const subagents = path4.join(root, project, session, "subagents");
       let names = [];
       try {
-        names = fs2.readdirSync(subagents);
+        names = fs3.readdirSync(subagents);
       } catch {
       }
-      for (const n of names) if (/^agent-.*\.jsonl$/.test(n)) candidates.push(path3.join(subagents, n));
+      for (const n of names) if (/^agent-.*\.jsonl$/.test(n)) candidates.push(path4.join(subagents, n));
     }
     const newestFirst = candidates.map((file) => ({ file, mtime: mtimeOf(file) })).sort((a, b) => b.mtime - a.mtime);
     for (const { file } of newestFirst) {
@@ -6706,7 +6879,7 @@ var claudeCode = {
   finished(transcript) {
     let text;
     try {
-      text = fs2.readFileSync(metaFileOf(transcript), "utf8");
+      text = fs3.readFileSync(metaFileOf(transcript), "utf8");
     } catch {
       return null;
     }
@@ -6749,15 +6922,15 @@ function observe(transcript, from) {
   let chunk = Buffer.alloc(0);
   let mtime = Date.now();
   try {
-    const fd = fs2.openSync(transcript, "r");
+    const fd = fs3.openSync(transcript, "r");
     try {
-      const stat = fs2.fstatSync(fd);
+      const stat = fs3.fstatSync(fd);
       mtime = stat.mtimeMs;
       if (stat.size < cursor.offset) cursor = freshCursor();
       chunk = Buffer.alloc(stat.size - cursor.offset);
-      fs2.readSync(fd, chunk, 0, chunk.length, cursor.offset);
+      fs3.readSync(fd, chunk, 0, chunk.length, cursor.offset);
     } finally {
-      fs2.closeSync(fd);
+      fs3.closeSync(fd);
     }
   } catch {
     cursor = freshCursor();
@@ -6814,38 +6987,60 @@ function observe(transcript, from) {
 // src/link/link.ts
 var DEFAULT_TIMING = { reconnectGiveUpMs: 6e4, reconnectEveryMs: 500, idleMs: 2 * 60 * 6e4, stateFileWaitMs: 5e3, watchEveryMs: 1e3, activityGapMs: 3e3 };
 function linkPipe(dataRoot, run2, member) {
-  const home = crypto2.createHash("sha256").update(path4.resolve(dataRoot)).digest("hex").slice(0, 12);
+  const home = crypto2.createHash("sha256").update(path5.resolve(dataRoot)).digest("hex").slice(0, 12);
   const name = `swarm-${home}-${run2}-${member.replace(/[^A-Za-z0-9_-]/g, "_")}`;
-  return process.platform === "win32" ? `\\\\.\\pipe\\${name}` : path4.join(os3.tmpdir(), `${name}.sock`);
+  return process.platform === "win32" ? `\\\\.\\pipe\\${name}` : path5.join(os3.tmpdir(), `${name}.sock`);
 }
 function readServerState(dataRoot) {
   try {
-    return JSON.parse(fs3.readFileSync(serverStateFile(dataRoot), "utf8"));
+    return JSON.parse(fs4.readFileSync(serverStateFile(dataRoot), "utf8"));
   } catch {
     return null;
   }
 }
+function describeStop(stop) {
+  if (stop.why === "refused") return `refused ${stop.reason}`;
+  if (stop.why === "no server") return `no server for ${Math.round(stop.forMs / 1e3)} s`;
+  if (stop.why === "closed") return "run closed";
+  return stop.why;
+}
+function sayStop(dataRoot, member, stop, toServerLog) {
+  const line = `link ${member}: ${describeStop(stop)}`;
+  process.stderr.write(line + "\n");
+  const state = toServerLog ? readServerState(dataRoot) : null;
+  if (!state || !isAlive(state.pid)) return;
+  try {
+    fs4.appendFileSync(serverLogFile(dataRoot), line + "\n");
+  } catch {
+  }
+}
 var pause = (ms2) => new Promise((r) => setTimeout(r, ms2));
+var pipeAnswers = (pipe) => new Promise((resolve) => {
+  const probe = net.connect(pipe, () => (probe.destroy(), resolve(true)));
+  probe.once("error", () => resolve(false));
+});
 async function listenOnPipe(pipe, onPipe) {
-  const tryListen = () => new Promise((resolve, reject) => {
+  if (await pipeAnswers(pipe)) return null;
+  const tryListen = () => new Promise((resolve) => {
     const server = net.createServer(onPipe);
-    server.once("error", (e) => e.code === "EADDRINUSE" ? resolve("taken") : reject(e));
+    server.once("error", () => resolve("taken"));
     server.listen(pipe, () => resolve(server));
   });
   const first = await tryListen();
   if (first !== "taken") return first;
-  if (process.platform === "win32") return null;
-  const alive = await new Promise((resolve) => {
-    const probe = net.connect(pipe, () => (probe.destroy(), resolve(true)));
-    probe.once("error", () => resolve(false));
-  });
-  if (alive) return null;
-  fs3.rmSync(pipe, { force: true });
+  if (process.platform === "win32" || await pipeAnswers(pipe)) return null;
+  fs4.rmSync(pipe, { force: true });
   const second = await tryListen();
   return second === "taken" ? null : second;
 }
 async function runLink(opts) {
   const timing = { ...DEFAULT_TIMING, ...opts.timing };
+  const pipeTaken = () => {
+    const stop = { why: "pipe taken" };
+    sayStop(opts.dataRoot, opts.member, stop, false);
+    return stop;
+  };
+  if (await pipeAnswers(linkPipe(opts.dataRoot, opts.run, opts.member))) return pipeTaken();
   let state = readServerState(opts.dataRoot);
   for (const startedAt = Date.now(); !state && Date.now() - startedAt < timing.stateFileWaitMs; ) {
     await pause(100);
@@ -6891,20 +7086,21 @@ async function runLink(opts) {
     }
     if (read.activity.finished) {
       flushActivity(true);
-      return exit("finished");
+      return exit({ why: "finished" }, "finished");
     }
     flushActivity();
   };
-  const exit = (bye) => {
+  const exit = (stop, bye) => {
     if (exiting) return;
     exiting = true;
     if (bye) sendUp({ type: "bye", reason: bye });
+    sayStop(opts.dataRoot, opts.member, stop, stop.why !== "no server");
     clearInterval(idleCheck);
     clearInterval(watch);
     pipeServer?.close();
     for (const p of pipes) p.end();
     socket?.close();
-    finish();
+    finish(stop);
   };
   const onDown = (f) => {
     if (f.type === "welcome") {
@@ -6912,13 +7108,13 @@ async function runLink(opts) {
       for (const { call } of unanswered.values()) sendUp(call);
       flushActivity();
     } else if (f.type === "refused") {
-      exit();
+      exit(f.reason === "closed" ? { why: "closed" } : { why: "refused", reason: f.reason });
     } else if (f.type === "result") {
       const asked = unanswered.get(f.id);
       if (!asked) return;
       unanswered.delete(f.id);
       if (!asked.pipe.destroyed) asked.pipe.write(encode(f) + "\n");
-      if (asked.call.method === "end" && f.ok) exit("ended");
+      if (asked.call.method === "end" && f.ok) exit({ why: "ended" }, "ended");
     }
   };
   const connectOnce = (s) => new Promise((resolve) => {
@@ -6955,7 +7151,7 @@ async function runLink(opts) {
         if (exiting) return;
         if (welcomedThisTime) lastAnsweredAt = Date.now();
       }
-      if (Date.now() - lastAnsweredAt >= timing.reconnectGiveUpMs) return exit();
+      if (Date.now() - lastAnsweredAt >= timing.reconnectGiveUpMs) return exit({ why: "no server", forMs: Date.now() - lastAnsweredAt });
       await pause(timing.reconnectEveryMs);
       s = readServerState(opts.dataRoot);
     }
@@ -6998,14 +7194,16 @@ async function runLink(opts) {
     });
   };
   const pipeServer = await listenOnPipe(linkPipe(opts.dataRoot, opts.run, opts.member), onPipe);
-  if (!pipeServer) return;
+  if (!pipeServer) return pipeTaken();
   const idleCheck = setInterval(() => {
-    if (unanswered.size === 0 && Date.now() - lastStirAt >= timing.idleMs) exit("idle");
+    if (unanswered.size === 0 && Date.now() - lastStirAt >= timing.idleMs) exit({ why: "idle" }, "idle");
   }, Math.min(6e4, Math.max(10, Math.floor(timing.idleMs / 4))));
   const watch = setInterval(watchTranscript, timing.watchEveryMs);
-  if (state.version !== bundleVersion()) return exit();
-  void connectionLoop();
-  watchTranscript();
+  if (state.version !== bundleVersion()) exit({ why: "server of another version" });
+  if (!exiting) {
+    void connectionLoop();
+    watchTranscript();
+  }
   return finished;
 }
 
@@ -7015,7 +7213,7 @@ var START_POLL_MS = 50;
 var entry = () => [process.argv[1]];
 var homeEnv = (dataRoot) => ({ ...process.env, CHARRETTE_HOME: dataRoot });
 var pause2 = (ms2) => new Promise((r) => setTimeout(r, ms2));
-function isAlive(pid) {
+function isAlive2(pid) {
   try {
     process.kill(pid, 0);
     return true;
@@ -7025,46 +7223,48 @@ function isAlive(pid) {
 }
 function readServerState2(dataRoot) {
   try {
-    const s = JSON.parse(fs4.readFileSync(serverStateFile(dataRoot), "utf8"));
+    const s = JSON.parse(fs5.readFileSync(serverStateFile(dataRoot), "utf8"));
     return Number.isInteger(s.pid) && Number.isInteger(s.port) ? s : null;
   } catch {
     return null;
   }
 }
-var isCurrent = (s, swarmEntry) => !!s && s.version === bundleVersion(swarmEntry) && isAlive(s.pid);
-var serverLog = (dataRoot) => path5.join(dataRoot, "swarm-server.log");
+var isCurrent = (s, swarmEntry) => !!s && s.version === bundleVersion(swarmEntry) && isAlive2(s.pid);
 async function ensureServer(dataRoot, swarmEntry = entry()[0]) {
   const found = readServerState2(dataRoot);
   if (found && isCurrent(found, swarmEntry)) return found;
-  if (found && found.pid !== process.pid && isAlive(found.pid)) {
+  if (found && found.pid !== process.pid && isAlive2(found.pid)) {
     try {
       process.kill(found.pid);
     } catch {
     }
-    for (const until = Date.now() + START_TIMEOUT_MS; isAlive(found.pid) && Date.now() < until; ) await pause2(START_POLL_MS);
+    for (const until = Date.now() + START_TIMEOUT_MS; isAlive2(found.pid) && Date.now() < until; ) await pause2(START_POLL_MS);
   }
-  let log = "ignore";
-  try {
-    fs4.mkdirSync(dataRoot, { recursive: true });
-    fs4.writeFileSync(serverLog(dataRoot), "");
-    log = fs4.openSync(serverLog(dataRoot), "a");
-  } catch {
-  }
-  const child = spawn(process.execPath, [swarmEntry, "serve"], { detached: true, stdio: ["ignore", log, log], windowsHide: true, env: homeEnv(dataRoot) });
+  const startedElsewhere = () => liveStartLockHolder(dataRoot) !== null;
   let exited = null;
-  child.on("exit", (code, signal) => exited = signal ? `it was killed by ${signal}` : `it exited with code ${code}`);
-  child.on("error", (e) => exited = e.message);
-  child.unref();
-  if (typeof log === "number") fs4.closeSync(log);
+  if (!startedElsewhere()) {
+    let log = "ignore";
+    try {
+      fs5.mkdirSync(dataRoot, { recursive: true });
+      fs5.writeFileSync(serverLogFile(dataRoot), "");
+      log = fs5.openSync(serverLogFile(dataRoot), "a");
+    } catch {
+    }
+    const child = spawn(process.execPath, [swarmEntry, "serve"], { detached: true, stdio: ["ignore", log, log], windowsHide: true, env: { ...homeEnv(dataRoot), [SERVER_STARTER_ENV]: process.argv.join(" ") } });
+    child.on("exit", (code, signal) => exited = signal ? `it was killed by ${signal}` : `it exited with code ${code}`);
+    child.on("error", (e) => exited = e.message);
+    child.unref();
+    if (typeof log === "number") fs5.closeSync(log);
+  }
   for (const until = Date.now() + START_TIMEOUT_MS; Date.now() < until; ) {
     const s = readServerState2(dataRoot);
     if (s && isCurrent(s, swarmEntry)) return s;
-    if (exited) break;
+    if (exited && !startedElsewhere()) break;
     await pause2(START_POLL_MS);
   }
   let said = "";
   try {
-    const lines = fs4.readFileSync(serverLog(dataRoot), "utf8").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = fs5.readFileSync(serverLogFile(dataRoot), "utf8").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     said = lines.find((l) => /^(\w*Error|swarm\b)[^:]*:/.test(l)) ?? lines.filter((l) => !/^Node\.js v/.test(l)).pop() ?? "";
   } catch {
   }
@@ -7090,10 +7290,20 @@ function connectPipe(pipe) {
   });
 }
 var linkVerbArgs = (member) => ["link", "--run", String(member.run), "--as", member.name];
-async function openLinkPipe(dataRoot, member) {
+var HARNESS_LINK_WAIT_MS = 1e4;
+var inHarnessSession = (env = process.env) => !!env.CLAUDE_CODE_SESSION_ID;
+async function openLinkPipe(dataRoot, member, harnessWaitMs) {
   const pipe = linkPipe(dataRoot, member.run, member.name);
   const there = await connectPipe(pipe);
   if (there) return there;
+  if (harnessWaitMs != null) {
+    for (const until = Date.now() + harnessWaitMs; Date.now() < until; ) {
+      await pause2(START_POLL_MS);
+      const s = await connectPipe(pipe);
+      if (s) return s;
+    }
+    return null;
+  }
   const child = spawn(process.execPath, [...entry(), ...linkVerbArgs(member)], {
     detached: true,
     stdio: "ignore",
@@ -7193,39 +7403,43 @@ async function connectBoard(opts) {
   const state = await ensureServer(opts.dataRoot);
   if (opts.member) {
     const member = opts.member;
-    const sock = await openLinkPipe(opts.dataRoot, member);
-    const calls2 = callsOver((f) => sock.write(`${encode(f)}
+    const harness = opts.harness ?? inHarnessSession();
+    const sock = await openLinkPipe(opts.dataRoot, member, harness ? opts.harnessWaitMs ?? HARNESS_LINK_WAIT_MS : null);
+    if (sock) {
+      const calls2 = callsOver((f) => sock.write(`${encode(f)}
 `));
-    lineFrames(sock, (f) => calls2.settle(f));
-    let direct = null;
-    let closing = false;
-    sock.on("close", () => {
-      if (closing) return;
-      connectServer(state).then(
-        (conn2) => {
-          direct = conn2;
-          conn2.onFrame((f) => calls2.settle(f));
-          conn2.onClose(() => calls2.fail("swarm: the board server closed the connection"));
-          calls2.reroute(conn2.send);
+      lineFrames(sock, (f) => calls2.settle(f));
+      let direct = null;
+      let closing = false;
+      sock.on("close", () => {
+        if (closing) return;
+        connectServer(state).then(
+          (conn2) => {
+            direct = conn2;
+            conn2.onFrame((f) => calls2.settle(f));
+            conn2.onClose(() => calls2.fail("swarm: the board server closed the connection"));
+            calls2.reroute(conn2.send);
+          },
+          () => calls2.fail(`swarm: ${member.name}'s link closed the pipe`)
+        );
+      });
+      sock.on("error", () => {
+      });
+      return Object.assign(asRemote(calls2.call), {
+        close: () => {
+          closing = true;
+          sock.destroy();
+          direct?.close();
         },
-        () => calls2.fail(`swarm: ${member.name}'s link closed the pipe`)
-      );
-    });
-    sock.on("error", () => {
-    });
-    return Object.assign(asRemote(calls2.call), {
-      close: () => {
-        closing = true;
-        sock.destroy();
-        direct?.close();
-      }
-    });
+        linkMissing: false
+      });
+    }
   }
   const conn = await connectServer(state);
   const calls = callsOver(conn.send);
   conn.onFrame((f) => calls.settle(f));
   conn.onClose(() => calls.fail("swarm: the board server closed the connection"));
-  return Object.assign(asRemote(calls.call), { close: conn.close });
+  return Object.assign(asRemote(calls.call), { close: conn.close, linkMissing: !!opts.member });
 }
 
 // src/cli/args.ts
@@ -7300,11 +7514,11 @@ init_mentions();
 
 // src/cli/aiview-document.ts
 import { spawnSync } from "node:child_process";
-import fs5 from "node:fs";
+import fs6 from "node:fs";
 import path6 from "node:path";
 function aiviewLauncher(toolRoot2) {
   const file = process.env.SWARM_AIVIEW ?? path6.join(toolRoot2, "..", "aiview", "aiview.mjs");
-  return fs5.existsSync(file) ? file : null;
+  return fs6.existsSync(file) ? file : null;
 }
 var callAiview = (launcher, cwd, argv) => {
   const r = spawnSync(process.execPath, [launcher, ...argv, "--json"], { cwd, encoding: "utf8" });
@@ -7353,8 +7567,8 @@ function registerBoardDocument(input) {
   const existing = readDocumentText(file);
   const text = boardDocumentText(boardReposFor(existing, input.repo));
   if (text !== existing) {
-    fs5.mkdirSync(path6.dirname(file), { recursive: true });
-    fs5.writeFileSync(file, text);
+    fs6.mkdirSync(path6.dirname(file), { recursive: true });
+    fs6.writeFileSync(file, text);
   }
   const opened = aiview(existing === null ? ["open", file, "--kind", "swarm"] : ["open", file]);
   if (!opened.ok) return { registered: false, reason: opened.error };
@@ -7364,7 +7578,7 @@ function registerBoardDocument(input) {
 }
 function readDocumentText(file) {
   try {
-    return fs5.readFileSync(file, "utf8");
+    return fs6.readFileSync(file, "utf8");
   } catch {
     return null;
   }
@@ -7408,6 +7622,17 @@ var gitAnswer = (cwd, ...argv) => {
 var git = (cwd, ...argv) => {
   const r = gitAnswer(cwd, ...argv);
   return r.status === 0 ? r.stdout.trim() : null;
+};
+var worktreeHolding = (cwd, branch) => {
+  const list = git(cwd, "worktree", "list", "--porcelain");
+  if (!list) return null;
+  const ref = branch.startsWith("refs/") ? branch : `refs/heads/${branch}`;
+  let at = null;
+  for (const line of list.split(/\r?\n/)) {
+    if (line.startsWith("worktree ")) at = line.slice("worktree ".length);
+    else if (line === `branch ${ref}`) return at;
+  }
+  return null;
 };
 
 // src/cli/conflicts.ts
@@ -7534,7 +7759,7 @@ ${USAGE}`);
 function repoOf(dir) {
   const common = git(dir, "rev-parse", "--git-common-dir");
   if (!common) fail(`not in a git repository: ${dir}`);
-  const abs = path9.resolve(dir, common);
+  const abs = path8.resolve(dir, common);
   try {
     return fs8.realpathSync.native(abs);
   } catch {
@@ -7543,7 +7768,7 @@ function repoOf(dir) {
 }
 function worktreeOf(dir) {
   const top = git(dir, "rev-parse", "--show-toplevel");
-  return top ? path9.resolve(top) : null;
+  return top ? path8.resolve(top) : null;
 }
 function changedIn(worktree) {
   const r = spawnSync3("git", ["status", "--porcelain", "-z", "--untracked-files=all"], { cwd: worktree, encoding: "utf8" });
@@ -7569,7 +7794,7 @@ var printReconciled = (unclaimed, flags) => {
   for (const line of unclaimedLines(unclaimed)) console.log(line);
   for (const f of flags) console.log(`#${f.seq} flagged: you wrote ${f.path} outside your claim; ${f.holder} holds it. Settle it with @${f.holder} on the thread.`);
 };
-var toolRoot = () => process.env.SWARM_ROOT ?? path9.dirname(path9.resolve(process.argv[1]));
+var toolRoot = () => process.env.SWARM_ROOT ?? path8.dirname(path8.resolve(process.argv[1]));
 var need = (flag) => args.flag(flag) ?? fail(`${flag} is required
 ${USAGE}`);
 var runArg = () => {
@@ -7579,21 +7804,30 @@ var runArg = () => {
   return id;
 };
 var board;
+var linkToStart = null;
 async function caller() {
   const as = args.flag("--as");
   const wt = as ? null : worktreeOf(process.cwd());
   const p = as ? await board.participant(as) ?? fail(`unknown runner ${as}`) : (wt ? await board.identify({ worktree: wt }) : null) ?? fail("who is calling? no single runner joined from this worktree; pass --as <plan>/<slice>");
   const direct = board;
-  board = await connectBoard({ dataRoot: DATA_ROOT, member: { name: p.name, run: p.run } });
+  const member = { name: p.name, run: p.run };
+  if (p.ended || !(await direct.runs()).some((r) => r.id === p.run)) return p;
+  board = await connectBoard({ dataRoot: DATA_ROOT, member });
+  if (board.linkMissing) linkToStart = member;
   direct.close();
   return p;
 }
-var stateLine = (r) => `${r.state}${r.activity ? ` (${r.activity})` : ""}`;
-var rosterLine = (r) => {
+var ago = (at) => {
+  if (at == null) return "never";
+  const s = Math.max(0, Math.floor((Date.now() - at) / 1e3));
+  return s < 120 ? `${s}s` : s < 7200 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h`;
+};
+var stateLine = (r, ages = false) => `${r.state}${r.activity ? ` (${r.activity})` : ""}` + (ages ? `  progress ${ago(r.progressAt)}${r.progressAt == null ? "" : " ago"}, link ${ago(r.aliveAt)}${r.aliveAt == null ? "" : " ago"}` : "");
+var rosterLine = (r, ages = false) => {
   const files = r.files.map((f) => f.interface ? `${f.path} (interface)` : f.path).join(", ");
   const who = r.slice === "orchestrator" ? r.name : `${r.nick} \xB7 ${r.name}`;
   const on = r.subscriptions.length ? `  on: ${formatSubscriptions(r.subscriptions)}` : "";
-  return `${who}${r.stale ? " (stale)" : ""}  run ${r.run}  ${stateLine(r)}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}${on}`;
+  return `${who}${r.stale ? " (stale)" : ""}  run ${r.run}  ${stateLine(r, ages)}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}${on}`;
 };
 var phaseHeader = async (run2) => {
   const ph = await board.currentPhase(run2);
@@ -7601,7 +7835,7 @@ var phaseHeader = async (run2) => {
   const head = ph ? `phase ${ph.name}: ${ph.text}` : null;
   return paused == null ? head : [head, `PAUSED${paused ? `: ${paused}` : ""}`].filter(Boolean).join("  ");
 };
-var phaseSuffix = (phase, progress) => phase ? `  phase ${phase.name}: ${phase.text}${progress ? `  ${progress.done}/${progress.of} done` : ""}` : "";
+var phaseSuffix = (phase, progress) => phase ? `  phase ${phase.name}: ${phase.text}${progress ? `  ${progressText(progress)}` : ""}` : "";
 var withNext = (me, d) => ({
   ...d,
   full: d.full.map((m) => {
@@ -7681,19 +7915,19 @@ var emitHeard = async (p, json, human) => {
   });
 };
 function resolveClaimPath(file) {
-  if (path9.isAbsolute(file)) return file;
-  const here = path9.resolve(file);
+  if (path8.isAbsolute(file)) return file;
+  const here = path8.resolve(file);
   if (fs8.existsSync(here)) return here;
   const root = worktreeOf(process.cwd());
-  const fromRoot = root ? path9.resolve(root, file) : null;
+  const fromRoot = root ? path8.resolve(root, file) : null;
   if (fromRoot && fs8.existsSync(fromRoot)) return fromRoot;
   if (args.has("--new")) return here;
   return fail(`no such file: ${here}${fromRoot && fromRoot !== here ? ` nor ${fromRoot}` : ""}; pass --new if you are creating it`);
 }
 function repoRelative(abs) {
   const root = worktreeOf(process.cwd());
-  const rel = root ? path9.relative(root, abs) : abs;
-  return rel.split(path9.sep).join("/");
+  const rel = root ? path8.relative(root, abs) : abs;
+  return rel.split(path8.sep).join("/");
 }
 function aboutArg() {
   const about = args.flag("--about");
@@ -7706,16 +7940,16 @@ function parseFile(spec) {
   return { ...d, path: repoRelative(declaredPath(d.path)) };
 }
 function declaredPath(file) {
-  if (path9.isAbsolute(file)) return file;
-  const here = path9.resolve(file);
+  if (path8.isAbsolute(file)) return file;
+  const here = path8.resolve(file);
   if (fs8.existsSync(here)) return here;
   const root = worktreeOf(process.cwd());
-  return root ? path9.resolve(root, file) : here;
+  return root ? path8.resolve(root, file) : here;
 }
 function readSlices(file) {
   let raw;
   try {
-    raw = JSON.parse(fs8.readFileSync(path9.resolve(file), "utf8"));
+    raw = JSON.parse(fs8.readFileSync(path8.resolve(file), "utf8"));
   } catch (e) {
     return fail(`cannot read slices from ${file}: ${e.message}`);
   }
@@ -7888,8 +8122,8 @@ ${USAGE}`);
 ${USAGE}`);
       const r = await board.done(p, name);
       const next = `wait for the next phase, in the foreground: ${self().join(" ")} wait --mentions --as ${shellWord(p.name)}`;
-      emit({ runner: p.name, phase: name, done: r.progress.done, of: r.progress.of, all: r.all, already: r.already, next }, () => {
-        console.log(`${r.already ? "already done" : "done"} ${name}: ${r.progress.done}/${r.progress.of} members done${r.all ? "; the orchestrator is told every member is done" : ""}`);
+      emit({ runner: p.name, phase: name, done: r.progress.done, of: r.progress.of, gone: r.progress.gone, all: r.all, already: r.already, next }, () => {
+        console.log(`${r.already ? "already done" : "done"} ${name}: ${r.progress.done}/${r.progress.of} members done${r.progress.gone.length ? `, ${r.progress.gone.length} gone` : ""}${r.all ? "; the orchestrator is told every member is done" : ""}`);
         console.log(next);
       });
       break;
@@ -8054,7 +8288,7 @@ ${rearm}` : rearm;
     }
     case "roster": {
       if (args.flag("--as") && await answeredClosed(await caller())) break;
-      const repo = repoOf(path9.resolve(args.flag("--repo") ?? process.cwd()));
+      const repo = repoOf(path8.resolve(args.flag("--repo") ?? process.cwd()));
       const roster = await board.roster(repo);
       const runs = new Map((await board.runs()).filter((r) => r.repo === repo).map((r) => [r.id, r]));
       const progress = new Map(await Promise.all([...runs.keys()].map(async (id) => [id, await board.phaseProgress(id)])));
@@ -8064,7 +8298,7 @@ ${rearm}` : rearm;
           const run2 = runs.get(r.run);
           if (run2 && r.run !== shown) console.log(`run ${run2.id}  ${run2.title}${phaseSuffix(run2.phase, progress.get(run2.id) ?? null)}`);
           shown = r.run;
-          console.log(rosterLine(r));
+          console.log(rosterLine(r, true));
         }
       });
       break;
@@ -8096,6 +8330,13 @@ ${rearm}` : rearm;
       const p = await caller();
       if (await refusedPaused(p, "merge-lock")) break;
       const onto = need("--onto");
+      const holding = p.worktree ? worktreeHolding(p.worktree, onto) : null;
+      if (holding) {
+        process.exitCode = 5;
+        const line = `${onto} is checked out at ${holding}: ask the orchestrator to detach it, then run merge-lock again`;
+        emit({ runner: p.name, granted: false, checkedOutAt: holding, next: line }, line);
+        break;
+      }
       const reconciled = p.worktree ? branchChangedIn(p.worktree, onto) : [];
       const held = new Set(await board.heldBy(p));
       const unclaimed = reconciled.filter((f) => !held.has(f));
@@ -8114,7 +8355,7 @@ ${rearm}` : rearm;
       const files = args.list("--files");
       const lock = await board.heldMergeLock(p);
       const conflicts = p.worktree && lock && lock.reflogMark !== null ? conflictsOf(p.worktree, lock.onto ?? "", lock.reflogMark) : void 0;
-      const sharers = await board.merged(p, sha, files.map((f) => path9.resolve(f)), conflicts);
+      const sharers = await board.merged(p, sha, files.map((f) => path8.resolve(f)), conflicts);
       const ended = new Set(await board.endedMembers(p.repo));
       const tell = sharers.map(
         (o) => ended.has(o.runner) ? `if you resolved a conflict in ${o.path}: ${o.runner} has ended, so say how in your report` : `if you resolved a conflict in ${o.path}, tell them: swarm post "@${o.runner} I resolved ${o.path}: <how>" --about ${o.path}`
@@ -8127,7 +8368,12 @@ ${rearm}` : rearm;
     }
     case "end": {
       const p = await caller();
-      if (p.ended || (await board.runs()).every((r) => r.id !== p.run)) break;
+      if ((await board.runs()).every((r) => r.id !== p.run)) {
+        const line = `run ${p.run} closed: ${p.name} ended; return your summary now`;
+        emit({ runner: p.name, ended: true, closed: true, next: line }, line);
+        break;
+      }
+      if (p.ended) break;
       const reconciled = p.worktree ? changedIn(p.worktree) : [];
       const held = new Set(await board.heldBy(p));
       const unclaimed = reconciled.filter((f) => !held.has(f));
@@ -8154,7 +8400,7 @@ ${rearm}` : rearm;
         }
       });
       const stats = await board.stats({
-        repo: repoOf(path9.resolve(args.flag("--repo") ?? process.cwd())),
+        repo: repoOf(path8.resolve(args.flag("--repo") ?? process.cwd())),
         ...run2 !== void 0 ? { run: run2 } : {},
         // a named run is read whatever its age: no default period (plan D40)
         ...all ? {} : since !== void 0 ? { since } : run2 !== void 0 ? {} : { since: "30d" },
@@ -8170,7 +8416,7 @@ ${rearm}` : rearm;
     }
     case "status": {
       const runs = await board.runs();
-      const membersOf = async (r) => (await board.roster(r.repo)).filter((m) => m.run === r.id).map((m) => ({ name: m.name, nick: m.nick, worktree: m.worktree, state: m.state, activity: m.activity }));
+      const membersOf = async (r) => (await board.roster(r.repo)).filter((m) => m.run === r.id).map((m) => ({ name: m.name, nick: m.nick, worktree: m.worktree, state: m.state, activity: m.activity, progressAt: m.progressAt, aliveAt: m.aliveAt }));
       const cli = self().join(" ");
       const open = await Promise.all(
         runs.map(async (r) => {
@@ -8186,7 +8432,7 @@ ${rearm}` : rearm;
         for (const [i, r] of runs.entries()) {
           console.log(`run ${r.id}  ${r.kind}  ${r.plan}  ${r.title}${phaseSuffix(r.phase, open[i].progress)}  ${r.repo}`);
           for (const s of r.slices) console.log(`  ${s.id} ${s.state}  ${s.title}${s.blockers.length ? `  blocked by ${s.blockers.join(", ")}` : ""}`);
-          for (const m of open[i].members) console.log(`  ${m.name}  ${stateLine(m)}`);
+          for (const m of open[i].members) console.log(`  ${m.name}  ${stateLine(m, true)}`);
           const idle = open[i].idleMs;
           if (idle >= FORGOTTEN_MS)
             console.log(`  no activity for ${Math.floor(idle / 864e5)} d: likely left open; ask the person, then archive it: ${cli} close --run ${r.id}`);
@@ -8230,6 +8476,7 @@ if (args.verb === "serve") {
   try {
     if (args.verb !== "poll") board = await connectBoard({ dataRoot: DATA_ROOT });
     await main();
+    if (linkToStart) (asJson ? console.error : console.log)(startLinkLine(linkToStart));
   } catch (e) {
     const said = e.message;
     console.error(e instanceof CliError || said.startsWith("swarm: ") ? said : `swarm: ${said}`);
