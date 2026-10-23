@@ -958,7 +958,7 @@ test("done: a member's done is counted, roster and status show n/m done, the las
   assert.equal(run("done", "diverge", "--as", "idea/orchestrator").status, 1);
 });
 
-test("end on an ended member, or on a closed run, exits 0 and says nothing", () => {
+test("end on an ended member exits 0 and says nothing; on a closed run it prints the summary prompt the closed line promised, never a link line (S62)", () => {
   const id = openRun();
   assert.equal(run("join", "--run", String(id), "--slice", "S3", "--doing", "x").status, 0);
   assert.equal(run("end", "--as", "review-tool/S3").status, 0);
@@ -967,7 +967,8 @@ test("end on an ended member, or on a closed run, exits 0 and says nothing", () 
   assert.equal(run("join", "--run", String(id), "--slice", "S5", "--doing", "x").status, 0);
   run("close", "--run", String(id));
   const closed = run("end", "--as", "review-tool/S5");
-  assert.deepEqual([closed.status, closed.stdout, closed.stderr], [0, "", ""]);
+  assert.deepEqual([closed.status, closed.stdout, closed.stderr], [0, `run ${id} closed: review-tool/S5 ended; return your summary now\n`, ""]);
+  assert.doesNotMatch(closed.stdout + closed.stderr, /start your link now/);
 });
 
 test("once its run is closed, a member's wait, deliver, read, roster, post and done answer the one closed line, exit 0, and write nothing", () => {

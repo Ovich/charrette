@@ -37,7 +37,12 @@ export type Flag = { path: string; holder: string; seq: number };
 /** The phase a run's orchestrator opened last (`phase <name> <text>`). */
 export type Phase = { name: string; text: string };
 /** How many of the run's members (the orchestrator apart) ran `done` for its current phase. */
-export type PhaseProgress = { phase: string; done: number; of: number };
+/** `of` leaves out the members gone and not done (swarm-relay D41); `gone` names them, `<group>/<member>`. */
+export type PhaseProgress = { phase: string; done: number; of: number; gone: string[] };
+/** The progress as every line prints it: `3/3 done`, and `, 1 gone` only when a member is gone (D41). */
+export const progressText = (p: PhaseProgress): string => `${p.done}/${p.of} done${p.gone.length ? `, ${p.gone.length} gone` : ""}`;
+/** The gone members as a line's suffix: ` (1 gone: idea/b)`, empty when none (D41). */
+export const goneSuffix = (gone: string[]): string => (gone.length ? ` (${gone.length} gone: ${gone.join(", ")})` : "");
 /** A member's state from its activity and its link (swarm-relay D9, D31, E12, D12). */
 export type MemberStateName = "working" | "busy" | "waiting" | "quiet" | "gone";
 /** `doing`: the open tool, else the last; `since`: ms epoch the state counts from; `reason`: why quiet or gone. */
@@ -1082,12 +1087,27 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     if (phase == null) return null;
     const rows = db
       .prepare(
-        `SELECT p.ended_at, EXISTS (SELECT 1 FROM phase_done d WHERE d.run = p.run AND d.participant = p.id AND d.phase = ?) AS done
+        `SELECT (SELECT r.plan FROM runs r WHERE r.id = p.run) AS plan, p.slice, p.ended_at, EXISTS (SELECT 1 FROM phase_done d WHERE d.run = p.run AND d.participant = p.id AND d.phase = ?) AS done,
+           EXISTS (SELECT 1 FROM liveness_warned w WHERE w.run = p.run AND w.member = p.slice AND w.cond = 'gone') AS gone
          FROM participants p WHERE p.run = ? AND p.slice != '${ORCHESTRATOR}'`,
       )
       .all(phase, run) as Row[];
-    const counted = rows.filter((r) => Number(r.done) === 1 || r.ended_at == null);
-    return { phase, done: counted.filter((r) => Number(r.done) === 1).length, of: counted.length };
+    // D41: a member gone (as the last tick told it) and not done holds no phase; it counts again once back
+    const live = rows.filter((r) => Number(r.done) === 1 || r.ended_at == null);
+    const gone = live.filter((r) => Number(r.done) !== 1 && Number(r.gone) === 1);
+    const counted = live.filter((r) => !gone.includes(r));
+    return { phase, done: counted.filter((r) => Number(r.done) === 1).length, of: counted.length, gone: gone.map((r) => `${r.plan}/${r.slice}`) };
+  };
+  /** `all-done` to the orchestrator, once per run and phase whoever reaches it first: the last `done`, or the tick
+   *  that finds the last member not done gone (D41). */
+  const allDoneOnce = (author: Participant, progress: PhaseProgress): boolean => {
+    if (!(progress.of > 0 && progress.done === progress.of)) return false;
+    if (Number(db.prepare("INSERT OR IGNORE INTO liveness_warned (run, member, cond) VALUES (?, ?, ?)").run(author.run, ORCHESTRATOR, `all-done ${progress.phase}`).changes) !== 1) return false;
+    insertMessage(author, `all done ${progress.phase}: every member is done (${progress.done}/${progress.of})${goneSuffix(progress.gone)}; open the next phase`, null, "event", [`${author.plan}/${ORCHESTRATOR}`], {
+      event: EVENTS["all-done"].name,
+      meta: { phase: progress.phase },
+    });
+    return true;
   };
 
   /** The closed run's summary into run_stats (D20); summarize reads, this writes. */
@@ -1402,6 +1422,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         db.prepare("UPDATE runs SET phase = ?, phase_text = ? WHERE id = ?").run(name, said, fresh.run);
         // a phase opened again starts with no member done
         db.prepare("DELETE FROM phase_done WHERE run = ? AND phase = ?").run(fresh.run, name);
+        // D41: its all-done told once per opening
+        db.prepare("DELETE FROM liveness_warned WHERE run = ? AND member = ? AND cond = ?").run(fresh.run, ORCHESTRATOR, `all-done ${name}`);
         return insertMessage(fresh, `phase ${name}: ${said}`, null, "event", [`${fresh.plan}/*`], { event: EVENTS.phase.name, meta: { phase: name } });
       });
     },
@@ -1453,12 +1475,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         const all = progress.of > 0 && progress.done === progress.of;
         if (!added) return { progress, all, already: true, message: null };
         const orch = `${fresh.plan}/${ORCHESTRATOR}`;
-        const message = insertMessage(fresh, `done ${name} (${progress.done}/${progress.of})`, null, "event", [orch], { event: EVENTS.done.name, meta: { phase: name } });
-        if (all)
-          insertMessage(fresh, `all done ${name}: every member is done (${progress.done}/${progress.of}); open the next phase`, null, "event", [orch], {
-            event: EVENTS["all-done"].name,
-            meta: { phase: name },
-          });
+        const message = insertMessage(fresh, `done ${name} (${progress.done}/${progress.of})${goneSuffix(progress.gone)}`, null, "event", [orch], { event: EVENTS.done.name, meta: { phase: name } });
+        allDoneOnce(fresh, progress);
         return { progress, all, already: false, message };
       });
     },
@@ -1520,8 +1538,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         const states = statesOf(run, t);
         const others = [...states.values()].filter((st) => st.member !== ORCHESTRATOR);
         const orch = orchestratorIn(run);
-        const progress = progressOf(run, r.phase == null ? null : String(r.phase));
-        const where = progress ? `phase ${progress.phase} ${progress.done}/${progress.of} done` : "no phase open";
+        let progress = progressOf(run, r.phase == null ? null : String(r.phase));
+        let where = progress ? `phase ${progress.phase} ${progressText(progress)}` : "no phase open";
         let moved = false;
         for (const st of others) {
           // D12: gone, once while it lasts, told in the store so a restarted server never tells it again (D37);
@@ -1554,8 +1572,14 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           insertMessage(orch, `stalled ${orch.plan}/${st.member}: ${st.reason}; ${where}`, null, "event", [orch.name], { event: EVENTS.stalled.name });
           db.prepare("UPDATE member_activity SET stalled_at = ? WHERE run = ? AND member = ?").run(t, run, st.member);
         }
-        // D31: idle only when every member but the orchestrator is truly blocked in a wait
-        const allWaiting = r.paused == null && others.length > 0 && others.every((st) => st.state === "waiting");
+        // D41: the gone members this tick told are out of the count; the last one not done gone means all-done now
+        progress = progressOf(run, r.phase == null ? null : String(r.phase));
+        where = progress ? `phase ${progress.phase} ${progressText(progress)}` : "no phase open";
+        if (progress?.gone.length) allDoneOnce(orch, progress);
+        // D31: idle only when every member but the orchestrator is truly blocked in a wait; D41: the gone left out
+        const gone = others.filter((st) => st.state === "gone").map((st) => `${orch.plan}/${st.member}`);
+        const present = others.filter((st) => st.state !== "gone");
+        const allWaiting = r.paused == null && present.length > 0 && present.every((st) => st.state === "waiting");
         if (!allWaiting) idleSince.delete(run);
         else {
           // D34: once when it begins, then only after IDLE_MS while it lasts; a member moving resets it
@@ -1564,7 +1588,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           const held = t - idle.since;
           if (idle.postedAt == null || t - idle.postedAt >= IDLE_MS) {
             idle.postedAt = t;
-            insertMessage(orch, `idle ${Math.floor(held / 1000)}s: every member is waiting; ${where}`, null, "event", [orch.name], { event: EVENTS.idle.name });
+            insertMessage(orch, `idle ${Math.floor(held / 1000)}s: every member is waiting${goneSuffix(gone)}; ${where}`, null, "event", [orch.name], { event: EVENTS.idle.name });
           }
         }
         if (moved) bump(String(r.repo));

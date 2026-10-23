@@ -3,7 +3,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { openBoard, type Declared, type Delivery, type Flag, type Kind, type Message, type Participant, type PhaseProgress, type RosterEntry, type RunStats, type SliceSpec, type SliceState } from "../board/board.ts";
+import { openBoard, progressText, type Declared, type Delivery, type Flag, type Kind, type Message, type Participant, type PhaseProgress, type RosterEntry, type RunStats, type SliceSpec, type SliceState } from "../board/board.ts";
 import { profileOf } from "../board/kinds.ts";
 import { EVENTS, eventOf, formatSubscriptions, parseSubscriptions, type Subscription } from "../board/events.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
@@ -189,6 +189,9 @@ async function caller(): Promise<Participant> {
     : ((wt ? await board.identify({ worktree: wt }) : null) ?? fail("who is calling? no single runner joined from this worktree; pass --as <plan>/<slice>"));
   const direct = board;
   const member = { name: p.name, run: p.run };
+  // S62: a member ended, or of a closed run, has no link: its verb stays on the server, waits for no link and never
+  // prints the link line; it answers the closed line, or end its summary prompt
+  if (p.ended || !(await direct.runs()).some((r) => r.id === p.run)) return p;
   board = await connectBoard({ dataRoot: DATA_ROOT, member });
   if (board.linkMissing) linkToStart = member;
   direct.close();
@@ -222,9 +225,9 @@ const phaseHeader = async (run: number): Promise<string | null> => {
   const head = ph ? `phase ${ph.name}: ${ph.text}` : null;
   return paused == null ? head : [head, `PAUSED${paused ? `: ${paused}` : ""}`].filter(Boolean).join("  ");
 };
-/** `phase <name>: <text>  <n>/<m> done` beside a run's title, or nothing before its first phase. */
+/** `phase <name>: <text>  <n>/<m> done[, <k> gone]` beside a run's title, or nothing before its first phase. */
 const phaseSuffix = (phase: { name: string; text: string } | null, progress: PhaseProgress | null): string =>
-  phase ? `  phase ${phase.name}: ${phase.text}${progress ? `  ${progress.done}/${progress.of} done` : ""}` : "";
+  phase ? `  phase ${phase.name}: ${phase.text}${progress ? `  ${progressText(progress)}` : ""}` : "";
 
 /** A delivery as the member reads it: each event followed by the line its registry row gives (D36, D59). */
 const withNext = (me: Participant, d: Delivery): Delivery & { full: (Message & { endorse?: string })[] } => ({
@@ -577,8 +580,8 @@ ${USAGE}`);
       const r = await board.done(p, name);
       // the member's next step (rule 10): wait for the next phase
       const next = `wait for the next phase, in the foreground: ${self().join(" ")} wait --mentions --as ${shellWord(p.name)}`;
-      emit({ runner: p.name, phase: name, done: r.progress.done, of: r.progress.of, all: r.all, already: r.already, next }, () => {
-        console.log(`${r.already ? "already done" : "done"} ${name}: ${r.progress.done}/${r.progress.of} members done${r.all ? "; the orchestrator is told every member is done" : ""}`);
+      emit({ runner: p.name, phase: name, done: r.progress.done, of: r.progress.of, gone: r.progress.gone, all: r.all, already: r.already, next }, () => {
+        console.log(`${r.already ? "already done" : "done"} ${name}: ${r.progress.done}/${r.progress.of} members done${r.progress.gone.length ? `, ${r.progress.gone.length} gone` : ""}${r.all ? "; the orchestrator is told every member is done" : ""}`);
         console.log(next);
       });
       break;
@@ -856,8 +859,14 @@ ${rearm}` : rearm;
     }
     case "end": {
       const p = await caller();
-      // a member already ended, or its run closed: nothing to do, nothing to say
-      if (p.ended || (await board.runs()).every((r) => r.id !== p.run)) break;
+      // its run closed: the close ended it; end answers what the closed line promised, the summary to return
+      if ((await board.runs()).every((r) => r.id !== p.run)) {
+        const line = `run ${p.run} closed: ${p.name} ended; return your summary now`;
+        emit({ runner: p.name, ended: true, closed: true, next: line }, line);
+        break;
+      }
+      // a member already ended: nothing to do, nothing to say
+      if (p.ended) break;
       // what the runner wrote without claiming it, once, before its claims go (D58)
       const reconciled = p.worktree ? changedIn(p.worktree) : [];
       // what it held before the reconcile claims the rest: only those written without a claim are told
