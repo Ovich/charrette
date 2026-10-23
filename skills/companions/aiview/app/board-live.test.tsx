@@ -1,6 +1,6 @@
 // The board page as a browser gets it: the real useBoard over fetch and /events (stood in for),
 // answered a body shaped as /api/run answers it. A phase event of a closed run, picked by the URL,
-// draws a separator; the stall poller's events draw rows of their own; the agent strip holds the
+// draws a separator; the board server's liveness events draw rows of their own; the agent strip holds the
 // orchestrator as one of its cards, each with its token counter. And a tab of an older build reloads.
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";

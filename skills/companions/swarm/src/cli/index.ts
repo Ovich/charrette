@@ -24,7 +24,7 @@ const FORGOTTEN_MS = 24 * 60 * 60 * 1000;
 
 const USAGE = [
   "usage: swarm <verb> [--json]        (swarm --help code: the claim and merge verbs)",
-  "  open    --kind plan|brainstorm --group <slug> --title <t> --seats <file.json> [--link <url>] [--stall-ms <ms>]   # opens a run, registers the project's board in aiview, starts its stall poller, prints the run id then the board's URL (orchestrator)",
+  "  open    --kind plan|brainstorm --group <slug> --title <t> --seats <file.json> [--link <url>] [--stall-ms <ms>]   # opens a run, registers the project's board in aiview, prints the run id, the board's URL, then the line that starts your link (orchestrator)",
   "          # --stall-ms: no counter moved this long posts stalled, default 60000; ends on the command that starts your link",
   "          # --plan <slug> --slices <file.json>: the same as --kind plan --group <slug> --seats <file.json>",
   '          # the seats file: [{"id", "title", "role"?, "blockers": [...], "link"?: "<URL>", "on"?: ["agreement", …]}]',

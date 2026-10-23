@@ -348,7 +348,7 @@ function heldFileOf(snap: BoardSnapshot, e: SnapshotEvent, ctx: MentionCtx): { p
 
 const QUESTION = /^@orchestrator new question:/;
 
-/** The stall poller's line as the audience reads it: `idle 35s · last active recruiter · phase polish 3/6 done`. */
+/** The board server's liveness line as the audience reads it: `idle 35s · last active recruiter · phase polish 3/6 done`. */
 function idleText(body: string): string {
   const secs = /^stalled (\d+)s/.exec(body)?.[1];
   const who = /last active (?:[\w.-]+\/)?([\w.-]+)/.exec(body)?.[1];
@@ -375,7 +375,7 @@ function itemOf(snap: BoardSnapshot, e: SnapshotEvent, run: RunSummary, ctx: Men
     if (answer.state === "settled") return said("settled", "decided", `⚑ flag settled by #${answer.seq}`, TIPS.settled, "settled");
     return said("flag", "act", "⚑ flag · open", TIPS.flag, answer.state);
   }
-  // the stall poller's events, told apart from the board's plain lines (`swarm` liveness)
+  // the board server's liveness events, told apart from the board's plain lines (`swarm` liveness)
   if (e.kind === "event" && e.event === "stalled") return { ...said("stalled", "wait", "◷ idle", TIPS.stalled), text: idleText(e.body) };
   if (e.kind === "event" && e.event === "liveness") return said("liveness", "wait", "liveness · blind", TIPS.liveness);
   if (isQuiet(e)) {
