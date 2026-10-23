@@ -355,3 +355,46 @@ test("an upkeep or tick that throws is logged to stderr, and the server goes on"
     console.error = was;
   }
 });
+
+// ── presence outlives a restart (swarm-relay S42, D37) ──
+/** `serve stop`, then a new server on the same data home, on the same skewed clock. */
+const restart = async (): Promise<void> => {
+  await server!.close();
+  server = await startBoardServer({ dataRoot: dir, now: () => new Date(Date.now() + skew) });
+};
+
+test("after a restart, a member that had a link and has none 30 s later is gone, posted once, again after a second restart (D37)", async () => {
+  const { s1 } = await linkedRun();
+  await restart();
+  const c = await welcomed();
+  skew += 28_000; // with the 1.5 s below, 29.5 s since the start
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.deepEqual(goneEvents(await value(c, "snapshot", REPO)).map((e) => e.body), [], "not before 30 s");
+  skew += 3_000;
+  const gone = await within(c, 4000, (snap) => goneEvents(snap)[0]);
+  assert.equal(gone.body, `gone ${s1.name}: its link was lost`);
+  // S2 never had a link: never gone; a second restart tells S1's gone no second time
+  await restart();
+  const again = await welcomed();
+  skew += 60_000;
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.deepEqual(goneEvents(await value(again, "snapshot", REPO)).map((e) => e.body), [`gone ${s1.name}: its link was lost`]);
+});
+
+test("a link lost and back within 30 s, across a restart or not, is never gone (D37)", async () => {
+  const { c, run, s1, link } = await linkedRun();
+  link.socket.close();
+  await link.closed;
+  skew += 20_000;
+  await welcomed({ member: { name: s1.name, run: run.id } });
+  skew += 40_000;
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.equal(goneEvents(await value(c, "snapshot", REPO)).length, 0, "back in time, no restart");
+  await restart();
+  skew += 20_000;
+  const reader = await welcomed();
+  await welcomed({ member: { name: s1.name, run: run.id } });
+  skew += 40_000;
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.equal(goneEvents(await value(reader, "snapshot", REPO)).length, 0, "back in time after a restart");
+});

@@ -39,11 +39,15 @@ export async function startBoardServer(opts: { dataRoot: string; host?: string; 
   /** Per run, per member (its seat or slice id): its link connected, else since when it is lost (D12). */
   const links = new Map<number, Map<string, { connected: boolean; lostAt: number | null }>>();
   const memberOf = (name: string): string => name.slice(name.lastIndexOf("/") + 1);
-  const linked = (m: NonNullable<Speaker["member"]>, connected: boolean): void => {
-    const run = links.get(m.run) ?? new Map<string, { connected: boolean; lostAt: number | null }>();
-    links.set(m.run, run);
-    run.set(memberOf(m.name), connected ? { connected: true, lostAt: null } : { connected: false, lostAt: now().getTime() });
+  /** Sets a member's link here and in the store (D37). */
+  const keepLink = (run: number, member: string, link: { connected: boolean; lostAt: number | null }): void => {
+    const members = links.get(run) ?? new Map<string, { connected: boolean; lostAt: number | null }>();
+    links.set(run, members);
+    members.set(member, link);
+    logged("recordLink", () => board.recordLink(run, member, link));
   };
+  const linked = (m: NonNullable<Speaker["member"]>, connected: boolean): void =>
+    keepLink(m.run, memberOf(m.name), connected ? { connected: true, lostAt: null } : { connected: false, lostAt: now().getTime() });
   const presenceIn = (run: number): Presence => (member) => links.get(run)?.get(member) ?? { connected: false, lostAt: null };
   /** An upkeep or tick that throws is logged, and the server goes on (S21). */
   const logged = (what: string, fn: () => void): void => {
@@ -53,6 +57,12 @@ export async function startBoardServer(opts: { dataRoot: string; host?: string; 
       console.error(`swarm server: ${what} failed: ${(e as Error).stack ?? (e as Error).message}`);
     }
   };
+
+  // D37: presence outlives a restart. A link the last server saw connected is lost from this start: back
+  // within LINK_LOST_MS it never counts, else its member is gone; a link already lost keeps its loss time.
+  const startedAt = now().getTime();
+  for (const saved of board.savedLinks())
+    keepLink(saved.run, saved.member, saved.connected ? { connected: false, lostAt: startedAt } : { connected: false, lostAt: saved.lostAt });
 
   const send = (s: Speaker, f: Frame): void => {
     if (s.socket.readyState === s.socket.OPEN) s.socket.send(encode(f));

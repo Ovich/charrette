@@ -52,7 +52,7 @@ export const RPC_METHODS = [
 export type RpcMethod = (typeof RPC_METHODS)[number];
 
 /** The Board methods kept off the wire; with RPC_METHODS, every method of Board (checked below). */
-type ServerOnly = "onChange" | "close" | "livenessTick" | "recordActivity" | "memberStates" | "upkeepIfDue" | "prune" | "flagStale";
+type ServerOnly = "onChange" | "close" | "livenessTick" | "recordActivity" | "memberStates" | "upkeepIfDue" | "prune" | "flagStale" | "recordLink" | "savedLinks";
 // a Board method added later must be put on one side or the other: this fails to compile until it is
 type Unlisted = Exclude<keyof Board, RpcMethod | ServerOnly>;
 const everyMethodPlaced: [Unlisted] extends [never] ? true : Unlisted = true;

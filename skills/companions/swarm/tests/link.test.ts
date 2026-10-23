@@ -2,6 +2,8 @@
 // server written here: it speaks the plan's §3 frames over a bare WebSocket, so the test owns
 // every answer, every drop and every refusal.
 import { test, afterEach } from "node:test";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -259,6 +261,25 @@ test("pipe names differ by data home; a second link of the same member exits at 
   await until("connected", () => server.connections.length === 1);
   await startLink(home).done;
   assert.equal(first.exited(), false);
+  await exitLink(server, first);
+});
+
+test("a member's link started twice as the CLI: one runs, the second exits 0 and prints nothing (D37)", { timeout: 30000 }, async () => {
+  const server = await stubServer();
+  servers.push(server);
+  const home = dataHome(server.port);
+  const first = startLink(home);
+  await openPipe(home);
+  await until("connected", () => server.connections.length === 1);
+  const cli = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "cli", "index.ts");
+  const second = spawnSync(process.execPath, [cli, "link", "--as", MEMBER, "--run", String(RUN)], {
+    encoding: "utf8",
+    timeout: 20000,
+    env: { ...process.env, CHARRETTE_HOME: home, SWARM_ROOT: home, CLAUDE_CODE_SESSION_ID: "" },
+  });
+  assert.deepEqual([second.status, second.stdout, second.stderr], [0, "", ""]);
+  assert.equal(server.connections.length, 1, "the second link never reached the server");
+  assert.equal(first.exited(), false, "the first link still runs");
   await exitLink(server, first);
 });
 

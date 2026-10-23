@@ -345,6 +345,12 @@ export interface Board {
   onChange(listener: (repo: string) => void): () => void;
 
   close(): void;
+
+  /** A member's link connected, or lost at `lostAt` (ms epoch): kept in the store, so presence outlives a
+   *  server restart (swarm-relay D37). */
+  recordLink(run: RunId, member: string, link: { connected: boolean; lostAt: number | null }): void;
+  /** Every link the store keeps, as the last server left them: read by a server at its start (D37). */
+  savedLinks(): { run: RunId; member: string; connected: boolean; lostAt: number | null }[];
 }
 
 /** A phase's name: one word. */
@@ -572,6 +578,10 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       grew_at INTEGER, tokens INTEGER NOT NULL DEFAULT 0, context INTEGER,
       open_tool TEXT, open_target TEXT, open_since INTEGER, last_tool TEXT,
       finished INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL, stalled_at INTEGER,
+      PRIMARY KEY (run, member));
+    -- a member's link as the server last saw it: connected, else lost since lost_at (ms epoch); swarm-relay D37
+    CREATE TABLE IF NOT EXISTS member_links (
+      run INTEGER NOT NULL, member TEXT NOT NULL, connected INTEGER NOT NULL, lost_at INTEGER,
       PRIMARY KEY (run, member));
   `);
   if (recordsAreNew) db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES (?, ?)").run(RECORDS_SINCE, new Date().toISOString());
@@ -990,8 +1000,6 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   /** The presence each run's tick last gave: the snapshot and the roster read states through it. */
   const presenceOf = new Map<RunId, Presence>();
   const noPresence: Presence = () => ({ connected: false, lostAt: null });
-  /** The members `gone` was told of, while they stay gone. */
-  const goneTold = new Set<string>();
   const orchestratorIn = (run: RunId): Participant =>
     participantById(Number((db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run, ORCHESTRATOR) as Row).id));
   const activityOf = (run: RunId, member: string): Row | undefined =>
@@ -1179,7 +1187,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           }
           db.prepare("DELETE FROM slices WHERE run = ?").run(run);
           db.prepare("DELETE FROM merges WHERE run = ?").run(run);
-          for (const table of ["phase_done", "transcripts", "token_readings", "liveness_warned", "member_activity"]) db.prepare(`DELETE FROM ${table} WHERE run = ?`).run(run);
+          for (const table of ["phase_done", "transcripts", "token_readings", "liveness_warned", "member_activity", "member_links"]) db.prepare(`DELETE FROM ${table} WHERE run = ?`).run(run);
           // the row stays, stamped: its id is never handed to a new run (D61)
           db.prepare("UPDATE runs SET pruned_at = ? WHERE id = ?").run(at.toISOString(), run);
         }
@@ -1483,11 +1491,10 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         const where = progress ? `phase ${progress.phase} ${progress.done}/${progress.of} done` : "no phase open";
         let moved = false;
         for (const st of others) {
-          const key = `${run}/${st.member}`;
-          // D12: gone, once while it lasts; an ended member is not live, so never gone
-          if (st.state !== "gone") goneTold.delete(key);
-          else if (!goneTold.has(key)) {
-            goneTold.add(key);
+          // D12: gone, once while it lasts, told in the store so a restarted server never tells it again (D37);
+          // an ended member is not live, so never gone
+          if (st.state !== "gone") db.prepare("DELETE FROM liveness_warned WHERE run = ? AND member = ? AND cond = 'gone'").run(run, st.member);
+          else if (Number(db.prepare("INSERT OR IGNORE INTO liveness_warned (run, member, cond) VALUES (?, ?, 'gone')").run(run, st.member).changes) === 1) {
             insertMessage(orch, `gone ${orch.plan}/${st.member}: ${st.reason}`, null, "event", [orch.name], { event: EVENTS.gone.name });
           }
           // D11: stalled per member, to the orchestrator alone; never while paused
@@ -1888,6 +1895,18 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       };
     },
 
+    recordLink(run, member, link) {
+      db.prepare("INSERT OR REPLACE INTO member_links (run, member, connected, lost_at) VALUES (?, ?, ?, ?)").run(run, member, link.connected ? 1 : 0, link.lostAt);
+    },
+
+    savedLinks() {
+      return (db.prepare("SELECT * FROM member_links").all() as Row[]).map((r) => ({
+        run: Number(r.run),
+        member: String(r.member),
+        connected: Number(r.connected) === 1,
+        lostAt: r.lost_at == null ? null : Number(r.lost_at),
+      }));
+    },
 
     close() {
       watching?.close();

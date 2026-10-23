@@ -51,23 +51,28 @@ function readServerState(dataRoot: string): ServerState | null {
 
 const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** Listens on the member's pipe; null when another link of the same member already holds it. */
+/** Does another link answer on this pipe? */
+const pipeAnswers = (pipe: string): Promise<boolean> =>
+  new Promise<boolean>((resolve) => {
+    const probe = net.connect(pipe, () => (probe.destroy(), resolve(true)));
+    probe.once("error", () => resolve(false));
+  });
+
+/** Listens on the member's pipe; null when another link of the same member already holds it (D37:
+ *  the pipe answering is the test, asked first, whatever error a listen on a taken pipe gives). */
 async function listenOnPipe(pipe: string, onPipe: (s: net.Socket) => void): Promise<net.Server | null> {
+  if (await pipeAnswers(pipe)) return null;
   const tryListen = () =>
-    new Promise<net.Server | "taken">((resolve, reject) => {
+    new Promise<net.Server | "taken">((resolve) => {
       const server = net.createServer(onPipe);
-      server.once("error", (e: NodeJS.ErrnoException) => (e.code === "EADDRINUSE" ? resolve("taken") : reject(e)));
+      // any refusal is a link that took the pipe meanwhile, or a pipe it holds: this link is the second
+      server.once("error", () => resolve("taken"));
       server.listen(pipe, () => resolve(server));
     });
   const first = await tryListen();
   if (first !== "taken") return first;
-  if (process.platform === "win32") return null;
-  // a socket file left by a link that died: taken only if someone answers on it
-  const alive = await new Promise<boolean>((resolve) => {
-    const probe = net.connect(pipe, () => (probe.destroy(), resolve(true)));
-    probe.once("error", () => resolve(false));
-  });
-  if (alive) return null;
+  if (process.platform === "win32" || (await pipeAnswers(pipe))) return null;
+  // a socket file left by a link that died
   fs.rmSync(pipe, { force: true });
   const second = await tryListen();
   return second === "taken" ? null : second;
@@ -86,6 +91,8 @@ export async function runLink(opts: {
   timing?: Partial<LinkTiming>;
 }): Promise<void> {
   const timing = { ...DEFAULT_TIMING, ...opts.timing };
+  // D37: one link per member; a second, its pipe answering, exits at once, before anything else can fail it
+  if (await pipeAnswers(linkPipe(opts.dataRoot, opts.run, opts.member))) return;
 
   let state = readServerState(opts.dataRoot);
   for (const startedAt = Date.now(); !state && Date.now() - startedAt < timing.stateFileWaitMs; ) {
