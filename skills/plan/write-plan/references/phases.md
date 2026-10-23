@@ -1,0 +1,69 @@
+# Phases and seats
+
+Every plan runs on the swarm board: N seats, phase by phase. This says how the phases and seats
+are cut.
+
+## The seats
+
+- **The plan runs on N seats**, `seat1` … `seat<N>`, plus the validator when the person wants
+  one. N is the mandate's `seats:` field: propose it from the work, **4 for a normal plan**, 2–3
+  for a small one, 5–6 for a large one, and settle it with the person.
+- **A seat is a place in the swarm, not an agent.** Each phase dispatches a fresh subagent into
+  it; what it learned reaches the next phase through the board's thread and its report.
+
+## The phases
+
+- **A phase exists only where work must wait for other work merged**: a contract, a move, a
+  schema the rest builds on; the tests once the code stands. Work that can run together is one
+  phase. Most plans need one to three.
+- **Derive the phases from what each piece of work needs merged**: name, for each, the merged
+  work it cannot start without; that, and nothing else, puts it in a later phase.
+- **A phase of one seat is still a phase**, a ground phase most often: on the board like the
+  others, never run outside it.
+- **A phase is seats working, nothing else.** A run of the person's (a gate, a trial) is a `👤`
+  step; work of yours (a baseline, a check) is an orchestrator step. Neither is called a phase,
+  and neither is added unless the person asks for it: offer it with its cost, never as a
+  default.
+- **Every seat works in every phase**, one slice each, at most nine seats, a special seat's
+  phase excepted: a phase has at most N slices. **A phase with fewer slices than seats is said
+  to the person**, with why, and with the offer to merge it into its neighbour or shrink it.
+- **A special seat runs alone in its own phase**, no other seat working in it: the validator,
+  a reviewer reading every merge. Its role is the mandate's, in the person's words.
+- **Each phase names every seat's role and area in it**, one line each: builder of the api,
+  tests of the store, reviewer of another seat's merge. A seat's role may change from one phase
+  to the next.
+- **The riskiest unknown goes in the first phase**, so the slices after it are written knowing it.
+
+## The validator
+
+**Opt in, the mandate's `verify:` field.** One seat for the whole run,
+dormant on the board from the run's open, following the thread, until the orchestrator tells it
+its phase has come: after each building phase or once at the end, as the mandate says. It runs
+the project's `verify-<app>-<focus>` skill on the merged result, scoped by the orchestrator to what was
+done since the last validation, plus what the person added to watch. It may talk on the board to whoever it needs, and asks the orchestrator for a seat when
+something must be answered or fixed.
+**With a validator, the run alternates**: a building phase, every seat working, until a
+feature can be checked; then the validation phase, the validator alone, the building seats
+ended with their slices. **A building phase before a validation phase ends on a feature the
+validator can check end to end**, never a layer (the api without its screen), and its goal
+names that feature. **The validation phase's goal says what to validate**: the feature, the
+stories or screens to walk, what counts as a blocker. **Its verdict feeds the orchestrator's next cut**: what
+the next phase is and its slices, a fix slice, or a pause for the person.
+
+## The slices
+
+**No slice is written with the plan.** The plan fixes each phase's goal and every seat's role
+and area; each slice is written at its phase's open, by the `write-slice` skill.
+
+## The tracker
+
+**One subgraph per slice, titled with its phase and seat**, `P1 · seat2 · the api`, its id
+`SL<phase><seat>`, its steps `S<phase><seat>.<step>`; until a phase opens, one subgraph
+`SL<phase>0` stands for it. The shape is `references/tracker.md`.
+
+## The mandate
+
+**`phases:`, `seats:` and `verify:` come first**, proposed from the work and settled with the
+person as the `orchestrate-plan` skill's `references/mandate.md` asks them. The *Mandate*
+section holds the phase table (each phase, what it waits on, its goal, every seat's role and
+area), and what the person added for the validator to watch, in their words.

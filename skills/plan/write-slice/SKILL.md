@@ -7,7 +7,7 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 **Cutting a plan's increment into slices**: read `references/cutting.md`. The rest of this skill is one slice's document.
 
-**A plan whose mandate says `mode: swarm`**: read `references/swarm.md` before the cut or the document.
+**A slice is one seat's share of a phase, written when it is about to be dispatched**, at its phase's open, never with the plan. The plan gives the phase's goal and the seat's role and area; read first what the run left: its merges, the agreements and findings on the board's thread (the `swarm` skill's `thread <phase>`), each seat's report. A slice says what it builds on from them. A finding that changes the phase's goal is a pause, not a recut.
 
 **One document per slice, the whole design one agent needs.** The mandate (when tests are written, the pull request, the boundaries) is not in it: it reaches the agent through the brief at dispatch (the `orchestrate-plan` skill).
 
@@ -23,6 +23,7 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 - **Signatures as code, bodies never**: a block in the project's language, the exports with their types. Before the first block, read `references/examples.md`: one block per state.
 - **An agreed `module` document (`deepen-module`) is quoted word for word.**
 - **Callers bound by different rules get an entry each**, named for their case, the stricter case's rules in its signature, over a core they cannot import.
+- **The modules table marks every file the slice will edit, `interface` or `inside`**: *interface* when another slice imports or calls through it, *inside* when only this slice reads it. The seat declares exactly these when it joins the board; a file another slice of the phase also edits is marked in both documents, and the two seats settle it on the board.
 - **One block per module the slice touches, under the plan's name for it.** A module the slice only calls gets no block. A module the plan does not name is a finding for the plan, never a block invented here.
 
 | State | What the block carries |
@@ -36,7 +37,7 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 ## Tests
 
-**Only when the mandate's `tests` is not `none`.** One line per seam: the module whose interface the tests cross, and the cases by name, each traced to an acceptance criterion. Tests read the answer through the interface, never through a table, a private function or a spy. For the test slice of `tests: at the plan end`, the cases the other slices left owed.
+**Only when the mandate's `tests` is not `none`.** One line per seam: the module whose interface the tests cross, and the cases by name, each traced to an acceptance criterion. Tests read the answer through the interface, never through a table, a private function or a spy. In the tests phase of `tests: at the plan end`, the cases the earlier slices left owed, split by seat.
 
 ## The document
 
@@ -46,14 +47,14 @@ description: Use when a plan's increment has to be cut into slices, or when an a
 
 <slice-template>
 
-# <node id>: <title>
+# S<phase><seat> · P<phase> · seat<n> · <role> · <title>
 
 > **Slice document** of `<plan file>`. Carry it out with the `execute-slice` skill.
 
 **What this delivers.** The end-to-end behaviour, from the user's side.
 
-**Blocked by.** The slices this one depends on, done or not. "Nothing" only when nothing
-was ever required.
+**Builds on.** What the phases before merged that this slice needs, and the slices of its
+phase it shares a file with.
 
 **Acceptance criteria.** A checklist, the slice's `👤` mark among them. A command and its
 expected exit code wherever one exists.

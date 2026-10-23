@@ -20,8 +20,8 @@ const GLYPH_CLASS: ReadonlyMap<string, string> = new Map([
 const NODE = /^(\s*)([A-Za-z_][\w.-]*)\[\s*"(.*)"\s*\]\s*$/;
 const CLASS_LINE = /^(\s*)class\s+([\w.,\s-]+?)\s+(\w+)\s*$/;
 const CLASSDEF = /^\s*classDef\s+(\w+)\b/;
-/** A slice: `subgraph SL3["Slice 3 · US4 · … · 👤 design review"]`. The id names the
- *  slice the way a step id does (`S3.4`), so the two can be held to each other. */
+/** A slice: `subgraph SL12["P1 · seat2 · US4 · … · 👤 design review"]`. The id names the
+ *  slice the way a step id does (`S12.4`), so the two can be held to each other. */
 const SUBGRAPH = /^\s*subgraph\s+([A-Za-z_][\w.-]*)\s*\[\s*"?(.*?)"?\s*\]\s*$/;
 const END = /^\s*end\s*$/;
 /** The slice number a `SL<n>` id or an `S<n>.<step>` id carries. */
@@ -184,13 +184,13 @@ export function check(t: Tracker): Finding[] {
   }
 
   if (!t.mandateLine) {
-    found.push({ line: t.fence, text: "no mandate line under the tracker: the first line below the diagram states the mandate in force, `mandate: run through · one for the plan · …`" });
+    found.push({ line: t.fence, text: "no mandate line under the tracker: the first line below the diagram states the mandate in force, `mandate: seats 4 · phases 3 · …`" });
   }
 
   // Tests at the plan end is chosen in the mandate and paid for in the tracker: without
-  // its test slice every slice runs untested and nothing ever writes the tests.
+  // its tests phase every slice runs untested and nothing ever writes the tests.
   if (/tests at the plan end/i.test(t.mandate) && !t.slices.some((sl) => /\bthe tests\b/i.test(sl.title))) {
-    found.push({ line: t.fence, text: "the mandate says tests at the plan end and no slice is the test slice: draw it, titled `… · the tests`, last before the person's checks, every other slice owing it its tests" });
+    found.push({ line: t.fence, text: "the mandate says tests at the plan end and no phase is the tests phase: draw it, titled `… · the tests`, last before the person's checks, every other slice owing it its tests" });
   }
 
   for (const n of t.nodes) {
@@ -215,8 +215,8 @@ export function check(t: Tracker): Finding[] {
     if (!ids.has(id)) found.push({ line: t.classLines[0] ?? 0, text: `${id} is styled '${names.join(", ")}' but no node declares it` });
   }
 
-  // One ▶ per slice: the protocol allows one per branch a plan draws, and a branch is
-  // drawn inside its slice, so two running steps in one slice is the case to name.
+  // One ▶ per slice: every seat of the open phase runs one, each inside its own slice,
+  // so two running steps in one slice is the case to name.
   const perSlice = new Map<string, TrackerNode[]>();
   for (const n of t.nodes.filter((x) => x.glyph === "▶")) {
     const key = n.slice ?? "";
@@ -308,9 +308,9 @@ function shapeFindings(n: TrackerNode): Finding[] {
 }
 
 /** The fixed fields of the state node, which are overwritten and never appended to. The
- *  mandate's fields (pace, steps, model, verify) live in the plan's Mandate section. */
+ *  mandate's fields (seats, phases, pace, model, verify) live in the plan's Mandate section. */
 const STATE_FIELDS = ["branch", "deployed", "next", "blocked", "parked"] as const;
-const MANDATE_FIELDS = ["pace", "steps", "model", "verify"] as const;
+const MANDATE_FIELDS = ["seats", "phases", "pace", "model", "verify"] as const;
 
 function stateFindings(state: TrackerNode): Finding[] {
   const seen = new Map<string, number>();

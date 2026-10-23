@@ -2,23 +2,11 @@
 
 How the fields are asked, written and amended is the `orchestrate` skill's
 `references/charter.md`. The charter section is the plan's *Mandate*; the one line sits under the tracker:
-`mandate: mode classic · run through · one for the plan · delegated · opus · medium · tests at the plan end · verify off`.
+`mandate: seats 4 · phases 3 · verify at the end · run through · opus · medium · tests at the plan end`.
 
-**`mode:`** first. Asked by the `write-plan` skill before the cut, since the plan differs by
-mode; asked here only for a plan that predates the field, where a plan cut for classic stays
-classic.
-
-Both are recommended, each for its work; recommend the one the plan fits, first.
-
-1. **swarm**, recommended when the work has room for two seats or more at once: N seats work the plan phase by phase, every seat at once in each phase,
-   coordinating on the board of the `swarm` skill. The plan must have been cut for it (the
-   `write-plan` skill's `references/swarm.md`).
-2. **classic**, recommended for a small or strictly sequential change: slices one after another,
-   forks proved apart and joined at the end.
-
-**In swarm mode, three more fields, asked right after `mode:`, before the cut**, in their own
-exchange, never folded into the approval of the defaults. The rules behind them are the
-`write-plan` skill's `references/swarm.md`.
+**`phases:`, `seats:` and `verify:` first, before the cut**, asked by the `write-plan` skill,
+each in its own message, never folded into the approval of the defaults. The rules behind them
+are the `write-plan` skill's `references/phases.md`.
 
 **First show the run as one numbered table**, the same in every question that follows: each
 phase, what merged work it waits on, its goal, who works in it (which seats, the validator, the
@@ -31,51 +19,32 @@ message, each proposed from the work with its reason:
   merge or shrink it. An extra (a baseline, a cross-review, a gate) is offered with its cost and
   is in only on a yes.
 - **`seats:`** the number of seats working at once, proposed as the widest phase: **4** for a
-  normal plan, 2–3 small, 5–6 large.
-- **`verify:`** opt in, as in classic (the field below), asked here because it shapes the
-  phases: `after each phase`, `at the end`, or `off`. On, a validator seat runs the project's
-  `verify-<app>-<focus>` skill alone in its own phases, scoped at each by you to what the phases before
-  merged; the next phase is cut from its verdict. No `verify-<app>-<focus>` skill: offer to create it
-  (yes runs `verification-skill-create` before the first phase); no is `verify: off`. With several verifiers, ask which one
-  each validation phase runs. What the
-  person adds to watch is written into the *Mandate* in their words. Any other special seat (a
-  reviewer of every merge) is asked the same way.
+  normal plan, 2–3 small, 5–6 large; 1 when the work is strictly sequential.
+- **`verify:`** `after each phase`, `at the end`, or `off`. Look for a `verify-<app>-<focus>`
+  skill in the project's local skill folder; several: ask which one each validation phase runs.
+  None: offer to create it (yes runs `verification-skill-create` before the first phase); no is
+  `verify: off`. On, a validator seat runs it alone in its own phases, scoped by you to what the
+  phases before merged. What the person adds to watch is written into the *Mandate* in their
+  words. Any other special seat (a reviewer of every merge) is asked the same way.
 
 **`pace:`**
 
-1. **run through** (recommended): at each pull request boundary, mark ready, merge once the check re-run here exits 0 (and the verification passes, where there is one), report, continue.
-2. **run through, the person merges**: push, mark ready, report, continue. Never merge.
-3. **stop at each slice**: finish, report, name what is next, wait.
+1. **run through** (recommended): at the plan's end, mark the pull request ready, merge once the check re-run here exits 0 (and the verification passes, where there is one), report.
+2. **run through, the person merges**: push, mark ready, report. Never merge.
+3. **stop at each phase**: close the phase, report, name what is next, wait.
 
 Under any pace, a slice marked `👤` stops before it starts, and a finding that changes the next
-slice is a pause.
+phase is a pause.
 
-**`pull requests:`**
+**`model:`** **opus** (recommended).
 
-1. **one for the plan** (recommended): one branch off `main`, forks merged into it at the join, one merge at the end.
-2. **one per slice**, off `main`: each slice lands on its own and leaves `main` green.
-
-**`steps:`**
-
-1. **delegated** (recommended): a subagent per slice runs the `execute-slice` skill.
-2. **inline**: this session does the work as that skill says. For small plans or a person who wants to watch.
-
-**`model:`** when delegated: **opus** (recommended).
-
-**`effort:`** when delegated, `low | medium | high | xhigh | max`: **medium** (recommended).
+**`effort:`** `low | medium | high | xhigh | max`: **medium** (recommended).
 The design is the plan's, but the subagent shapes the code around its slice and names what it
 adds. How effort reaches a subagent: the `orchestrate` skill's *Dispatch*.
 
 **`tests:`** when the tests the plan names get written. The testing prompt each answer puts in
 the brief: `references/tests.md`.
 
-1. **at the plan end** (recommended): slices write no tests; a last slice writes them all. `aiview tracker check` refuses this answer until the tracker carries that test slice: a subgraph titled `… · the tests`, last before the `👤` checks, blocked by every other slice, its done-when the full check at 0. With `one per slice`, tell the person the pair merges untested code and ask for one to move. Its document is written through the `write-slice` skill once every other slice is done. In `mode: swarm` it is the tests phase, one slice per seat (the `write-plan` skill's `references/swarm.md`).
+1. **at the plan end** (recommended): slices write no tests; a last phase, `· the tests`, one slice per seat, writes them all. `aiview tracker check` refuses this answer until the tracker carries that phase.
 2. **at the slice end**: each slice writes its own tests after its code.
 3. **none**: no tests written in this plan.
-
-**`verify:`** `each slice | slot done | off`, the same field as in swarm, asked here in
-classic. Look for a `verify-<app>-<focus>` skill in the project's local skill folder; several: ask which one runs. One exists: ask
-"Verify after each slice (recommended), or once the slot is done?". It does not: ask whether to
-create one; yes runs `verification-skill-create` before the first slice, then the first
-question; no is `verify: off`. On, a check subagent runs the skill after each merge, scoped by
-you to the slice or the plan (`references/brief.md`).

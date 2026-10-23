@@ -1,12 +1,12 @@
 ---
 name: swarm
-description: "Use when agents run together on the project's swarm board: a plan in swarm mode or a swarmstorm, as its orchestrator or a seat whose brief names a run, or when a run on the board has to be opened, read, interrupted or closed, or how the runs went has to be read from outside them. Produces nothing but the run's state on the board, or its figures. Not for a classic run, and not for documents (aiview)."
+description: "Use when agents run together on the project's swarm board: a plan or a swarmstorm, as its orchestrator or a seat whose brief names a run, or when a run on the board has to be opened, read, interrupted or closed, or how the runs went has to be read from outside them. Produces nothing but the run's state on the board, or its figures. Not for documents (aiview)."
 ---
 
 # swarm: the board
 
 **The board is where agents running together on one project see each other and settle what
-they share.** A run is one piece of work on it, of a kind: a plan in swarm mode, its seats working
+they share.** A run is one piece of work on it, of a kind: a plan, its seats working
 phase by phase, each slice in a worktree of its own, or a swarmstorm, its seats talking without touching
 the repository. The board says who is there, doing what, and carries their talk. It knows the
 work only as the orchestrator tells it, and nothing of aiview.
@@ -85,8 +85,7 @@ installed.
 
 - **A plan's seat whose brief names a run and a slice**: read `references/runner.md` before the first edit.
 - **A swarmstorm seat whose brief names a run**: read `references/seat.md` before the first call.
-- **The orchestrator of a run** (a plan whose mandate says `mode: swarm`, or a
-  swarmstorm): read `references/orchestrator.md` before opening it, and the `orchestrate` skill
+- **The orchestrator of a run** (a plan, or a swarmstorm): read `references/orchestrator.md` before opening it, and the `orchestrate` skill
   for dispatch.
 - **An outside reader of how the runs went**, from the project and never a member: `$S stats
   --json` gives every run's figures and the scope's totals, with the run ids, members and seqs

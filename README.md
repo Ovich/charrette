@@ -24,15 +24,15 @@ flowchart LR
   B["brainstorm<br/>a board"] --> P
   DM["deepen-module<br/>a module document"] --> P
   RM["roadmap<br/>the next slot"] --> P
-  P["write-plan<br/>one document, written while interviewing"] --> WS["write-slice<br/>one document per slice"]
-  WS --> E["execute-plan<br/>one agent per slice"]
+  P["write-plan<br/>one document, written while interviewing"] --> WS["write-slice<br/>one document per slice, at its phase's open"]
+  WS --> E["execute-plan<br/>seats on the swarm board, phase by phase"]
   E --> R["pr-review"]
   E -.->|"recommended"| V["validate-delivery<br/>with the person, live"]
   V --> R
   R --> M["merge"]
 ```
 
-A plan starts from whatever exists: an idea said in chat, a board, an agreed module, the roadmap's next slot. `interview` resolves the decisions along the way and `write-diagrams` draws them. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it. The executor orchestrates: each slice goes to a fresh agent that first shapes the code around it, then does it. When the project has a verify skill, a subagent judges each delivery's product quality alone, as its quality owner: done as specified, usable, finished. When the plan has delivered something a person looks at, its close recommends `validate-delivery`: the same verify process walked with the person, who guides it and decides, the agent proposing what to check and changing what they ask for.
+A plan starts from whatever exists: an idea said in chat, a board, an agreed module, the roadmap's next slot. `interview` resolves the decisions along the way and `write-diagrams` draws them. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it. The executor orchestrates on the swarm board, phase by phase: each slice goes to a fresh seat that first shapes the code around it, then does it. When the project has a verify skill, a subagent judges each delivery's product quality alone, as its quality owner: done as specified, usable, finished. When the plan has delivered something a person looks at, its close recommends `validate-delivery`: the same verify process walked with the person, who guides it and decides, the agent proposing what to check and changing what they ask for.
 
 ## Iterate the loop
 
@@ -152,7 +152,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | Skill | Use case | Example ask |
 |---|---|---|
 | [write-plan](skills/plan/write-plan/SKILL.md) | Something non-trivial is about to be built and its plan has to be written | *"Write the plan for per-user rate limiting."* One document, written while interviewing: why, before and after, the deep modules, the flows, the failure modes, the slices with their tracker, and the mandate you give the orchestrator. No code until it is approved. |
-| [write-slice](skills/plan/write-slice/SKILL.md) | A plan's increment has to be cut into slices, or a slice of an approved plan needs the document an agent will carry it out from | *"Write the slice document for SL3."* One plan node in, its document out: the decisions quoted, the modules table, the cases to test when the mandate has tests, the environment facts the first command trips on. |
+| [write-slice](skills/plan/write-slice/SKILL.md) | A plan's increment has to be cut into slices, or a slice of an approved plan needs the document an agent will carry it out from | *"Write the slice document for SL12."* One plan node in, its document out: the decisions quoted, the modules table, the cases to test when the mandate has tests, the environment facts the first command trips on. |
 
 ### Execute
 
@@ -160,8 +160,8 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 |---|---|---|
 | [execute-plan](skills/execute/execute-plan/SKILL.md) | An approved plan is ready, or was left mid-way by an earlier session | *"Execute the rate-limiting plan."* Keeps the tracker and the plan's decisions; the orchestration itself is orchestrate-plan's. Pauses only for your decisions, your checks, or an action that does not undo. Refuses a plan with no tracker. |
 | [orchestrate](skills/orchestrate/SKILL.md) | Loads whenever an agent runs other agents, a plan or a swarmstorm | Settles the charter with you, dispatches each member with its brief and role, watches them and steers a drift. |
-| [orchestrate-plan](skills/execute/orchestrate-plan/SKILL.md) | Loads with execute-plan, whenever a plan runs | Settles the mandate, sends each slice to a fresh agent with a brief that carries the testing prompt, checks every few minutes that the run is healthy, re-runs each slice's check itself, and has a subagent do each merge and each verification pass. Pull requests open as drafts and are marked ready only at the merge. In swarm mode, every ready slice runs at once on the swarm board: the runners claim their files, settle a shared one on the thread and merge under the board's lock, in phases when the mandate names them. |
-| [execute-slice](skills/execute/execute-slice/SKILL.md) | One slice document is handed to an agent to carry out | *"Do slice 2."* Stops on what the document cannot carry, shapes the code around the slice (the dependency graph shows the neighbourhood), then does the slice, naming everything for its purpose, and returns the branch and the run as evidence. |
+| [orchestrate-plan](skills/execute/orchestrate-plan/SKILL.md) | Loads with execute-plan, whenever a plan runs | Settles the mandate, then runs the plan phase by phase on the swarm board: each phase's slices written at its open, every seat dispatched at once with a brief that carries the testing prompt, the runners claiming their files, settling a shared one on the thread and merging under the board's lock. Re-runs each slice's check itself; a validator seat judges the merged result when the mandate asks. One draft pull request for the plan, marked ready only at the merge. |
+| [execute-slice](skills/execute/execute-slice/SKILL.md) | One slice document is handed to an agent to carry out | *"Do slice S12."* Stops on what the document cannot carry, shapes the code around the slice (the dependency graph shows the neighbourhood), then does the slice, naming everything for its purpose, and returns the branch and the run as evidence. |
 
 ### Verify
 
@@ -188,7 +188,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | Skill | Use case | Example ask |
 |---|---|---|
 | [aiview](skills/companions/aiview/SKILL.md) | A viewer at `localhost:4321` and an index, driven by the agent from a CLI. Called by the other skills; directly, to show a document or query the index | *"Open docs/notes/cache-idea.md in aiview, tagged payments."* |
-| [swarm](skills/companions/swarm/SKILL.md) | The board agents running together share, for a plan in swarm mode or a swarmstorm: who is there, what each holds, their thread, drawn by aiview a tab per run. Called by the orchestrators and their members; directly, to read how the runs went | *"How did the swarm runs go this week?"* |
+| [swarm](skills/companions/swarm/SKILL.md) | The board agents running together share, for a plan or a swarmstorm: who is there, what each holds, their thread, drawn by aiview a tab per run. Called by the orchestrators and their members; directly, to read how the runs went | *"How did the swarm runs go this week?"* |
 
 `write-diagrams`, `interview`, `orchestrate`, the tracker protocol in `write-plan` and the companion tools are the shared layer the others delegate to. `roadmap` sits above the loop: it names the next slot, and a board, a plan or a run finishing tells it to redraw. House rules in `AGENTS.md` win over general principles wherever the two disagree.
 

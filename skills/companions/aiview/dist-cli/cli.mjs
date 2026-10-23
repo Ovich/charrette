@@ -12145,10 +12145,10 @@ function check(t) {
     found.push({ line: t.fence, text: `the tracker is drawn below ${t.diagramsAbove === 1 ? "another diagram" : `${t.diagramsAbove} other diagrams`}: it is the first thing in the plan, under the header` });
   }
   if (!t.mandateLine) {
-    found.push({ line: t.fence, text: "no mandate line under the tracker: the first line below the diagram states the mandate in force, `mandate: run through \xB7 one for the plan \xB7 \u2026`" });
+    found.push({ line: t.fence, text: "no mandate line under the tracker: the first line below the diagram states the mandate in force, `mandate: seats 4 \xB7 phases 3 \xB7 \u2026`" });
   }
   if (/tests at the plan end/i.test(t.mandate) && !t.slices.some((sl) => /\bthe tests\b/i.test(sl.title))) {
-    found.push({ line: t.fence, text: "the mandate says tests at the plan end and no slice is the test slice: draw it, titled `\u2026 \xB7 the tests`, last before the person's checks, every other slice owing it its tests" });
+    found.push({ line: t.fence, text: "the mandate says tests at the plan end and no phase is the tests phase: draw it, titled `\u2026 \xB7 the tests`, last before the person's checks, every other slice owing it its tests" });
   }
   for (const n of t.nodes) {
     const has = t.assigned.get(n.id) ?? [];
@@ -12241,7 +12241,7 @@ function shapeFindings(n) {
   return found;
 }
 var STATE_FIELDS = ["branch", "deployed", "next", "blocked", "parked"];
-var MANDATE_FIELDS = ["pace", "steps", "model", "verify"];
+var MANDATE_FIELDS = ["seats", "phases", "pace", "model", "verify"];
 function stateFindings(state) {
   const seen = /* @__PURE__ */ new Map();
   const mandate = [];

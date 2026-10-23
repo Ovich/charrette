@@ -6,13 +6,13 @@ copies it from here rather than rewriting it. The seams and cases are the slice 
 
 ## at the plan end
 
-Every slice but the test slice:
+Every slice outside the tests phase:
 
 ```markdown
 **Tests**: write none and touch none. At the end, run the suite once (`<command>`) and list every test your change breaks, by name, in the return; do not repair, skip or delete them. The proof in your acceptance criteria is not a test: whatever drives it is scratch, outside the repository, never under a name the suite collects.
 ```
 
-The test slice:
+A slice of the tests phase:
 
 ```markdown
 **Tests**: write the cases this document names at the seams it names, from the document, not the code. Repair the tests listed as broken first. A small bug the tests expose is fixed in its own commit; anything that changes a decision is a stop. Never bend a case to pass. Land with `<the full check>` at 0.

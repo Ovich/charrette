@@ -17,7 +17,7 @@ with the person during development and the project skills that feed them; the lo
 `architecture/`, `ui/`, `plan/`, `execute/`, `review/`; `interview/`, `swarmstorm/` and `whiteboard-defense/` sit at the root;
 `companions/` holds the two tools, shipped as versioned bundles so an install never builds:
 aiview (`skills/companions/aiview/`), a CLI, the one server and the one UI, drawing the
-documents and the board; and swarm (`skills/companions/swarm/`, the board a swarm-mode plan
+documents and the board; and swarm (`skills/companions/swarm/`, the board every plan
 runs on), a CLI and a store, with no page or server of its own. aiview reads swarm's store
 only through the BoardReader, `skills/companions/swarm/src/board/snapshot.ts`, bundled into
 aiview's `dist-cli/`; never `board.ts` or SQL, and swarm never imports aiview. The plugin sees a group only through the `skills`

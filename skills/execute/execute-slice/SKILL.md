@@ -7,7 +7,7 @@ description: Use when handed one slice document to carry out, as the agent doing
 
 **The slice document is the design; the brief is the mandate.** Where the brief asks for something, it wins over any habit, this skill's included.
 
-**Before the first edit, look for a run on the board**: the `swarm` skill's `status` lists the open runs. One of kind plan open on this repository, or a run the brief names, means you load the `swarm` skill, runner side, and join it before the work, even when the brief forgot to say so; ask the orchestrator on the board which slice id is yours if the brief names none. It changes nothing else here.
+**Join the board before the first edit**: load the `swarm` skill, runner side, and join the run the brief names. A brief naming none: the `swarm` skill's `status` lists the open runs; join the plan's run on this repository and ask the orchestrator there which slice id is yours.
 
 ## When to stop
 
@@ -23,7 +23,7 @@ Each is a report, never an improvisation.
 2. **Do the slice.** The acceptance criteria and nothing beyond them. Tick each criterion in the slice document as its evidence lands; the document is yours to edit, the plan is not. A comment citing a decision names its plan: `<topic>#D<n>`.
 3. **Name for purpose.** Every identifier you add or touch (module, file, function, type, variable) says what it is for, readable at the call site without opening its body. No generic names (`data`, `handle`, `utils`, `manager`, `info`), no names left from what the code used to do. Rename what step 1 surfaced, in its commits.
 
-Commit small, push as the brief's pull request line says, and open the draft it names on the first commit.
+Commit small, and merge as the brief's merge line says.
 
 ## The return
 

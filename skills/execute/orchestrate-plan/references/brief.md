@@ -10,25 +10,16 @@ Carry out one slice document with the `execute-slice` skill.
 
 **Slice document**: `<file name>`, aiview id `#<id>`, in project `<slug>`. Read it through the aiview skill's tool.
 
-**Workspace**: <the worktree, or this checkout>. **Branch**: `<branch>`, based on `<base>` at `<sha>`; confirm that base in your return. **Prepare**: `<the command, install included>`.
+**Board**: run `<run id>` on `<repository>`, slice `<slice id>`, seat `<seat>` as `<role>` in phase `<phase>`; load the `swarm` skill, runner side, and join the board before anything else, the install and the rebase included. What the phases before left is on the thread: `thread <phase>`.
 
-**Pull request**: <the line below that applies>.
+**Workspace**: <the worktree>. **Branch**: `<slice branch>`, based on `<branch>` at `<sha>`; confirm that base in your return. **Prepare**: `<the command, install included>`.
 
-**Board**: run `<run id>` on `<repository>`, slice `<slice id>`, seat `<seat>` as `<role>` in phase `<phase>`; load the `swarm` skill, runner side, and join the board before anything else, the install and the rebase included. What the phases before left is on the thread: `thread <phase>`.   ← `mode: swarm` only
+**Merge**: yourself, under the board's lock, as the `swarm` skill's runner side says: rebase onto `<branch>`, run your check, then from your worktree `git push . HEAD:<branch>` (fast-forward only, never force). Open no pull request.
 
 <the testing prompt of the mandate's `tests` answer, from `references/tests.md`>
 
 <the one thing this slice must not do, when there is one>
 ```
-
-| The mandate | The pull request line |
-|---|---|
-| `one per slice` | open a draft `<title>` (`gh pr create --draft`) on your first commit, push as you go. |
-| `one for the plan`, open | none. Commit to your branch; the orchestrator joins it into `<branch>`. |
-| `one for the plan`, not yet open | open a draft `<title>` (`gh pr create --draft`) on your first commit; every later slice pushes to it. |
-| `mode: swarm` | none. Merge yourself, under the board's lock, as the `swarm` skill's runner side says: rebase onto `<branch>`, run your check, then from your worktree `git push . HEAD:<branch>` (fast-forward only, never force). |
-
-**The board line** only in swarm mode, without its marker; a classic brief has none.
 
 ## The validator
 
@@ -45,15 +36,3 @@ Talk on the board to whoever you need; ask `@orchestrator` for a seat when somet
 ```
 
 **The last line** as the `orchestrate` skill's `references/brief.md` says.
-
-## A merge
-
-```markdown
-Merge `<slice branch>` into `<target branch>` in `<checkout>`, then run `<the check>` on the result and return its output. On a conflict, stop and report both sides; do not resolve it. Never delete a branch.
-```
-
-## A verification
-
-```markdown
-Run the `verify-<app>-<focus>` skill over `<base sha>..<head sha>`, scope `<what was delivered: the slice | the plan | the parts>`, inputs `<those that differ from the skill's defaults, or none>`; judge that scope only. Your return is the skill's report: the inputs, the verdict, the findings table.
-```

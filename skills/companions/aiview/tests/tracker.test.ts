@@ -41,7 +41,7 @@ ${body}
   classDef state stroke:#8a8a8a
 \`\`\`
 
-mandate: run through · one for the plan · delegated · opus · tests at the slice end · verify off`;
+mandate: seats 4 · phases 2 · verify off · run through · opus · tests at the slice end`;
 
 /** Steps live inside a slice, so a fixture that omits one is not a tracker. */
 const slice = (n: number, steps: string[], title = `Slice ${n}`) =>
@@ -149,12 +149,12 @@ test("check: two steps running in one slice, but one per slice is fine", () => {
   const clash = need(plan([slice(1, [`S1.1["▶ one"]`, `S1.2["▶ two"]`]), "  class S1.1,S1.2 next"].join("\n")));
   assert.match(check(clash)[0].text, /^2 steps are ▶ in SL1 \(S1.1, S1.2\)/);
 
-  const forked = need(plan([
-    slice(1, [`S1.1["▶ the api branch"]`]),
-    slice(2, [`S2.1["▶ the infra branch"]`]),
+  const phase = need(plan([
+    slice(1, [`S1.1["▶ seat1, the api"]`]),
+    slice(2, [`S2.1["▶ seat2, the infra"]`]),
     "  class S1.1,S2.1 next",
   ].join("\n")));
-  assert.deepEqual(check(forked), []);
+  assert.deepEqual(check(phase), []);
 });
 
 test("check: a step drawn in the wrong slice, and one drawn outside every slice", () => {
@@ -209,13 +209,13 @@ test("check: the mandate in force is stated right under the tracker", () => {
   assert.deepEqual(check(need(bold)), [], "bold or not");
 });
 
-test("check: a mandate that says tests at the plan end needs its test slice in the tracker", () => {
+test("check: a mandate that says tests at the plan end needs its tests phase in the tracker", () => {
   const fast = (body: string) => plan(body).replace("tests at the slice end", "tests at the plan end");
   const without = [slice(1, [`A["⬜ A the route answers"]`]), "  class A todo"].join("\n");
-  assert.match(check(need(fast(without)))[0].text, /^the mandate says tests at the plan end and no slice is the test slice/);
+  assert.match(check(need(fast(without)))[0].text, /^the mandate says tests at the plan end and no phase is the tests phase/);
   const withIt = [slice(1, [`A["⬜ A the route answers"]`]), slice(2, [`B["⬜ B every named case a test"]`], "Slice 2 · US1 · the tests"), "  class A,B todo"].join("\n");
   assert.deepEqual(check(need(fast(withIt))), []);
-  assert.deepEqual(check(need(plan(without))), [], "another rhythm asks for no test slice");
+  assert.deepEqual(check(need(plan(without))), [], "another rhythm asks for no tests phase");
 });
 
 test("check: the glyph names the verdict line, and a step ticked without one is caught", () => {
