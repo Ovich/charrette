@@ -1,9 +1,9 @@
 # Swarmstorm
 
-[![version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FOvich%2Fcharrette%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=version&prefix=v)](RELEASING.md)
-[![stars](https://img.shields.io/github/stars/Ovich/charrette)](https://github.com/Ovich/charrette/stargazers)
-[![last commit](https://img.shields.io/github/last-commit/Ovich/charrette)](https://github.com/Ovich/charrette/commits/main)
-[![licence](https://img.shields.io/github/license/Ovich/charrette)](LICENSE)
+[![version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FOvich%2Fswarmstorm%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=version&prefix=v)](RELEASING.md)
+[![stars](https://img.shields.io/github/stars/Ovich/swarmstorm)](https://github.com/Ovich/swarmstorm/stargazers)
+[![last commit](https://img.shields.io/github/last-commit/Ovich/swarmstorm)](https://github.com/Ovich/swarmstorm/commits/main)
+[![licence](https://img.shields.io/github/license/Ovich/swarmstorm)](LICENSE)
 
 *(Agents working one piece of work together on a shared board, a person deciding what holds.
 Formerly Charrette.)*
@@ -103,7 +103,7 @@ An agent trace bench: a support assistant walked call by call, each step with th
 **Claude Code**, as a plugin. The skills answer to `swarmstorm:`, as `/swarmstorm:brainstorm` or `/swarmstorm:pr-review`, so nothing collides with skills you already have:
 
 ```
-/plugin marketplace add Ovich/charrette
+/plugin marketplace add Ovich/swarmstorm
 /plugin install swarmstorm@swarmstorm
 ```
 
@@ -112,13 +112,13 @@ An agent trace bench: a support assistant walked call by call, each step with th
 ```
 /plugin uninstall charrette@charrette
 /plugin marketplace remove charrette
-/plugin marketplace add Ovich/charrette
+/plugin marketplace add Ovich/swarmstorm
 /plugin install swarmstorm@swarmstorm
 ```
 
 **Any other agent**, from a clone. Node 22.5 or later, nothing else. Prompt:
 
-> Set up Swarmstorm: clone `https://github.com/Ovich/charrette.git` into
+> Set up Swarmstorm: clone `https://github.com/Ovich/swarmstorm.git` into
 > `<the checkout>`, build the bundled viewer, and make every skill under `skills/`, at
 > the root or one folder down in its group, discoverable to you (symlink or otherwise).
 > Then tell me the aiview URL and the skills you can reach by name.

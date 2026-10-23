@@ -1,12 +1,12 @@
 {
   "name": "swarmstorm",
   "description": "Agent skills for the drawing-board loop: brainstorm, interview, diagram, plan, review. Every document rendered live in aiview, the companion app, outside your repositories.",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "author": {
     "name": "Stefan Teofanovic"
   },
-  "homepage": "https://github.com/Ovich/charrette",
-  "repository": "https://github.com/Ovich/charrette",
+  "homepage": "https://github.com/Ovich/swarmstorm",
+  "repository": "https://github.com/Ovich/swarmstorm",
   "license": "MIT",
   "keywords": [
     "skills",

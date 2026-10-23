@@ -761,7 +761,7 @@ describe("Sidebar footer: the way to the repository", () => {
   test("the link opens the repository in a new tab and says what a star is for", () => {
     const link = footer("2.0.0").querySelector('[data-component="GitHubLink"]') as HTMLAnchorElement;
     expect(link.textContent).toContain("Star on GitHub");
-    expect(link.href).toBe("https://github.com/Ovich/charrette");
+    expect(link.href).toBe("https://github.com/Ovich/swarmstorm");
     expect(link.target).toBe("_blank");
     expect(link.rel).toBe("noreferrer");
     expect(link.title).toBe("Swarmstorm on GitHub. A star helps others find it.");

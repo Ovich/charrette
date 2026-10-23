@@ -152,7 +152,7 @@ export function Sidebar({
           )}
           <a
             data-component="GitHubLink"
-            href="https://github.com/Ovich/charrette"
+            href="https://github.com/Ovich/swarmstorm"
             target="_blank"
             rel="noreferrer"
             title="Swarmstorm on GitHub. A star helps others find it."
