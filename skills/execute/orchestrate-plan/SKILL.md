@@ -23,7 +23,7 @@ Read the plan's *Mandate* section. Ask what it leaves open before the first phas
 1. **Write its slices now**, one per seat, with the `write-slice` skill, from the phase's goal, every seat's role and area, and what the run taught so far. The tracker's placeholder becomes the slices.
 2. **Open it**: `slice add` each slice, then `phase <name> "<text>"`, the text naming every seat's role in it.
 3. **Dispatch every seat of the phase at once**, one fresh subagent each, in its own worktree, with the brief of `references/brief.md`, read before the first dispatch. A seat with no slice in this phase is not dispatched.
-4. **Watch the board.** The digest (the `orchestrate` skill's `scripts/watch-agents.mjs`) remains for a seat the board shows stale. A drift is answered on the board, by the interrupt the `swarm` skill describes.
+4. **Watch the board**: it replaces the periodic check and the digest. Each seat's state, and the `stalled`, `gone`, `idle` and `liveness` events, are read and answered as the `swarm` skill's orchestrator side says; a drift is answered on the board, by its interrupt.
 5. **A return**: the seat merged its own branch under the board's lock. Re-run the slice's check on the merged branch, and what the testing prompt asked for; tick, mark the slice done on the board, remove its worktree once the tick stands, and check the path is gone.
 6. **The phase closes** when every slice is ticked and the full check is green on the merged branch: the board's `all-done`, then that check. Only then is the next phase cut. A seat that stopped on a finding: fix the slice document and dispatch a fresh subagent into the same slice, or pause when the finding changes the phase.
 

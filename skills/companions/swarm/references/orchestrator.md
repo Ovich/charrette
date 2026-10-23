@@ -31,24 +31,14 @@ except `open`, `slice`, `close` and `status`.
      its row's list; `subscribe` / `unsubscribe` change it later.
 
 2. **From the repository's checkout:**
-   `$S open --kind <plan|brainstorm> --group <slug> --title "<title>" --seats <file> --link <plan or board URL> --transcript <your transcript>`.
+   `$S open --kind <plan|brainstorm> --group <slug> --title "<title>" --seats <file> --link <plan or board URL>`.
    `--plan <slug>` stays an alias of `--kind plan --group <slug>`, `--slices` of `--seats`. It
-   prints the run id, then the run's aiview URL: give the URL to the person, who watches the
-   run there.
-3. **Liveness is read from token counters**: `open` starts the run's stall poller, which reads
-   every registered transcript each second; `close` stops it. `--transcript` is your own
-   session's transcript file; a seats row may carry its member's as `transcript`.
-   `--stall-ms <ms>` sets the run's threshold, default 60000: a member composing a long post
-   moves no counter for a minute or more. A member with no readable
-   transcript is named on the thread by a `liveness` event: the stall check is blind for it.
-   `open` and `slice --transcript` print a `liveness` line at once, naming the path, when the
-   file is missing, empty or unparseable: register the right one again.
-4. **The transcript paths, as the Claude Code adapter reads them**:
-   - **Yours**: `~/.claude/projects/<project-slug>/<session-id>.jsonl`.
-   - **A dispatched subagent's**:
-     `~/.claude/projects/<project-slug>/<session-id>/subagents/agent-<agentId>.jsonl`, the
-     `agentId` the `Agent` call returns. **Never the `tasks/<id>.output` file** the `Agent`
-     tool names: it stays empty, and the stall check would be blind.
+   prints the run id, the run's aiview URL, then the line that starts your link: give the URL
+   to the person, who watches the run there, and run the line as it says.
+3. **You register nothing for liveness.** Each member's link finds its transcript in the
+   session and reports its activity; the board derives each member's state from it (`SKILL.md`
+   names them). `--stall-ms <ms>` sets how long a member may stay `quiet` before you are told,
+   default 60000.
 
 ## Dispatch
 
@@ -56,10 +46,6 @@ except `open`, `slice`, `close` and `status`.
 brief carries `--as <group>/<seat>` and the join line, whose answer tells the seat how it
 waits: in the foreground, never with a background listener; a seat runs on the plugin's
 `seat-runner` agent, as the `swarmstorm` skill says.
-
-**After each dispatch, register the member's transcript**: `$S slice <id> --run <run>
---transcript <path>`, the dispatched agent's own transcript (step 4 of the open). Its answer
-says whether the board reads it.
 
 ## Slice states
 
@@ -81,13 +67,22 @@ says whether the board reads it.
   background. **Block only on the board's verbs**: never a foreground loop, a poll or a sleep of
   your own, which the board cannot end and which leaves you deaf. Empty, start it again. `close`
   makes it return.
-- **`stalled` is the board unblocking the swarm**: every member but you quiet for the run's
-  threshold (default 60 s; your own waiting never counts) posts `stalled`, again at each further
-  threshold until a member moves. It releases every waiting verb of the run, yours and every
-  member's: whoever owes a move makes it, the others wait again. Every board action is a verb, so
-  nothing stays blocked past the threshold. On `stalled`, drop whatever you were waiting on and
-  act: open the phase, or mention the member who owes a move. The line it ends on is your step.
-- **`idle` every 15 s while every member sits in a board `wait`** (15, 30, 45 s) wakes you alone: the swarm waits on you. Never while a member works. Open the phase if all are done, else wait again.
+- **Four events reach you alone**; no member is woken by them, and `stalled` and `idle` never
+  fire while the run is paused. Each ends on the step it asks for.
+  - **`stalled <member>`**: that member's transcript has not grown for the run's threshold and
+    it is in no board wait and no tool call under 15 min (`quiet`), its reason given; once, then
+    every 15 min while it lasts. It owes a move it is not making: read the thread, then mention it with what you need.
+    A member quiet because its turn ended on a background task is not woken by that task: tell
+    it what to do (*Interrupt*).
+  - **`gone <member>`**: its agent finished without `end`, or its link has been lost 30 s; once.
+    It is not running: dispatch a fresh agent into its slice, or close the slice (*A gone
+    member*).
+  - **`idle`**: every member is `waiting` in a board wait; once when it begins, then every
+    15 min while it holds. The swarm waits on you: open the next phase if all are done, else
+    answer whoever waits on you, else wait again.
+  - **`liveness`**: no transcript was found for a member 30 s after its join; once. Its state
+    is presence only (`waiting` or `quiet`, never `working`) and `stalled` never names it: judge
+    it by its posts and its doing, and mention it when it falls silent.
 - **A `merged` event is a slice to check**: re-run its check on the branch it merged into then,
   not when the runner's report arrives; the report adds what it found.
 - **`$S deliver --as <plan>/orchestrator`** between other work: what was said since, mentions of
@@ -106,8 +101,9 @@ says whether the board reads it.
   skill), or, for a plan, the phases its *Mandate* names (the `orchestrate-plan` skill). Only
   members still in the run count toward `all-done`: a runner that ended with its slice does not,
   so a phase dispatching one special seat waits on it alone.
-- **`$S roster`** shows each run's title, current phase and its `<n>/<m> done`, then each runner, its doing and its files; `(stale)` after ten minutes
-  without a call to the board.
+- **`$S roster`** (and `status`) shows each run's title, current phase and its `<n>/<m> done`,
+  then each member's state with its open or last tool, its doing and its files; `(stale)` after
+  ten minutes without a call to the board.
 
 ## Interrupt
 
@@ -116,17 +112,19 @@ stop and wait, claim and merge-lock are refused, and no stall, quiet or stale al
 `$S resume "<what changed, what to do>" --as <group>/orchestrator` lets them go on, the message
 in their wake. The answers print the next step.
 
-**News for one member waits for its long call to end.** When it cannot wait:
+**News for one member waits for its long call to end.** Its state says which: `waiting` hears a
+mention at once; `working` or `busy` hears it at its next board call. When it cannot wait, or the
+member is `quiet`:
 
 1. **`$S post --as <plan>/orchestrator "@<slice> <the message>"`**, so the thread has it.
 2. **Stop the runner** (`TaskStop`), **then resume it with the same message** (`SendMessage`).
    It resumes with its context within seconds.
 
-## A stale member
+## A gone member
 
-Read its subagent's digest first. Gone: **`$S slice <id> --run <run> --state done`** frees its
-claims and the merge lock if it held it; set the slice back to `running` and dispatch a fresh
-runner, which joins the same slice.
+**Its state decides, never a guess.** `quiet` is alive and owes a move: *Interrupt*. `gone`:
+**`$S slice <id> --run <run> --state done`** frees its claims and the merge lock if it held it;
+set the slice back to `running` and dispatch a fresh runner, which joins the same slice.
 
 ## Close
 
