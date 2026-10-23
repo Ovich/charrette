@@ -7,7 +7,7 @@ import { openBoard, type Declared, type Delivery, type Flag, type Kind, type Mes
 import { profileOf } from "../board/kinds.ts";
 import { EVENTS, eventOf, formatSubscriptions, parseSubscriptions, type Subscription } from "../board/events.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
-import { bindingOf, connectBoard, linkVerbArgs, type BoardMember, type RemoteBoard } from "../client/remote.ts";
+import { bindingOf, connectBoard, linkVerbArgs, type BoardMember, type ConnectedBoard } from "../client/remote.ts";
 import { parseArgs } from "./args.ts";
 import { fullText, seqLine } from "./format.ts";
 import { nameHandle, unmatchedMentions } from "../board/mentions.ts";
@@ -175,7 +175,9 @@ const runArg = (): number => {
 };
 
 /** The board a verb talks to: straight to the server until `caller` binds it to the caller's link (D29). */
-let board!: RemoteBoard & { close(): void };
+let board!: ConnectedBoard;
+/** The caller whose link did not answer in a harness session: the verb ends on the line that starts it (D39). */
+let linkToStart: BoardMember | null = null;
 
 /** The caller: --as names it; otherwise the runner that joined from this worktree, asked of the server
  *  directly (D29). From then on the verb's calls go through that member's link. */
@@ -186,7 +188,9 @@ async function caller(): Promise<Participant> {
     ? ((await board.participant(as)) ?? fail(`unknown runner ${as}`))
     : ((wt ? await board.identify({ worktree: wt }) : null) ?? fail("who is calling? no single runner joined from this worktree; pass --as <plan>/<slice>"));
   const direct = board;
-  board = await connectBoard({ dataRoot: DATA_ROOT, member: { name: p.name, run: p.run } });
+  const member = { name: p.name, run: p.run };
+  board = await connectBoard({ dataRoot: DATA_ROOT, member });
+  if (board.linkMissing) linkToStart = member;
   direct.close();
   return p;
 }
@@ -252,7 +256,8 @@ const self = (): string[] => ["node", shellWord(process.argv[1].replace(/\\/g, "
  *  that ends its turn is gone, no background listener wakes it); the orchestrator and a slice runner
  *  listen in the background while they work. */
 /** The link line of join and open, before any listener or wait line (D32, swarm-relay D33, AGENTS rule 10): the member's link, run as its agent's own
- *  background task, so a stopped agent takes it down; a verb that finds none spawns one detached. */
+ *  background task, so a stopped agent takes it down; a verb that finds none spawns one detached outside a harness session,
+ *  and inside one ends on this line (D39). */
 const startLinkLine = (member: BoardMember): string =>
   `start your link now, in the background (your harness's background task): ${[...self(), ...linkVerbArgs(member).map(shellWord)].join(" ")}`;
 const listensInForeground = (p: Pick<Participant, "slice" | "kind">): boolean => p.slice !== "orchestrator" && profileOf(p.kind).member === "seat";
@@ -966,6 +971,8 @@ if (args.verb === "serve") {
     // every verb reaches the board through the server, started on demand (D6, D19); the poller reads the store itself
     if (args.verb !== "poll") board = await connectBoard({ dataRoot: DATA_ROOT });
     await main();
+    // D39: the call went straight to the server; the agent starts its own link (on stderr under --json, which stays parseable)
+    if (linkToStart) (asJson ? console.error : console.log)(startLinkLine(linkToStart));
   } catch (e) {
     const said = (e as Error).message;
     console.error(e instanceof CliError || said.startsWith("swarm: ") ? said : `swarm: ${said}`);

@@ -1,4 +1,4 @@
-// The board as the CLI sees it (swarm-relay D5, D6, D19, D29, D30): every Board call a verb makes,
+// The board as the CLI sees it (swarm-relay D5, D6, D19, D29, D30, D39): every Board call a verb makes,
 // awaited over a member's link or straight to the server, either started on demand.
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
@@ -116,12 +116,27 @@ function connectPipe(pipe: string): Promise<net.Socket | null> {
 /** The hidden verb that runs `member`'s link, its binding derived from the name (D29, D32). */
 export const linkVerbArgs = (member: BoardMember): string[] => ["link", "--run", String(member.run), "--as", member.name];
 
-/** The member's pipe; when no link answers on it, a detached one is spawned first: the fallback for an
- *  agent that did not start its own as a background task (D32), and a link that died comes back (D6). */
-async function openLinkPipe(dataRoot: string, member: BoardMember): Promise<net.Socket> {
+/** How long a verb in a harness session waits for the agent's own link to answer before going straight to the server (D39). */
+export const HARNESS_LINK_WAIT_MS = 10_000;
+
+/** Inside a harness session: the agent runs its link as its own background task, so nothing here spawns one (D39). */
+export const inHarnessSession = (env: NodeJS.ProcessEnv = process.env): boolean => !!env.CLAUDE_CODE_SESSION_ID;
+
+/** The member's pipe. Inside a harness session, the agent's own link is waited for up to `harnessWaitMs`, never spawned:
+ *  null when none answers by then (D39). Outside one, a detached link is spawned first when none answers: the fallback for
+ *  an agent that did not start its own as a background task (D32), and a link that died comes back (D6). */
+async function openLinkPipe(dataRoot: string, member: BoardMember, harnessWaitMs: number | null): Promise<net.Socket | null> {
   const pipe = linkPipe(dataRoot, member.run, member.name);
   const there = await connectPipe(pipe);
   if (there) return there;
+  if (harnessWaitMs != null) {
+    for (const until = Date.now() + harnessWaitMs; Date.now() < until; ) {
+      await pause(START_POLL_MS);
+      const s = await connectPipe(pipe);
+      if (s) return s;
+    }
+    return null;
+  }
   const child = spawn(process.execPath, [...entry(), ...linkVerbArgs(member)], {
     detached: true,
     stdio: "ignore",
@@ -233,43 +248,52 @@ function asRemote(call: (method: RpcMethod, args: unknown[]) => Promise<unknown>
   return board as unknown as RemoteBoard;
 }
 
-/** The board for a verb: through `member`'s link when given (started when its pipe does not answer),
- *  else straight to the server; the server started first when none of this version runs (D6, D29). */
-export async function connectBoard(opts: { dataRoot: string; member?: BoardMember }): Promise<RemoteBoard & { close(): void }> {
+/** A verb's board; `linkMissing`: the member's calls went straight to the server, no link of its answering (D39). */
+export type ConnectedBoard = RemoteBoard & { close(): void; linkMissing: boolean };
+
+/** The board for a verb: through `member`'s link when given, else straight to the server; the server started first when
+ *  none of this version runs (D6, D29). Without a link answering, outside a harness session one is started detached (D32);
+ *  inside one (`harness`, from CLAUDE_CODE_SESSION_ID by default) it is waited for `harnessWaitMs`, then the calls go
+ *  straight to the server, `linkMissing` set, so the verb prints the line that starts it (D39). */
+export async function connectBoard(opts: { dataRoot: string; member?: BoardMember; harness?: boolean; harnessWaitMs?: number }): Promise<ConnectedBoard> {
   const state = await ensureServer(opts.dataRoot);
   if (opts.member) {
     const member = opts.member;
-    const sock = await openLinkPipe(opts.dataRoot, member);
-    const calls = callsOver((f) => sock.write(`${encode(f)}
+    const harness = opts.harness ?? inHarnessSession();
+    const sock = await openLinkPipe(opts.dataRoot, member, harness ? (opts.harnessWaitMs ?? HARNESS_LINK_WAIT_MS) : null);
+    if (sock) {
+      const calls = callsOver((f) => sock.write(`${encode(f)}
 `));
-    lineFrames(sock, (f) => calls.settle(f));
-    let direct: Awaited<ReturnType<typeof connectServer>> | null = null;
-    let closing = false;
-    // the link exits when its member ends or its run closes (D15): what the verb still asks goes to the server
-    sock.on("close", () => {
-      if (closing) return;
-      connectServer(state).then(
-        (conn) => {
-          direct = conn;
-          conn.onFrame((f) => calls.settle(f));
-          conn.onClose(() => calls.fail("swarm: the board server closed the connection"));
-          calls.reroute(conn.send);
+      lineFrames(sock, (f) => calls.settle(f));
+      let direct: Awaited<ReturnType<typeof connectServer>> | null = null;
+      let closing = false;
+      // the link exits when its member ends or its run closes (D15): what the verb still asks goes to the server
+      sock.on("close", () => {
+        if (closing) return;
+        connectServer(state).then(
+          (conn) => {
+            direct = conn;
+            conn.onFrame((f) => calls.settle(f));
+            conn.onClose(() => calls.fail("swarm: the board server closed the connection"));
+            calls.reroute(conn.send);
+          },
+          () => calls.fail(`swarm: ${member.name}'s link closed the pipe`),
+        );
+      });
+      sock.on("error", () => {});
+      return Object.assign(asRemote(calls.call), {
+        close: () => {
+          closing = true;
+          sock.destroy();
+          direct?.close();
         },
-        () => calls.fail(`swarm: ${member.name}'s link closed the pipe`),
-      );
-    });
-    sock.on("error", () => {});
-    return Object.assign(asRemote(calls.call), {
-      close: () => {
-        closing = true;
-        sock.destroy();
-        direct?.close();
-      },
-    });
+        linkMissing: false,
+      });
+    }
   }
   const conn = await connectServer(state);
   const calls = callsOver(conn.send);
   conn.onFrame((f) => calls.settle(f));
   conn.onClose(() => calls.fail("swarm: the board server closed the connection"));
-  return Object.assign(asRemote(calls.call), { close: conn.close });
+  return Object.assign(asRemote(calls.call), { close: conn.close, linkMissing: !!opts.member });
 }
