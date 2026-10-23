@@ -191,8 +191,16 @@ async function caller(): Promise<Participant> {
   return p;
 }
 
-/** A member's state (swarm-relay D9) and the tool it is in or last ran: `busy (Bash npm test)`. */
-const stateLine = (r: Pick<RosterEntry, "state" | "activity">): string => `${r.state}${r.activity ? ` (${r.activity})` : ""}`;
+/** How long ago an ms epoch was, short: `12s`, `4m`, `2h`; `never` for null. */
+const ago = (at: number | null): string => {
+  if (at == null) return "never";
+  const s = Math.max(0, Math.floor((Date.now() - at) / 1000));
+  return s < 120 ? `${s}s` : s < 7200 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h`;
+};
+/** A member's state (swarm-relay D9), the tool it is in or last ran, and its two ages (D38):
+ *  `busy (Bash npm test)  progress 12s ago, link 0s ago`. */
+const stateLine = (r: Pick<RosterEntry, "state" | "activity" | "progressAt" | "aliveAt">): string =>
+  `${r.state}${r.activity ? ` (${r.activity})` : ""}  progress ${ago(r.progressAt)}${r.progressAt == null ? "" : " ago"}, link ${ago(r.aliveAt)}${r.aliveAt == null ? "" : " ago"}`;
 
 const rosterLine = (r: RosterEntry): string => {
   const files = r.files.map((f) => (f.interface ? `${f.path} (interface)` : f.path)).join(", ");
@@ -890,7 +898,7 @@ ${rearm}` : rearm;
     case "status": {
       const runs = await board.runs();
       // each member's worktree, null for a seat or an orchestrator (D64)
-      const membersOf = async (r: (typeof runs)[number]) => (await board.roster(r.repo)).filter((m) => m.run === r.id).map((m) => ({ name: m.name, nick: m.nick, worktree: m.worktree, state: m.state, activity: m.activity }));
+      const membersOf = async (r: (typeof runs)[number]) => (await board.roster(r.repo)).filter((m) => m.run === r.id).map((m) => ({ name: m.name, nick: m.nick, worktree: m.worktree, state: m.state, activity: m.activity, progressAt: m.progressAt, aliveAt: m.aliveAt }));
       const cli = self().join(" ");
       const open = await Promise.all(
         runs.map(async (r) => {

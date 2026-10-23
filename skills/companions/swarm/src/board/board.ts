@@ -44,8 +44,10 @@ export type MemberStateName = "working" | "busy" | "waiting" | "quiet" | "gone";
 export type MemberState = { member: string; state: MemberStateName; doing: string | null; since: number | null; reason?: string };
 /** Whether a member's link is connected, and since when it is lost (null: connected, or never linked). Kept by the server. */
 export type Presence = (member: string) => { connected: boolean; lostAt: number | null };
-/** A member's liveness as the page draws it (D20): its state, and its counter from its link's last activity. */
-export type Liveness = Omit<MemberState, "member"> & { tokens: number | null; movedAt: string | null };
+/** A member's liveness as the page draws it (D20): its state, its counter from its link's last activity, and its two
+ *  ages (swarm-relay D38): `progressAt` its last progress, `aliveAt` its last sign of life by its link, the time
+ *  read while the link is up (ms epoch; null: never linked). */
+export type Liveness = Omit<MemberState, "member"> & { tokens: number | null; movedAt: string | null; progressAt: number | null; aliveAt: number | null };
 
 export interface Run {
   id: RunId;
@@ -101,6 +103,9 @@ export interface RosterEntry {
   /** Its state from its activity (D9), and the open or last tool. */
   state: MemberStateName;
   activity: string | null;
+  /** Its two ages (swarm-relay D38), ms epoch: its last progress, its last sign of life by its link (null: never linked). */
+  progressAt: number | null;
+  aliveAt: number | null;
 }
 
 export interface Message {
@@ -622,6 +627,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   // 1 once the run's stale event is in main; any member call resets it (D19)
   upkeep("runs", "stale_flagged", "stale_flagged INTEGER NOT NULL DEFAULT 0");
   // 1 once an orchestrator's quiet event is posted; its next call posts back and resets it (D15)
+  // the member's last post, done or doing (swarm-relay D36)
+  upkeep("participants", "progress_at", "progress_at TEXT");
   upkeep("participants", "quiet_flagged", "quiet_flagged INTEGER NOT NULL DEFAULT 0");
   // set when prune removed the run's contents; the row stays so its id is never reused (D61): never listed
   upkeep("runs", "pruned_at", "pruned_at TEXT");
@@ -1000,15 +1007,28 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   /** The presence each run's tick last gave: the snapshot and the roster read states through it. */
   const presenceOf = new Map<RunId, Presence>();
   const noPresence: Presence = () => ({ connected: false, lostAt: null });
+  /** The waits this process holds, by participant id, and since when (ms epoch): the waiting of D35. */
+  const heldWaits = new Map<number, number>();
   const orchestratorIn = (run: RunId): Participant =>
     participantById(Number((db.prepare("SELECT id FROM participants WHERE run = ? AND slice = ?").get(run, ORCHESTRATOR) as Row).id));
   const activityOf = (run: RunId, member: string): Row | undefined =>
     db.prepare("SELECT * FROM member_activity WHERE run = ? AND member = ?").get(run, member) as Row | undefined;
   /** A participant row's state at `t`: gone, waiting (its open call is the board wait), busy, working, else quiet. */
+  /** When the member's last progress was (D36): its transcript growing, or a post, `done` or `doing`; never through
+   *  a pause (from the resume), else from the join. */
+  const progressAtOf = (p: Row, run: Row, a: Row | undefined): number =>
+    Math.max(
+      a?.grew_at == null ? 0 : Number(a.grew_at),
+      p.progress_at == null ? 0 : Date.parse(String(p.progress_at)),
+      Date.parse(String(p.joined_at)),
+      run.resumed_at == null ? 0 : Date.parse(String(run.resumed_at)),
+    );
   const stateOf = (p: Row, run: Row, t: number, presence: Presence): MemberState => {
     const member = String(p.slice);
     const a = activityOf(Number(run.id), member);
-    const inWait = Number(p.waiting) === 1 || Number(p.listening) === 1;
+    // D35: waiting is the board's own fact, a wait this server holds for the member, whatever command ran it
+    const heldSince = heldWaits.get(Number(p.id)) ?? null;
+    const inWait = heldSince != null;
     if (a && Number(a.finished) === 1) return { member, state: "gone", doing: null, since: Number(a.at), reason: "its agent finished without end" };
     const link = presence(member);
     if (!link.connected && link.lostAt != null && t - link.lostAt >= LINK_LOST_MS) return { member, state: "gone", doing: null, since: link.lostAt, reason: "its link was lost" };
@@ -1019,16 +1039,18 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       return { member, state: "quiet", doing: null, since: joined, reason: t - joined >= NO_TRANSCRIPT_MS ? "no transcript found" : "no activity yet" };
     }
     const open = a.open_tool == null ? null : `${a.open_tool} ${String(a.open_target ?? "")}`.trim();
-    // D31: waiting is a foreground wait, its open call being that wait; a background listener is not
-    if (open && inWait && /\bwait\b/.test(String(a.open_target ?? ""))) return { member, state: "waiting", doing: open, since: Number(a.open_since) };
+    // D31, D35: the open call is the held wait when it opened before the wait began, whatever its text; a call opened
+    // after (the wait being a background listener) is the member's own work
+    if (open && heldSince != null && Number(a.open_since) <= heldSince) return { member, state: "waiting", doing: open, since: Number(a.open_since) };
     if (open && t - Number(a.open_since) < BUSY_MAX_MS) return { member, state: "busy", doing: open, since: Number(a.open_since) };
     const last = a.last_tool == null ? null : String(a.last_tool);
-    // silence counts from the last growth, never through a pause: from the resume, else from the join
-    const grew = Math.max(a.grew_at == null ? Date.parse(String(p.joined_at)) : Number(a.grew_at), run.resumed_at == null ? 0 : Date.parse(String(run.resumed_at)));
-    if (t - grew < Number(run.stall_ms ?? STALL_MS_DEFAULT)) return { member, state: "working", doing: open ?? last, since: grew };
-    // E12: a member stopped with no call open (its last line a background task's result) is quiet too
-    const reason = open ? `${open} open ${Math.floor((t - Number(a.open_since)) / 60000)} min` : `no output for ${Math.floor((t - grew) / 1000)}s${last ? ` after ${last}` : ""}`;
-    return { member, state: "quiet", doing: open ?? last, since: grew, reason };
+    const progressed = progressAtOf(p, run, a);
+    if (t - progressed < Number(run.stall_ms ?? STALL_MS_DEFAULT)) return { member, state: "working", doing: open ?? last, since: progressed };
+    // E12: a member stopped with no call open (its last line a background task's result) is quiet too; D36: the reason
+    // names the missing signal, the link, and the last call
+    const lastCall = open ? `${open} (open ${Math.floor((t - Number(a.open_since)) / 60000)} min)` : last;
+    const reason = `no progress for ${Math.floor((t - progressed) / 1000)}s, link ${link.connected ? "alive" : "lost"}${lastCall ? `; last ${lastCall}` : ""}`;
+    return { member, state: "quiet", doing: open ?? last, since: progressed, reason };
   };
   /** The states of a run's live members (not ended), keyed by member. */
   const statesOf = (run: RunId, t: number): Map<string, MemberState> => {
@@ -1038,12 +1060,23 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     const live = db.prepare("SELECT * FROM participants WHERE run = ? AND ended_at IS NULL ORDER BY id").all(run) as Row[];
     return new Map(live.map((p) => [String(p.slice), stateOf(p, r, t, presence)]));
   };
-  const livenessOf = (run: RunId, st: MemberState | undefined): Liveness | undefined => {
+  const livenessOf = (run: RunId, st: MemberState | undefined, t: number): Liveness | undefined => {
     if (!st) return undefined;
     const a = activityOf(run, st.member);
+    const r = db.prepare("SELECT * FROM runs WHERE id = ?").get(run) as Row;
+    const p = db.prepare("SELECT * FROM participants WHERE run = ? AND slice = ?").get(run, st.member) as Row;
+    const link = (presenceOf.get(run) ?? noPresence)(st.member);
     const { member: _, ...state } = st;
-    return { ...state, tokens: a ? Number(a.tokens) : null, movedAt: a?.grew_at == null ? null : new Date(Number(a.grew_at)).toISOString() };
+    return {
+      ...state,
+      tokens: a ? Number(a.tokens) : null,
+      movedAt: a?.grew_at == null ? null : new Date(Number(a.grew_at)).toISOString(),
+      // D38: the two ages, since its last progress and since its last sign of life
+      progressAt: progressAtOf(p, r, a),
+      aliveAt: link.connected ? t : link.lostAt,
+    };
   };
+  const agesOf = (l: Liveness | undefined): { progressAt: number | null; aliveAt: number | null } => ({ progressAt: l?.progressAt ?? null, aliveAt: l?.aliveAt ?? null });
   /** The phase's done count: members done, of the members (the orchestrator apart) not ended without their done. */
   const progressOf = (run: RunId, phase: string | null): PhaseProgress | null => {
     if (phase == null) return null;
@@ -1509,7 +1542,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
             }
             continue;
           }
-          if (st.state !== "quiet" || r.paused != null) {
+          // D36: stalled needs no progress AND the link alive; a member whose link is down is gone, or about to be
+          if (st.state !== "quiet" || r.paused != null || !presence(st.member).connected) {
             if (a.stalled_at != null) {
               db.prepare("UPDATE member_activity SET stalled_at = NULL WHERE run = ? AND member = ?").run(run, st.member);
               moved = true;
@@ -1551,10 +1585,11 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       const rows = db
         .prepare(`${PARTICIPANT_SQL} WHERE r.repo = ? AND r.state = 'open' AND p.ended_at IS NULL ORDER BY r.id, p.id`)
         .all(repo) as Row[];
-      const cutoff = Date.now() - STALE_MS;
+      const t = Date.now();
+      const cutoff = t - STALE_MS;
       const statesByRun = new Map<RunId, Map<string, MemberState>>();
       const stateIn = (run: RunId, member: string): MemberState | undefined => {
-        if (!statesByRun.has(run)) statesByRun.set(run, statesOf(run, Date.now()));
+        if (!statesByRun.has(run)) statesByRun.set(run, statesOf(run, t));
         return statesByRun.get(run)!.get(member);
       };
       return rows.map((r) => ({
@@ -1570,6 +1605,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         worktree: r.worktree == null ? null : String(r.worktree),
         state: stateIn(Number(r.run), String(r.slice))?.state ?? "working",
         activity: stateIn(Number(r.run), String(r.slice))?.doing ?? null,
+        ...agesOf(livenessOf(Number(r.run), stateIn(Number(r.run), String(r.slice)), t)),
       }));
     },
 
@@ -1632,6 +1668,9 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         return Number((db.prepare("SELECT wait_gen FROM participants WHERE id = ?").get(me.id) as Row).wait_gen);
       });
       const current = (): boolean => Number((db.prepare("SELECT wait_gen FROM participants WHERE id = ?").get(p.id) as Row).wait_gen) === gen;
+      // D35: held from now until it returns; a newer wait of the member takes it over
+      const held = Date.now();
+      heldWaits.set(p.id, held);
       return new Promise<Delivery>((resolve, reject) => {
         let settled = false;
         let poll: NodeJS.Timeout | undefined;
@@ -1643,6 +1682,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           abort?.removeEventListener("abort", onAbort);
           clearInterval(poll);
           clearTimeout(timer);
+          if (heldWaits.get(p.id) === held) heldWaits.delete(p.id);
           try {
             // the page's state is this wait's only while no newer one took it
             transaction(() => {
@@ -1731,12 +1771,13 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       const sliceOf = new Map(sliceRows.map((s) => [`${s.run}/${s.id}`, s]));
       const people = db.prepare(`${PARTICIPANT_SQL} WHERE p.run IN (${marks}) ORDER BY p.run, p.id`).all(...runIds) as Row[];
       const runOpen = new Map(runRows.map((r) => [Number(r.id), r.state === "open"]));
+      const t = Date.now();
       const statesByRun = new Map<RunId, Map<string, MemberState>>();
       const stateIn = (run: RunId, member: string): MemberState | undefined => {
-        if (!statesByRun.has(run)) statesByRun.set(run, statesOf(run, Date.now()));
+        if (!statesByRun.has(run)) statesByRun.set(run, statesOf(run, t));
         return statesByRun.get(run)!.get(member);
       };
-      const cutoff = Date.now() - STALE_MS;
+      const cutoff = t - STALE_MS;
       const claimsOf = db.prepare("SELECT path, kind FROM claims WHERE participant = ? ORDER BY rowid");
       // every live claim on the repository, in claim order: the FileMap's rows, and which paths are shared (D40)
       const live = (
@@ -1798,7 +1839,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           listening: !ended && Number(r.listening) === 1,
           on: subsOf(r).map((x) => formatSubscriptions([x])),
           lastCall: String(r.last_call ?? r.joined_at),
-          liveness: ended ? undefined : livenessOf(Number(r.run), stateIn(Number(r.run), slice)),
+          liveness: ended ? undefined : livenessOf(Number(r.run), stateIn(Number(r.run), slice), t),
         };
       });
 
@@ -1918,9 +1959,13 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   // Every verb a runner calls is one call to the board, counted here and nowhere else (D66):
   // what the card's call count shows, and the last sign of life "stale" is measured from.
   // `reconcileWrites` is part of `merge-lock` and `end`, not a call.
+  /** The verbs that are a member's progress (swarm-relay D36). */
+  const PROGRESS_VERBS: ReadonlySet<string> = new Set(["post", "done", "setDoing", "endorse", "merged"]);
   const countCall = (p: Participant, verb: string): void => {
     const at = now();
     db.prepare("UPDATE participants SET calls = calls + 1, last_call = ? WHERE id = ?").run(at, p.id);
+    // D36: a post, `done` or `doing` is progress, a look at the board is not
+    if (PROGRESS_VERBS.has(verb)) db.prepare("UPDATE participants SET progress_at = ? WHERE id = ?").run(at, p.id);
     // the call itself, for the member's timeline (D25)
     db.prepare("INSERT INTO call_log (participant, at, verb) VALUES (?, ?, ?)").run(p.id, at, verb);
     // a member's call clears its run's stale mark, so a later silence flags again (D19)
