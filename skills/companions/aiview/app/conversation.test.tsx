@@ -41,7 +41,7 @@ const EVENTS = [
   item("alpha/S1", "joined: the page", { kind: "event", event: "joined" }),
 ];
 const SNAP: BoardSnapshot = {
-  repo: "/r/.git", name: "r", runs: [RUN], lock: null, roster: [member("S1", "Sleepy Otter"), member("S2", "Brave Badger"), member("orchestrator", "Calm Owl")],
+  repo: "/r/.git", name: "r", runs: [RUN], lock: null, lockHistory: [], roster: [member("S1", "Sleepy Otter"), member("S2", "Brave Badger"), member("orchestrator", "Calm Owl")],
   events: EVENTS, queues: {}, files: [{ path: "a.ts", holders: ["alpha/S1"], interface: false }], flags: [],
 };
 

@@ -25,7 +25,7 @@ const post = (from: string, body: string, over: Partial<SnapshotEvent> = {}): Sn
   seq: ++seq, at: AT, kind: "msg", from, body, about: null, run: 1, channel: 1, ...over,
 });
 const SNAP: BoardSnapshot = {
-  repo: "/r/.git", name: "r", runs: [RUN], lock: null, roster: [member("S1", "Sleepy Otter"), member("S2", "Brave Badger")],
+  repo: "/r/.git", name: "r", runs: [RUN], lock: null, lockHistory: [], roster: [member("S1", "Sleepy Otter"), member("S2", "Brave Badger")],
   events: [
     post("alpha/S1", "flag", { kind: "event", event: "flag", about: "src/b.ts", mentions: ["alpha/S2", "alpha/S1"] }),
     post("alpha/S2", "a word on b", { about: "src/b.ts" }),
