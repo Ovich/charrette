@@ -37,7 +37,7 @@ before(async () => {
   boardId = index.register(board, { tags: ["t1"] }).id;
   pdfId = index.register(write("out/cv.pdf", "%PDF-1.4"), { kind: "pdf" }).id;
 
-  server = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp, writeState: false, boardDbPath: path.join(tmp, "swarm.sqlite") });
+  server = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp, writeState: false, boardDataRoot: tmp });
   await new Promise<void>((r) => server.on("listening", () => r()));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -110,7 +110,7 @@ test("dist/ takes over static serving with SPA fallback", async () => {
   fs.writeFileSync(path.join(tmp, "dist", "index.html"), "<title>new app</title>");
   fs.writeFileSync(path.join(tmp, "dist", "assets", "app.js"), "console.log(1)");
   // new server instance: dist presence is read at startup
-  const s2 = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp, writeState: false, boardDbPath: path.join(tmp, "swarm.sqlite") });
+  const s2 = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp, writeState: false, boardDataRoot: tmp });
   await new Promise<void>((r) => s2.on("listening", () => r()));
   const b2 = `http://127.0.0.1:${(s2.address() as AddressInfo).port}`;
   try {

@@ -35,7 +35,7 @@ before(async () => {
   index = openIndex(path.join(tmp, "test.sqlite"), root);
   benchId = index.register(write("docs/b.workbench.html", "<html></html>"), { kind: "workbench" }).id;
   boardId = index.register(write("docs/n.brainstorm.md", "# n"), {}).id;
-  server = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp, writeState: false, boardDbPath: path.join(tmp, "swarm.sqlite") });
+  server = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp, writeState: false, boardDataRoot: tmp });
   await new Promise<void>((r) => server.on("listening", () => r()));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });

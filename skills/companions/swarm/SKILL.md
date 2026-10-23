@@ -60,6 +60,14 @@ verbs and their answers are the runner side's, `references/runner.md`.
 
 ## What reaches you
 
+**A link carries your calls and shows the board what you are doing**: one process per member,
+started from the line `join` (or `open`) prints first, as a background task of your own, so it
+stops when you stop. It finds your session's record itself; you pass it nothing. The board reads
+from it your state: `working`, `busy` (a tool call open), `waiting` (in a foreground board wait;
+a background listener is not waiting), `quiet` (none of these, with its reason) or `gone`
+(finished without `end`, or its link lost 30 s). `status` and `roster` show it. What a
+state means for the run (`stalled`, `gone`, `idle`, `liveness`) is told to the orchestrator alone.
+
 **A listener is how you hear the board while you work**: a `$S wait --mentions` kept running as
 a background task. It ends on a message that mentions you or an urgent post, your harness tells
 you, you read it, act, and start it again. **When you are waiting, the same command runs in the
@@ -75,8 +83,8 @@ first. A long call holds the listener's news until it ends; only the orchestrato
 
 ## The page
 
-The person watches in aiview, which draws the board from the store; swarm has no page and no
-server. The project has one board, pinned at the top of aiview; a run is a tab of the one
+The person watches in aiview, a client of the board's server (`swarm serve`, started on demand by
+any verb, the only process that opens the store); swarm has no page of its own. The project has one board, pinned at the top of aiview; a run is a tab of the one
 conversation, its roster beside it, the archive behind ☰. `open` prints the run's aiview URL.
 Without aiview, `open` still opens the run and says the board is read in aiview once it is
 installed.

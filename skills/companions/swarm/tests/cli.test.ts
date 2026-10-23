@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openBoard } from "../src/board/board.ts";
+import { stopServerOf } from "./fixtures/server.ts";
 
 const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "cli", "index.ts");
 
@@ -53,6 +54,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopServerOf(toolRoot);
   // Windows may briefly hold handles of a just-ended child; a leaked temp dir
   // must not fail the suite.
   for (let i = 0; ; i++) {
@@ -81,7 +83,7 @@ test("open then join prints the roster", () => {
   const r = run("join", "--run", String(id), "--slice", "S3", "--doing", "the page", "--file", "src/page.ts:interface", "--file", "src/a.ts");
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /you are review-tool\/S3/);
-  assert.match(r.stdout, /review-tool\/S3 {2}run \d+ {2}doing: the page {2}files: src\/page\.ts \(interface\), src\/a\.ts/);
+  assert.match(r.stdout, /review-tool\/S3 {2}run \d+ {2}quiet {2}doing: the page {2}files: src\/page\.ts \(interface\), src\/a\.ts/);
   assert.match(r.stdout, /review-tool\/orchestrator/);
 });
 
@@ -224,10 +226,10 @@ test("open without aiview opens the run and exits 0, printing no URL and saying 
   const slices = path.join(toolRoot, "s.json");
   const text = runIn(repo, "open", "--plan", "other", "--title", "T", "--slices", slices);
   assert.equal(text.status, 0, text.stderr);
-  assert.match(text.stdout, /^\d+\n$/, "the run id alone");
+  assert.match(text.stdout, /^\d+\nstart your link now, [^\n]* link --run \d+ --as other\/orchestrator\n$/, "the run id, then the link line alone");
   const board = await openBoard(path.join(toolRoot, "swarm.sqlite"));
   try {
-    assert.deepEqual(board.runs().map((x) => x.id).sort(), [out.run, Number(text.stdout.trim())].sort());
+    assert.deepEqual(board.runs().map((x) => x.id).sort(), [out.run, Number(text.stdout.split("\n")[0])].sort());
   } finally {
     board.close();
   }
@@ -261,7 +263,7 @@ test("status --json lists each open run with its kind; the text names the kind (
   assert.equal(s.runs, 1);
   const nick = s.open[0]?.members[0]?.nick as string;
   assert.match(nick, /^[A-Z][a-z]+ [A-Z][a-z]+$/, "the orchestrator's funny name, given at open (D17)");
-  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null }], lastActivity: s.open[0].lastActivity, forgotten: false }]);
+  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null, state: "quiet", activity: null, progressAt: s.open[0].members[0].progressAt, aliveAt: null }], lastActivity: s.open[0].lastActivity, forgotten: false }]);
   assert.match(run("status").stdout, new RegExp(`run ${id}  plan  review-tool  A plan`));
 });
 
@@ -269,7 +271,7 @@ test("--json on every verb parses", () => {
   const slices = path.join(toolRoot, "s.json");
   fs.writeFileSync(slices, SLICES);
   const opened = JSON.parse(run("open", "--plan", "review-tool", "--title", "T", "--slices", slices, "--json").stdout);
-  assert.deepEqual(Object.keys(opened).sort(), ["group", "kind", "plan", "repo", "run", "url"]);
+  assert.deepEqual(Object.keys(opened).sort(), ["group", "kind", "link", "plan", "repo", "run", "url"]);
   const id = String(opened.run);
   const as = ["--as", "review-tool/S3"];
   const verbs: string[][] = [
@@ -348,15 +350,23 @@ test("wait prints, before the message, the line that re-arms it with the exact c
 const LISTEN = (runner: string): string =>
   `start your listener now, in the background (your harness's background task): node ${CLI.replace(/\\/g, "/")} wait --mentions --as ${runner}`;
 
-test("join ends on the line that starts the listener, the exact command with --as; --json carries it as next (D61)", () => {
+const START_LINK = (member: string, run: string): string =>
+  `start your link now, in the background (your harness's background task): node ${CLI.replace(/\\/g, "/")} link --run ${run} --as ${member}`;
+
+test("join prints the link line, then the line that starts the listener, the exact command with --as, last; --json carries them as link then next (D61, D32, swarm-relay D33)", () => {
   const id = String(openRun());
   const r = run("join", "--run", id, "--slice", "S5", "--doing", "y");
   assert.equal(r.status, 0, r.stderr);
   const lines = r.stdout.trimEnd().split("\n");
+  // the agent starts its link before a wait could block it
+  assert.equal(lines.at(-2), START_LINK("review-tool/S5", id));
   assert.equal(lines.at(-1), LISTEN("review-tool/S5"));
   assert.equal(lines.filter((l) => l.startsWith("start your listener")).length, 1);
   const json = JSON.parse(run("join", "--run", id, "--slice", "S3", "--doing", "x", "--json").stdout);
   assert.equal(json.next, LISTEN("review-tool/S3"));
+  assert.equal(json.link, START_LINK("review-tool/S3", id));
+  const keys = Object.keys(json);
+  assert.ok(keys.indexOf("link") < keys.indexOf("next"), keys.join(","));
 });
 
 test("merged ends, for each merged path another runner holds or held, on the line that tells them; --json carries the lines as tell (D63)", () => {
@@ -546,17 +556,10 @@ test("the launcher has no hook verb: usage, exit 1, and the usage never names a 
   }
 });
 
-// ── no page, no server (companions-merge D4) ─────────────────────────────────────
+// ── serve is a hidden verb (swarm-relay D6); its server is tested in server.test.ts ─────────
 
-test("serve is an unknown verb: exit 2, and --help lists no serve", () => {
-  for (const argv of [["serve"], ["serve", "--detach"], ["serve", "--detach", "--port", "4322", "--json"]]) {
-    const r = run(...argv);
-    assert.equal(r.status, 2, argv.join(" "));
-    assert.match(r.stderr, /unknown verb serve/);
-    assert.equal(r.stdout, "");
-  }
-  assert.equal(fs.existsSync(path.join(toolRoot, "swarm.pid")), false, "no server started");
-  for (const help of [run("--help"), run("--help", "code")]) assert.doesNotMatch(help.stdout, /\bserve\b/);
+test("--help lists no serve: the board server is a hidden verb", () => {
+  for (const help of [run("--help"), run("--help", "code")]) assert.doesNotMatch(help.stdout, /serve/);
 });
 
 test("status has no server: the data home, the store and the open runs", () => {
@@ -676,7 +679,7 @@ test("join --seat is --slice; both naming different ids exit 1 (D49)", () => {
   assert.match(both.stderr, /--seat S5 and --slice S3 name different members/);
 });
 
-test("a seat joining from the shared checkout is told its --as and its next commands, the listener last", () => {
+test("a seat joining from the shared checkout is told its --as and its next commands, the listener before the link line", () => {
   const id = openBrainstorm();
   const r = joinSeat(id, "architect");
   assert.equal(r.status, 0, r.stderr);
@@ -688,6 +691,7 @@ test("a seat joining from the shared checkout is told its --as and its next comm
   }
   assert.doesNotMatch(r.stdout, /--slice/);
   // a seat waits in the foreground, never a background listener
+  assert.equal(lines.at(-2), START_LINK("idea/architect", String(id)));
   assert.match(lines.at(-1)!, /^wait now, in the foreground \(never a background listener.* wait --mentions --as idea\/architect$/);
   const json = JSON.parse(run("join", "--run", String(id), "--seat", "skeptic", "--doing", "doubting", "--json").stdout);
   assert.equal(json.as, "idea/skeptic");
@@ -698,7 +702,7 @@ test("a seat joining from the shared checkout is told its --as and its next comm
 test("a seat's join tells it to draw, before the listener line; a runner's join does not", () => {
   const draw = "posts render markdown and mermaid: compare in a table, draw a flow as a mermaid block";
   const lines = joinSeat(openBrainstorm(), "architect").stdout.trimEnd().split("\n");
-  assert.equal(lines.at(-2), draw);
+  assert.equal(lines.at(-3), draw);
   const runner = run("join", "--run", String(openRun()), "--slice", "S3", "--doing", "x");
   assert.equal(runner.status, 0, runner.stderr);
   assert.doesNotMatch(runner.stdout, /posts render markdown/);
@@ -806,7 +810,7 @@ test("join --on with an unknown event exits 1 listing the known ones; --on store
   const id = openBrainstorm();
   const bad = joinSeat(id, "architect", "--on", "agreed");
   assert.equal(bad.status, 1);
-  assert.match(bad.stderr, /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, quiet, back, opened, closed, urgent, phase, pause, resume, done, all-done, idle, stalled, liveness, flag/);
+  assert.match(bad.stderr, /unknown event agreed: the events are agreement, endorsement, merged, joined, ended, stale, quiet, back, opened, closed, urgent, phase, pause, resume, done, all-done, idle, stalled, gone, liveness, flag/);
   const ok = joinSeat(id, "architect", "--on", "agreement,any:merged");
   assert.equal(ok.status, 0, ok.stderr);
   const roster = run("roster");
@@ -954,7 +958,7 @@ test("done: a member's done is counted, roster and status show n/m done, the las
   assert.equal(run("done", "diverge", "--as", "idea/orchestrator").status, 1);
 });
 
-test("end on an ended member, or on a closed run, exits 0 and says nothing", () => {
+test("end on an ended member exits 0 and says nothing; on a closed run it prints the summary prompt the closed line promised, never a link line (S62)", () => {
   const id = openRun();
   assert.equal(run("join", "--run", String(id), "--slice", "S3", "--doing", "x").status, 0);
   assert.equal(run("end", "--as", "review-tool/S3").status, 0);
@@ -963,7 +967,8 @@ test("end on an ended member, or on a closed run, exits 0 and says nothing", () 
   assert.equal(run("join", "--run", String(id), "--slice", "S5", "--doing", "x").status, 0);
   run("close", "--run", String(id));
   const closed = run("end", "--as", "review-tool/S5");
-  assert.deepEqual([closed.status, closed.stdout, closed.stderr], [0, "", ""]);
+  assert.deepEqual([closed.status, closed.stdout, closed.stderr], [0, `run ${id} closed: review-tool/S5 ended; return your summary now\n`, ""]);
+  assert.doesNotMatch(closed.stdout + closed.stderr, /start your link now/);
 });
 
 test("once its run is closed, a member's wait, deliver, read, roster, post and done answer the one closed line, exit 0, and write nothing", () => {
@@ -1024,74 +1029,49 @@ test("how a member listens: a seat's wait re-arms in the foreground, the orchest
   assert.match(runner.at(-1)!, /^start your listener now, in the background/);
 });
 
-test("transcripts: open --transcript, slice --transcript after dispatch, the seats file's; none or unreadable warns once on the thread", () => {
-  const good = path.join(toolRoot, "good.jsonl");
-  fs.writeFileSync(good, JSON.stringify({ type: "assistant", message: { usage: { input_tokens: 3, output_tokens: 4, cache_creation_input_tokens: 0, cache_read_input_tokens: 5 } } }) + "\n");
-  const seats = path.join(toolRoot, "seats.json");
-  fs.writeFileSync(seats, JSON.stringify([{ id: "a", title: "A", blockers: [], transcript: good }, { id: "b", title: "B", blockers: [] }]));
-  const opened = run("open", "--kind", "brainstorm", "--group", "idea", "--title", "I", "--seats", seats, "--transcript", good, "--stall-ms", "8000");
-  assert.equal(opened.status, 0, opened.stderr);
-  const id = Number(opened.stdout.split("\n")[0]);
-  assert.equal(run("join", "--run", String(id), "--seat", "a", "--doing", "x").status, 0);
-  assert.equal(run("join", "--run", String(id), "--seat", "b", "--doing", "x").status, 0);
-  const told = run("deliver", "--as", "idea/orchestrator").stdout;
-  assert.match(told, /liveness: no readable transcript for idea\/b, stall check blind for it/);
-  assert.doesNotMatch(told, /for idea\/(a|orchestrator)/);
-  const bad = path.join(toolRoot, "bad.txt");
-  fs.writeFileSync(bad, "not json\n");
-  const r = run("slice", "b", "--run", String(id), "--transcript", bad);
-  assert.equal(r.status, 0, r.stderr);
-  // said at once, naming the path
-  assert.ok(r.stdout.includes(`liveness: b's transcript ${bad} is in no known format`), r.stdout);
-  run("slice", "b", "--run", String(id), "--transcript", bad);
-  const twice = run("deliver", "--as", "idea/orchestrator").stdout.match(/liveness: no readable transcript for idea\/b/g) ?? [];
-  assert.equal(twice.length, 1, "once per member and condition");
-  const ok = JSON.parse(run("slice", "b", "--run", String(id), "--transcript", good, "--json").stdout);
-  assert.deepEqual([ok.liveness.state, ok.liveness.tokens], ["ok", 12]);
-  assert.match(run("--help").stdout, /--transcript <path>/);
-});
-
-test("an empty transcript (a task-output file) is warned of at once by open and slice, naming the path; a good one is not", () => {
-  const empty = path.join(toolRoot, "task.output");
-  fs.writeFileSync(empty, "");
+test("open --transcript, slice --transcript and the seats file's transcript are refused as unknown, and the help names none (D24)", () => {
   const seats = path.join(toolRoot, "seats.json");
   fs.writeFileSync(seats, SEATS);
-  const opened = run("open", "--kind", "brainstorm", "--group", "idea", "--title", "I", "--seats", seats, "--transcript", empty);
-  assert.equal(opened.status, 0, opened.stderr);
-  const id = Number(opened.stdout.split("\n")[0]);
-  assert.ok(opened.stdout.includes(`liveness: orchestrator's transcript ${empty} is empty`), opened.stdout);
-  const r = run("slice", "architect", "--run", String(id), "--transcript", empty, "--json");
-  assert.equal(r.status, 0, r.stderr);
-  assert.ok(JSON.parse(r.stdout).warning.includes(`${empty} is empty`));
-  const missing = path.join(toolRoot, "none.jsonl");
-  assert.ok(run("slice", "architect", "--run", String(id), "--transcript", missing).stdout.includes(`${missing} does not exist`));
-  const good = path.join(toolRoot, "good.jsonl");
-  fs.writeFileSync(good, JSON.stringify({ type: "assistant", message: { usage: { output_tokens: 1 } } }) + "\n");
-  assert.doesNotMatch(run("slice", "architect", "--run", String(id), "--transcript", good).stdout, /liveness/);
+  const flagged = run("open", "--kind", "brainstorm", "--group", "idea", "--title", "I", "--seats", seats, "--transcript", "t.jsonl");
+  assert.equal(flagged.status, 1);
+  assert.match(flagged.stderr, /^open: unknown flag --transcript/);
+  const named = path.join(toolRoot, "named.json");
+  fs.writeFileSync(named, JSON.stringify([{ id: "a", title: "A", blockers: [], transcript: "t.jsonl" }]));
+  const fielded = run("open", "--kind", "brainstorm", "--group", "idea", "--title", "I", "--seats", named);
+  assert.equal(fielded.status, 1);
+  assert.match(fielded.stderr, /unknown field transcript in a/);
+  const id = String(openBrainstorm());
+  const sliced = run("slice", "architect", "--run", id, "--state", "running", "--transcript", "t.jsonl");
+  assert.equal(sliced.status, 1);
+  assert.match(sliced.stderr, /^slice: unknown flag --transcript/);
+  for (const help of [run("--help").stdout, run("--help", "code").stdout]) assert.doesNotMatch(help, /transcript/);
 });
 
-test("open starts the run's poller, its pid in the data home; close stops it", async () => {
+test("open starts no poller process, and the hidden poll verb is gone (US6, D13)", () => {
   const seats = path.join(toolRoot, "seats.json");
   fs.writeFileSync(seats, SEATS);
   const live = { ...env(), SWARM_NO_POLLER: "0" };
   const opened = spawnSync(process.execPath, [CLI, "open", "--kind", "brainstorm", "--group", "idea", "--title", "I", "--seats", seats], { cwd: repo, encoding: "utf8", env: live });
+  assert.equal(opened.status, 0, opened.stderr);
   const id = Number(opened.stdout.split("\n")[0]);
-  const pidFile = path.join(toolRoot, `swarm-poll-${id}.pid`);
-  for (let i = 0; i < 50 && !fs.existsSync(pidFile); i++) await new Promise((r) => setTimeout(r, 100));
-  const pid = Number(fs.readFileSync(pidFile, "utf8"));
-  const alive = (): boolean => {
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  assert.ok(alive());
-  spawnSync(process.execPath, [CLI, "close", "--run", String(id)], { cwd: repo, encoding: "utf8", env: live });
-  for (let i = 0; i < 50 && alive(); i++) await new Promise((r) => setTimeout(r, 100));
-  assert.ok(!alive(), "the poller stopped");
-  assert.ok(!fs.existsSync(pidFile));
+  assert.ok(!fs.readdirSync(toolRoot).some((f) => f.startsWith("swarm-poll-")), "no poller pid file");
+  const poll = spawnSync(process.execPath, [CLI, "poll", "--run", String(id)], { cwd: repo, encoding: "utf8", env: live, timeout: 20000 });
+  assert.notEqual(poll.status, 0, "poll is no verb");
+});
+
+test("status and roster print each member's state, what it is doing, and its two ages, progressAt and aliveAt (D38)", () => {
+  const id = openRun();
+  const before = Date.now();
+  assert.equal(run("join", "--run", String(id), "--slice", "S3", "--doing", "page").status, 0);
+  // no activity yet from its link: no evidence of work, so quiet, nothing open (swarm-relay D33); never linked: link never
+  assert.match(run("roster").stdout, /review-tool\/S3  run \d+  quiet  progress \d+s ago, link never  doing: page/);
+  const roster = JSON.parse(run("roster", "--json").stdout).roster.find((r: { name: string }) => r.name === "review-tool/S3");
+  assert.deepEqual([roster.state, roster.activity, roster.aliveAt], ["quiet", null, null]);
+  assert.ok(roster.progressAt >= before - 1000 && roster.progressAt <= Date.now(), "progress counts from the join");
+  assert.match(run("status").stdout, /^  review-tool\/S3  quiet  progress \d+s ago, link never$/m);
+  const status = JSON.parse(run("status", "--json").stdout).open.find((r: { run: number }) => r.run === id);
+  const s3 = status.members.find((m: { name: string }) => m.name === "review-tool/S3");
+  assert.deepEqual([s3.state, s3.progressAt, s3.aliveAt], ["quiet", roster.progressAt, null]);
 });
 
 test("on a plan run too: the current phase heads wait, deliver and read, follows the roster at join, and sits beside the title in roster and status", () => {
@@ -1117,7 +1097,7 @@ test("on a plan run too: the current phase heads wait, deliver and read, follows
   assert.equal(JSON.parse(run("read", seqOf(posted.stdout), "--as", s3, "--json").stdout).phase, header);
 
   const joined = run("join", "--run", String(id), "--slice", "S5", "--doing", "skill").stdout.split("\n");
-  const lastRoster = joined.map((l) => / run \d+ {2}doing: /.test(l)).lastIndexOf(true);
+  const lastRoster = joined.map((l) => / run \d+ {2}\w+ .*doing: /.test(l)).lastIndexOf(true);
   assert.equal(joined[lastRoster + 1], header);
 
   assert.match(run("roster").stdout, new RegExp(`^run ${id} {2}A plan {2}phase build: the first wave {2}0/2 done$`, "m"));

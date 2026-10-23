@@ -1,4 +1,4 @@
-import type { RunSummary } from "../../../../../swarm/src/board/snapshot.ts";
+import type { RunSummary } from "../../../../../swarm/src/client/reader.ts";
 import { useStats } from "../../../hooks/useStats.ts";
 import { runLine, summaryLine, type RunView } from "../../../lib/board/analytics.ts";
 import { BrainstormRunAnalytics } from "./BrainstormRunAnalytics.tsx";

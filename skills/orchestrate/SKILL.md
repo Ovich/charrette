@@ -25,7 +25,7 @@ A member given a role (a seat, an expert) gets it in a few sentences. Read `refe
 
 ## Watching
 
-The completion notification ends a member; it does not tell you the work is healthy. While members work:
+The completion notification ends a member; it does not tell you the work is healthy. On a swarm board, the board's member states and events replace the digest below (the `swarm` skill's orchestrator side). Otherwise, while members work:
 
 - **Every few minutes, run the digest** and look at it: `node <skill-dir>/scripts/watch-agents.mjs <subagents-dir> [--label <id>=<member>] [--forbidden '<regex>']`. One line per live member: calls, idle time, last tool, last words. Never open a transcript whole; it exhausts this session's context. Transcripts live under `<claude home>/projects/<project>/<session id>/subagents/`.
 - **Report only what is news**: a stale member (no new call in ten minutes), a `BREACH` of the brief's boundary, work clearly outside the member's document. `--forbidden` is the brief's boundary as a regex anchored on a command's verb, never a path.

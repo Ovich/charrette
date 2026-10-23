@@ -1,6 +1,6 @@
 // The board page's view model (plan D1, D7, D8, D13-D16, D18, D20), on snapshots built here.
 import { describe, expect, test } from "vitest";
-import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm/src/board/snapshot.ts";
+import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm/src/client/reader.ts";
 import { agents, archive, claimRows, conversation, feed, filters, flagAnswer, flagOf, mentionCtx, mergedRecipients, narrow, runTabs, type Item } from "./lib/board/view.ts";
 import { PHASE, PHASED } from "./board-fixtures.ts";
 
@@ -17,7 +17,7 @@ const item = (runId: number, from: string, body: string, over: Partial<SnapshotE
   seq: ++seq, at: AT, kind: "msg", from, body, about: null, run: runId, channel: runId, ...over,
 });
 const board = (runs: RunSummary[], roster: SnapshotRunner[] = [], events: SnapshotEvent[] = [], files: BoardSnapshot["files"] = []): BoardSnapshot => ({
-  repo: "/r/.git", name: "r", runs, lock: null, roster, events, queues: {}, files, flags: [],
+  repo: "/r/.git", name: "r", runs, lock: null, lockHistory: [], roster, events, queues: {}, files, flags: [],
 });
 
 // alpha (AL, run 1) and beta (BE, run 2) open, gamma (GA, run 3) closed

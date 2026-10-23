@@ -1,4 +1,4 @@
-import type { Totals } from "../../../../../swarm/src/board/snapshot.ts";
+import type { Totals } from "../../../../../swarm/src/client/reader.ts";
 import { ESTIMATED_TIP, figure, less, plural } from "../../../lib/board/analytics.ts";
 
 /** Does the claim protocol hold? The scope's shared files through the four steps (D33), each drop the

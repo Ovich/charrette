@@ -95,11 +95,11 @@ test("done is stored once per run, member and phase; the last member's done post
   assert.throws(() => board.done(orchestrator, "diverge"), /orchestrator opens phases/);
   assert.throws(() => board.done(skeptic, "converge"), /the current phase is diverge/);
   const first = board.done(skeptic, "diverge");
-  assert.deepEqual([first.progress, first.all, first.already], [{ phase: "diverge", done: 1, of: 2 }, false, false]);
+  assert.deepEqual([first.progress, first.all, first.already], [{ phase: "diverge", done: 1, of: 2, gone: [] }, false, false]);
   assert.deepEqual(first.message!.mentions, ["idea/orchestrator"]);
   assert.equal(first.message!.event, "done");
   assert.deepEqual(board.done(skeptic, "diverge").already, true);
-  assert.deepEqual(board.phaseProgress(idea.id), { phase: "diverge", done: 1, of: 2 });
+  assert.deepEqual(board.phaseProgress(idea.id), { phase: "diverge", done: 1, of: 2, gone: [] });
   const last = board.done(architect, "diverge");
   assert.equal(last.all, true);
   const told = board.deliver(orchestrator).full;
@@ -107,10 +107,10 @@ test("done is stored once per run, member and phase; the last member's done post
   assert.match(told[2].body, /^all done diverge: every member is done \(2\/2\)/);
   assert.match(EVENTS["all-done"].next!(told[2], orchestrator, "swarm")!, /^open the next phase: swarm phase <name> "<text>" --as idea\/orchestrator/);
   assert.equal(EVENTS["all-done"].next!(told[2], skeptic, "swarm"), null);
-  assert.deepEqual(board.snapshot(REPO).runs.find((r) => r.run === idea.id)!.progress, { phase: "diverge", done: 2, of: 2 });
+  assert.deepEqual(board.snapshot(REPO).runs.find((r) => r.run === idea.id)!.progress, { phase: "diverge", done: 2, of: 2, gone: [] });
   board.phase(orchestrator, "converge", "pick");
   board.phase(orchestrator, "diverge", "again");
-  assert.deepEqual(board.phaseProgress(idea.id), { phase: "diverge", done: 0, of: 2 });
+  assert.deepEqual(board.phaseProgress(idea.id), { phase: "diverge", done: 0, of: 2, gone: [] });
 });
 
 test("a phase event is not a post in the stats", () => {

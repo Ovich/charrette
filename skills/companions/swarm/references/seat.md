@@ -1,5 +1,10 @@
 # The seat's side
 
+**The first rule: every wait runs in the foreground, and you never end your turn while the run
+is open.** Your link is your one background task; a wait is never one. A seat that ends its turn
+is stuck: nothing wakes it, and the run stalls on it. How to wait is the line the CLI prints;
+read it and run it, in the foreground.
+
 You hold one seat in a swarmstorm: a role, working the run's questions with the
 other seats under the protocol your brief names. `$S` is the tool, as `SKILL.md` names it. **You do no real work**: no edit to the
 repository, no claim, no merge. An experiment, when the strategy allows one, runs in a sandbox
@@ -20,19 +25,20 @@ nothing of you, then wait as its answer says; you may post
 found by. **Run the line the previous command printed**; never compose a command the CLI could
 have printed you.
 
-**You never end your turn while the run is open**, and you never write the run's record or dossier.
-**You wait in the foreground, never with a background listener**: a seat that ends its turn is
-gone, and nothing wakes it. How to wait is the line the CLI prints; read it and run it.
+You never write the run's record or dossier.
 
 ## The checklist
 
 1. **Run the join line your brief gives, before anything else.** Read the roster it prints and
    your funny name.
-2. **Keep the wait line `join` printed last**: it is how you wait, in the foreground, whenever
-   you have nothing to do (step 9). When a phase is already open and you have not run `done`
+2. **Start your link at once**: `join` prints `start your link now, in the background …` after
+   the roster; run that command, as printed, as a background task. It carries your calls to the
+   board.
+3. **Keep the wait line `join` printed last**: it is how you wait, in the foreground, whenever
+   you have nothing to do (step 10). When a phase is already open and you have not run `done`
    for it, the answer says so first: do that part now, wait only after.
-3. **Read your role and the open questions**: your role and questions in the brief, and the sections of the dossier and the record it names, through the `aiview` skill.
-4. **Post per question**: `$S post "<your position>" --about D<n> --as <group>/<seat>`. **Posts
+4. **Read your role and the open questions**: your role and questions in the brief, and the sections of the dossier and the record it names, through the `aiview` skill.
+5. **Post per question**: `$S post "<your position>" --about D<n> --as <group>/<seat>`. **Posts
    render markdown and mermaid**; the shape follows what the post says:
    - **A comparison of options is a table**, one option per column, one case per row:
 
@@ -55,20 +61,20 @@ gone, and nothing wakes it. How to wait is the line the CLI prints; read it and 
      ````
    - **A position is prose naming its source**: `keep one writer: two writers raced in the
      test suite (tests/store.test, the concurrent case)`.
-5. **A position holds for you and the seats you argue with**:
+6. **A position holds for you and the seats you argue with**:
    `$S agree "<terms> because <reason>" --about D<n> --as <group>/<seat>`, naming the post
    `#<seq>` of the diagram when one carries it.
-6. **As the skeptic**, your seats row subscribes you to `agreement`, so every agreement of the
+7. **As the skeptic**, your seats row subscribes you to `agreement`, so every agreement of the
    run wakes your wait, mentioned or not. An agreement reaching you ends on its line `back it: … endorse <seq>
    --as …`: run that line only when its reason holds; otherwise post the objection,
    `--about D<n>`.
-7. **A new question**: `$S post "@orchestrator new question: …" --as <group>/<seat>`.
-8. **A mention from the orchestrator** (a relay from the person, a ruling, an interrupt) is
+8. **A new question**: `$S post "@orchestrator new question: …" --as <group>/<seat>`.
+9. **A mention from the orchestrator** (a relay from the person, a ruling, an interrupt) is
    acted on first. A pause: wait, as its answer says, until the resume, then follow its message.
-9. **Nothing to do**: `$S wait --mentions --as <group>/<seat>` in the **foreground**. It returns
+10. **Nothing to do**: `$S wait --mentions --as <group>/<seat>` in the **foreground**. It returns
    with the message, after the line that waits again: act, then run that line. Empty: run it
-   again. Never end your turn to wait.
-10. **The run is closed**: any call answers `run <id> closed: run end and return your summary:
+   again (the first rule).
+11. **The run is closed**: any call answers `run <id> closed: run end and return your summary:
     <command>`. Run that command, then return your positions, the agreements you made or
     endorsed, and what you left open. The same when the orchestrator mentions you to stop.
 
@@ -83,7 +89,7 @@ gone, and nothing wakes it. How to wait is the line the CLI prints; read it and 
   phase's whole discussion, read before a post that decides or adds.
 - **`$S roster --as <group>/<seat>`** for who sits where, and what wakes each.
 - **What wakes your `wait --mentions`**: a mention, an urgent post, a phase, and the events you are
-  subscribed to (your seats row's `on`, or `join --on`), and `stalled`: every member but the orchestrator quiet for the run's threshold; if the current phase asks a move of you and you have not run `done`, make it now, else wait again. Change them with
+  subscribed to (your seats row's `on`, or `join --on`). Change them with
   `$S subscribe <events> --as <group>/<seat>` or `unsubscribe`; `$S --help` lists the events,
   `any:<event>` for one of any run, a plain `<event>` your own run's.
 - **Talk across runs** is a mention: `@<CODE>` a run, `@<CODE>·<id>` one of its members.

@@ -2,6 +2,7 @@
 // retention are arranged without waiting. The store is written directly only by setup (D41): the board's settings
 // `records-since` and `shares-since`, a deleted or corrupt row; no case reads a table.
 import { mock } from "node:test";
+import { stopServerOf } from "./server.ts";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -30,6 +31,7 @@ export async function scratchBoard(prefix: string): Promise<ScratchBoard> {
     board,
     file,
     done() {
+      stopServerOf(dir);
       board.close();
       mock.timers.reset();
       fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });

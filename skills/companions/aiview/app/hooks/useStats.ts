@@ -2,7 +2,7 @@
 // repository's `board-changed` on aiview's /events, as useBoard is (D32). Keeps the body as the server
 // sent it, for "Copy as JSON" to put on the clipboard unchanged (US3).
 import { useEffect, useState } from "react";
-import type { Stats } from "../../../swarm/src/board/snapshot.ts";
+import type { Stats } from "../../../swarm/src/client/reader.ts";
 import { statsUrl, type StatsAsk } from "../lib/board/analytics.ts";
 
 export interface StatsState {

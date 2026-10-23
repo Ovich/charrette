@@ -16,3 +16,17 @@ export const git = (cwd: string, ...argv: string[]): string | null => {
   const r = gitAnswer(cwd, ...argv);
   return r.status === 0 ? r.stdout.trim() : null;
 };
+
+/** The worktree of the repository that has `branch` checked out, from `git worktree list --porcelain`;
+ *  null when none. git refuses a push to a branch checked out elsewhere, so merge-lock says so first. */
+export const worktreeHolding = (cwd: string, branch: string): string | null => {
+  const list = git(cwd, "worktree", "list", "--porcelain");
+  if (!list) return null;
+  const ref = branch.startsWith("refs/") ? branch : `refs/heads/${branch}`;
+  let at: string | null = null;
+  for (const line of list.split(/\r?\n/)) {
+    if (line.startsWith("worktree ")) at = line.slice("worktree ".length);
+    else if (line === `branch ${ref}`) return at;
+  }
+  return null;
+};

@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stopServerOf } from "./server.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.resolve(HERE, "..", "..", "src", "cli", "index.ts");
@@ -27,7 +28,7 @@ export type Repo = {
   /** The CLI's stdout, its exit checked 0. */
   cli: (cwd: string, ...argv: string[]) => string;
   git: (cwd: string, ...argv: string[]) => string;
-  /** Writes `file` in `cwd` and commits everything there. */
+  /** Writes `file` in `cwd` and commits everything there; in `repo`, detached, the commit moves main. */
   commitFile: (cwd: string, file: string, lines: string[], msg?: string) => void;
   /** Rebases `cwd`'s branch onto main; a conflicted file is resolved to `resolved`'s lines, then the rebase goes on. */
   rebaseOntoMain: (cwd: string, resolved?: Record<string, string[]>) => { conflicted: string[] };
@@ -41,7 +42,8 @@ export function makeRepo(prefix = "swarm-merge-"): Repo {
   const repo = path.join(home, "repo");
   const wtA = path.join(home, "wt-a");
   const wtB = path.join(home, "wt-b");
-  const env = (): NodeJS.ProcessEnv => ({ ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home, GIT_EDITOR: "true" });
+  // no stall poller: it would outlive the test (D27)
+  const env = (): NodeJS.ProcessEnv => ({ ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home, GIT_EDITOR: "true", SWARM_NO_POLLER: "1" });
   const git = (cwd: string, ...argv: string[]): string => {
     const r = spawnSync("git", argv, { cwd, encoding: "utf8", env: env() });
     assert.equal(r.status, 0, `git ${argv.join(" ")}: ${r.stderr}`);
@@ -58,6 +60,8 @@ export function makeRepo(prefix = "swarm-merge-"): Repo {
     fs.writeFileSync(path.join(cwd, file), body(lines));
     git(cwd, "add", "-A");
     git(cwd, "commit", "-q", "-m", msg);
+    // the repository's own folder is detached: its commit moves main
+    if (cwd === repo) git(cwd, "update-ref", "refs/heads/main", "HEAD");
   };
   const rebaseOntoMain = (cwd: string, resolved: Record<string, string[]> = {}): { conflicted: string[] } => {
     const first = spawnSync("git", ["rebase", "main"], { cwd, encoding: "utf8", env: env() });
@@ -82,8 +86,11 @@ export function makeRepo(prefix = "swarm-merge-"): Repo {
   git(repo, "commit", "-q", "-m", "root");
   git(repo, "worktree", "add", "-q", "-b", "a", wtA);
   git(repo, "worktree", "add", "-q", "-b", "b", wtB);
+  // main checked out nowhere, as a run's target must be: merge-lock refuses a target checked out in a worktree
+  git(repo, "checkout", "-q", "--detach");
 
   const cleanup = (): void => {
+    stopServerOf(home);
     for (let i = 0; ; i++) {
       try {
         fs.rmSync(home, { recursive: true, force: true });

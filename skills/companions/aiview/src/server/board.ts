@@ -1,13 +1,14 @@
-// The board routes: swarm's board as aiview serves it (D3, D5). `/api/board` answers one
-// repository's board and every repository; a write through swarm's board, in any process,
-// reaches every open tab on aiview's `/events` as `board-changed`. Hides the BoardReader's
-// opening (lazy, or at start when the store exists), its watch, and how a request names
-// its repository. The SSE hub and the static page are the server's.
+// The board routes: swarm's board as aiview serves it (D3, D5), read through swarm's BoardReader, a
+// client of the board server (swarm-relay D23). `/api/board` answers one repository's board and
+// every repository; a commit on the server reaches every open tab on aiview's `/events` as
+// `board-changed`. Hides the reader's opening (lazy, or at start when a server is there), and how a
+// request names its repository. The SSE hub and the static page are the server's.
 import fs from "node:fs";
 import type http from "node:http";
 import path from "node:path";
-import { openBoardReader, type BoardReader, type Kind, type StatsScope } from "../../../swarm/src/board/snapshot.ts";
+import { openBoardReader, type BoardReader, type Kind, type StatsScope } from "../../../swarm/src/client/reader.ts";
 import type { BoardChangedEventPayload } from "../core/api.ts";
+import { TOOL_ROOT } from "../core/db.ts";
 import { DATA_ROOT } from "../core/home.ts";
 import type { SseHub } from "./sse.ts";
 
@@ -17,27 +18,30 @@ export interface BoardRoutes {
   close(): void;
 }
 
-/** Where swarm keeps its board: the data home's `swarm.sqlite`, beside aiview's index. */
-const DEFAULT_BOARD_PATH = path.join(DATA_ROOT, "swarm.sqlite");
+/** The swarm launcher beside aiview's own, as the plugin lays the two companions out. */
+const DEFAULT_SWARM_ENTRY = path.join(TOOL_ROOT, "..", "swarm", "swarm.mjs");
+/** What a running board server writes in its data home: one there, the reader opens at start. */
+const SERVER_STATE_FILE = "swarm-server.json";
 
-export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRoutes {
-  const dbPath = opts.dbPath ?? DEFAULT_BOARD_PATH;
+export function mountBoard(sse: SseHub, opts: { dataRoot?: string; swarmEntry?: string } = {}): BoardRoutes {
+  const dataRoot = opts.dataRoot ?? DATA_ROOT;
+  const swarmEntry = opts.swarmEntry ?? DEFAULT_SWARM_ENTRY;
   let reader: BoardReader | null = null;
   let opening: Promise<BoardReader> | null = null;
-  let stopWatching: (() => void) | null = null;
+  let stopListening: (() => void) | null = null;
   let closed = false;
 
   // One open at a time; a failed one is forgotten, so the next request tries again.
   const openReader = (): Promise<BoardReader> => {
     if (reader) return Promise.resolve(reader);
-    opening ??= openBoardReader(dbPath).then(
+    opening ??= openBoardReader({ dataRoot, swarmEntry }).then(
       (opened) => {
         if (closed) {
           opened.close();
           throw new Error("the server is closing");
         }
         reader = opened;
-        stopWatching = opened.onChange((repo) =>
+        stopListening = opened.onChange((repo) =>
           sse.broadcast({ type: "board-changed", repo } satisfies BoardChangedEventPayload),
         );
         return opened;
@@ -49,8 +53,8 @@ export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRo
     );
     return opening;
   };
-  // Opened at start when the store is there, so a tab hears board changes before it asks.
-  if (fs.existsSync(dbPath)) openReader().catch(() => {}); // a failure answers on the next request
+  // Opened at start when a board server is there, so a tab hears board changes before it asks.
+  if (fs.existsSync(path.join(dataRoot, SERVER_STATE_FILE))) openReader().catch(() => {}); // a failure answers on the next request
 
   const json = (res: http.ServerResponse, obj: unknown, status = 200): void => {
     if (res.headersSent) return;
@@ -60,10 +64,10 @@ export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRo
 
   /** The repository a request names, as swarm's page server resolved it: a run's, a repository, or
    *  the most recently active; `missing` is the 404's message. `/api/run?id=` kept as `?run=`. */
-  const repoNamed = (board: BoardReader, url: URL): { repo: string } | { missing: string } => {
+  const repoNamed = async (board: BoardReader, url: URL): Promise<{ repo: string } | { missing: string }> => {
     const run = url.searchParams.get(url.pathname === "/api/run" ? "id" : "run");
     const key = url.searchParams.get("repo");
-    const repos = board.repos();
+    const repos = await board.repos();
     if (run !== null) {
       const repo = repos.find((r) => r.runs.some((x) => x.run === Number(run)))?.repo;
       return repo ? { repo } : { missing: `no run ${run}` };
@@ -77,20 +81,21 @@ export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRo
   };
 
   /** One repository's whole board. */
-  const answerBoard = (board: BoardReader, url: URL, res: http.ServerResponse): void => {
-    const named = repoNamed(board, url);
+  const answerBoard = async (board: BoardReader, url: URL, res: http.ServerResponse): Promise<void> => {
+    const named = await repoNamed(board, url);
     if ("missing" in named) return json(res, { error: named.missing }, 404);
-    json(res, { repos: board.repos(), snapshot: board.snapshot(named.repo) });
+    const [repos, snapshot] = await Promise.all([board.repos(), board.snapshot(named.repo)]);
+    json(res, { repos, snapshot });
   };
 
   /** The figures of a scope, `BoardReader.stats()` as it answers; the scope maps the CLI's flags one to one
    *  (D34): `since=all` is `--all` (no since, every run kept), `closedOnly=1` is `--closed`, `kind` is `--kind`. */
-  const answerStats = (board: BoardReader, url: URL, res: http.ServerResponse): void => {
+  const answerStats = async (board: BoardReader, url: URL, res: http.ServerResponse): Promise<void> => {
     const q = url.searchParams;
     const key = q.get("repo");
     // a named repository is read as `swarm stats --repo` reads it, its run whatever its age, pruned with its summary
     // kept or not in the board's list (plan D40); a run named alone is found among the runs the board lists
-    const named = key !== null ? (board.repos().some((r) => r.repo === key) ? { repo: key } : { missing: `no repository ${key}` }) : repoNamed(board, url);
+    const named = key !== null ? ((await board.repos()).some((r) => r.repo === key) ? { repo: key } : { missing: `no repository ${key}` }) : await repoNamed(board, url);
     if ("missing" in named) return json(res, { error: named.missing }, 404);
     const run = q.get("run");
     const since = q.get("since");
@@ -103,9 +108,9 @@ export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRo
       ...(kinds.length ? { kinds } : {}),
       ...(q.get("closedOnly") === "1" ? { closedOnly: true } : {}),
     };
-    let stats: ReturnType<BoardReader["stats"]>;
+    let stats: Awaited<ReturnType<BoardReader["stats"]>>;
     try {
-      stats = board.stats(scope);
+      stats = await board.stats(scope);
     } catch (err) {
       // a run unknown to the named repository is a 404, as an unknown repository is
       if (scope.run !== undefined && (err as Error).message === `no run ${scope.run}`) return json(res, { error: (err as Error).message }, 404);
@@ -114,7 +119,7 @@ export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRo
     json(res, stats);
   };
 
-  const ROUTES = new Map<string, (board: BoardReader, url: URL, res: http.ServerResponse) => void>([
+  const ROUTES = new Map<string, (board: BoardReader, url: URL, res: http.ServerResponse) => Promise<void>>([
     ["/api/board", answerBoard],
     ["/api/run", answerBoard],
     ["/api/stats", answerStats],
@@ -125,10 +130,6 @@ export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRo
       const answer = ROUTES.get(url.pathname);
       if (!answer) return false;
       if (req.method !== "GET" && req.method !== "HEAD") return false; // aiview's own 404 answers it
-      if (!reader && !fs.existsSync(dbPath)) {
-        json(res, { error: "no run on the board yet" }, 404);
-        return true;
-      }
       openReader()
         .then((board) => answer(board, url, res))
         .catch((err: unknown) => json(res, { error: (err as Error).message }, 500));
@@ -136,7 +137,7 @@ export function mountBoard(sse: SseHub, opts: { dbPath?: string } = {}): BoardRo
     },
     close() {
       closed = true;
-      stopWatching?.();
+      stopListening?.();
       reader?.close();
       reader = null;
     },

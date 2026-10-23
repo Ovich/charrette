@@ -1,6 +1,7 @@
 // Claims by the CLI (D58): `swarm claim` before an edit, and `swarm end` reconciling what the
 // runner wrote without one. Two runners of one run, each in a worktree of its own.
 import { test, beforeEach, afterEach } from "node:test";
+import { stopServerOf } from "./fixtures/server.ts";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -70,9 +71,12 @@ beforeEach(() => {
   wtB = path.join(home, "wt-b");
   git(repo, "worktree", "add", "-q", "-b", "a", wtA);
   git(repo, "worktree", "add", "-q", "-b", "b", wtB);
+  // main checked out nowhere, as a run's target must be
+  git(repo, "checkout", "-q", "--detach");
 });
 
 afterEach(() => {
+  stopServerOf(home);
   for (let i = 0; ; i++) {
     try {
       fs.rmSync(home, { recursive: true, force: true });
@@ -235,6 +239,19 @@ test("merge-lock without --onto says it is required and grants nothing (D59)", (
   assert.equal(r.status, 1);
   assert.match(r.stderr, /--onto is required/);
   assert.ok(cli(wtA, "merge-lock", "--onto", "main").includes("granted: "), "the lock is still free");
+});
+
+test("merge-lock onto a branch checked out in a worktree names the worktree, says what to do and grants nothing (validation finding 4)", () => {
+  running();
+  git(repo, "checkout", "-q", "main");
+  const r = swarm(wtB, "merge-lock", "--onto", "main");
+  assert.equal(r.status, 5, r.stderr);
+  const lines = r.stdout.trim().split(/\r?\n/);
+  assert.equal(lines.length, 1, r.stdout);
+  assert.match(lines[0], /^main is checked out at (.+): ask the orchestrator to detach it, then run merge-lock again$/);
+  assert.equal(path.resolve(lines[0].match(/at (.+?): ask/)![1]), fs.realpathSync.native(repo));
+  git(repo, "checkout", "-q", "--detach");
+  assert.ok(cli(wtA, "merge-lock", "--onto", "main").includes("granted: "), "the refusal held no lock");
 });
 
 // Claims across runs (D26): global per repository; what crosses runs lands in main.

@@ -1,7 +1,7 @@
 // The analytics views as the page's URL keeps them (D31): the across-runs view's scope, a run tab's
 // Analytics; the `/api/stats` route each asks, and how a figure and a run's line read. Formats and selects, never aggregates (D34, D35): a figure the JSON does not
 // carry is not drawn here. Pure: no DOM, no fetch.
-import type { Kind, RunStats, RunSummary, Totals } from "../../../../swarm/src/board/snapshot.ts";
+import type { Kind, RunStats, RunSummary, Totals } from "../../../../swarm/src/client/reader.ts";
 import type { RunId } from "./view.ts";
 
 /** "all": every run kept, `since` left out (D33). */

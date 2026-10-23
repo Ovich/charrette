@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { LIVE } from "./board-fixtures.ts";
 import { ACROSS, ACROSS_ALL_KNOWN, ACROSS_EMPTY, PLAN_RUN, bodyOf } from "./stats-fixtures.ts";
 import { source, standIn } from "./stats-stand-in.ts";
-import type { Stats } from "../../swarm/src/board/snapshot.ts";
+import type { Stats } from "../../swarm/src/client/reader.ts";
 
 vi.mock("./hooks/useBoard.ts", async () => ({ useBoard: (await import("./stats-stand-in.ts")).useBoardStandIn }));
 vi.mock("./hooks/useStats.ts", async () => ({ useStats: (await import("./stats-stand-in.ts")).useStatsStandIn }));

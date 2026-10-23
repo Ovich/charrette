@@ -1,0 +1,419 @@
+// The board server at its wire (swarm-relay S11): a test client (Node's WebSocket) against
+// startBoardServer on a temporary data home.
+import { test, beforeEach, afterEach } from "node:test";
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { DatabaseSync } from "node:sqlite";
+import { openBoard } from "../src/board/board.ts";
+import { startBoardServer, stopBoardServer } from "../src/server/server.ts";
+import { decode, encode, serverLogFile, serverStateFile, SERVER_STARTER_ENV, type Frame, type Hello, type MemberActivity, type RpcMethod, type ServerState } from "../src/wire.ts";
+
+const REPO = "/repos/one/.git";
+const SEATS = [
+  { id: "S1", title: "one", blockers: [] },
+  { id: "S2", title: "two", blockers: [] },
+];
+
+let dir: string;
+let server: { url: string; close(): Promise<void> } | null;
+const sockets: WebSocket[] = [];
+/** The server's clock runs this far ahead of the real one: a test moves time without sleeping. */
+let skew = 0;
+
+beforeEach(async () => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-server-"));
+  skew = 0;
+  server = await startBoardServer({ dataRoot: dir, now: () => new Date(Date.now() + skew) });
+});
+
+afterEach(async () => {
+  for (const s of sockets.splice(0)) s.close();
+  await server?.close();
+  server = null;
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+});
+
+const state = (): ServerState => JSON.parse(fs.readFileSync(serverStateFile(dir), "utf8")) as ServerState;
+
+/** A connected test client: every frame it receives, in order, awaited one by one. */
+type Client = { send(f: Frame): void; next(): Promise<Frame>; closed: Promise<void>; socket: WebSocket };
+const connect = async (): Promise<Client> => {
+  const socket = new WebSocket(server!.url);
+  sockets.push(socket);
+  const queue: Frame[] = [];
+  const waiting: ((f: Frame) => void)[] = [];
+  socket.addEventListener("message", (e) => {
+    const f = decode(String(e.data));
+    const w = waiting.shift();
+    if (w) w(f);
+    else queue.push(f);
+  });
+  const closed = new Promise<void>((r) => socket.addEventListener("close", () => r()));
+  await new Promise<void>((r, j) => {
+    socket.addEventListener("open", () => r());
+    socket.addEventListener("error", () => j(new Error("no connection")));
+  });
+  return {
+    socket,
+    closed,
+    send: (f) => socket.send(encode(f)),
+    next: () => (queue.length ? Promise.resolve(queue.shift()!) : new Promise((r) => waiting.push(r))),
+  };
+};
+const hello = async (over: Partial<Hello> = {}): Promise<{ c: Client; reply: Frame }> => {
+  const c = await connect();
+  c.send({ type: "hello", version: state().version, secret: state().secret, ...over });
+  return { c, reply: await c.next() };
+};
+const welcomed = async (over: Partial<Hello> = {}): Promise<Client> => {
+  const { c, reply } = await hello(over);
+  assert.equal(reply.type, "welcome");
+  return c;
+};
+let ids = 0;
+const call = async (c: Client, method: string, ...args: unknown[]): Promise<Frame> => {
+  const id = `c${++ids}`;
+  c.send({ type: "call", id, method: method as RpcMethod, args });
+  const f = await c.next();
+  assert.equal(f.type === "result" && f.id, id);
+  return f;
+};
+const value = async (c: Client, method: string, ...args: unknown[]): Promise<any> => {
+  const f = await call(c, method, ...args);
+  assert.ok(f.type === "result" && f.ok, JSON.stringify(f));
+  return f.type === "result" && f.ok ? f.value : undefined;
+};
+
+test("a hello with the secret and this version is welcomed; a wrong secret or version refused", async () => {
+  const c = await welcomed();
+  c.socket.close();
+  assert.deepEqual((await hello({ secret: "nope" })).reply, { type: "refused", reason: "secret" });
+  assert.deepEqual((await hello({ version: "other" })).reply, { type: "refused", reason: "version" });
+});
+
+test("a second hello for the same member with supersede refuses the older connection", async () => {
+  const member = { name: "p/S1", run: 1 };
+  const old = await welcomed({ member });
+  await welcomed({ member, supersede: true });
+  assert.deepEqual(await old.next(), { type: "refused", reason: "superseded" });
+});
+
+test("every method answers over the wire what the Board answers in process; an unknown one names itself", async () => {
+  const c = await welcomed();
+  const run = await value(c, "openRun", { repo: REPO, group: "g", title: "T", seats: SEATS });
+  const s1 = (await value(c, "join", { run: run.id, slice: "S1", doing: "x", files: [] })).runner;
+  const s2 = (await value(c, "join", { run: run.id, slice: "S2", doing: "y", files: [] })).runner;
+  await value(c, "post", s1, "hello @S2");
+  // the same store opened in process reads what the wire answered
+  const local = await openBoard(path.join(dir, "swarm.sqlite"));
+  try {
+    const same: [string, unknown[]][] = [
+      ["runs", []],
+      ["roster", [REPO]],
+      ["participant", [s1.name]],
+      ["heldBy", [s1]],
+      ["read", [1]],
+      ["thread", [s1]],
+      ["currentPhase", [run.id]],
+      ["pausedOf", [run.id]],
+      ["phaseProgress", [run.id]],
+      ["lastActivity", [run.id]],
+      ["owedPhase", [s2]],
+      ["setting", ["retention-days"]],
+      ["endedMembers", [REPO]],
+      ["heldMergeLock", [s1]],
+      ["repos", []],
+      ["snapshot", [REPO]],
+      ["stats", [{ repo: REPO }]],
+    ];
+    for (const [m, args] of same) {
+      const wire = await value(c, m, ...args);
+      const here = JSON.parse(JSON.stringify((local as any)[m](...args) ?? null));
+      // a read counts a call: compared on the fields a call does not move
+      if (m === "snapshot" || m === "roster" || m === "stats" || m === "runs" || m === "repos" || m === "lastActivity") assert.equal(typeof wire, typeof here, m);
+      else assert.deepEqual(wire, here, m);
+    }
+  } finally {
+    local.close();
+  }
+  // writes answer as in process
+  assert.equal((await value(c, "deliver", s2)).full.length, 1);
+  assert.equal(typeof (await value(c, "checkEdit", s1, "a.ts")).allowed, "boolean");
+  const unknown = await call(c, "flagStale");
+  assert.deepEqual(unknown.type === "result" && !unknown.ok && unknown.error, "unknown method flagStale");
+  const thrown = await call(c, "read", 99999);
+  assert.ok(thrown.type === "result" && !thrown.ok && /unknown message/.test(thrown.error));
+});
+
+test("a resent call is answered from the cache: one post in the store, not two", async () => {
+  const c = await welcomed();
+  const run = await value(c, "openRun", { repo: REPO, group: "g", title: "T", seats: SEATS });
+  const s1 = (await value(c, "join", { run: run.id, slice: "S1", doing: "x", files: [] })).runner;
+  const frame: Frame = { type: "call", id: "post-once", method: "post", args: [s1, "only once"] };
+  c.send(frame);
+  const first = await c.next();
+  // reconnected, the same call resent
+  const again = await welcomed();
+  again.send(frame);
+  assert.deepEqual(await again.next(), first);
+  const local = await openBoard(path.join(dir, "swarm.sqlite"));
+  try {
+    const all = local.snapshot(REPO).events.filter((e) => e.body === "only once");
+    assert.equal(all.length, 1);
+  } finally {
+    local.close();
+  }
+});
+
+test("a wait returns within 200 ms of a post on another connection; a cancelled wait clears waiting", async () => {
+  const a = await welcomed();
+  const run = await value(a, "openRun", { repo: REPO, group: "g", title: "T", seats: SEATS });
+  const s1 = (await value(a, "join", { run: run.id, slice: "S1", doing: "x", files: [] })).runner;
+  const s2 = (await value(a, "join", { run: run.id, slice: "S2", doing: "y", files: [] })).runner;
+  await value(a, "deliver", s1);
+  await value(a, "deliver", s2);
+  const b = await welcomed({ member: { name: s2.name, run: run.id } });
+  b.send({ type: "call", id: "w7", method: "wait", args: [s2, { mentionsOnly: true }] });
+  await new Promise((r) => setTimeout(r, 100));
+  const t0 = Date.now();
+  await value(a, "post", s1, "@S2 wake");
+  const woke = await b.next();
+  assert.ok(Date.now() - t0 < 200, `woke after ${Date.now() - t0} ms`);
+  assert.ok(woke.type === "result" && woke.id === "w7" && woke.ok && (woke.value as { full: unknown[] }).full.length === 1);
+
+  b.send({ type: "call", id: "w8", method: "wait", args: [s2, {}] });
+  await new Promise((r) => setTimeout(r, 100));
+  const local = await openBoard(path.join(dir, "swarm.sqlite"));
+  try {
+    const waiting = (): boolean => local.snapshot(REPO).roster.find((r) => r.runner === s2.name)!.state === "waiting";
+    assert.equal(waiting(), true);
+    b.send({ type: "cancel", id: "w8" });
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(waiting(), false);
+  } finally {
+    local.close();
+  }
+});
+
+test("closeRun over the wire refuses every member connection of that run", async () => {
+  const a = await welcomed();
+  const run = await value(a, "openRun", { repo: REPO, group: "g", title: "T", seats: SEATS });
+  const s1 = (await value(a, "join", { run: run.id, slice: "S1", doing: "x", files: [] })).runner;
+  const link = await welcomed({ member: { name: s1.name, run: run.id } });
+  await value(a, "closeRun", run.id);
+  assert.deepEqual(await link.next(), { type: "refused", reason: "closed" });
+});
+
+test("serve stop refuses every connection with shutdown and removes the state file", async () => {
+  const c = await welcomed();
+  assert.equal(await stopBoardServer(dir), true);
+  assert.deepEqual(await c.next(), { type: "refused", reason: "shutdown" });
+  assert.equal(fs.existsSync(serverStateFile(dir)), false);
+  assert.equal(await stopBoardServer(dir), false);
+  server = null;
+});
+
+test("the built bundle, alone in an empty folder, runs serve, answers a client and stops on serve stop", { timeout: 60000 }, async () => {
+  await server!.close();
+  server = null;
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const out = path.join(dir, "alone", "cli.mjs");
+  // the package's own build, written elsewhere: what ships, with nothing beside it
+  const built = spawn(process.execPath, [path.join(here, "..", "build.mjs"), "--outfile", out], { cwd: path.join(here, ".."), stdio: "ignore" });
+  assert.equal(await new Promise((r) => built.on("exit", r)), 0);
+  const home = path.join(dir, "home");
+  const env = { ...process.env, CHARRETTE_HOME: home };
+  const serve = spawn(process.execPath, [out, "serve"], { cwd: path.dirname(out), env, stdio: ["ignore", "pipe", "pipe"] });
+  const exited = new Promise<number | null>((r) => serve.on("exit", (code) => r(code)));
+  const url = await new Promise<string>((r, j) => {
+    let text = "";
+    serve.stdout.on("data", (d) => {
+      text += String(d);
+      const m = /ws:\/\/\S+/.exec(text);
+      if (m) r(m[0]);
+    });
+    serve.on("exit", () => j(new Error(`serve exited early`)));
+  });
+  const st = JSON.parse(fs.readFileSync(serverStateFile(home), "utf8")) as ServerState;
+  const socket = new WebSocket(url);
+  sockets.push(socket);
+  const frames: Frame[] = [];
+  const got = (n: number): Promise<void> =>
+    new Promise((r) => {
+      const look = (): void => (frames.length >= n ? r() : void setTimeout(look, 20));
+      look();
+    });
+  socket.addEventListener("message", (e) => frames.push(decode(String(e.data))));
+  await new Promise((r) => socket.addEventListener("open", r));
+  socket.send(encode({ type: "hello", version: st.version, secret: st.secret }));
+  await got(1);
+  assert.equal(frames[0].type, "welcome");
+  socket.send(encode({ type: "call", id: "r1", method: "runs", args: [] }));
+  await got(2);
+  assert.deepEqual(frames[1], { type: "result", id: "r1", ok: true, value: [] });
+  const stop = spawn(process.execPath, [out, "serve", "stop"], { cwd: path.dirname(out), env, stdio: "ignore" });
+  assert.equal(await new Promise((r) => stop.on("exit", r)), 0);
+  assert.equal(await exited, 0);
+  await got(3);
+  assert.deepEqual(frames[2], { type: "refused", reason: "shutdown" });
+  assert.equal(fs.existsSync(serverStateFile(home)), false);
+});
+
+// ── liveness in the server (swarm-relay S21) ──────────────────────────────────────────
+const activity = (o: Partial<MemberActivity> = {}): MemberActivity => ({ grewAt: Date.now(), tokens: 0, context: null, openTool: null, lastTool: null, finished: false, ...o });
+/** Asks the snapshot every 100 ms until `ok`, or fails after `ms`. */
+const within = async <T>(c: Client, ms: number, pick: (snap: any) => T | undefined): Promise<T> => {
+  const until = Date.now() + ms;
+  for (;;) {
+    const got = pick(await value(c, "snapshot", REPO));
+    if (got !== undefined) return got;
+    if (Date.now() > until) assert.fail(`not within ${ms} ms`);
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
+const goneEvents = (snap: any): { body: string; mentions: string[] }[] => snap.events.filter((e: { event?: string }) => e.event === "gone");
+/** A run with S1 and S2 joined, and S1's link welcomed. */
+const linkedRun = async () => {
+  const c = await welcomed();
+  const run = await value(c, "openRun", { repo: REPO, group: "g", title: "T", seats: SEATS });
+  const s1 = (await value(c, "join", { run: run.id, slice: "S1", doing: "x", files: [] })).runner;
+  await value(c, "join", { run: run.id, slice: "S2", doing: "y", files: [] });
+  const link = await welcomed({ member: { name: s1.name, run: run.id } });
+  return { c, run, s1, link };
+};
+
+test("an activity frame from a member's link updates its member_activity row and a token reading; the snapshot carries state and doing", async () => {
+  const { c, run, link } = await linkedRun();
+  link.send({ type: "activity", at: Date.now(), activity: activity({ tokens: 77, openTool: { name: "Bash", target: "npm test", since: Date.now() } }) });
+  const live = await within(c, 3000, (snap) => snap.roster.find((r: { runner: string; liveness?: { tokens: number | null } }) => r.runner === "g/S1" && r.liveness?.tokens === 77)?.liveness);
+  assert.deepEqual([live.state, live.doing], ["busy", "Bash npm test"]);
+  const db = new DatabaseSync(path.join(dir, "swarm.sqlite"));
+  try {
+    assert.equal((db.prepare("SELECT COUNT(*) AS n FROM token_readings WHERE run = ? AND member = 'S1'").get(run.id) as { n: number }).n, 1);
+    assert.equal((db.prepare("SELECT open_tool FROM member_activity WHERE run = ? AND member = 'S1'").get(run.id) as { open_tool: string }).open_tool, "Bash");
+  } finally {
+    db.close();
+  }
+});
+
+test("gone is posted within 5 s of an activity with finished and no end, to the orchestrator alone (US3, D12)", async () => {
+  const { c, link } = await linkedRun();
+  const sent = Date.now();
+  link.send({ type: "activity", at: sent, activity: activity({ finished: true }) });
+  const gone = await within(c, 5000, (snap) => goneEvents(snap)[0]);
+  assert.ok(Date.now() - sent < 5000);
+  assert.deepEqual([gone.body, gone.mentions], ["gone g/S1: its agent finished without end", ["g/orchestrator"]]);
+});
+
+test("gone is posted within 35 s of a link lost and not back; never for an ended member (US3, D12)", async () => {
+  const { c, run, s1, link } = await linkedRun();
+  const s2 = await value(c, "participant", "g/S2");
+  const link2 = await welcomed({ member: { name: s2.name, run: run.id } });
+  link.socket.close();
+  await link.closed;
+  // S2 ends, then its link goes: never gone
+  await value(c, "end", s2);
+  link2.socket.close();
+  await link2.closed;
+  skew += 29_000;
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.equal(goneEvents(await value(c, "snapshot", REPO)).length, 0, "not before 30 s");
+  skew += 2_000;
+  const gone = await within(c, 4000, (snap) => goneEvents(snap)[0]);
+  assert.equal(gone.body, `gone ${s1.name}: its link was lost`);
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.deepEqual(goneEvents(await value(c, "snapshot", REPO)).map((e) => e.body), [`gone ${s1.name}: its link was lost`]);
+});
+
+test("an upkeep or tick that throws is logged to stderr, and the server goes on", async () => {
+  const { c, run, link } = await linkedRun();
+  const broken = await value(c, "openRun", { repo: REPO, group: "b", title: "B", seats: SEATS });
+  await value(c, "join", { run: broken.id, slice: "S1", doing: "x", files: [] });
+  // the broken run's tick throws: pruning its old token reading is refused by a trigger
+  const db = new DatabaseSync(path.join(dir, "swarm.sqlite"));
+  try {
+    db.prepare("INSERT INTO token_readings (run, member, t, tokens) VALUES (?, 'S1', '2000-01-01T00:00:00.000Z', 1)").run(broken.id);
+    db.exec(`CREATE TRIGGER refuse_prune BEFORE DELETE ON token_readings WHEN old.run = ${Number(broken.id)} BEGIN SELECT RAISE(ABORT, 'refused'); END`);
+  } finally {
+    db.close();
+  }
+  const logged: string[] = [];
+  const was = console.error;
+  console.error = (...a: unknown[]) => void logged.push(a.join(" "));
+  try {
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.ok(logged.some((l) => l.startsWith(`swarm server: liveness of run ${broken.id} failed`)), logged.join("\n"));
+    // the other run still ticks, and the server still answers
+    link.send({ type: "activity", at: Date.now(), activity: activity({ finished: true }) });
+    assert.equal((await within(c, 5000, (snap) => goneEvents(snap).find((e) => e.mentions.includes("g/orchestrator")))).body, "gone g/S1: its agent finished without end");
+    assert.ok((await value(c, "runs")).some((r: { id: number }) => r.id === run.id));
+  } finally {
+    console.error = was;
+  }
+});
+
+// ── presence outlives a restart (swarm-relay S42, D37) ──
+/** `serve stop`, then a new server on the same data home, on the same skewed clock. */
+const restart = async (): Promise<void> => {
+  await server!.close();
+  server = await startBoardServer({ dataRoot: dir, now: () => new Date(Date.now() + skew) });
+};
+
+test("after a restart, a member that had a link and has none 30 s later is gone, posted once, again after a second restart (D37)", async () => {
+  const { s1 } = await linkedRun();
+  await restart();
+  const c = await welcomed();
+  skew += 28_000; // with the 1.5 s below, 29.5 s since the start
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.deepEqual(goneEvents(await value(c, "snapshot", REPO)).map((e) => e.body), [], "not before 30 s");
+  skew += 3_000;
+  const gone = await within(c, 4000, (snap) => goneEvents(snap)[0]);
+  assert.equal(gone.body, `gone ${s1.name}: its link was lost`);
+  // S2 never had a link: never gone; a second restart tells S1's gone no second time
+  await restart();
+  const again = await welcomed();
+  skew += 60_000;
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.deepEqual(goneEvents(await value(again, "snapshot", REPO)).map((e) => e.body), [`gone ${s1.name}: its link was lost`]);
+});
+
+test("a link lost and back within 30 s, across a restart or not, is never gone (D37)", async () => {
+  const { c, run, s1, link } = await linkedRun();
+  link.socket.close();
+  await link.closed;
+  skew += 20_000;
+  await welcomed({ member: { name: s1.name, run: run.id } });
+  skew += 40_000;
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.equal(goneEvents(await value(c, "snapshot", REPO)).length, 0, "back in time, no restart");
+  await restart();
+  skew += 20_000;
+  const reader = await welcomed();
+  await welcomed({ member: { name: s1.name, run: run.id } });
+  skew += 40_000;
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.equal(goneEvents(await value(reader, "snapshot", REPO)).length, 0, "back in time after a restart");
+});
+
+// ── who started it (swarm-relay D42) ──────────────────────────────────────────
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+test("a server's log starts with its data home, its pid, and its starter's pid and command line, else unknown (D42)", async () => {
+  const first = fs.readFileSync(serverLogFile(dir), "utf8").split("\n")[0];
+  const unknownOrProc = process.platform === "win32" ? "unknown" : "\\S.*";
+  assert.match(first, new RegExp(`^serve: home ${escapeRegExp(path.resolve(dir))}, pid ${process.pid}, started by ${process.ppid} ${unknownOrProc}$`));
+  await server!.close();
+  server = null;
+  const home = path.join(dir, "named");
+  process.env[SERVER_STARTER_ENV] = "node swarm.mjs join --run 72";
+  try {
+    server = await startBoardServer({ dataRoot: home });
+  } finally {
+    delete process.env[SERVER_STARTER_ENV];
+  }
+  assert.equal(fs.readFileSync(serverLogFile(home), "utf8").split("\n")[0], `serve: home ${path.resolve(home)}, pid ${process.pid}, started by ${process.ppid} node swarm.mjs join --run 72`);
+});

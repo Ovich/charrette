@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm/src/board/snapshot.ts";
+import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm/src/client/reader.ts";
 import { conversation, TIPS } from "./lib/board/view.ts";
 import { Conversation } from "./components/viewers/board/Conversation.tsx";
 import { TipLayer } from "./components/viewers/board/Tip.tsx";
@@ -41,7 +41,7 @@ const EVENTS = [
   item("alpha/S1", "joined: the page", { kind: "event", event: "joined" }),
 ];
 const SNAP: BoardSnapshot = {
-  repo: "/r/.git", name: "r", runs: [RUN], lock: null, roster: [member("S1", "Sleepy Otter"), member("S2", "Brave Badger"), member("orchestrator", "Calm Owl")],
+  repo: "/r/.git", name: "r", runs: [RUN], lock: null, lockHistory: [], roster: [member("S1", "Sleepy Otter"), member("S2", "Brave Badger"), member("orchestrator", "Calm Owl")],
   events: EVENTS, queues: {}, files: [{ path: "a.ts", holders: ["alpha/S1"], interface: false }], flags: [],
 };
 

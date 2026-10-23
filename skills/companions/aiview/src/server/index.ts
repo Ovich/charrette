@@ -37,9 +37,11 @@ export interface ServeOptions {
   writeState?: boolean;
   /** How often open tabs are pinged. Injectable for tests. */
   heartbeatMs?: number;
-  /** swarm's board store; the data home's by default. Tests pass their own so a suite
-   *  run never opens the real board. */
-  boardDbPath?: string;
+  /** The data home whose swarm board server is read; the data home's by default. Tests pass
+   *  their own so a suite run never reads the real board. */
+  boardDataRoot?: string;
+  /** The swarm launcher a board server is started from when none answers; beside aiview's by default. */
+  swarmEntry?: string;
 }
 
 const MIME: Record<string, string> = {
@@ -85,14 +87,14 @@ function openBrowser(url: string): void {
 
 export function startServer(
   index: Index,
-  { port, open, startDoc, toolRoot = TOOL_ROOT, writeState = true, heartbeatMs, boardDbPath }: ServeOptions,
+  { port, open, startDoc, toolRoot = TOOL_ROOT, writeState = true, heartbeatMs, boardDataRoot, swarmEntry }: ServeOptions,
 ): http.Server {
   // the hello names the build dist/ serves now: a tab drawn by an older build reloads (app/lib/build.ts)
   const sse = createSseHub(heartbeatMs, () => {
     const build = servedBuild(path.join(toolRoot, "dist"));
     return build ? { build } : {};
   });
-  const board = mountBoard(sse, { dbPath: boardDbPath });
+  const board = mountBoard(sse, { dataRoot: boardDataRoot, swarmEntry });
   const version = collectionVersion(toolRoot);
   const watcher = new DocWatcher((dir, name) =>
     index

@@ -1,7 +1,7 @@
-// aiview's server answering swarm's board (SL2): the board routes through HTTP on a test
-// server, port 0, no pid files, over a store in a temp data home. The board is written as
-// swarm's own process writes it, through openBoard on the same file. Ported from swarm's
-// page-server tests (the /api/board and /events cases); the static page is aiview's own.
+// aiview's server answering swarm's board (SL2, swarm-relay D23): the board routes through HTTP on
+// a test server, port 0, no pid files, read through the BoardReader from a board server on a temp
+// data home, seeded through that server. Ported from swarm's page-server tests (the /api/board and
+// /events cases); the static page is aiview's own.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -11,7 +11,10 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { openIndex, type Index } from "../src/core/db.ts";
 import { startServer } from "../src/server/index.ts";
-import { openBoard, type Board, type BoardSnapshot } from "../../swarm/src/board/board.ts";
+import type { RemoteBoard } from "../../swarm/src/client/remote.ts";
+import type { BoardSnapshot } from "../../swarm/src/client/reader.ts";
+import { serverStateFile } from "../../swarm/src/wire.ts";
+import { SWARM_CLI, startTestBoard, stopSpawnedBoard, type TestBoard } from "./fixtures/board-server.ts";
 
 const REPO = "/repos/one/.git";
 const OTHER = "/repos/two/.git";
@@ -24,7 +27,8 @@ type Event = { type: string; repo?: string; id?: number };
 
 let tmp: string;
 let index: Index;
-let writer: Board; // swarm's own process, writing the board aiview reads
+let board: TestBoard; // swarm's board server, the board aiview reads
+let writer: RemoteBoard; // a client of it, writing as members' verbs do
 let server: http.Server;
 let base: string;
 let docId: number;
@@ -47,16 +51,17 @@ before(async () => {
   fs.writeFileSync(docPath, "# Board X\n");
   docId = index.register(docPath).id;
 
-  const dbPath = path.join(tmp, "swarm.sqlite");
-  writer = await openBoard(dbPath);
-  writer.openRun({ repo: REPO, group: "review-tool", title: "Review tool", seats: SLICES });
-  server = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp, writeState: false, heartbeatMs: 200, boardDbPath: dbPath });
+  board = await startTestBoard(tmp);
+  writer = board.writer;
+  await writer.openRun({ repo: REPO, group: "review-tool", title: "Review tool", seats: SLICES });
+  server = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: tmp, writeState: false, heartbeatMs: 200, boardDataRoot: tmp, swarmEntry: SWARM_CLI });
   base = await listening(server);
 });
 
 after(async () => {
   await closing(server);
-  writer.close();
+  await board.close();
+  stopSpawnedBoard(tmp); // a server the reader started while the test's was away, if any
   await new Promise((r) => setTimeout(r, 250)); // a watcher debounce in flight lands on an open index
   index.close();
   fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
@@ -95,19 +100,19 @@ function listen(until: (events: Event[]) => boolean, ms: number): Promise<Event[
 test("answers the most recent repository", async () => {
   const only = (await (await fetch(`${base}/api/board`)).json()) as BoardBody;
   assert.equal(only.snapshot.repo, REPO);
-  writer.openRun({ repo: OTHER, group: "other", title: "Other", seats: [] });
+  await writer.openRun({ repo: OTHER, group: "other", title: "Other", seats: [] });
   const r = await fetch(`${base}/api/board`);
   assert.equal(r.status, 200);
   const latest = (await r.json()) as BoardBody;
   assert.equal(latest.snapshot.repo, OTHER);
   assert.deepEqual(latest.repos.map((x) => x.repo), [OTHER, REPO]);
-  assert.deepEqual(latest.snapshot, writer.snapshot(OTHER));
+  assert.deepEqual(latest.snapshot, await writer.snapshot(OTHER));
   const byKey = (await (await fetch(`${base}/api/board?repo=${encodeURIComponent(REPO)}`)).json()) as BoardBody;
   assert.equal(byKey.snapshot.repo, REPO);
 });
 
 test("answers a run's repository", async () => {
-  const run = writer.runs().find((x) => x.repo === REPO)!;
+  const run = (await writer.runs()).find((x) => x.repo === REPO)!;
   const byRun = (await (await fetch(`${base}/api/board?run=${run.id}`)).json()) as BoardBody;
   assert.equal(byRun.snapshot.repo, REPO);
   assert.ok(byRun.repos.some((x) => x.repo === OTHER));
@@ -131,41 +136,33 @@ test("404 for an unknown repository", async () => {
   assert.deepEqual(await r.json(), { error: "no repository /nowhere/.git" });
 });
 
-test("404 no run yet without a store, and the server stays up", async () => {
+test("with no server running, the reader starts it: 404 with no repository, and the server stays up", async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "aiview-board-empty-"));
-  const dbPath = path.join(home, "swarm.sqlite");
-  const bare = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: home, writeState: false, boardDbPath: dbPath });
+  const bare = startServer(index, { port: 0, open: false, startDoc: null, toolRoot: home, writeState: false, boardDataRoot: home, swarmEntry: SWARM_CLI });
   const at = await listening(bare);
   try {
+    assert.equal(fs.existsSync(serverStateFile(home)), false, "no board server before the request");
     const r = await fetch(`${at}/api/board`);
     assert.equal(r.status, 404);
-    assert.deepEqual(await r.json(), { error: "no run on the board yet" });
-    assert.equal(fs.existsSync(dbPath), false, "asking created no store");
+    assert.deepEqual(await r.json(), { error: "no repository on the board" });
+    assert.equal(fs.existsSync(serverStateFile(home)), true, "the reader started the board server");
     assert.equal((await fetch(`${at}/api/documents`)).status, 200, "the server is still up");
-    // a store that appears after start is opened on the next request
-    const late = await openBoard(dbPath);
-    try {
-      late.openRun({ repo: REPO, group: "late", title: "Late", seats: [] });
-      const body = (await (await fetch(`${at}/api/board`)).json()) as BoardBody;
-      assert.equal(body.snapshot.repo, REPO);
-    } finally {
-      late.close();
-    }
   } finally {
     await closing(bare);
+    stopSpawnedBoard(home);
     fs.rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 });
 
 test("a post is heard as board-changed", async () => {
-  const run = writer.runs().find((x) => x.repo === REPO)!;
-  const s3 = writer.join({ run: run.id, slice: "S3", doing: "page", files: [] }).runner;
+  const run = (await writer.runs()).find((x) => x.repo === REPO)!;
+  const s3 = (await writer.join({ run: run.id, slice: "S3", doing: "page", files: [] })).runner;
   await new Promise((r) => setTimeout(r, 300)); // let that join's change go by before listening
   let posted = 0;
   const seen = listen((ev) => ev.some((e) => e.type === "board-changed") && ev.some((e) => e.type === "ping"), 5000);
   setTimeout(() => {
     posted = Date.now();
-    writer.post(s3, "@S5 from swarm's process");
+    void writer.post(s3, "@S5 committed on the server");
   }, 300);
   const events = await seen;
   const latency = Date.now() - posted;
@@ -173,6 +170,17 @@ test("a post is heard as board-changed", async () => {
   assert.deepEqual(events.find((e) => e.type === "board-changed"), { type: "board-changed", repo: REPO });
   assert.ok(!events.some((e) => e.type === "changed"), "a board write is never a document's changed");
   assert.ok(latency < 1000, `board-changed after ${latency} ms`);
+});
+
+test("the board server restarted: the reader reconnects and each repository is told once", async () => {
+  const seen = listen(() => false, 2500).catch((e: Error) => JSON.parse(e.message.replace(/^timed out; saw /, "")) as Event[]);
+  await new Promise((r) => setTimeout(r, 200)); // the stream is open
+  await board.close();
+  board = await startTestBoard(tmp);
+  writer = board.writer;
+  const changed = (await seen).filter((e) => e.type === "board-changed").map((e) => e.repo);
+  assert.deepEqual(changed.sort(), [REPO, OTHER].sort());
+  assert.equal(((await (await fetch(`${base}/api/board?repo=${encodeURIComponent(REPO)}`)).json()) as BoardBody).snapshot.repo, REPO);
 });
 
 test("document events unchanged", async () => {

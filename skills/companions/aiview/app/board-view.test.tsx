@@ -2,7 +2,7 @@
 // fixtures; each call's selection is recorded, and the snapshot answered is the repository it asks for.
 import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import type { BoardSnapshot } from "../../swarm/src/board/snapshot.ts";
+import type { BoardSnapshot } from "../../swarm/src/client/reader.ts";
 import type { BoardState } from "./hooks/useBoard.ts";
 import { ALL_CLOSED, APP, BRAINSTORM, CLOSED, LIVE, NICKS, OTHER, PHASED, REPOS, SITE } from "./board-fixtures.ts";
 
@@ -217,6 +217,80 @@ test("a card followed narrows the conversation to its member; clicked again, rel
   expect(convo().queryByText(/return the new token/)).toBeNull();
   fireEvent.click(s5);
   expect(convo().getByText(/return the new token/)).toBeTruthy();
+});
+
+// ── the member's activity (swarm-relay S24, D9, D20) ─────────────────────────────
+
+const ACTIVE = LIVE.roster.find((r) => r.runner.startsWith("refresh-tokens/") && r.slice !== "orchestrator" && r.state !== "ended" && r.state !== "done")!;
+const withActivity = (liveness: object | undefined) => ({ ...LIVE, roster: LIVE.roster.map((r) => (r.runner === ACTIVE.runner ? { ...r, liveness } : r)) }) as BoardSnapshot;
+const activeCard = () => within(strip()!).getAllByRole("button").find((c) => c.textContent?.includes(ACTIVE.nick))!;
+const minutesAgo = (m: number) => Date.now() - m * 60000;
+
+test.each([
+  ["working", { state: "working", doing: "Edit", since: null }, /^working$/, "last: Edit"],
+  ["busy", { state: "busy", doing: "browser_click /jobs", since: minutesAgo(3) }, /^busy · 3 min$/, "browser_click /jobs"],
+  ["waiting", { state: "waiting", doing: "swarm wait", since: null }, /^waiting$/, "last: swarm wait"],
+  ["quiet", { state: "quiet", doing: "Bash", since: minutesAgo(12), reason: "no call since 12 min" }, /^quiet · 12 min$/, "last: Bash · no call since 12 min"],
+  ["gone", { state: "gone", doing: "Read", since: null }, /^gone$/, "last: Read"],
+])("a %s member shows its own label and its tool beside it", (state, liveness, label, tool) => {
+  show([APP], 1, [withActivity({ tokens: null, movedAt: null, ...liveness })]);
+  const card = activeCard();
+  const status = card.querySelector(".state")!;
+  expect(status.className).toBe(`state ${state}`);
+  expect(status.textContent).toMatch(label);
+  const line = card.querySelector('[data-component="MemberActivity"]')!;
+  expect(line.getAttribute("data-state")).toBe(state);
+  expect(line.textContent).toBe(tool);
+});
+
+test("a gone member stays in the roster, its card marked gone", () => {
+  show([APP], 1, [withActivity({ state: "gone", doing: null, since: null, tokens: null, movedAt: null })]);
+  const card = activeCard();
+  expect(card).toBeTruthy();
+  expect(card.classList.contains("gone")).toBe(true);
+});
+
+test("a member with no activity state renders as before it", () => {
+  show([APP], 1, [withActivity(undefined)]);
+  const card = activeCard();
+  expect(card.querySelector('[data-component="MemberActivity"]')).toBeNull();
+  expect(card.classList.contains("gone")).toBe(false);
+  expect(card.querySelector(".state")!.className).not.toMatch(/\b(busy|gone)\b/);
+});
+
+// ── the member's two ages (swarm-relay S43, D36, D38) ──────────────────────────
+
+const agesOf = (card: HTMLElement) => card.querySelector('[data-component="MemberAges"]');
+
+test("each card shows progress <age> and alive <age> beside the state", () => {
+  show([APP], 1, [withActivity({ state: "working", doing: "Edit", since: null, tokens: null, movedAt: null, progressAt: minutesAgo(4), aliveAt: Date.now() - 20000 })]);
+  const card = activeCard();
+  expect(card.querySelector(".state")!.textContent).toMatch(/^working$/);
+  expect(agesOf(card)!.textContent).toBe("progress 4 min · alive 20 s");
+});
+
+test("a card without the two ages renders as before", () => {
+  show([APP], 1, [withActivity({ state: "working", doing: "Edit", since: null, tokens: null, movedAt: null })]);
+  expect(agesOf(activeCard())).toBeNull();
+});
+
+test("a stalled member's card reads as stalled with its missing signal", () => {
+  show([APP], 1, [withActivity({ state: "quiet", doing: "Bash", since: minutesAgo(16), reason: "no progress for 960s, link alive; last Bash",tokens: null, movedAt: null, progressAt: minutesAgo(16), aliveAt: Date.now() - 5000 })]);
+  const card = activeCard();
+  const status = card.querySelector(".state")!;
+  expect(status.className).toBe("state stalled");
+  expect(status.textContent).toMatch(/^stalled · 16 min$/);
+  expect(card.querySelector('[data-component="MemberActivity"]')!.textContent).toBe("last: Bash · no progress for 960s, link alive; last Bash");
+  expect(agesOf(card)!.textContent).toBe("progress 16 min · alive 5 s");
+});
+
+test("a gone member's card reads as gone, its lost link named", () => {
+  show([APP], 1, [withActivity({ state: "gone", doing: "Read", since: null, reason: "no progress for 120s, link lost; last Read", tokens: null, movedAt: null, progressAt: minutesAgo(2), aliveAt: Date.now() - 40000 })]);
+  const card = activeCard();
+  expect(card.classList.contains("gone")).toBe(true);
+  expect(card.querySelector(".state")!.textContent).toMatch(/^gone$/);
+  expect(card.querySelector('[data-component="MemberActivity"]')!.textContent).toBe("last: Read · no progress for 120s, link lost; last Read");
+  expect(agesOf(card)!.textContent).toBe("progress 2 min · alive 40 s");
 });
 
 // ── ClaimsRow ────────────────────────────────────────────────────────────────────

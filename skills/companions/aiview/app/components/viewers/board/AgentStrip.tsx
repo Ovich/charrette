@@ -1,59 +1,90 @@
 // A picked run's members, a closed run's as they ended, five cards a row under the tabs, the orchestrator the first card (D7, D20):
-// each card its member (code, then nick), its status, the slice, what it does, its token counter. A card clicked
+// each card its member (code, then nick), its status, the slice, what it does. A card clicked
 // follows the member and narrows the conversation; clicked again, released.
 import { useEffect, useState, type CSSProperties } from "react";
-import type { SnapshotRunner } from "../../../../../swarm/src/board/snapshot.ts";
+import type { Liveness, SnapshotRunner } from "../../../../../swarm/src/client/reader.ts";
 import { hhmm, ORCHESTRATOR } from "../../../lib/board/view.ts";
 import { RunnerName } from "./chips.tsx";
 
-/** What the card's right side says: ended, quiet, or since when, with today's RunnerCard states. */
-function statusOf(p: SnapshotRunner): { text: string; className: string } {
+/** A member's activity as the server computes it (swarm-relay#D9, #D20), its two ages' instants included (swarm-relay#D38). */
+type MemberActivity = Liveness;
+const ACTIVITY_STATES: ReadonlySet<string> = new Set(["working", "busy", "waiting", "quiet", "gone"]);
+
+/** Stalled is quiet with its link alive (swarm-relay#D36): the server says so in the reason, the state stays one of D9's five. */
+const isStalled = (activity: MemberActivity): boolean => activity.state === "quiet" && /\blink alive\b/.test(activity.reason ?? "");
+
+/** The member's activity, or null when the reader sends none it knows (a server before swarm-relay#D20): the card draws as before. */
+function activityOf(p: SnapshotRunner): MemberActivity | null {
+  const l = p.liveness;
+  return l && ACTIVITY_STATES.has(l.state) ? l : null;
+}
+
+const minutesSince = (since: number, now: number): string => `${Math.max(1, Math.round((now - since) / 60000))} min`;
+
+/** An age as a person reads it at a glance: seconds under a minute, minutes under an hour, then hours. */
+function ageSince(at: number, now: number): string {
+  const secs = Math.max(0, Math.round((now - at) / 1000));
+  if (secs < 60) return `${secs} s`;
+  if (secs < 3600) return `${Math.round(secs / 60)} min`;
+  return `${Math.round(secs / 3600)} h`;
+}
+
+/** What the card's right side says: ended, the member's activity state (busy and quiet with how long), or as before it. */
+function statusOf(p: SnapshotRunner, activity: MemberActivity | null, now: number): { text: string; className: string } {
   if (p.state === "ended" || p.state === "done") return { text: p.ended ? `ended ${hhmm(p.ended)}` : "ended", className: "ended" };
-  if (p.stale) return { text: `quiet ${Math.max(1, Math.round((Date.now() - Date.parse(p.lastCall)) / 60000))} min`, className: "quiet" };
+  if (activity) {
+    const label = isStalled(activity) ? "stalled" : activity.state;
+    const timed = (activity.state === "busy" || activity.state === "quiet") && activity.since !== null;
+    return { text: timed ? `${label} · ${minutesSince(activity.since!, now)}` : label, className: label };
+  }
+  if (p.stale) return { text: `quiet ${Math.max(1, Math.round((now - Date.parse(p.lastCall)) / 60000))} min`, className: "quiet" };
   const doing = p.listening && p.slice !== ORCHESTRATOR ? "listening" : p.state;
   return { text: `${doing} · ${hhmm(p.joined)}`, className: p.state };
 }
 
-/** A token count in few characters: 950, 12K, 2.2M (the user asked for K over the full count). */
-export const compactTokens = (n: number): string =>
-  n < 1000 ? String(n) : n < 1_000_000 ? `${Math.round(n / 1000)}K` : `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-
-/** The member's token counter (swarm's stall poller): the count and the seconds since it last moved,
- *  marked flat at the run's stall threshold; the reason when the board cannot read it. */
-function Counter({ p, now, stallMs }: { p: SnapshotRunner; now: number; stallMs: number }) {
-  const l = p.liveness;
-  if (!l || p.state === "ended" || p.state === "done") return null;
-  if (l.state !== "ok")
-    return (
-      <span className="counter blind" data-component="TokenCounter" data-state={l.state}>
-        {l.state === "none" ? "no transcript" : "transcript unreadable"}
-      </span>
-    );
-  const since = l.movedAt ? Math.max(0, Math.floor((now - Date.parse(l.movedAt)) / 1000)) : null;
-  const flat = since !== null && since * 1000 >= stallMs;
+/** The tool the member has open (busy) or called last, and why it is quiet when the server says. */
+function ActivityLine({ activity }: { activity: MemberActivity }) {
+  const tool = activity.doing ? (activity.state === "busy" ? activity.doing : `last: ${activity.doing}`) : null;
+  const text = [tool, activity.state === "quiet" || activity.state === "gone" ? activity.reason : null].filter(Boolean).join(" · ");
+  if (!text) return null;
   return (
-    <span className={flat ? "counter flat" : "counter"} data-component="TokenCounter" data-state={flat ? "flat" : "moving"}>
-      {compactTokens(l.tokens ?? 0)} tok{since !== null && ` · ${since}s`}
+    <span className="activity" data-component="MemberActivity" data-state={activity.state}>
+      {text}
     </span>
   );
 }
 
-/** Now, every second: the counters' seconds since they moved go on between two snapshots. */
+/** Since the member's last progress and since its last sign of life (swarm-relay#D38); nothing when the server sends neither. */
+function MemberAges({ activity, now }: { activity: MemberActivity; now: number }) {
+  const ages = [
+    typeof activity.progressAt === "number" ? `progress ${ageSince(activity.progressAt, now)}` : null,
+    typeof activity.aliveAt === "number" ? `alive ${ageSince(activity.aliveAt, now)}` : null,
+  ].filter(Boolean);
+  if (ages.length === 0) return null;
+  return (
+    <span className="ages" data-component="MemberAges">
+      {ages.join(" · ")}
+    </span>
+  );
+}
+
+/** Now, every minute is enough: busy and quiet count in minutes between two snapshots. */
 function useNow(): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
+    const t = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(t);
   }, []);
   return now;
 }
 
-function AgentCard({ p, hue, followed, onFollow, now, stallMs }: { p: SnapshotRunner; hue: number; followed: boolean; onFollow: () => void; now: number; stallMs: number }) {
+function AgentCard({ p, hue, followed, onFollow, now }: { p: SnapshotRunner; hue: number; followed: boolean; onFollow: () => void; now: number }) {
   const orch = p.slice === ORCHESTRATOR;
-  const status = statusOf(p);
+  const activity = p.state === "ended" || p.state === "done" ? null : activityOf(p);
+  const status = statusOf(p, activity, now);
   return (
     <button
-      className={["card", orch && "orch", p.state].filter(Boolean).join(" ")}
+      className={["card", orch && "orch", p.state, activity?.state === "gone" && "gone"].filter(Boolean).join(" ")}
       style={{ "--h": hue, "--s": 60 } as CSSProperties}
       aria-pressed={followed}
       onClick={onFollow}
@@ -68,6 +99,8 @@ function AgentCard({ p, hue, followed, onFollow, now, stallMs }: { p: SnapshotRu
       </span>
       <span className="slice">{orch ? "orchestrator" : p.title ? `${p.slice} · ${p.title}` : p.slice}</span>
       <span className="doing">{p.doing}</span>
+      {activity && <MemberAges activity={activity} now={now} />}
+      {activity && <ActivityLine activity={activity} />}
     </button>
   );
 }
@@ -77,22 +110,19 @@ export function AgentStrip({
   hue,
   follow,
   onFollow,
-  stallMs = 5000,
 }: {
   agents: SnapshotRunner[];
   /** The run's hue (D19): every member's stripe takes it. */
   hue: number;
   follow: string | null;
   onFollow: (runner: string | null) => void;
-  /** The run's stall threshold: a counter flat this long is marked. */
-  stallMs?: number;
 }) {
   const now = useNow();
   if (agents.length === 0) return null;
   return (
     <section className={follow ? "agent-strip following" : "agent-strip"} data-component="AgentStrip" aria-label="Agents">
       {agents.map((p) => (
-        <AgentCard key={p.runner} p={p} hue={hue} followed={follow === p.runner} onFollow={() => onFollow(follow === p.runner ? null : p.runner)} now={now} stallMs={stallMs} />
+        <AgentCard key={p.runner} p={p} hue={hue} followed={follow === p.runner} onFollow={() => onFollow(follow === p.runner ? null : p.runner)} now={now} />
       ))}
     </section>
   );

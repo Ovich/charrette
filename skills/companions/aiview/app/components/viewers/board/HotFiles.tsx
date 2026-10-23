@@ -1,4 +1,4 @@
-import type { FileAcrossRuns, RunStats } from "../../../../../swarm/src/board/snapshot.ts";
+import type { FileAcrossRuns, RunStats } from "../../../../../swarm/src/client/reader.ts";
 import { figure, plural } from "../../../lib/board/analytics.ts";
 
 /** A square's shade by the holders it had in that run. */

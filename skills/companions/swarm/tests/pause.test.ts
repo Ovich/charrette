@@ -7,26 +7,22 @@ import os from "node:os";
 import path from "node:path";
 import { openBoard, type Board } from "../src/board/board.ts";
 import { EVENTS } from "../src/board/events.ts";
-import type { TranscriptReader } from "../src/board/liveness.ts";
+import type { Presence } from "../src/board/board.ts";
 
 const REPO = "/repos/one/.git";
 let dir: string;
 let board: Board;
 const opened: Board[] = [];
-let counters: Map<string, number>;
-const read: TranscriptReader = (file) => {
-  const n = counters.get(path.basename(file));
-  return n == null ? null : { adapter: "test", cursor: { offset: 0, tokens: n } };
-};
+/** Every link connected: presence plays no part here. */
+const linked: Presence = () => ({ connected: true, lostAt: null });
 const another = async (): Promise<Board> => {
-  const b = await openBoard(path.join(dir, "swarm.sqlite"), { readTranscript: read });
+  const b = await openBoard(path.join(dir, "swarm.sqlite"));
   opened.push(b);
   return b;
 };
 
 beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-pause-"));
-  counters = new Map([["o.jsonl", 1], ["a.jsonl", 1]]);
   board = await another();
 });
 afterEach(() => {
@@ -40,9 +36,9 @@ const setup = () => {
     kind: "brainstorm",
     group: "idea",
     title: "I",
-    transcript: path.join(dir, "o.jsonl"),
+    stallMs: 5000,
     seats: [
-      { id: "a", title: "A", blockers: [], transcript: path.join(dir, "a.jsonl") },
+      { id: "a", title: "A", blockers: [] },
       { id: "b", title: "B", blockers: [] },
     ],
   });
@@ -87,14 +83,16 @@ test("a paused run raises no stalled, quiet or stale alert; after resume the sil
   const base = Date.now() - 120_000;
   const at = (s: number) => new Date(base + s * 1000);
   const alerts = () => board.snapshot(REPO).events.filter((e) => ["stalled", "quiet", "stale"].includes(e.event ?? ""));
-  board.livenessTick(run.id, at(0));
+  for (const m of ["a", "b"]) board.recordActivity(run.id, m, { grewAt: base, tokens: 1, context: null, openTool: null, lastTool: null, finished: false }, at(0));
+  board.livenessTick(run.id, at(0), linked);
   board.pause(orchestrator);
-  for (const s of [6, 11, 30, 60]) board.livenessTick(run.id, at(s));
+  for (const s of [6, 11, 30, 60]) board.livenessTick(run.id, at(s), linked);
   board.flagStale(new Date(Date.now() + 60 * 60_000));
   assert.equal(alerts().length, 0);
   board.resume(orchestrator);
-  board.livenessTick(run.id, new Date(Date.now() + 30_000));
+  board.livenessTick(run.id, new Date(Date.now() + 3_000), linked);
   assert.equal(alerts().length, 0, "silence counts from the resume");
-  board.livenessTick(run.id, new Date(Date.now() + 61_000));
-  assert.deepEqual(alerts().map((e) => e.event), ["stalled"]);
+  board.livenessTick(run.id, new Date(Date.now() + 6_000), linked);
+  // per member (D11): a and b are each quiet past the threshold
+  assert.deepEqual(alerts().map((e) => e.event), ["stalled", "stalled"]);
 });
