@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronRight, FileText, LayoutTemplate, Lightbulb, ListChecks, Wrench, type LucideIcon } from "lucide-react";
 import { cn } from "../../lib/utils.ts";
 import type { DocumentWithState } from "../../lib/api.ts";
+import { PinToggle } from "../docs/PinToggle.tsx";
 
 const ICONS: Record<string, LucideIcon> = {
   workbench: Wrench,
@@ -54,19 +55,31 @@ function KindItem({ kind, docs, currentId, onOpen, folded }: { kind: string; doc
       {shown && (
         <div className="mb-1 ml-[15px] border-l border-border pl-2">
           {docs.map((d) => (
-            <button
+            <div
               key={d.id}
-              data-component="PinnedDoc"
-              onClick={() => onOpen(d.id)}
-              aria-current={d.id === currentId}
-              title={d.abs_path}
               className={cn(
-                "block h-7 w-full cursor-pointer truncate rounded-md px-2 text-left text-[13px] hover:bg-surface-2",
-                d.id === currentId ? "bg-accent-soft font-medium text-accent hover:bg-accent-soft" : "text-foreground",
+                "group/pin flex h-7 items-center rounded-md hover:bg-surface-2",
+                d.id === currentId && "bg-accent-soft hover:bg-accent-soft",
               )}
             >
-              {d.title ?? "(untitled)"}
-            </button>
+              <button
+                data-component="PinnedDoc"
+                onClick={() => onOpen(d.id)}
+                aria-current={d.id === currentId}
+                title={d.abs_path}
+                className={cn(
+                  "h-full min-w-0 flex-1 cursor-pointer truncate px-2 text-left text-[13px]",
+                  d.id === currentId ? "font-medium text-accent" : "text-foreground",
+                )}
+              >
+                {d.title ?? "(untitled)"}
+              </button>
+              <PinToggle
+                id={d.id}
+                pinned
+                className="mr-1 h-6 w-6 shrink-0 justify-center opacity-0 focus-visible:opacity-100 group-hover/pin:opacity-100"
+              />
+            </div>
           ))}
         </div>
       )}
