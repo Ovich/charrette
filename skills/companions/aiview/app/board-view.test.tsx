@@ -275,21 +275,21 @@ test("a card without the two ages renders as before", () => {
 });
 
 test("a stalled member's card reads as stalled with its missing signal", () => {
-  show([APP], 1, [withActivity({ state: "stalled", doing: "Bash", since: minutesAgo(16), reason: "no progress for 16 min, link alive", tokens: null, movedAt: null, progressAt: minutesAgo(16), aliveAt: Date.now() - 5000 })]);
+  show([APP], 1, [withActivity({ state: "quiet", doing: "Bash", since: minutesAgo(16), reason: "no progress for 960s, link alive; last Bash",tokens: null, movedAt: null, progressAt: minutesAgo(16), aliveAt: Date.now() - 5000 })]);
   const card = activeCard();
   const status = card.querySelector(".state")!;
   expect(status.className).toBe("state stalled");
   expect(status.textContent).toMatch(/^stalled · 16 min$/);
-  expect(card.querySelector('[data-component="MemberActivity"]')!.textContent).toBe("last: Bash · no progress for 16 min, link alive");
+  expect(card.querySelector('[data-component="MemberActivity"]')!.textContent).toBe("last: Bash · no progress for 960s, link alive; last Bash");
   expect(agesOf(card)!.textContent).toBe("progress 16 min · alive 5 s");
 });
 
 test("a gone member's card reads as gone, its lost link named", () => {
-  show([APP], 1, [withActivity({ state: "gone", doing: "Read", since: null, reason: "link lost 30 s", tokens: null, movedAt: null, progressAt: minutesAgo(2), aliveAt: Date.now() - 40000 })]);
+  show([APP], 1, [withActivity({ state: "gone", doing: "Read", since: null, reason: "no progress for 120s, link lost; last Read", tokens: null, movedAt: null, progressAt: minutesAgo(2), aliveAt: Date.now() - 40000 })]);
   const card = activeCard();
   expect(card.classList.contains("gone")).toBe(true);
   expect(card.querySelector(".state")!.textContent).toMatch(/^gone$/);
-  expect(card.querySelector('[data-component="MemberActivity"]')!.textContent).toBe("last: Read · link lost 30 s");
+  expect(card.querySelector('[data-component="MemberActivity"]')!.textContent).toBe("last: Read · no progress for 120s, link lost; last Read");
   expect(agesOf(card)!.textContent).toBe("progress 2 min · alive 40 s");
 });
 
