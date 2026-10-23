@@ -47,8 +47,7 @@ function joinedInHarness(): { r: Repo; run: number; member: { name: string; run:
   const run = Number(r.cli(r.repo, "open", "--plan", "harness-plan", "--title", "T", "--slices", slices).split(/\r?\n/)[0]);
   const joined = spawnSync(process.execPath, [CLI, "join", "--run", String(run), "--slice", "S3", "--doing", "x"], { cwd: r.wtA, encoding: "utf8", env });
   assert.equal(joined.status, 0, joined.stderr);
-  // in a harness session the link line is join's last: a working member hears through the delivery hook, no listener line (D43)
-  const [, entry, verb] = joined.stdout.trimEnd().split(/\r?\n/).at(-1)!.match(LINK_LINE)!;
+  const [, entry, verb] = joined.stdout.trimEnd().split(/\r?\n/).at(-2)!.match(LINK_LINE)!;
   return { r, run, member: { name: "harness-plan/S3", run }, env, linkArgv: [entry, ...verb.split(" ")] };
 }
 

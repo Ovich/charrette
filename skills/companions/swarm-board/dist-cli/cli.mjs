@@ -597,8 +597,8 @@ function distinctFlags(messages) {
   const seen = /* @__PURE__ */ new Set();
   return messages.filter((m) => {
     if (!isBoardFlag(m)) return false;
-    const [, path10 = m.about ?? "", holder = ""] = String(m.body).match(FLAG_BODY) ?? [];
-    const key = JSON.stringify([Number(m.author), foldPath(String(path10)), holder]);
+    const [, path9 = m.about ?? "", holder = ""] = String(m.body).match(FLAG_BODY) ?? [];
+    const key = JSON.stringify([Number(m.author), foldPath(String(path9)), holder]);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -801,7 +801,7 @@ function computeRun(db, r, now, silentAfterMs) {
     if (!entry2.holders.includes(Number(c.participant))) entry2.holders.push(Number(c.participant));
     holdersByPath.set(key, entry2);
   }
-  const sharersOf = (path10) => new Set(shares.filter((sh) => foldPath(String(sh.path)) === foldPath(path10)).flatMap((sh) => [Number(sh.participant), Number(sh.other)]));
+  const sharersOf = (path9) => new Set(shares.filter((sh) => foldPath(String(sh.path)) === foldPath(path9)).flatMap((sh) => [Number(sh.participant), Number(sh.other)]));
   const byId = new Map(people.map((p) => [Number(p.id), p]));
   const membershipOf = (pid) => {
     const p = byId.get(pid);
@@ -813,10 +813,10 @@ function computeRun(db, r, now, silentAfterMs) {
     return x.from < y.to && y.from < x.to;
   };
   const claimersTogether = (claimers) => claimers.filter((h) => claimers.some((o) => o !== h && membersTogether(h, o)));
-  const namesPath = (m, path10) => {
-    if (aboutNames(m.about, path10)) return true;
+  const namesPath = (m, path9) => {
+    if (aboutNames(m.about, path9)) return true;
     const body = foldPath(String(m.body));
-    return body.includes(foldPath(path10)) || body.includes(foldPath(path10.split("/").pop()));
+    return body.includes(foldPath(path9)) || body.includes(foldPath(path9.split("/").pop()));
   };
   const said = messages.filter((m) => m.kind !== "event" && Number(m.by_board ?? 0) === 0);
   const interfaceClaims = claimLog.filter((c) => c.kind === "interface");
@@ -824,14 +824,14 @@ function computeRun(db, r, now, silentAfterMs) {
   let everyHolderTold = 0;
   let agreed = 0;
   let agreedBeforeMerge = 0;
-  for (const { path: path10, holders: everyHolder } of holdersByPath.values()) {
-    const sharers = sharersOf(path10);
+  for (const { path: path9, holders: everyHolder } of holdersByPath.values()) {
+    const sharers = sharersOf(path9);
     const holders = sharesRecorded ? everyHolder.filter((h) => sharers.has(h)) : claimersTogether(everyHolder);
     if (holders.length < 2) continue;
     const tellTimes = [];
     let told = true;
     for (let i = 1; i < holders.length; i++) {
-      const tells = said.filter((m) => Number(m.author) === holders[i] && namesPath(m, path10));
+      const tells = said.filter((m) => Number(m.author) === holders[i] && namesPath(m, path9));
       tellTimes.push(...tells.map((m) => ms(m.at)));
       const mentioned = (e) => tells.some((m) => {
         const named = JSON.parse(String(m.mentions));
@@ -840,8 +840,8 @@ function computeRun(db, r, now, silentAfterMs) {
       if (!holders.slice(0, i).every(mentioned)) told = false;
     }
     const sharedAt = tellTimes.length ? Math.min(...tellTimes) : null;
-    const agreement = messages.find((m) => m.kind === "agreement" && aboutNames(m.about, path10));
-    const mergedWith = mergesRead.filter((m) => m.files ? m.files.some((f) => foldPath(f) === foldPath(path10)) : holders.includes(m.participant));
+    const agreement = messages.find((m) => m.kind === "agreement" && aboutNames(m.about, path9));
+    const mergedWith = mergesRead.filter((m) => m.files ? m.files.some((f) => foldPath(f) === foldPath(path9)) : holders.includes(m.participant));
     const firstMergeOfPath = mergedWith.length ? Math.min(...mergedWith.map((m) => m.at)) : null;
     if (told) {
       everyHolderTold++;
@@ -851,13 +851,13 @@ function computeRun(db, r, now, silentAfterMs) {
       }
     }
     const met = mergedWith.map((m) => m.conflicts);
-    const conflict = !recorded ? null : met.some((c) => c?.some((f) => foldPath(f) === foldPath(path10))) ? true : met.some((c) => c === null) ? null : false;
+    const conflict = !recorded ? null : met.some((c) => c?.some((f) => foldPath(f) === foldPath(path9))) ? true : met.some((c) => c === null) ? null : false;
     const declaredInterface = holders.some(
-      (h) => JSON.parse(String(byId.get(h).files ?? "[]")).some((d) => d.interface === true && aboutNames(d.path, path10))
+      (h) => JSON.parse(String(byId.get(h).files ?? "[]")).some((d) => d.interface === true && aboutNames(d.path, path9))
     );
-    const claimedInterface = interfaceClaims.some((c) => holders.includes(Number(c.participant)) && foldPath(String(c.path)) === foldPath(path10));
+    const claimedInterface = interfaceClaims.some((c) => holders.includes(Number(c.participant)) && foldPath(String(c.path)) === foldPath(path9));
     perFile.push({
-      path: path10,
+      path: path9,
       holders: holders.map((h) => nameOf(byId.get(h))),
       interface: declaredInterface || claimedInterface,
       told,
@@ -1097,8 +1097,8 @@ function filesAcross(runs) {
       byPath.set(key, entry2);
     }
   }
-  return [...byPath.values()].map(({ path: path10, perRun }) => ({
-    path: path10,
+  return [...byPath.values()].map(({ path: path9, perRun }) => ({
+    path: path9,
     runs: perRun.map((x) => x.run),
     holders: new Set(perRun.flatMap((x) => x.holders)).size,
     agreements: perRun.filter((x) => x.agreed).length,
@@ -1165,10 +1165,10 @@ var init_stats = __esm({
     ms = (at) => Date.parse(String(at));
     iso = (t) => new Date(t).toISOString();
     firstLine = (body) => body.split(/\r?\n/)[0].slice(0, 120);
-    aboutNames = (about, path10) => {
+    aboutNames = (about, path9) => {
       if (about == null) return false;
       const a = foldPath(String(about).replace(/\\/g, "/"));
-      const f = foldPath(path10);
+      const f = foldPath(path9);
       return a === f || f.endsWith(`/${a}`);
     };
     MERGED_BODY = /^merged \S+/;
@@ -2492,7 +2492,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
           if (f && !f.holders.includes(name) && !everClaimed.get(repo, f.path, Number(r.id))) f.holders.push(name);
         }
       }
-      const sharedBy = (path10, id) => live2.some((c) => String(c.path) === path10 && Number(c.participant) !== id);
+      const sharedBy = (path9, id) => live2.some((c) => String(c.path) === path9 && Number(c.participant) !== id);
       const roster = people.map((r) => {
         const id = Number(r.id);
         const slice = String(r.slice);
@@ -6431,9 +6431,9 @@ __export(server_exports, {
   stopBoardServer: () => stopBoardServer
 });
 import crypto4 from "node:crypto";
-import fs8 from "node:fs";
+import fs7 from "node:fs";
 import http from "node:http";
-import path8 from "node:path";
+import path7 from "node:path";
 async function startBoardServer(opts) {
   logStart(opts.dataRoot);
   await takeStartLock(opts.dataRoot);
@@ -6445,26 +6445,26 @@ async function startBoardServer(opts) {
   }
 }
 function logStart(dataRoot) {
-  fs8.mkdirSync(dataRoot, { recursive: true });
-  fs8.appendFileSync(serverLogFile(dataRoot), `serve: home ${path8.resolve(dataRoot)}, pid ${process.pid}, started by ${process.ppid} ${starterCommandLine()}
+  fs7.mkdirSync(dataRoot, { recursive: true });
+  fs7.appendFileSync(serverLogFile(dataRoot), `serve: home ${path7.resolve(dataRoot)}, pid ${process.pid}, started by ${process.ppid} ${starterCommandLine()}
 `);
 }
 function starterCommandLine() {
   const passed = process.env[SERVER_STARTER_ENV];
   if (passed) return passed;
   try {
-    const read = fs8.readFileSync(`/proc/${process.ppid}/cmdline`, "utf8").split("\0").filter(Boolean).join(" ");
+    const read = fs7.readFileSync(`/proc/${process.ppid}/cmdline`, "utf8").split("\0").filter(Boolean).join(" ");
     if (read) return read;
   } catch {
   }
   return "unknown";
 }
 async function takeStartLock(dataRoot) {
-  fs8.mkdirSync(dataRoot, { recursive: true });
+  fs7.mkdirSync(dataRoot, { recursive: true });
   const lock = serverStartLock(dataRoot);
   for (let emptyReads = 0; ; ) {
     try {
-      fs8.writeFileSync(lock, String(process.pid), { flag: "wx" });
+      fs7.writeFileSync(lock, String(process.pid), { flag: "wx" });
       return;
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
@@ -6483,29 +6483,29 @@ async function takeStartLock(dataRoot) {
 async function removeStaleStartLock(dataRoot, seen) {
   const breaker = `${serverStartLock(dataRoot)}.break`;
   try {
-    fs8.writeFileSync(breaker, String(process.pid), { flag: "wx" });
+    fs7.writeFileSync(breaker, String(process.pid), { flag: "wx" });
   } catch (e) {
     if (e.code !== "EEXIST") throw e;
     try {
-      if (Date.now() - fs8.statSync(breaker).mtimeMs > BREAKER_STALE_MS) fs8.rmSync(breaker, { force: true });
+      if (Date.now() - fs7.statSync(breaker).mtimeMs > BREAKER_STALE_MS) fs7.rmSync(breaker, { force: true });
     } catch {
     }
     await new Promise((r) => setTimeout(r, LOCK_READ_RETRY_MS));
     return;
   }
   try {
-    if (serverLockHolder(dataRoot) === seen) fs8.rmSync(serverStartLock(dataRoot), { force: true });
+    if (serverLockHolder(dataRoot) === seen) fs7.rmSync(serverStartLock(dataRoot), { force: true });
   } finally {
-    fs8.rmSync(breaker, { force: true });
+    fs7.rmSync(breaker, { force: true });
   }
 }
 function releaseStartLock(dataRoot) {
-  if (serverLockHolder(dataRoot) === process.pid) fs8.rmSync(serverStartLock(dataRoot), { force: true });
+  if (serverLockHolder(dataRoot) === process.pid) fs7.rmSync(serverStartLock(dataRoot), { force: true });
 }
 async function runBoardServer(opts) {
   const host = opts.host ?? "127.0.0.1";
   const now = opts.now ?? (() => /* @__PURE__ */ new Date());
-  const board2 = await openBoard(path8.join(opts.dataRoot, "swarm.sqlite"));
+  const board2 = await openBoard(path7.join(opts.dataRoot, "swarm.sqlite"));
   const secret = crypto4.randomBytes(24).toString("hex");
   const version = bundleVersion();
   const speakers = /* @__PURE__ */ new Set();
@@ -6636,8 +6636,8 @@ async function runBoardServer(opts) {
   const port = await listen(httpServer, host, opts.port ?? 0);
   const state = { pid: process.pid, port, secret, version };
   const stateFile = serverStateFile(opts.dataRoot);
-  fs8.mkdirSync(opts.dataRoot, { recursive: true });
-  fs8.writeFileSync(stateFile, JSON.stringify(state));
+  fs7.mkdirSync(opts.dataRoot, { recursive: true });
+  fs7.writeFileSync(stateFile, JSON.stringify(state));
   const stopTellingReaders = board2.onChange((repo) => {
     for (const s of speakers) if (s.subscribed) send(s, { type: "changed", repo });
   });
@@ -6671,8 +6671,8 @@ async function runBoardServer(opts) {
     await new Promise((r) => httpServer.close(() => r()));
     board2.close();
     try {
-      const written = JSON.parse(fs8.readFileSync(stateFile, "utf8"));
-      if (written.pid === state.pid && written.port === state.port) fs8.rmSync(stateFile);
+      const written = JSON.parse(fs7.readFileSync(stateFile, "utf8"));
+      if (written.pid === state.pid && written.port === state.port) fs7.rmSync(stateFile);
     } catch {
     }
     releaseStartLock(opts.dataRoot);
@@ -6689,7 +6689,7 @@ async function stopBoardServer(dataRoot) {
   const file = serverStateFile(dataRoot);
   let state;
   try {
-    state = JSON.parse(fs8.readFileSync(file, "utf8"));
+    state = JSON.parse(fs7.readFileSync(file, "utf8"));
   } catch {
     return false;
   }
@@ -6697,12 +6697,12 @@ async function stopBoardServer(dataRoot) {
     const res = await fetch(`http://127.0.0.1:${state.port}${STOP_PATH}`, { method: "POST", headers: { [SECRET_HEADER]: state.secret } });
     if (!res.ok) throw new Error(`refused ${res.status}`);
   } catch {
-    fs8.rmSync(file, { force: true });
+    fs7.rmSync(file, { force: true });
     const holder = serverLockHolder(dataRoot);
-    if (holder !== null && liveStartLockHolder(dataRoot) === null) fs8.rmSync(serverStartLock(dataRoot), { force: true });
+    if (holder !== null && liveStartLockHolder(dataRoot) === null) fs7.rmSync(serverStartLock(dataRoot), { force: true });
     return false;
   }
-  for (let i = 0; i < 100 && fs8.existsSync(file); i++) await new Promise((r) => setTimeout(r, 50));
+  for (let i = 0; i < 100 && fs7.existsSync(file); i++) await new Promise((r) => setTimeout(r, 50));
   return true;
 }
 function listen(server, host, port) {
@@ -6748,23 +6748,23 @@ init_kinds();
 init_events();
 init_home();
 import { spawnSync as spawnSync3 } from "node:child_process";
-import fs9 from "node:fs";
-import path9 from "node:path";
+import fs8 from "node:fs";
+import path8 from "node:path";
 
 // src/client/remote.ts
 init_wire();
 import { spawn } from "node:child_process";
 import crypto3 from "node:crypto";
-import fs6 from "node:fs";
+import fs5 from "node:fs";
 import net2 from "node:net";
 
 // src/link/link.ts
 init_wire();
 import crypto2 from "node:crypto";
-import fs5 from "node:fs";
+import fs4 from "node:fs";
 import net from "node:net";
 import os3 from "node:os";
-import path6 from "node:path";
+import path5 from "node:path";
 
 // src/link/transcripts.ts
 init_liveness();
@@ -7012,37 +7012,16 @@ function observe(transcript, from) {
   };
 }
 
-// src/link/hooked.ts
-import fs4 from "node:fs";
-import path5 from "node:path";
-var hookedDir = (dataRoot) => path5.join(dataRoot, "swarm-hooked");
-var transcriptKey = (transcript) => path5.basename(transcript).replace(/\.jsonl$/i, "");
-var fileOf = (dataRoot, key) => path5.join(hookedDir(dataRoot), `${key.replace(/[^\w.-]/g, "_")}.json`);
-function registerHooked(dataRoot, transcript, h) {
-  try {
-    fs4.mkdirSync(hookedDir(dataRoot), { recursive: true });
-    fs4.writeFileSync(fileOf(dataRoot, transcriptKey(transcript)), JSON.stringify(h));
-  } catch {
-  }
-}
-function unregisterHooked(dataRoot, transcript, pid) {
-  const f = fileOf(dataRoot, transcriptKey(transcript));
-  try {
-    if (JSON.parse(fs4.readFileSync(f, "utf8")).pid === pid) fs4.rmSync(f, { force: true });
-  } catch {
-  }
-}
-
 // src/link/link.ts
 var DEFAULT_TIMING = { reconnectGiveUpMs: 6e4, reconnectEveryMs: 500, idleMs: 2 * 60 * 6e4, stateFileWaitMs: 5e3, watchEveryMs: 1e3, activityGapMs: 3e3 };
 function linkPipe(dataRoot, run2, member) {
-  const home = crypto2.createHash("sha256").update(path6.resolve(dataRoot)).digest("hex").slice(0, 12);
+  const home = crypto2.createHash("sha256").update(path5.resolve(dataRoot)).digest("hex").slice(0, 12);
   const name = `swarm-${home}-${run2}-${member.replace(/[^A-Za-z0-9_-]/g, "_")}`;
-  return process.platform === "win32" ? `\\\\.\\pipe\\${name}` : path6.join(os3.tmpdir(), `${name}.sock`);
+  return process.platform === "win32" ? `\\\\.\\pipe\\${name}` : path5.join(os3.tmpdir(), `${name}.sock`);
 }
 function readServerState(dataRoot) {
   try {
-    return JSON.parse(fs5.readFileSync(serverStateFile(dataRoot), "utf8"));
+    return JSON.parse(fs4.readFileSync(serverStateFile(dataRoot), "utf8"));
   } catch {
     return null;
   }
@@ -7059,15 +7038,11 @@ function sayStop(dataRoot, member, stop, toServerLog) {
   const state = toServerLog ? readServerState(dataRoot) : null;
   if (!state || !isAlive(state.pid)) return;
   try {
-    fs5.appendFileSync(serverLogFile(dataRoot), line + "\n");
+    fs4.appendFileSync(serverLogFile(dataRoot), line + "\n");
   } catch {
   }
 }
 var pause = (ms2) => new Promise((r) => setTimeout(r, ms2));
-function restartCommand() {
-  const word2 = (w) => /^[\w@%+=:,./-]+$/.test(w) ? w : `"${w.replace(/(["\\$`])/g, "\\$1")}"`;
-  return ["node", ...process.argv.slice(1).map((a) => a.replace(/\\/g, "/"))].map(word2).join(" ");
-}
 var pipeAnswers = (pipe) => new Promise((resolve) => {
   const probe = net.connect(pipe, () => (probe.destroy(), resolve(true)));
   probe.once("error", () => resolve(false));
@@ -7082,7 +7057,7 @@ async function listenOnPipe(pipe, onPipe) {
   const first = await tryListen();
   if (first !== "taken") return first;
   if (process.platform === "win32" || await pipeAnswers(pipe)) return null;
-  fs5.rmSync(pipe, { force: true });
+  fs4.rmSync(pipe, { force: true });
   const second = await tryListen();
   return second === "taken" ? null : second;
 }
@@ -7126,10 +7101,7 @@ async function runLink(opts) {
   const env = opts.env ?? process.env;
   const watchTranscript = () => {
     if (exiting) return;
-    if (!transcript) {
-      transcript = locate(opts.binding, env);
-      if (transcript) registerHooked(opts.dataRoot, transcript, { run: opts.run, member: opts.member, pid: process.pid, link: restartCommand() });
-    }
+    transcript ??= locate(opts.binding, env);
     if (!transcript) return;
     const read = observe(transcript, cursor);
     const grew = read.cursor.offset !== cursor?.offset;
@@ -7150,7 +7122,6 @@ async function runLink(opts) {
     if (exiting) return;
     exiting = true;
     if (bye) sendUp({ type: "bye", reason: bye });
-    if (transcript && (stop.why === "ended" || stop.why === "closed" || stop.why === "finished")) unregisterHooked(opts.dataRoot, transcript, process.pid);
     sayStop(opts.dataRoot, opts.member, stop, stop.why !== "no server");
     clearInterval(idleCheck);
     clearInterval(watch);
@@ -7280,7 +7251,7 @@ function isAlive2(pid) {
 }
 function readServerState2(dataRoot) {
   try {
-    const s = JSON.parse(fs6.readFileSync(serverStateFile(dataRoot), "utf8"));
+    const s = JSON.parse(fs5.readFileSync(serverStateFile(dataRoot), "utf8"));
     return Number.isInteger(s.pid) && Number.isInteger(s.port) ? s : null;
   } catch {
     return null;
@@ -7302,16 +7273,16 @@ async function ensureServer(dataRoot, swarmEntry = entry()[0]) {
   if (!startedElsewhere()) {
     let log = "ignore";
     try {
-      fs6.mkdirSync(dataRoot, { recursive: true });
-      fs6.writeFileSync(serverLogFile(dataRoot), "");
-      log = fs6.openSync(serverLogFile(dataRoot), "a");
+      fs5.mkdirSync(dataRoot, { recursive: true });
+      fs5.writeFileSync(serverLogFile(dataRoot), "");
+      log = fs5.openSync(serverLogFile(dataRoot), "a");
     } catch {
     }
     const child = spawn(process.execPath, [swarmEntry, "serve"], { detached: true, stdio: ["ignore", log, log], windowsHide: true, env: { ...homeEnv(dataRoot), [SERVER_STARTER_ENV]: process.argv.join(" ") } });
     child.on("exit", (code, signal) => exited = signal ? `it was killed by ${signal}` : `it exited with code ${code}`);
     child.on("error", (e) => exited = e.message);
     child.unref();
-    if (typeof log === "number") fs6.closeSync(log);
+    if (typeof log === "number") fs5.closeSync(log);
   }
   for (const until = Date.now() + START_TIMEOUT_MS; Date.now() < until; ) {
     const s = readServerState2(dataRoot);
@@ -7321,7 +7292,7 @@ async function ensureServer(dataRoot, swarmEntry = entry()[0]) {
   }
   let said = "";
   try {
-    const lines = fs6.readFileSync(serverLogFile(dataRoot), "utf8").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = fs5.readFileSync(serverLogFile(dataRoot), "utf8").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     said = lines.find((l) => /^(\w*Error|swarm\b)[^:]*:/.test(l)) ?? lines.filter((l) => !/^Node\.js v/.test(l)).pop() ?? "";
   } catch {
   }
@@ -7571,11 +7542,11 @@ init_mentions();
 
 // src/cli/aiview-document.ts
 import { spawnSync } from "node:child_process";
-import fs7 from "node:fs";
-import path7 from "node:path";
+import fs6 from "node:fs";
+import path6 from "node:path";
 function aiviewLauncher(toolRoot2) {
-  const file = process.env.SWARM_AIVIEW ?? path7.join(toolRoot2, "..", "aiview", "aiview.mjs");
-  return fs7.existsSync(file) ? file : null;
+  const file = process.env.SWARM_AIVIEW ?? path6.join(toolRoot2, "..", "aiview", "aiview.mjs");
+  return fs6.existsSync(file) ? file : null;
 }
 var callAiview = (launcher, cwd, argv) => {
   const r = spawnSync(process.execPath, [launcher, ...argv, "--json"], { cwd, encoding: "utf8" });
@@ -7624,8 +7595,8 @@ function registerBoardDocument(input) {
   const existing = readDocumentText(file);
   const text = boardDocumentText(boardReposFor(existing, input.repo));
   if (text !== existing) {
-    fs7.mkdirSync(path7.dirname(file), { recursive: true });
-    fs7.writeFileSync(file, text);
+    fs6.mkdirSync(path6.dirname(file), { recursive: true });
+    fs6.writeFileSync(file, text);
   }
   const opened = aiview(existing === null ? ["open", file, "--kind", "swarm"] : ["open", file]);
   if (!opened.ok) return { registered: false, reason: opened.error };
@@ -7635,7 +7606,7 @@ function registerBoardDocument(input) {
 }
 function readDocumentText(file) {
   try {
-    return fs7.readFileSync(file, "utf8");
+    return fs6.readFileSync(file, "utf8");
   } catch {
     return null;
   }
@@ -7643,7 +7614,7 @@ function readDocumentText(file) {
 function retireOtherSwarmDocuments(aiview, project, board2) {
   const listed = aiview(["list", "--kind", "swarm", "--project", project]);
   if (!listed.ok) return listed;
-  const others = listed.out.filter((d) => path7.resolve(d.abs_path ?? d.file_path) !== path7.resolve(board2));
+  const others = listed.out.filter((d) => path6.resolve(d.abs_path ?? d.file_path) !== path6.resolve(board2));
   if (!others.length) return { ok: true, files: [] };
   const removed = aiview(["remove", ...others.map((d) => `#${d.id}`)]);
   if (!removed.ok) return removed;
@@ -7816,16 +7787,16 @@ ${USAGE}`);
 function repoOf(dir) {
   const common = git(dir, "rev-parse", "--git-common-dir");
   if (!common) fail(`not in a git repository: ${dir}`);
-  const abs = path9.resolve(dir, common);
+  const abs = path8.resolve(dir, common);
   try {
-    return fs9.realpathSync.native(abs);
+    return fs8.realpathSync.native(abs);
   } catch {
     return abs;
   }
 }
 function worktreeOf(dir) {
   const top = git(dir, "rev-parse", "--show-toplevel");
-  return top ? path9.resolve(top) : null;
+  return top ? path8.resolve(top) : null;
 }
 function changedIn(worktree) {
   const r = spawnSync3("git", ["status", "--porcelain", "-z", "--untracked-files=all"], { cwd: worktree, encoding: "utf8" });
@@ -7851,7 +7822,7 @@ var printReconciled = (unclaimed, flags) => {
   for (const line of unclaimedLines(unclaimed)) console.log(line);
   for (const f of flags) console.log(`#${f.seq} flagged: you wrote ${f.path} outside your claim; ${f.holder} holds it. Settle it with @${f.holder} on the thread.`);
 };
-var toolRoot = () => process.env.SWARM_ROOT ?? path9.dirname(path9.resolve(process.argv[1]));
+var toolRoot = () => process.env.SWARM_ROOT ?? path8.dirname(path8.resolve(process.argv[1]));
 var need = (flag) => args.flag(flag) ?? fail(`${flag} is required
 ${USAGE}`);
 var runArg = () => {
@@ -7869,7 +7840,6 @@ async function caller() {
   const direct = board;
   const member = { name: p.name, run: p.run };
   if (p.ended || !(await direct.runs()).some((r) => r.id === p.run)) return p;
-  if (args.has("--from-hook")) return p;
   board = await connectBoard({ dataRoot: DATA_ROOT, member });
   if (board.linkMissing) linkToStart = member;
   direct.close();
@@ -7912,8 +7882,8 @@ var printDelivery = (d) => {
 var shellWord = (w) => /^[\w@%+=:,./-]+$/.test(w) ? w : `"${w.replace(/(["\\$`])/g, "\\$1")}"`;
 var self = () => ["node", shellWord(process.argv[1].replace(/\\/g, "/"))];
 var startLinkLine = (member) => `start your link now, in the background (your harness's background task): ${[...self(), ...linkVerbArgs(member).map(shellWord)].join(" ")}`;
-var listensInForeground = (p) => p.slice !== "orchestrator" && profileOf(p.kind).member === "seat";
 var waitCommand = (name) => [...self(), "wait", "--mentions", "--as", shellWord(name)].join(" ");
+var listensInForeground = (p) => p.slice !== "orchestrator" && profileOf(p.kind).member === "seat";
 var listenNow = (p, afterPhase = false) => listensInForeground(p) ? `${afterPhase ? "only then wait" : "wait now"}, in the foreground (never a background listener: a seat that ends its turn is gone): ${waitCommand(p.name)}` : `start your listener now, in the background (your harness's background task): ${waitCommand(p.name)}`;
 var owedLine = async (p, thread = true) => {
   const paused = await pausedLine(p);
@@ -7940,8 +7910,8 @@ var nextStep = async (p) => {
   const paused = await pausedLine(p);
   if (paused) return paused;
   const owed = await owedLine(p);
-  const listen2 = inHarnessSession() && !listensInForeground(p) ? null : listenNow(p, !!owed);
-  return [owed, listen2].filter(Boolean).join("\n") || null;
+  return owed ? `${owed}
+${listenNow(p, true)}` : listenNow(p);
 };
 var closedLine = (p) => `run ${p.run} closed: run end and return your summary: ${[...self(), "end", "--as", shellWord(p.name)].join(" ")}`;
 var answeredClosed = async (p) => {
@@ -7973,19 +7943,19 @@ var emitHeard = async (p, json, human) => {
   });
 };
 function resolveClaimPath(file) {
-  if (path9.isAbsolute(file)) return file;
-  const here = path9.resolve(file);
-  if (fs9.existsSync(here)) return here;
+  if (path8.isAbsolute(file)) return file;
+  const here = path8.resolve(file);
+  if (fs8.existsSync(here)) return here;
   const root = worktreeOf(process.cwd());
-  const fromRoot = root ? path9.resolve(root, file) : null;
-  if (fromRoot && fs9.existsSync(fromRoot)) return fromRoot;
+  const fromRoot = root ? path8.resolve(root, file) : null;
+  if (fromRoot && fs8.existsSync(fromRoot)) return fromRoot;
   if (args.has("--new")) return here;
   return fail(`no such file: ${here}${fromRoot && fromRoot !== here ? ` nor ${fromRoot}` : ""}; pass --new if you are creating it`);
 }
 function repoRelative(abs) {
   const root = worktreeOf(process.cwd());
-  const rel = root ? path9.relative(root, abs) : abs;
-  return rel.split(path9.sep).join("/");
+  const rel = root ? path8.relative(root, abs) : abs;
+  return rel.split(path8.sep).join("/");
 }
 function aboutArg() {
   const about = args.flag("--about");
@@ -7998,16 +7968,16 @@ function parseFile(spec) {
   return { ...d, path: repoRelative(declaredPath(d.path)) };
 }
 function declaredPath(file) {
-  if (path9.isAbsolute(file)) return file;
-  const here = path9.resolve(file);
-  if (fs9.existsSync(here)) return here;
+  if (path8.isAbsolute(file)) return file;
+  const here = path8.resolve(file);
+  if (fs8.existsSync(here)) return here;
   const root = worktreeOf(process.cwd());
-  return root ? path9.resolve(root, file) : here;
+  return root ? path8.resolve(root, file) : here;
 }
 function readSlices(file) {
   let raw;
   try {
-    raw = JSON.parse(fs9.readFileSync(path9.resolve(file), "utf8"));
+    raw = JSON.parse(fs8.readFileSync(path8.resolve(file), "utf8"));
   } catch (e) {
     return fail(`cannot read slices from ${file}: ${e.message}`);
   }
@@ -8235,7 +8205,7 @@ ${USAGE}`);
       const p = await caller();
       if (await answeredClosed(p)) break;
       const file = args.flag("--file");
-      const body = (file ? fs9.readFileSync(file, "utf8").trim() : args.positional.join(" ")) || fail(`${args.verb}: nothing to say`);
+      const body = (file ? fs8.readFileSync(file, "utf8").trim() : args.positional.join(" ")) || fail(`${args.verb}: nothing to say`);
       const m = await board.post(p, body, {
         about: aboutArg(),
         kind: args.verb === "agree" ? "agreement" : "msg"
@@ -8347,7 +8317,7 @@ ${rearm}` : rearm;
     }
     case "roster": {
       if (args.flag("--as") && await answeredClosed(await caller())) break;
-      const repo = repoOf(path9.resolve(args.flag("--repo") ?? process.cwd()));
+      const repo = repoOf(path8.resolve(args.flag("--repo") ?? process.cwd()));
       const roster = await board.roster(repo);
       const runs = new Map((await board.runs()).filter((r) => r.repo === repo).map((r) => [r.id, r]));
       const progress = new Map(await Promise.all([...runs.keys()].map(async (id) => [id, await board.phaseProgress(id)])));
@@ -8414,7 +8384,7 @@ ${rearm}` : rearm;
       const files = args.list("--files");
       const lock = await board.heldMergeLock(p);
       const conflicts = p.worktree && lock && lock.reflogMark !== null ? conflictsOf(p.worktree, lock.onto ?? "", lock.reflogMark) : void 0;
-      const sharers = await board.merged(p, sha, files.map((f) => path9.resolve(f)), conflicts);
+      const sharers = await board.merged(p, sha, files.map((f) => path8.resolve(f)), conflicts);
       const ended = new Set(await board.endedMembers(p.repo));
       const tell = sharers.map(
         (o) => ended.has(o.runner) ? `if you resolved a conflict in ${o.path}: ${o.runner} has ended, so say how in your report` : `if you resolved a conflict in ${o.path}, tell them: swarm post "@${o.runner} I resolved ${o.path}: <how>" --about ${o.path}`
@@ -8459,7 +8429,7 @@ ${rearm}` : rearm;
         }
       });
       const stats = await board.stats({
-        repo: repoOf(path9.resolve(args.flag("--repo") ?? process.cwd())),
+        repo: repoOf(path8.resolve(args.flag("--repo") ?? process.cwd())),
         ...run2 !== void 0 ? { run: run2 } : {},
         // a named run is read whatever its age: no default period (plan D40)
         ...all ? {} : since !== void 0 ? { since } : run2 !== void 0 ? {} : { since: "30d" },

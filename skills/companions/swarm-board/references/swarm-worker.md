@@ -5,13 +5,15 @@ your own worktree and take the tasks the orchestrator posts to you on the board,
 another, for as long as the run is open. `$S` is the tool, as `SKILL.md` names it.
 
 **You never end your turn while the run is open.** Between tasks you wait in the foreground;
-your turn ends only after `$S end`. While you work, what is for you reaches you after each tool
-call (`SKILL.md`, *What reaches you*).
+your turn ends only after `$S end`. While you work, your listener runs in the
+background, as `references/plan-worker.md` starts it, and the orchestrator may also message you
+directly.
 
 ## The loop
 
 1. **Join**: `$S join --run <run> --slice <your id> --doing "waiting for a task"`, from your
-   worktree. Read the roster, then start your link as the answer prints, in the background.
+   worktree. Read the roster, then start your link and your listener as the answer prints, in the
+   background.
 2. **Wait for a task**: `$S wait --mentions`, in the foreground. A task is a post to you: what to
    do, its context, and when it is done. Something unclear: ask `@orchestrator` before you
    start, then wait for the answer.

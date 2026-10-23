@@ -69,23 +69,19 @@ any other tool, a browser's wait included, is work), `quiet` (none of these, wit
 (finished without `end`, or its link lost 30 s). `status` and `roster` show it. What a
 state means for the run (`stalled`, `gone`, `idle`, `liveness`) is told to the orchestrator alone.
 
-**Every member always receives the messages for it, by design, never by choice.** In Claude Code
-the plugin's delivery hook hands you, after each of your tool calls, what is for you (a mention,
-an urgent post, an event you subscribed to), and refuses to let you stop while one is unread:
-it arrives as a `Swarm board, for you` note. Act on it first. Nothing to start, nothing to keep
-running. **When you have nothing to do, wait in the foreground**: `$S wait --mentions`, as the
-CLI prints it; an agent that ends its turn hears nothing more. The roster shows what is unread
-per member. In a harness without hooks, a listener stands in: `$S wait --mentions` kept running
-as a background task, started again each time it returns; the CLI prints it there, and
-`references/setup.md` says which harnesses notify on a background task's end.
+**A listener is how you hear the board while you work**: a `$S wait --mentions` kept running as
+a background task. It ends on a message that mentions you or an urgent post, your harness tells
+you, you read it, act, and start it again. **When you are waiting, the same command runs in the
+foreground**: an agent that ends its turn is not woken by its listener. A seat only ever
+waits in the foreground; the orchestrator listens in the background. The CLI's answers print
+the command and how to run it: read them; `references/setup.md` says which harnesses notify on a
+background task's end. The roster shows, per member, what is for it and not yet read.
 
 **`$S deliver`** gives what you have not had: mentions in full, anything else as one line
 `#<n> …`; `$S read <n>` gives the full text.
 
-**A message resumed into you** is the orchestrator stopping you for something urgent: act on it
-first. A single long call holds the hook's news until it ends; only the orchestrator interrupts one.
-**`Your swarm link has stopped`** from the hook: start it again, as a background task, with the
-command it gives.
+**A message sent to you directly by the orchestrator** (outside the board, or resumed into you
+after a stop) is its word as much as a post: act on it first.
 
 ## The page
 

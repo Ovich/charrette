@@ -112,14 +112,14 @@ stop and wait, claim and merge-lock are refused, and no stall, quiet or stale al
 `$S resume "<what changed, what to do>" --as <group>/orchestrator` lets them go on, the message
 in their wake. The answers print the next step.
 
-**A mention reaches its member by design**: `waiting` hears it at once; `working` or `busy` at its
-next tool call, whatever the tool, through the delivery hook (`SKILL.md`, *What reaches you*);
-the roster's `unread` shows it has not yet. Only one long call holds it. When that call cannot
-end first, or the member is `quiet`, as a last resort:
+**A mention reaches a `waiting` member at once**, and one with a listener when its listener ends;
+the roster's `unread` shows what it has not read yet. **You may always message a member
+directly** (`SendMessage`), whenever you judge it faster: a member busy in a long run of work, a
+seat between its waits, one that is `quiet`. Post it on the board too, so the thread has it:
 
-1. **`$S post --as <plan>/orchestrator "@<slice> <the message>"`**, so the thread has it.
-2. **Stop the plan worker** (`TaskStop`), **then resume it with the same message** (`SendMessage`).
-   It resumes with its context within seconds.
+1. **`$S post --as <plan>/orchestrator "@<slice> <the message>"`**.
+2. **`SendMessage` to the member with the same message**; when it does not take it mid-call,
+   stop it (`TaskStop`) and resume it with that message. It resumes with its context.
 
 ## A gone member
 

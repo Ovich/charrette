@@ -8,7 +8,6 @@ import os from "node:os";
 import path from "node:path";
 import { bundleVersion, decode, encode, isAlive, serverLogFile, serverStateFile, type Activity, type Bye, type Call, type Refused, type Frame, type ServerState } from "../wire.ts";
 import { locate, observe, type Binding, type TranscriptCursor } from "./transcripts.ts";
-import { registerHooked, unregisterHooked } from "./hooked.ts";
 
 type RunId = number;
 
@@ -77,11 +76,6 @@ function sayStop(dataRoot: string, member: string, stop: LinkStop, toServerLog: 
 
 const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** The command that starts this link again, as its agent runs it: the hook gives it to an agent whose link stopped (D43). */
-function restartCommand(): string {
-  const word = (w: string): string => (/^[\w@%+=:,./-]+$/.test(w) ? w : `"${w.replace(/(["\\$`])/g, "\\$1")}"`);
-  return ["node", ...process.argv.slice(1).map((a) => a.replace(/\\/g, "/"))].map(word).join(" ");
-}
 
 /** Does another link answer on this pipe? */
 const pipeAnswers = (pipe: string): Promise<boolean> =>
@@ -174,11 +168,7 @@ export async function runLink(opts: {
   /** one look: locate until found (D8), then read what was appended; a change queues an activity */
   const watchTranscript = () => {
     if (exiting) return;
-    if (!transcript) {
-      transcript = locate(opts.binding, env);
-      // D43: the agent found is the one the delivery hook hands this member's messages to
-      if (transcript) registerHooked(opts.dataRoot, transcript, { run: opts.run, member: opts.member, pid: process.pid, link: restartCommand() });
-    }
+    transcript ??= locate(opts.binding, env);
     if (!transcript) return; // not found (yet), or a harness that keeps none: no activity
     const read = observe(transcript, cursor);
     const grew = read.cursor.offset !== cursor?.offset;
@@ -202,8 +192,6 @@ export async function runLink(opts: {
     if (exiting) return;
     exiting = true;
     if (bye) sendUp({ type: "bye", reason: bye });
-    // a member done, or its run closed, gets nothing more; any other stop leaves the entry, so the hook asks for a new link
-    if (transcript && (stop.why === "ended" || stop.why === "closed" || stop.why === "finished")) unregisterHooked(opts.dataRoot, transcript, process.pid);
     sayStop(opts.dataRoot, opts.member, stop, stop.why !== "no server");
     clearInterval(idleCheck);
     clearInterval(watch);

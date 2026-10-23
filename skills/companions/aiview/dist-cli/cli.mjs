@@ -9102,13 +9102,6 @@ var init_transcripts = __esm({
   }
 });
 
-// ../swarm-board/src/link/hooked.ts
-var init_hooked = __esm({
-  "../swarm-board/src/link/hooked.ts"() {
-    "use strict";
-  }
-});
-
 // ../swarm-board/src/link/link.ts
 import crypto2 from "node:crypto";
 import os2 from "node:os";
@@ -9124,7 +9117,6 @@ var init_link = __esm({
     "use strict";
     init_wire();
     init_transcripts();
-    init_hooked();
     DEFAULT_TIMING = { reconnectGiveUpMs: 6e4, reconnectEveryMs: 500, idleMs: 2 * 60 * 6e4, stateFileWaitMs: 5e3, watchEveryMs: 1e3, activityGapMs: 3e3 };
   }
 });

@@ -15,8 +15,3 @@ await build({
   sourcemap: false,
   logLevel: "info",
 });
-
-// The delivery hook (swarm-relay D43): its own small bundle, run at every tool call of every session; it loads the CLI only for a member.
-if (at < 0) {
-  await build({ entryPoints: ["src/hook/hook.ts"], outfile: "dist-cli/hook.mjs", bundle: true, platform: "node", format: "esm", target: "node22", sourcemap: false, logLevel: "info" });
-}

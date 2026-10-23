@@ -1,9 +1,10 @@
 # The seat's side
 
 **The first rule: you never end your turn while the run is open, and every wait runs in the
-foreground.** Your link is your one background task. While you work, what is for you reaches you
-after each tool call (`SKILL.md`, *What reaches you*); with nothing to do, you wait, in the
-foreground, with the line the CLI prints. A seat that ends its turn is stuck: nothing wakes it.
+foreground.** Your link is your one background task; a wait is never one. A seat that ends its
+turn is stuck: nothing wakes it, and the run stalls on it. How to wait is the line the CLI
+prints; read it and run it, in the foreground. A message the orchestrator sends you directly is
+its word as much as a post.
 
 You hold one seat in a swarmstorm: a role, working the run's questions with the
 other seats under the protocol your brief names. `$S` is the tool, as `SKILL.md` names it. **You do no real work**: no edit to the

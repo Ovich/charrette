@@ -7,7 +7,7 @@ import { openBoard, progressText, type Declared, type Delivery, type Flag, type 
 import { profileOf } from "../board/kinds.ts";
 import { EVENTS, eventOf, formatSubscriptions, parseSubscriptions, type Subscription } from "../board/events.ts";
 import { DATA_ROOT, SQLITE_PATH } from "../board/home.ts";
-import { bindingOf, connectBoard, inHarnessSession, linkVerbArgs, type BoardMember, type ConnectedBoard } from "../client/remote.ts";
+import { bindingOf, connectBoard, linkVerbArgs, type BoardMember, type ConnectedBoard } from "../client/remote.ts";
 import { parseArgs } from "./args.ts";
 import { fullText, seqLine } from "./format.ts";
 import { nameHandle, unmatchedMentions } from "../board/mentions.ts";
@@ -192,8 +192,6 @@ async function caller(): Promise<Participant> {
   // S62: a member ended, or of a closed run, has no link: its verb stays on the server, waits for no link and never
   // prints the link line; it answers the closed line, or end its summary prompt
   if (p.ended || !(await direct.runs()).some((r) => r.id === p.run)) return p;
-  // D43: the delivery hook reads straight from the server; it never waits for, nor starts, the member's link
-  if (args.has("--from-hook")) return p;
   board = await connectBoard({ dataRoot: DATA_ROOT, member });
   if (board.linkMissing) linkToStart = member;
   direct.close();
@@ -265,8 +263,8 @@ const self = (): string[] => ["node", shellWord(process.argv[1].replace(/\\/g, "
  *  and inside one ends on this line (D39). */
 const startLinkLine = (member: BoardMember): string =>
   `start your link now, in the background (your harness's background task): ${[...self(), ...linkVerbArgs(member).map(shellWord)].join(" ")}`;
-const listensInForeground = (p: Pick<Participant, "slice" | "kind">): boolean => p.slice !== "orchestrator" && profileOf(p.kind).member === "seat";
 const waitCommand = (name: string): string => [...self(), "wait", "--mentions", "--as", shellWord(name)].join(" ");
+const listensInForeground = (p: Pick<Participant, "slice" | "kind">): boolean => p.slice !== "orchestrator" && profileOf(p.kind).member === "seat";
 /** The line that starts a member's listener: the exact command, --as included (D61); `afterPhase`: it
  *  follows the owed-phase line, so a seat waits only once its part is in. */
 const listenNow = (p: Pick<Participant, "name" | "slice" | "kind">, afterPhase = false): string =>
@@ -301,15 +299,13 @@ const refusedPaused = async (p: Participant, verb: string): Promise<boolean> => 
   emit({ run: p.run, paused: true, refused: verb, next: line }, `${verb} refused: ${line}`);
   return true;
 };
-/** A member's next step where it would be told to listen: the pause first, then the owed phase. In a Claude Code
- *  session the delivery hook hands a working member its messages (swarm-relay D43): no background listener to start,
- *  so nothing for a runner or the orchestrator; a seat is still told how to wait once its part is in. */
-const nextStep = async (p: Participant): Promise<string | null> => {
+/** A member's next step where it would be told to listen: the pause first, then the owed phase. */
+const nextStep = async (p: Participant): Promise<string> => {
   const paused = await pausedLine(p);
   if (paused) return paused;
   const owed = await owedLine(p);
-  const listen = inHarnessSession() && !listensInForeground(p) ? null : listenNow(p, !!owed);
-  return [owed, listen].filter(Boolean).join("\n") || null;
+  return owed ? `${owed}
+${listenNow(p, true)}` : listenNow(p);
 };
 
 /** A member whose run is closed (the close ended it): every member verb answers with this one line, exit 0. */
@@ -713,12 +709,12 @@ ${USAGE}`);
     case "deliver": {
       const me = await caller();
       if (await answeredClosed(me)) break;
-      // --mentions (D43): only what is for the member, never blocking; the delivery hook's call
+      // --mentions: only what is for the member (a mention, an urgent post, a subscribed event), never blocking
       const mentionsOnly = args.has("--mentions");
       const d = withNext(me, await (mentionsOnly ? board.deliverMentions(me) : board.deliver(me)));
       // the run's phase heads every delivery that carries something
       const phase = d.full.length || d.lines.length ? await phaseHeader(me.run) : null;
-      // a member owing the open phase is told to do it, last; never by the hook, which would say it at every call
+      // a member owing the open phase is told to do it, last
       const owes = mentionsOnly ? null : await owedLine(me);
       emit({ phase, ...d, ...(owes ? { next: owes } : {}) }, () => {
         if (phase) console.log(phase);

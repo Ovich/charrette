@@ -14,12 +14,13 @@ pays nothing. A run starts two kinds of process, both `node <skill-dir>/swarm.mj
 | Symptom | Cause | Fix |
 |---|---|---|
 | A verb fails before it runs, on `node:sqlite` or the version | Node older than 22.5 | `node --version`; install 22.5 or later |
-| A member's call to the tool waits on a permission prompt, or auto mode blocks it | the session prompts for shell calls; a subagent cannot answer a prompt | the allow rule below |
+| A member's call to the tool waits on a permission prompt, or auto mode blocks it | the session prompts for shell calls; a subagent cannot answer a prompt | the allow rule below, added by the person |
 
 ## The allow rule
 
-One rule in the project's or the user's `settings.json`, for sessions that prompt or run in
-auto mode:
+One rule the person adds to their own `settings.json`, project or user, for sessions that prompt
+or run in auto mode. **Show it to the person and let them add it; never write it yourself**
+(a settings change outlives the session and reaches every project):
 
 ```json
 { "permissions": { "allow": ["Bash(node <skill-dir>/swarm.mjs:*)"] } }

@@ -29,8 +29,8 @@ makes you the product's quality owner; this file only fixes how you stand in the
   sha out in your detached worktree, run the skill, post the report with what you would cut
   next, mark the phase done and wait. The orchestrator answers with the same table judged: look
   again only at the rows it left standing, when it asks.
-- **A message for you arrives while you walk** (a `Swarm board, for you` note after a tool
-  call): read it at once and do what it says before your next step. `stop` means stop the walk,
+- **A message for you arrives while you walk** (your listener's output, or a message the
+  orchestrator sends you directly): read it at once and do what it says before your next step. `stop` means stop the walk,
   post what you have, and wait.
 - **The run closes**: run `end` as the closed line says, then return your last verdict and the
   findings still standing.

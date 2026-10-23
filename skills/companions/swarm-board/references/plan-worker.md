@@ -4,10 +4,9 @@ You carry out one slice in your own worktree while other plan workers carry out 
 you. `$S` is the tool, as `SKILL.md` names it. Your brief names the run, the repository, and
 the branch your slice merges into, `<target>` below.
 
-**You never end your turn while your slice is open.** A plan worker that ends its turn hears nothing
-more: it is gone. Waiting is a foreground `wait`; your turn ends only after `$S end`. While you
-work, what is for you reaches you after each tool call (`SKILL.md`, *What reaches you*).
-**Your only background tasks are your link, and your listener in a harness without hooks.** A check, a test run or a build
+**You never end your turn while your slice is open.** A plan worker that ends its turn is not
+woken by its listener: it is gone. Waiting is a foreground `wait`; your turn ends only after `$S end`.
+**Your only background tasks are your link and your listener.** A check, a test run or a build
 runs in the foreground: an agent that ends its turn on a background task of its own is not woken
 by it.
 
@@ -20,17 +19,19 @@ by it.
    file, *inside* when only this slice reads it; a file the slice creates is declared too, its
    path from the repository root. Read the roster it prints: who is there, doing
    what, holding which files, and your funny name.
-2. **Start your link as a background task.** After the roster, `join` prints `start your link
-   now, in the background …`: run that command, as printed, as a background task (the harness's
-   own background feature; `references/setup.md` says which harnesses have one). It carries your
-   calls to the board while you work. In a harness without hooks only, `join` then ends on
-   `start your listener now, in the background …`: run it the same way.
+2. **Start your link, then your listener, as your first two background tasks.** After the
+   roster, `join` prints `start your link now, in the background …`: run that command, as
+   printed, as a background task (the harness's own background feature; `references/setup.md`
+   says which harnesses have one). It carries your calls to the board while you work. `join`
+   ends on `start your listener now, in the background …`: run it the same way; it listens while
+   you work. `claim`, `post` and `doing` end on the listener line while no listener of yours is
+   pending: start it then.
 3. **Before each edit, `$S claim <path>`**, and before a command that writes a file (a
    generator, a formatter, a move). `--interface` for a file other slices import. Paths are
    repository-relative (from the current folder when the file exists there); `--new` for a file
    you are creating. Read its answer and do what it says (*Claiming a file*).
-4. **A message for you arrives** (a `Swarm board, for you` note after a tool call, or a
-   listener's output): act on it, answer on the thread if it asks (`$S post "@<them> …" --about
+4. **A message for you arrives** (your listener's output, or a message the orchestrator sends
+   you directly): act on it, answer on the thread if it asks (`$S post "@<them> …" --about
    <path>`; a message ending on `swarm agree …` is answered with that agreement, *Sharing a
    file*), then go on. A listener's first line is the command that re-arms it: run it again in
    the background; `superseded by a newer wait`: a foreground wait of yours took over, ignore it.
