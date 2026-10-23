@@ -1,7 +1,13 @@
 # Setup
 
-**The board needs nothing installed beyond the plugin and Node**: `$S` runs only when an agent
-calls it, so a session with no run open pays nothing.
+**The board needs nothing installed beyond the plugin and Node**: a session with no run open
+pays nothing. A run starts two kinds of process, both `node <skill-dir>/swarm.mjs`:
+
+- **the board's server**, `serve`, one per data home, started detached by the first verb that
+  finds none (or finds another version running); its errors land in `swarm-server.log` in the
+  data home;
+- **one link per member**, run from `join`'s (or `open`'s) line as the agent's background task; a
+  verb that finds no link spawns one detached.
 
 ## When a check fails
 
@@ -19,7 +25,7 @@ auto mode:
 { "permissions": { "allow": ["Bash(node <skill-dir>/swarm.mjs:*)"] } }
 ```
 
-`<skill-dir>` holds the plugin's version, so the rule is rewritten after each plugin update.
+It covers every verb, the link and the listener included. `<skill-dir>` holds the plugin's version, so the rule is rewritten after each plugin update.
 
 ## Harnesses that notify on a background task's end
 
