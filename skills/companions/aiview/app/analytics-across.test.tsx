@@ -41,7 +41,7 @@ test("the page counts nothing (D28, D34, D35)", () => {
   expect(valueOf("Slices merged")).toBe("29of 33");
   expect(tile("Slices merged").textContent).toContain("11 plan runs");
   expect(valueOf("Lock wait")).toBe("4m 10sp50");
-  expect(screen.getByText("14 runs · 37 members · charrette-app")).toBeTruthy();
+  expect(screen.getByText("14 runs · 37 members · swarmstorm-app")).toBeTruthy();
   // the funnel's four steps, from totals.shared: 9, 8, 6, 4 (the runs' perFile hold 2 files)
   const funnel = across().querySelector('[data-component="SharingFunnel"]') as HTMLElement;
   expect([...funnel.querySelectorAll(".step .num")].map((n) => n.textContent)).toEqual(["9", "8", "6", "4"]);

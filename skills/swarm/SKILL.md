@@ -1,6 +1,6 @@
 ---
 name: swarm
-description: "Use when a person asks to swarm, delegate or parallelize work without a plan ('swarm this', 'run a swarm on…', 'get a few agents on it'), or when a task in front of you splits into independent parts or is long enough to hand off: then propose a swarm in one line, workers and why, and open it only on a yes. Runs a task swarm on the board: this session orchestrates, N swarm-worker agents take the tasks posted to them, report, and take the next, for as long as the person keeps giving work. Produces the run on the board and the workers' results and merges. Not for work an approved plan covers (execute-plan), a discussion of seats (swarmstorm), or a task small enough to do yourself."
+description: "Use when a person asks to swarm, delegate or parallelize work without a plan ('swarm this', 'run a swarm on…', 'get a few agents on it'), or when a task in front of you splits into independent parts or is long enough to hand off: then propose a swarm in one line, workers and why, and open it only on a yes. Runs a task swarm on the board: this session orchestrates, N swarm-worker agents take the tasks posted to them, report, and take the next, for as long as the person keeps giving work. Produces the run on the board and the workers' results and merges. Not for work an approved plan covers (execute-plan), a discussion of seats (brainswarm), or a task small enough to do yourself."
 ---
 
 # Swarm
@@ -31,7 +31,7 @@ pass on the merged work at the person's word, as the `orchestrate` skill dispatc
    --group <topic> --title "<what the swarm is for>" --seats <file>`, and start your link as it
    prints. Give the person the board's URL.
 3. **Every worker at once** on the plugin's `swarm-worker` agent (`subagent_type:
-   "charrette:swarm-worker"`), each with `isolation: "worktree"`, as the `orchestrate` skill
+   "swarmstorm:swarm-worker"`), each with `isolation: "worktree"`, as the `orchestrate` skill
    dispatches. The brief holds no task:
 
    ```markdown

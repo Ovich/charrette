@@ -1,14 +1,14 @@
 {
-  "name": "charrette",
+  "name": "swarmstorm",
   "owner": {
     "name": "Stefan Teofanovic"
   },
   "metadata": {
-    "description": "The Charrette skill collection"
+    "description": "The Swarmstorm skill collection"
   },
   "plugins": [
     {
-      "name": "charrette",
+      "name": "swarmstorm",
       "version": "2.3.44",
       "source": "./",
       "description": "Agent skills for the drawing-board loop: brainstorm, interview, diagram, plan, review, with aiview, the companion app that renders every document live."

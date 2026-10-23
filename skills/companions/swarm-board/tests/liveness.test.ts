@@ -133,7 +133,7 @@ test("states: a foreground wait (its open call opened before the held wait began
 test("states: waiting is the open call the link read as the board's own wait, its text truncated or prefixed; any other open call is work, a held background wait or not (D35, D45)", async () => {
   const { run, a } = setup();
   const opened = Date.now() - 1000;
-  const truncated = { name: "Bash", target: "export CHARRETTE_HOME=/tmp/h; cd /w; node /p/swar", since: opened, boardWait: true };
+  const truncated = { name: "Bash", target: "export SWARMSTORM_HOME=/tmp/h; cd /w; node /p/swar", since: opened, boardWait: true };
   // the run 75 false idle: a browser's wait_for while the member's background listener is held
   const browserWait = { name: "mcp__watched-browser__browser_wait_for", target: '{"time":30}', since: opened };
   const held = board.wait(a, { mentionsOnly: true, timeoutMs: 300 });
@@ -226,7 +226,7 @@ test("idle once when every member but the orchestrator turns waiting (D31, D34),
   const wb = board.wait(b, { mentionsOnly: true, timeoutMs: 400 });
   const base = Date.now() + 60_000;
   // a prefixed line, as a seat runs it: the link read it as the board's wait (D35, D45)
-  const waitCall = (m: string, since = opened) => ({ name: "Bash", target: `export CHARRETTE_HOME=/h; node swarm.mjs wait --mentions --as idea/${m}`, since, boardWait: true });
+  const waitCall = (m: string, since = opened) => ({ name: "Bash", target: `export SWARMSTORM_HOME=/h; node swarm.mjs wait --mentions --as idea/${m}`, since, boardWait: true });
   const idles = () => events("idle").map((e) => [e.body.split(":")[0], e.mentions]);
   board.recordActivity(run.id, "a", act({ grewAt: base, openTool: waitCall("a") }), at(base, 0));
   // b holds its wait in the background while it works: not waiting, no idle

@@ -46,7 +46,7 @@ function freshHome(): { home: string; launcher: string; client: string } {
     [
       `process.argv[1] = ${JSON.stringify(launcher)};`,
       `const { connectBoard } = await import(${JSON.stringify(pathToFileURL(path.join(SRC, "client", "remote.ts")).href)});`,
-      `const board = await connectBoard({ dataRoot: process.env.CHARRETTE_HOME });`,
+      `const board = await connectBoard({ dataRoot: process.env.SWARMSTORM_HOME });`,
       `console.log(JSON.stringify({ runs: await board.runs() }));`,
       `board.close();`,
     ].join("\n"),
@@ -56,7 +56,7 @@ function freshHome(): { home: string; launcher: string; client: string } {
 
 /** Outside a harness session, so the client calls the server straight (D39 is the other seat's). */
 const clientEnv = (home: string): NodeJS.ProcessEnv => {
-  const env: NodeJS.ProcessEnv = { ...process.env, CHARRETTE_HOME: home, SWARM_ROOT: home, SWARM_NO_POLLER: "1" };
+  const env: NodeJS.ProcessEnv = { ...process.env, SWARMSTORM_HOME: home, SWARM_ROOT: home, SWARM_NO_POLLER: "1" };
   delete env.CLAUDE_CODE_SESSION_ID;
   return env;
 };

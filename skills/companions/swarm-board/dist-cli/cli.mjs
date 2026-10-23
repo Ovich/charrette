@@ -48,13 +48,17 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // src/board/home.ts
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-var DATA_ROOT, SQLITE_PATH;
+var homeFromEnv, NEW_HOME, OLD_HOME, DATA_ROOT, SQLITE_PATH;
 var init_home = __esm({
   "src/board/home.ts"() {
     "use strict";
-    DATA_ROOT = process.env.CHARRETTE_HOME ? path.resolve(process.env.CHARRETTE_HOME) : path.join(os.homedir(), "charrette_appdata");
+    homeFromEnv = process.env.SWARMSTORM_HOME ?? process.env.CHARRETTE_HOME;
+    NEW_HOME = path.join(os.homedir(), "swarmstorm_appdata");
+    OLD_HOME = path.join(os.homedir(), "charrette_appdata");
+    DATA_ROOT = homeFromEnv ? path.resolve(homeFromEnv) : !fs.existsSync(NEW_HOME) && fs.existsSync(OLD_HOME) ? OLD_HOME : NEW_HOME;
     SQLITE_PATH = path.join(DATA_ROOT, "swarm.sqlite");
   }
 });
@@ -1307,7 +1311,7 @@ var init_liveness = __esm({
 });
 
 // src/board/board.ts
-import fs from "node:fs";
+import fs2 from "node:fs";
 import path2 from "node:path";
 function messageLine(m) {
   const first = m.body.split(/\r?\n/)[0];
@@ -1322,7 +1326,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
     if (w.name !== "ExperimentalWarning") console.warn(w);
   });
   const { DatabaseSync } = await import("node:sqlite");
-  fs.mkdirSync(path2.dirname(dbPath), { recursive: true });
+  fs2.mkdirSync(path2.dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath, { timeout: 5e3 });
   const recordsAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'call_log'").get() === void 0;
   const sharesAreNew = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'shares'").get() === void 0;
@@ -2696,7 +2700,7 @@ var init_board = __esm({
 
 // src/wire.ts
 import crypto from "node:crypto";
-import fs2 from "node:fs";
+import fs3 from "node:fs";
 import path3 from "node:path";
 function encode(f) {
   return JSON.stringify(f);
@@ -2711,7 +2715,7 @@ function bundleVersion(entry2 = process.argv[1] ?? "") {
   const file = path3.resolve(entry2);
   let v = versionsByEntry.get(file);
   if (v === void 0) {
-    v = crypto.createHash("sha256").update(fs2.readFileSync(file)).digest("hex").slice(0, 16);
+    v = crypto.createHash("sha256").update(fs3.readFileSync(file)).digest("hex").slice(0, 16);
     versionsByEntry.set(file, v);
   }
   return v;
@@ -2727,7 +2731,7 @@ function serverStartLock(dataRoot) {
 }
 function serverLockHolder(dataRoot) {
   try {
-    const pid = Number(fs2.readFileSync(serverStartLock(dataRoot), "utf8").trim());
+    const pid = Number(fs3.readFileSync(serverStartLock(dataRoot), "utf8").trim());
     return Number.isInteger(pid) && pid > 0 ? pid : null;
   } catch {
     return null;
@@ -2737,11 +2741,11 @@ function liveStartLockHolder(dataRoot) {
   const holder = serverLockHolder(dataRoot);
   if (holder === null || !isAlive(holder)) return null;
   try {
-    if (JSON.parse(fs2.readFileSync(serverStateFile(dataRoot), "utf8")).pid === holder) return holder;
+    if (JSON.parse(fs3.readFileSync(serverStateFile(dataRoot), "utf8")).pid === holder) return holder;
   } catch {
   }
   try {
-    return Date.now() - fs2.statSync(serverStartLock(dataRoot)).mtimeMs < START_LOCK_GRACE_MS ? holder : null;
+    return Date.now() - fs3.statSync(serverStartLock(dataRoot)).mtimeMs < START_LOCK_GRACE_MS ? holder : null;
   } catch {
     return null;
   }
@@ -6436,7 +6440,7 @@ __export(server_exports, {
   stopBoardServer: () => stopBoardServer
 });
 import crypto4 from "node:crypto";
-import fs7 from "node:fs";
+import fs8 from "node:fs";
 import http from "node:http";
 import path7 from "node:path";
 async function startBoardServer(opts) {
@@ -6450,26 +6454,26 @@ async function startBoardServer(opts) {
   }
 }
 function logStart(dataRoot) {
-  fs7.mkdirSync(dataRoot, { recursive: true });
-  fs7.appendFileSync(serverLogFile(dataRoot), `serve: home ${path7.resolve(dataRoot)}, pid ${process.pid}, started by ${process.ppid} ${starterCommandLine()}
+  fs8.mkdirSync(dataRoot, { recursive: true });
+  fs8.appendFileSync(serverLogFile(dataRoot), `serve: home ${path7.resolve(dataRoot)}, pid ${process.pid}, started by ${process.ppid} ${starterCommandLine()}
 `);
 }
 function starterCommandLine() {
   const passed = process.env[SERVER_STARTER_ENV];
   if (passed) return passed;
   try {
-    const read = fs7.readFileSync(`/proc/${process.ppid}/cmdline`, "utf8").split("\0").filter(Boolean).join(" ");
+    const read = fs8.readFileSync(`/proc/${process.ppid}/cmdline`, "utf8").split("\0").filter(Boolean).join(" ");
     if (read) return read;
   } catch {
   }
   return "unknown";
 }
 async function takeStartLock(dataRoot) {
-  fs7.mkdirSync(dataRoot, { recursive: true });
+  fs8.mkdirSync(dataRoot, { recursive: true });
   const lock = serverStartLock(dataRoot);
   for (let emptyReads = 0; ; ) {
     try {
-      fs7.writeFileSync(lock, String(process.pid), { flag: "wx" });
+      fs8.writeFileSync(lock, String(process.pid), { flag: "wx" });
       return;
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
@@ -6488,24 +6492,24 @@ async function takeStartLock(dataRoot) {
 async function removeStaleStartLock(dataRoot, seen) {
   const breaker = `${serverStartLock(dataRoot)}.break`;
   try {
-    fs7.writeFileSync(breaker, String(process.pid), { flag: "wx" });
+    fs8.writeFileSync(breaker, String(process.pid), { flag: "wx" });
   } catch (e) {
     if (e.code !== "EEXIST") throw e;
     try {
-      if (Date.now() - fs7.statSync(breaker).mtimeMs > BREAKER_STALE_MS) fs7.rmSync(breaker, { force: true });
+      if (Date.now() - fs8.statSync(breaker).mtimeMs > BREAKER_STALE_MS) fs8.rmSync(breaker, { force: true });
     } catch {
     }
     await new Promise((r) => setTimeout(r, LOCK_READ_RETRY_MS));
     return;
   }
   try {
-    if (serverLockHolder(dataRoot) === seen) fs7.rmSync(serverStartLock(dataRoot), { force: true });
+    if (serverLockHolder(dataRoot) === seen) fs8.rmSync(serverStartLock(dataRoot), { force: true });
   } finally {
-    fs7.rmSync(breaker, { force: true });
+    fs8.rmSync(breaker, { force: true });
   }
 }
 function releaseStartLock(dataRoot) {
-  if (serverLockHolder(dataRoot) === process.pid) fs7.rmSync(serverStartLock(dataRoot), { force: true });
+  if (serverLockHolder(dataRoot) === process.pid) fs8.rmSync(serverStartLock(dataRoot), { force: true });
 }
 async function runBoardServer(opts) {
   const host = opts.host ?? "127.0.0.1";
@@ -6641,8 +6645,8 @@ async function runBoardServer(opts) {
   const port = await listen(httpServer, host, opts.port ?? 0);
   const state = { pid: process.pid, port, secret, version };
   const stateFile = serverStateFile(opts.dataRoot);
-  fs7.mkdirSync(opts.dataRoot, { recursive: true });
-  fs7.writeFileSync(stateFile, JSON.stringify(state));
+  fs8.mkdirSync(opts.dataRoot, { recursive: true });
+  fs8.writeFileSync(stateFile, JSON.stringify(state));
   const stopTellingReaders = board2.onChange((repo) => {
     for (const s of speakers) if (s.subscribed) send(s, { type: "changed", repo });
   });
@@ -6676,8 +6680,8 @@ async function runBoardServer(opts) {
     await new Promise((r) => httpServer.close(() => r()));
     board2.close();
     try {
-      const written = JSON.parse(fs7.readFileSync(stateFile, "utf8"));
-      if (written.pid === state.pid && written.port === state.port) fs7.rmSync(stateFile);
+      const written = JSON.parse(fs8.readFileSync(stateFile, "utf8"));
+      if (written.pid === state.pid && written.port === state.port) fs8.rmSync(stateFile);
     } catch {
     }
     releaseStartLock(opts.dataRoot);
@@ -6694,7 +6698,7 @@ async function stopBoardServer(dataRoot) {
   const file = serverStateFile(dataRoot);
   let state;
   try {
-    state = JSON.parse(fs7.readFileSync(file, "utf8"));
+    state = JSON.parse(fs8.readFileSync(file, "utf8"));
   } catch {
     return false;
   }
@@ -6702,12 +6706,12 @@ async function stopBoardServer(dataRoot) {
     const res = await fetch(`http://127.0.0.1:${state.port}${STOP_PATH}`, { method: "POST", headers: { [SECRET_HEADER]: state.secret } });
     if (!res.ok) throw new Error(`refused ${res.status}`);
   } catch {
-    fs7.rmSync(file, { force: true });
+    fs8.rmSync(file, { force: true });
     const holder = serverLockHolder(dataRoot);
-    if (holder !== null && liveStartLockHolder(dataRoot) === null) fs7.rmSync(serverStartLock(dataRoot), { force: true });
+    if (holder !== null && liveStartLockHolder(dataRoot) === null) fs8.rmSync(serverStartLock(dataRoot), { force: true });
     return false;
   }
-  for (let i = 0; i < 100 && fs7.existsSync(file); i++) await new Promise((r) => setTimeout(r, 50));
+  for (let i = 0; i < 100 && fs8.existsSync(file); i++) await new Promise((r) => setTimeout(r, 50));
   return true;
 }
 function listen(server, host, port) {
@@ -6753,27 +6757,27 @@ init_kinds();
 init_events();
 init_home();
 import { spawnSync as spawnSync3 } from "node:child_process";
-import fs8 from "node:fs";
+import fs9 from "node:fs";
 import path8 from "node:path";
 
 // src/client/remote.ts
 init_wire();
 import { spawn } from "node:child_process";
 import crypto3 from "node:crypto";
-import fs5 from "node:fs";
+import fs6 from "node:fs";
 import net2 from "node:net";
 
 // src/link/link.ts
 init_wire();
 import crypto2 from "node:crypto";
-import fs4 from "node:fs";
+import fs5 from "node:fs";
 import net from "node:net";
 import os3 from "node:os";
 import path5 from "node:path";
 
 // src/link/transcripts.ts
 init_liveness();
-import fs3 from "node:fs";
+import fs4 from "node:fs";
 import os2 from "node:os";
 import path4 from "node:path";
 var TARGET_CHARS = 50;
@@ -6847,7 +6851,7 @@ function commandRunsBinding(command, binding) {
 function transcriptRunsBinding(file, binding) {
   let text;
   try {
-    text = fs3.readFileSync(file, "utf8");
+    text = fs4.readFileSync(file, "utf8");
   } catch {
     return false;
   }
@@ -6871,7 +6875,7 @@ function transcriptRunsBinding(file, binding) {
 var metaFileOf = (transcript) => transcript.replace(/\.jsonl$/, ".meta.json");
 var mtimeOf = (file) => {
   try {
-    return fs3.statSync(file).mtimeMs;
+    return fs4.statSync(file).mtimeMs;
   } catch {
     return 0;
   }
@@ -6884,18 +6888,18 @@ var claudeCode = {
     const root = env.SWARM_TRANSCRIPTS_ROOT || path4.join(env.USERPROFILE || env.HOME || os2.homedir(), ".claude", "projects");
     let projects;
     try {
-      projects = fs3.readdirSync(root);
+      projects = fs4.readdirSync(root);
     } catch {
       return null;
     }
     const candidates = [];
     for (const project of projects) {
       const main2 = path4.join(root, project, `${session}.jsonl`);
-      if (fs3.existsSync(main2)) candidates.push(main2);
+      if (fs4.existsSync(main2)) candidates.push(main2);
       const subagents = path4.join(root, project, session, "subagents");
       let names = [];
       try {
-        names = fs3.readdirSync(subagents);
+        names = fs4.readdirSync(subagents);
       } catch {
       }
       for (const n of names) if (/^agent-.*\.jsonl$/.test(n)) candidates.push(path4.join(subagents, n));
@@ -6910,7 +6914,7 @@ var claudeCode = {
   finished(transcript) {
     let text;
     try {
-      text = fs3.readFileSync(metaFileOf(transcript), "utf8");
+      text = fs4.readFileSync(metaFileOf(transcript), "utf8");
     } catch {
       return null;
     }
@@ -6953,15 +6957,15 @@ function observe(transcript, from) {
   let chunk = Buffer.alloc(0);
   let mtime = Date.now();
   try {
-    const fd = fs3.openSync(transcript, "r");
+    const fd = fs4.openSync(transcript, "r");
     try {
-      const stat = fs3.fstatSync(fd);
+      const stat = fs4.fstatSync(fd);
       mtime = stat.mtimeMs;
       if (stat.size < cursor.offset) cursor = freshCursor();
       chunk = Buffer.alloc(stat.size - cursor.offset);
-      fs3.readSync(fd, chunk, 0, chunk.length, cursor.offset);
+      fs4.readSync(fd, chunk, 0, chunk.length, cursor.offset);
     } finally {
-      fs3.closeSync(fd);
+      fs4.closeSync(fd);
     }
   } catch {
     cursor = freshCursor();
@@ -7026,7 +7030,7 @@ function linkPipe(dataRoot, run2, member) {
 }
 function readServerState(dataRoot) {
   try {
-    return JSON.parse(fs4.readFileSync(serverStateFile(dataRoot), "utf8"));
+    return JSON.parse(fs5.readFileSync(serverStateFile(dataRoot), "utf8"));
   } catch {
     return null;
   }
@@ -7043,7 +7047,7 @@ function sayStop(dataRoot, member, stop, toServerLog) {
   const state = toServerLog ? readServerState(dataRoot) : null;
   if (!state || !isAlive(state.pid)) return;
   try {
-    fs4.appendFileSync(serverLogFile(dataRoot), line + "\n");
+    fs5.appendFileSync(serverLogFile(dataRoot), line + "\n");
   } catch {
   }
 }
@@ -7062,7 +7066,7 @@ async function listenOnPipe(pipe, onPipe) {
   const first = await tryListen();
   if (first !== "taken") return first;
   if (process.platform === "win32" || await pipeAnswers(pipe)) return null;
-  fs4.rmSync(pipe, { force: true });
+  fs5.rmSync(pipe, { force: true });
   const second = await tryListen();
   return second === "taken" ? null : second;
 }
@@ -7244,7 +7248,7 @@ async function runLink(opts) {
 var START_TIMEOUT_MS = 5e3;
 var START_POLL_MS = 50;
 var entry = () => [process.argv[1]];
-var homeEnv = (dataRoot) => ({ ...process.env, CHARRETTE_HOME: dataRoot });
+var homeEnv = (dataRoot) => ({ ...process.env, SWARMSTORM_HOME: dataRoot });
 var pause2 = (ms2) => new Promise((r) => setTimeout(r, ms2));
 function isAlive2(pid) {
   try {
@@ -7256,7 +7260,7 @@ function isAlive2(pid) {
 }
 function readServerState2(dataRoot) {
   try {
-    const s = JSON.parse(fs5.readFileSync(serverStateFile(dataRoot), "utf8"));
+    const s = JSON.parse(fs6.readFileSync(serverStateFile(dataRoot), "utf8"));
     return Number.isInteger(s.pid) && Number.isInteger(s.port) ? s : null;
   } catch {
     return null;
@@ -7278,16 +7282,16 @@ async function ensureServer(dataRoot, swarmEntry = entry()[0]) {
   if (!startedElsewhere()) {
     let log = "ignore";
     try {
-      fs5.mkdirSync(dataRoot, { recursive: true });
-      fs5.writeFileSync(serverLogFile(dataRoot), "");
-      log = fs5.openSync(serverLogFile(dataRoot), "a");
+      fs6.mkdirSync(dataRoot, { recursive: true });
+      fs6.writeFileSync(serverLogFile(dataRoot), "");
+      log = fs6.openSync(serverLogFile(dataRoot), "a");
     } catch {
     }
     const child = spawn(process.execPath, [swarmEntry, "serve"], { detached: true, stdio: ["ignore", log, log], windowsHide: true, env: { ...homeEnv(dataRoot), [SERVER_STARTER_ENV]: process.argv.join(" ") } });
     child.on("exit", (code, signal) => exited = signal ? `it was killed by ${signal}` : `it exited with code ${code}`);
     child.on("error", (e) => exited = e.message);
     child.unref();
-    if (typeof log === "number") fs5.closeSync(log);
+    if (typeof log === "number") fs6.closeSync(log);
   }
   for (const until = Date.now() + START_TIMEOUT_MS; Date.now() < until; ) {
     const s = readServerState2(dataRoot);
@@ -7297,7 +7301,7 @@ async function ensureServer(dataRoot, swarmEntry = entry()[0]) {
   }
   let said = "";
   try {
-    const lines = fs5.readFileSync(serverLogFile(dataRoot), "utf8").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = fs6.readFileSync(serverLogFile(dataRoot), "utf8").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     said = lines.find((l) => /^(\w*Error|swarm\b)[^:]*:/.test(l)) ?? lines.filter((l) => !/^Node\.js v/.test(l)).pop() ?? "";
   } catch {
   }
@@ -7547,11 +7551,11 @@ init_mentions();
 
 // src/cli/aiview-document.ts
 import { spawnSync } from "node:child_process";
-import fs6 from "node:fs";
+import fs7 from "node:fs";
 import path6 from "node:path";
 function aiviewLauncher(toolRoot2) {
   const file = process.env.SWARM_AIVIEW ?? path6.join(toolRoot2, "..", "aiview", "aiview.mjs");
-  return fs6.existsSync(file) ? file : null;
+  return fs7.existsSync(file) ? file : null;
 }
 var callAiview = (launcher, cwd, argv) => {
   const r = spawnSync(process.execPath, [launcher, ...argv, "--json"], { cwd, encoding: "utf8" });
@@ -7600,8 +7604,8 @@ function registerBoardDocument(input) {
   const existing = readDocumentText(file);
   const text = boardDocumentText(boardReposFor(existing, input.repo));
   if (text !== existing) {
-    fs6.mkdirSync(path6.dirname(file), { recursive: true });
-    fs6.writeFileSync(file, text);
+    fs7.mkdirSync(path6.dirname(file), { recursive: true });
+    fs7.writeFileSync(file, text);
   }
   const opened = aiview(existing === null ? ["open", file, "--kind", "swarm"] : ["open", file]);
   if (!opened.ok) return { registered: false, reason: opened.error };
@@ -7611,7 +7615,7 @@ function registerBoardDocument(input) {
 }
 function readDocumentText(file) {
   try {
-    return fs6.readFileSync(file, "utf8");
+    return fs7.readFileSync(file, "utf8");
   } catch {
     return null;
   }
@@ -7794,7 +7798,7 @@ function repoOf(dir) {
   if (!common) fail(`not in a git repository: ${dir}`);
   const abs = path8.resolve(dir, common);
   try {
-    return fs8.realpathSync.native(abs);
+    return fs9.realpathSync.native(abs);
   } catch {
     return abs;
   }
@@ -7950,10 +7954,10 @@ var emitHeard = async (p, json, human) => {
 function resolveClaimPath(file) {
   if (path8.isAbsolute(file)) return file;
   const here = path8.resolve(file);
-  if (fs8.existsSync(here)) return here;
+  if (fs9.existsSync(here)) return here;
   const root = worktreeOf(process.cwd());
   const fromRoot = root ? path8.resolve(root, file) : null;
-  if (fromRoot && fs8.existsSync(fromRoot)) return fromRoot;
+  if (fromRoot && fs9.existsSync(fromRoot)) return fromRoot;
   if (args.has("--new")) return here;
   return fail(`no such file: ${here}${fromRoot && fromRoot !== here ? ` nor ${fromRoot}` : ""}; pass --new if you are creating it`);
 }
@@ -7975,14 +7979,14 @@ function parseFile(spec) {
 function declaredPath(file) {
   if (path8.isAbsolute(file)) return file;
   const here = path8.resolve(file);
-  if (fs8.existsSync(here)) return here;
+  if (fs9.existsSync(here)) return here;
   const root = worktreeOf(process.cwd());
   return root ? path8.resolve(root, file) : here;
 }
 function readSlices(file) {
   let raw;
   try {
-    raw = JSON.parse(fs8.readFileSync(path8.resolve(file), "utf8"));
+    raw = JSON.parse(fs9.readFileSync(path8.resolve(file), "utf8"));
   } catch (e) {
     return fail(`cannot read slices from ${file}: ${e.message}`);
   }
@@ -8210,7 +8214,7 @@ ${USAGE}`);
       const p = await caller();
       if (await answeredClosed(p)) break;
       const file = args.flag("--file");
-      const body = (file ? fs8.readFileSync(file, "utf8").trim() : args.positional.join(" ")) || fail(`${args.verb}: nothing to say`);
+      const body = (file ? fs9.readFileSync(file, "utf8").trim() : args.positional.join(" ")) || fail(`${args.verb}: nothing to say`);
       const m = await board.post(p, body, {
         about: aboutArg(),
         kind: args.verb === "agree" ? "agreement" : "msg"

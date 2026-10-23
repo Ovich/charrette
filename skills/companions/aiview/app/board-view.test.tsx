@@ -429,7 +429,7 @@ test("RepoList shows with two repositories, not with one; picking the second ask
   cleanup();
   show([APP, OTHER], null, [LIVE, SITE]);
   const repos = within(screen.getByRole("navigation", { name: "Repositories" }));
-  fireEvent.click(repos.getByText("charrette-site"));
+  fireEvent.click(repos.getByText("swarmstorm-site"));
   expect(source.calls.at(-1)).toEqual({ repo: OTHER, run: null });
   expect(pressed()?.textContent).toBe("All");
   expect(tabs().getByText("The landing page")).toBeTruthy();
@@ -462,7 +462,7 @@ test("no open run: the board opens on the most recently closed, as its archived 
 test("no run at all: All, and the board says it has none yet", () => {
   show([OTHER], null, [{ ...SITE, runs: [], events: [], roster: [] }]);
   expect(pressed()?.textContent).toBe("All");
-  expect(screen.getByText("No run on charrette-site yet.")).toBeTruthy();
+  expect(screen.getByText("No run on swarmstorm-site yet.")).toBeTruthy();
 });
 
 test("a run from the URL wins over the opening rule", () => {

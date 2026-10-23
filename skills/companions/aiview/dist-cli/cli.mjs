@@ -27,11 +27,14 @@ function adoptLegacyIndex(toolRoot, sqlitePath) {
   fs.copyFileSync(legacy, sqlitePath);
   console.error(`aiview: adopted the index from ${legacy} (the original is left in place, unused)`);
 }
-var DATA_ROOT, DOCS_ROOT, docsDirFor;
+var homeFromEnv, NEW_HOME, OLD_HOME, DATA_ROOT, DOCS_ROOT, docsDirFor;
 var init_home = __esm({
   "src/core/home.ts"() {
     "use strict";
-    DATA_ROOT = process.env.CHARRETTE_HOME ? path.resolve(process.env.CHARRETTE_HOME) : path.join(os.homedir(), "charrette_appdata");
+    homeFromEnv = process.env.SWARMSTORM_HOME ?? process.env.CHARRETTE_HOME;
+    NEW_HOME = path.join(os.homedir(), "swarmstorm_appdata");
+    OLD_HOME = path.join(os.homedir(), "charrette_appdata");
+    DATA_ROOT = homeFromEnv ? path.resolve(homeFromEnv) : !fs.existsSync(NEW_HOME) && fs.existsSync(OLD_HOME) ? OLD_HOME : NEW_HOME;
     DOCS_ROOT = path.join(DATA_ROOT, "docs");
     docsDirFor = (projectSlug) => path.join(DOCS_ROOT, projectSlug);
   }
@@ -9369,7 +9372,7 @@ var init_remote = __esm({
     START_TIMEOUT_MS = 5e3;
     START_POLL_MS = 50;
     entry = () => [process.argv[1]];
-    homeEnv = (dataRoot) => ({ ...process.env, CHARRETTE_HOME: dataRoot });
+    homeEnv = (dataRoot) => ({ ...process.env, SWARMSTORM_HOME: dataRoot });
     pause = (ms) => new Promise((r) => setTimeout(r, ms));
     isCurrent = (s, swarmEntry) => !!s && s.version === bundleVersion(swarmEntry) && isAlive2(s.pid);
     linkVerbArgs = (member) => ["link", "--run", String(member.run), "--as", member.name];

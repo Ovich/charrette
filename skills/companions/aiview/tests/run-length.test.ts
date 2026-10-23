@@ -21,7 +21,7 @@ let board: TestBoard;
 // spawned without blocking: the board server it reads runs in this process
 const swarmStats = (...argv: string[]): Promise<string> =>
   new Promise((resolve, reject) =>
-    execFile(process.execPath, [SWARM_CLI, "stats", "--all", ...argv], { cwd: repoDir, encoding: "utf8", env: { ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home } }, (err, stdout, stderr) =>
+    execFile(process.execPath, [SWARM_CLI, "stats", "--all", ...argv], { cwd: repoDir, encoding: "utf8", env: { ...process.env, SWARM_ROOT: home, SWARMSTORM_HOME: home } }, (err, stdout, stderr) =>
       err ? reject(new Error(`${err.message}: ${stderr}`)) : resolve(stdout.trimEnd()),
     ),
   );

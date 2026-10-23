@@ -155,7 +155,7 @@ export function Sidebar({
             href="https://github.com/Ovich/charrette"
             target="_blank"
             rel="noreferrer"
-            title="Charrette on GitHub. A star helps others find it."
+            title="Swarmstorm on GitHub. A star helps others find it."
             className="-mx-[3px] -my-0.5 inline-flex items-center gap-[5px] rounded px-[3px] py-0.5 hover:text-foreground focus-visible:text-foreground"
           >
             <Star size={14} aria-hidden="true" className="star-glow fill-star text-star" />

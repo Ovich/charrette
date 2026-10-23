@@ -20,7 +20,7 @@ const START_POLL_MS = 50;
 const entry = (): string[] => [process.argv[1]];
 
 /** The environment a server or a link of `dataRoot` runs in: that data home, whatever the caller's. */
-const homeEnv = (dataRoot: string): NodeJS.ProcessEnv => ({ ...process.env, CHARRETTE_HOME: dataRoot });
+const homeEnv = (dataRoot: string): NodeJS.ProcessEnv => ({ ...process.env, SWARMSTORM_HOME: dataRoot });
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

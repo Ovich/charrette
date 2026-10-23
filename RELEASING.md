@@ -1,13 +1,13 @@
-# Releasing Charrette
+# Releasing Swarmstorm
 
-Charrette reaches its users as a Claude Code plugin, installed from this repository
+Swarmstorm reaches its users as a Claude Code plugin, installed from this repository
 acting as its own marketplace. Two properties of that channel decide whether a change
 you push actually arrives, and both are easy to get wrong silently.
 
 ## The version is the delivery
 
 Claude Code caches an installed plugin by its *resolved version*, under
-`~/.claude/plugins/cache/charrette/charrette/<version>/`. On update it compares the
+`~/.claude/plugins/cache/swarmstorm/swarmstorm/<version>/`. On update it compares the
 version the marketplace declares against the one the user already has, and **skips the
 plugin when they match** — no diff is consulted, no commit SHA is compared.
 
@@ -59,28 +59,28 @@ git push                                        # the tag is created for you
 ```
 
 The tag is not yours to make. `.github/workflows/tag-release.yml` watches the two
-manifests on `main`; when the version they agree on has no `charrette--v<version>` tag,
+manifests on `main`; when the version they agree on has no `swarmstorm--v<version>` tag,
 it creates and pushes one. A push that touches those files without changing the version
 is a no-op, so editing a description or a keyword costs nothing. The workflow fails loudly
 on the one case that would otherwise ship silently wrong — the two manifests disagreeing,
 where `plugin.json` wins at install time while the catalogue advertises the other number.
 
-`claude plugin tag --push -m "charrette %s"` does the same thing locally and remains the
+`claude plugin tag --push -m "swarmstorm %s"` does the same thing locally and remains the
 fallback when Actions is unavailable. Neither it nor the workflow can tell that you failed
 to bump the version at all; that part stays yours.
 
 Verify against a real install rather than trusting the push:
 
 ```bash
-claude plugin marketplace update charrette
-claude plugin update charrette@charrette        # says "up to date" if you forgot the bump
+claude plugin marketplace update swarmstorm
+claude plugin update swarmstorm@swarmstorm        # says "up to date" if you forgot the bump
 ```
 
 ## What users run
 
 ```
-/plugin marketplace update charrette
-/plugin update charrette@charrette
+/plugin marketplace update swarmstorm
+/plugin update swarmstorm@swarmstorm
 ```
 
 then **restart Claude Code** — an update applies only to sessions started afterwards.
@@ -94,7 +94,7 @@ Users with background marketplace refresh still need the second command and the 
 - `aiview mermaid-check` is its own bundle, `dist-cli/mermaid-check.mjs`, about 3.5 MB,
   built by `npm run build` with the CLI. It is versioned like the CLI bundle, for the
   same reason.
-- The data home (`$CHARRETTE_HOME`, or `charrette_appdata` in the OS home) is never
+- The data home (`$SWARMSTORM_HOME`, or `swarmstorm_appdata` in the OS home) is never
   touched by an update. Documents and the index survive every release.
 - Dropping `version` from both manifests is the alternative delivery model: git sources
   then resolve to the commit SHA and every push becomes an update. It removes the bump

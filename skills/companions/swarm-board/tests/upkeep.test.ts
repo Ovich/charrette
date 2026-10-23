@@ -21,8 +21,8 @@ let dir: string;
 let file: string;
 let repo: string;
 
-// SWARM_ROOT and CHARRETTE_HOME both in the temp dir: nothing reaches the real data home
-const env = () => ({ ...process.env, SWARM_ROOT: dir, CHARRETTE_HOME: dir, SWARM_NO_POLLER: "1" });
+// SWARM_ROOT and SWARMSTORM_HOME both in the temp dir: nothing reaches the real data home
+const env = () => ({ ...process.env, SWARM_ROOT: dir, SWARMSTORM_HOME: dir, SWARM_NO_POLLER: "1" });
 const cli = (...argv: string[]) => spawnSync(process.execPath, [CLI, ...argv], { cwd: repo, encoding: "utf8", env: env() });
 const ago = (ms: number): string => new Date(Date.now() - ms).toISOString();
 

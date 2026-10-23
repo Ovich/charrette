@@ -32,7 +32,7 @@ function statePid(home: string): number | null {
  *  it started) is killed: whatever the test did, no `serve` of it outlives it (D40). */
 export function stopServerOf(home: string): void {
   const running = statePid(home);
-  spawnSync(process.execPath, [CLI, "serve", "stop"], { cwd: home, encoding: "utf8", env: { ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home, SWARM_NO_POLLER: "1" } });
+  spawnSync(process.execPath, [CLI, "serve", "stop"], { cwd: home, encoding: "utf8", env: { ...process.env, SWARM_ROOT: home, SWARMSTORM_HOME: home, SWARM_NO_POLLER: "1" } });
   // serve stop returns once the state file is gone; the process exits after it
   if (running !== null && running !== process.pid) untilGone(running);
   const holder = serverLockHolder(home);

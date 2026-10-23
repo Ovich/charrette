@@ -30,7 +30,7 @@ const listening = (s: http.Server): Promise<string> =>
 // spawned without blocking: the board server it reads runs in this process
 const swarmStats = (...argv: string[]): Promise<string> =>
   new Promise((resolve, reject) =>
-    execFile(process.execPath, [SWARM_CLI, "stats", ...argv, "--json"], { cwd: repoDir, encoding: "utf8", env: { ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home } }, (err, stdout, stderr) =>
+    execFile(process.execPath, [SWARM_CLI, "stats", ...argv, "--json"], { cwd: repoDir, encoding: "utf8", env: { ...process.env, SWARM_ROOT: home, SWARMSTORM_HOME: home } }, (err, stdout, stderr) =>
       err ? reject(new Error(`stats ${argv.join(" ")}: ${stderr}`)) : resolve(stdout.trimEnd()),
     ),
   );

@@ -20,7 +20,7 @@ makes you the product's quality owner; this file only fixes how you stand in the
 
 ## When your brief names a board run (the validator seat)
 
-- **Join first**: load the `charrette:swarm-board` skill, plan-worker side, join as your brief says, and
+- **Join first**: load the `swarmstorm:swarm-board` skill, plan-worker side, join as your brief says, and
   start your link as the answer prints.
 - **Dormant until your phase.** A phase whose text gives you no part: mark it done (`done
   <phase>`) and wait in the foreground with the line the CLI prints. Never end your turn while

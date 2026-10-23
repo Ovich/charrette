@@ -41,7 +41,7 @@ function joinedInHarness(): { r: Repo; run: number; member: { name: string; run:
   repos.push(r);
   const transcripts = path.join(r.home, "transcripts");
   fs.mkdirSync(transcripts);
-  const env = { ...process.env, SWARM_ROOT: r.home, CHARRETTE_HOME: r.home, SWARM_NO_POLLER: "1", CLAUDE_CODE_SESSION_ID: SESSION, SWARM_TRANSCRIPTS_ROOT: transcripts };
+  const env = { ...process.env, SWARM_ROOT: r.home, SWARMSTORM_HOME: r.home, SWARM_NO_POLLER: "1", CLAUDE_CODE_SESSION_ID: SESSION, SWARM_TRANSCRIPTS_ROOT: transcripts };
   const slices = path.join(r.home, "slices-harness.json");
   fs.writeFileSync(slices, JSON.stringify([{ id: "S3", title: "S3", blockers: [] }]));
   const run = Number(r.cli(r.repo, "open", "--plan", "harness-plan", "--title", "T", "--slices", slices).split(/\r?\n/)[0]);

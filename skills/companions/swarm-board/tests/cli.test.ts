@@ -14,9 +14,9 @@ const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "sr
 let toolRoot: string;
 let repo: string;
 
-// SWARM_ROOT = where the code would be; CHARRETTE_HOME = where the data goes.
+// SWARM_ROOT = where the code would be; SWARMSTORM_HOME = where the data goes.
 // The suite points both at one temp dir so a run leaves nothing in the real home.
-const env = () => ({ ...process.env, SWARM_ROOT: toolRoot, CHARRETTE_HOME: toolRoot, SWARM_NO_POLLER: "1" });
+const env = () => ({ ...process.env, SWARM_ROOT: toolRoot, SWARMSTORM_HOME: toolRoot, SWARM_NO_POLLER: "1" });
 
 const runIn = (cwd: string, ...argv: string[]) => spawnSync(process.execPath, [CLI, ...argv], { cwd, encoding: "utf8", env: env() });
 const run = (...argv: string[]) => runIn(repo, ...argv);

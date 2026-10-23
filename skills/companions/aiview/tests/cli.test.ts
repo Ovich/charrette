@@ -10,12 +10,12 @@ const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "sr
 
 let toolRoot: string;
 
-// AIVIEW_ROOT = where the code/dist would be; CHARRETTE_HOME = where the data goes.
+// AIVIEW_ROOT = where the code/dist would be; SWARMSTORM_HOME = where the data goes.
 // The suite points both at one temp dir so a run leaves nothing in the real home.
 const run = (...argv: string[]) =>
   spawnSync(process.execPath, [CLI, ...argv], {
     encoding: "utf8",
-    env: { ...process.env, AIVIEW_ROOT: toolRoot, CHARRETTE_HOME: toolRoot },
+    env: { ...process.env, AIVIEW_ROOT: toolRoot, SWARMSTORM_HOME: toolRoot },
   });
 
 const write = (rel: string, content: string): string => {
@@ -166,7 +166,7 @@ const install = (version: string): void => {
 const runInstalled = (...argv: string[]) =>
   spawnSync(process.execPath, [CLI, ...argv], {
     encoding: "utf8",
-    env: { ...process.env, AIVIEW_ROOT: installedSkill(), CHARRETTE_HOME: toolRoot },
+    env: { ...process.env, AIVIEW_ROOT: installedSkill(), SWARMSTORM_HOME: toolRoot },
   });
 const openJson = (...argv: string[]) => {
   const r = runInstalled("open", ...argv, "--json");
@@ -394,14 +394,14 @@ test("project rm is refused while documents reference it", () => {
 
 test("move --project refiles a document into another project, file and row together", () => {
   run("project", "add", "CIIP");
-  run("project", "add", "Charrette");
+  run("project", "add", "Swarmstorm");
   const f = write("docs/CIIP/a.spec.md", "# A\n");
   run("add", f, "--tag", "keep", "--group", "g", "--group-title", "Group G");
 
-  const moved = JSON.parse(run("move", "#1", "--project", "Charrette", "--json").stdout).moved[0];
-  assert.equal(moved.project, "Charrette");
-  assert.equal(moved.file_path, "docs/Charrette/a.spec.md");
-  assert.ok(fs.existsSync(path.join(toolRoot, "docs", "Charrette", "a.spec.md")), "the file moved");
+  const moved = JSON.parse(run("move", "#1", "--project", "Swarmstorm", "--json").stdout).moved[0];
+  assert.equal(moved.project, "Swarmstorm");
+  assert.equal(moved.file_path, "docs/Swarmstorm/a.spec.md");
+  assert.ok(fs.existsSync(path.join(toolRoot, "docs", "Swarmstorm", "a.spec.md")), "the file moved");
   assert.ok(!fs.existsSync(f), "the original is gone");
   // reclassifying must not cost the metadata that made the document findable
   assert.equal(moved.id, 1);
@@ -432,7 +432,7 @@ describe("move a workbench", () => {
   const runWith = (preload: string[], ...argv: string[]) =>
     spawnSync(process.execPath, [...preload, CLI, ...argv], {
       encoding: "utf8",
-      env: { ...process.env, AIVIEW_ROOT: toolRoot, CHARRETTE_HOME: toolRoot },
+      env: { ...process.env, AIVIEW_ROOT: toolRoot, SWARMSTORM_HOME: toolRoot },
     });
   const at = (...p: string[]) => path.join(toolRoot, "docs", ...p);
   const bench = (name: string, withSidecar: boolean) => {
@@ -499,7 +499,7 @@ describe("move a workbench", () => {
 test("update --project points at move instead of silently doing nothing", () => {
   run("project", "add", "CIIP");
   run("add", write("docs/CIIP/a.spec.md", "# A\n"));
-  const r = run("update", "#1", "--project", "Charrette");
+  const r = run("update", "#1", "--project", "Swarmstorm");
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /use: aiview move #1 --project <slug>/);
 });

@@ -74,7 +74,7 @@ function countSpawns(): string[] {
 test("a post of A in one process wakes B's wait in another, through the server and both links", async () => {
   const r = fresh();
   openTwoRunners(r);
-  const wait = spawn(process.execPath, [CLI, "wait", "--mentions", "--timeout", "20000"], { cwd: r.wtB, env: { ...process.env, SWARM_ROOT: r.home, CHARRETTE_HOME: r.home } });
+  const wait = spawn(process.execPath, [CLI, "wait", "--mentions", "--timeout", "20000"], { cwd: r.wtB, env: { ...process.env, SWARM_ROOT: r.home, SWARMSTORM_HOME: r.home } });
   let out = "";
   wait.stdout.on("data", (b) => (out += b));
   const exited = new Promise<number | null>((resolve) => wait.on("exit", resolve));
@@ -127,7 +127,7 @@ test("open ends on the command that starts the member's link, join prints it bef
   // no verb ran since join: no link of S3 yet
   assert.equal(await answers(linkPipe(r.home, run, "link-plan/S3")), false, "join spawns no link of its own");
   // the agent's background task
-  const link = spawn(process.execPath, [entry, ...verb.split(" ")], { cwd: r.wtA, env: { ...process.env, SWARM_ROOT: r.home, CHARRETTE_HOME: r.home }, stdio: "ignore" });
+  const link = spawn(process.execPath, [entry, ...verb.split(" ")], { cwd: r.wtA, env: { ...process.env, SWARM_ROOT: r.home, SWARMSTORM_HOME: r.home }, stdio: "ignore" });
   const linkExited = new Promise((resolve) => link.on("exit", resolve));
   try {
     let answered = false;
@@ -174,7 +174,7 @@ test("a server that cannot start makes the verb exit 1, naming swarm serve (D19)
   // a data home that is a file: no store can open there
   const home = path.join(r.home, "not-a-folder");
   fs.writeFileSync(home, "");
-  const s = spawnSync(process.execPath, [CLI, "status"], { cwd: r.repo, encoding: "utf8", env: { ...process.env, SWARM_ROOT: r.home, CHARRETTE_HOME: home, SWARM_NO_POLLER: "1" } });
+  const s = spawnSync(process.execPath, [CLI, "status"], { cwd: r.repo, encoding: "utf8", env: { ...process.env, SWARM_ROOT: r.home, SWARMSTORM_HOME: home, SWARM_NO_POLLER: "1" } });
   assert.equal(s.status, 1);
   assert.match(s.stderr, /^swarm: the board server did not start: .+; run swarm serve to see it$/m);
 });
@@ -190,7 +190,7 @@ test("a wait whose process is killed leaves the member not waiting (D16)", async
       db.close();
     }
   };
-  const wait = spawn(process.execPath, [CLI, "wait", "--timeout", "20000"], { cwd: r.wtB, env: { ...process.env, SWARM_ROOT: r.home, CHARRETTE_HOME: r.home } });
+  const wait = spawn(process.execPath, [CLI, "wait", "--timeout", "20000"], { cwd: r.wtB, env: { ...process.env, SWARM_ROOT: r.home, SWARMSTORM_HOME: r.home } });
   const exited = new Promise((resolve) => wait.on("exit", resolve));
   assert.ok(await until(() => waiting() === 1), "the wait is pending");
   wait.kill();

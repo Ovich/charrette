@@ -29,5 +29,5 @@ export async function startTestBoard(dataRoot: string): Promise<TestBoard> {
 
 /** `swarm serve stop` on `dataRoot`: a server a reader started there is stopped; none is no error. */
 export function stopSpawnedBoard(dataRoot: string): void {
-  spawnSync(process.execPath, [SWARM_CLI, "serve", "stop"], { cwd: dataRoot, encoding: "utf8", env: { ...process.env, SWARM_ROOT: dataRoot, CHARRETTE_HOME: dataRoot } });
+  spawnSync(process.execPath, [SWARM_CLI, "serve", "stop"], { cwd: dataRoot, encoding: "utf8", env: { ...process.env, SWARM_ROOT: dataRoot, SWARMSTORM_HOME: dataRoot } });
 }

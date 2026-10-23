@@ -17,7 +17,7 @@ let repo: string;
 let wtA: string;
 let wtB: string;
 
-const env = () => ({ ...process.env, SWARM_ROOT: home, CHARRETTE_HOME: home, SWARM_NO_POLLER: "1" });
+const env = () => ({ ...process.env, SWARM_ROOT: home, SWARMSTORM_HOME: home, SWARM_NO_POLLER: "1" });
 const swarm = (cwd: string, ...argv: string[]) => spawnSync(process.execPath, [CLI, ...argv], { cwd, encoding: "utf8", env: env() });
 const cli = (cwd: string, ...argv: string[]): string => {
   const r = swarm(cwd, ...argv);

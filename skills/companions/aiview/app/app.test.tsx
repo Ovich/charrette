@@ -764,7 +764,7 @@ describe("Sidebar footer: the way to the repository", () => {
     expect(link.href).toBe("https://github.com/Ovich/charrette");
     expect(link.target).toBe("_blank");
     expect(link.rel).toBe("noreferrer");
-    expect(link.title).toBe("Charrette on GitHub. A star helps others find it.");
+    expect(link.title).toBe("Swarmstorm on GitHub. A star helps others find it.");
   });
 
   test("the version is the server's, and is left out when the server has none", () => {

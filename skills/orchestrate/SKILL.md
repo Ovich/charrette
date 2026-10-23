@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: "Use when an agent orchestrates other agents on a piece of work, of any kind (a plan, a task swarm, a swarmstorm): settling the charter, dispatching each member with its brief and role, watching them and steering a drift. Not for the duties one kind adds (orchestrate-plan for a plan, swarm for a task swarm, swarmstorm for a seat swarm), and not for the board they talk on (swarm-board)."
+description: "Use when an agent orchestrates other agents on a piece of work, of any kind (a plan, a task swarm, a brainswarm): settling the charter, dispatching each member with its brief and role, watching them and steering a drift. Not for the duties one kind adds (orchestrate-plan for a plan, swarm for a task swarm, brainswarm for a seat swarm), and not for the board they talk on (swarm-board)."
 ---
 
 # Orchestrate
@@ -14,7 +14,7 @@ Every kind has a charter in its own document, approved in chat. Read `references
 ## Dispatch
 
 - **One member per unit of work**, on a subagent definition carrying the charter's model and effort; the dispatch passes its model, and its effort where the `Agent` tool takes one; otherwise effort is carried by the subagent definition the dispatch names (`effort:` in its frontmatter). A dispatch naming neither inherits the session's level. **When no subagent definition carries the charter's model and effort, say so to the person before dispatching**, naming the nearest one; never dispatch on another level silently.
-- **The member's agent follows its kind, never `general-purpose`**: a plan's slice on the plugin's `plan-worker`, a task swarm's worker on `swarm-worker`, a swarmstorm seat on `swarmstorm-seat`, any verification pass (a validator seat, one pass, the proof of a new verify skill) on `verifier` (`subagent_type: "charrette:<agent>"`). It holds the rules every brief of that kind would otherwise have to repeat.
+- **The member's agent follows its kind, never `general-purpose`**: a plan's slice on the plugin's `plan-worker`, a task swarm's worker on `swarm-worker`, a brainswarm seat on `brainswarm-seat`, any verification pass (a validator seat, one pass, the proof of a new verify skill) on `verifier` (`subagent_type: "swarmstorm:<agent>"`). It holds the rules every brief of that kind would otherwise have to repeat.
 - **The brief is the only thing sent.** Read `references/brief.md` before the first dispatch.
 - **Check blockers before every dispatch.**
 - **Every ready member's `Agent` call goes in one message**, each in the background, nothing between them.

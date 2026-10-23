@@ -31,7 +31,7 @@ automatically when `dist/` is absent.
 | Root | Holds | |
 |---|---|---|
 | This checkout | `app/`, `dist/`, `dist-cli/`, `node_modules/` | Rebuildable. Delete it, clone again, rebuild: nothing of yours was here. |
-| **Data home**: `$CHARRETTE_HOME`, else `charrette_appdata` in the OS home dir | `aiview.sqlite`, `aiview.pid`, `aiview.port`, and documents under `docs/<project>/` | Yours. Never versioned, never inside a project repo. |
+| **Data home**: `$SWARMSTORM_HOME`, else `swarmstorm_appdata` in the OS home dir | `aiview.sqlite`, `aiview.pid`, `aiview.port`, and documents under `docs/<project>/` | Yours. Never versioned, never inside a project repo. |
 
 `init` creates the home and adopts an index left next to the tool by a pre-appdata
 install (the original is kept, unused). Paths inside the home are stored relative, so a

@@ -1,11 +1,11 @@
 ---
 name: plan-worker
-description: "Carries out one charrette slice document end to end. Use for execute-plan dispatches: the design is settled in the plan, the work is shaping the code around the slice, doing it, and naming it well."
+description: "Carries out one swarmstorm slice document end to end. Use for execute-plan dispatches: the design is settled in the plan, the work is shaping the code around the slice, doing it, and naming it well."
 model: opus
 effort: medium
 ---
 
-You carry out exactly one slice of an approved plan. Invoke the `charrette:execute-slice` skill
+You carry out exactly one slice of an approved plan. Invoke the `swarmstorm:execute-slice` skill
 first and follow it; the slice document named in your brief is read through aiview.
 
 Where something cannot be done as written, or would change a decision the plan took, **stop

@@ -1,6 +1,6 @@
 ---
 name: swarm-board
-description: "Use when agents run together on the project's swarm board: a plan, a task swarm or a swarmstorm, as its orchestrator or a member whose brief names a run, or when a run on the board has to be opened, read, interrupted or closed, or how the runs went has to be read from outside them. Produces nothing but the run's state on the board, or its figures. Not for documents (aiview)."
+description: "Use when agents run together on the project's swarm board: a plan, a task swarm or a brainswarm, as its orchestrator or a member whose brief names a run, or when a run on the board has to be opened, read, interrupted or closed, or how the runs went has to be read from outside them. Produces nothing but the run's state on the board, or its figures. Not for documents (aiview)."
 ---
 
 # swarm-board: the board
@@ -8,7 +8,7 @@ description: "Use when agents run together on the project's swarm board: a plan,
 **The board is where agents running together on one project see each other and settle what
 they share.** A run is one piece of work on it, of a kind: a plan, its workers working
 phase by phase, each slice in a worktree of its own; a task swarm (kind `task`, the `swarm`
-skill), its workers each in a worktree taking the tasks posted to them; or a swarmstorm, its
+skill), its workers each in a worktree taking the tasks posted to them; or a brainswarm, its
 seats talking without touching the repository. The board says who is there, doing what, and carries their talk. It knows the
 work only as the orchestrator tells it, and nothing of aiview.
 
@@ -25,9 +25,9 @@ prompt): read `references/setup.md`.
 ## Who is who
 
 - **A member is `<group>/<id>`**: on a plan, the seat working a slice, `<plan>/<slice>`, which
-  the plan-worker side guides (`references/plan-worker.md`); on a swarmstorm, a seat `<group>/<seat>`,
-  guided by the swarmstorm-seat side (`references/swarmstorm-seat.md`); the orchestrator `<group>/orchestrator`. Without `--as`,
-  the CLI is the plan seat that joined from the worktree it runs in; a swarmstorm seat and the
+  the plan-worker side guides (`references/plan-worker.md`); on a brainswarm, a seat `<group>/<seat>`,
+  guided by the brainswarm-seat side (`references/brainswarm-seat.md`); the orchestrator `<group>/orchestrator`. Without `--as`,
+  the CLI is the plan seat that joined from the worktree it runs in; a brainswarm seat and the
   orchestrator always pass `--as`.
 - **A member gets a funny name at join**, an adjective and an animal, unique among the
   project's active members. `join` prints it.
@@ -96,8 +96,8 @@ installed.
 - **A plan worker whose brief names a run and a slice**: read `references/plan-worker.md` before the first edit.
 - **A swarm worker whose brief names a task run**: read `references/swarm-worker.md` before the first call.
 - **A verifier whose brief names a run** (a plan's validator seat): `references/plan-worker.md`, its joining and waiting.
-- **A swarmstorm seat whose brief names a run**: read `references/swarmstorm-seat.md` before the first call.
-- **The orchestrator of a run** (a plan, a task swarm, or a swarmstorm): read `references/orchestrator.md` before opening it, and the `orchestrate` skill
+- **A brainswarm seat whose brief names a run**: read `references/brainswarm-seat.md` before the first call.
+- **The orchestrator of a run** (a plan, a task swarm, or a brainswarm): read `references/orchestrator.md` before opening it, and the `orchestrate` skill
   for dispatch.
 - **An outside reader of how the runs went**, from the project and never a member: `$S stats
   --json` gives every run's figures and the scope's totals, with the run ids, members and seqs

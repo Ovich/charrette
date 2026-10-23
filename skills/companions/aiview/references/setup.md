@@ -7,7 +7,7 @@ cd <skill-dir> && npm install && npm run build && node aiview.mjs init
 `init` creates the data home, adopts an index left behind by an older install, and
 prints the three paths: home, docs, sqlite. `status` prints them any time; `status
 --json` exposes them as `home`, `docs`, `sqlite`, `tool`. Read `docs` from there rather
-than assuming it, since `CHARRETTE_HOME` may be set.
+than assuming it, since `SWARMSTORM_HOME` may be set.
 
 The built UI (`dist/`) and the CLI bundles (`dist-cli/cli.mjs`, `dist-cli/mermaid-check.mjs`)
 are versioned, so an installed copy never needs a build. Every verb prints the build

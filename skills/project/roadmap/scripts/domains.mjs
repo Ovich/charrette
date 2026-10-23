@@ -17,7 +17,7 @@ if (names.length === 0) {
 const tlds = tldArg.split(",").map((t) => t.trim().replace(/^\./, "")).filter(Boolean);
 const slug = (n) => n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
 
-const UA = "charrette-roadmap/1.0 (domain availability check)";
+const UA = "swarmstorm-roadmap/1.0 (domain availability check)";
 // country TLDs IANA's file does not list, with the registry's own server (checked 2026-09)
 const CC = { ch: "https://rdap.nic.ch", li: "https://rdap.nic.li", fr: "https://rdap.nic.fr", de: "https://rdap.denic.de", uk: "https://rdap.nominet.uk/uk" };
 let bootstrap = null;

@@ -311,7 +311,7 @@ test("a member's link started twice as the CLI: one runs, the second exits 0, sa
   const second = spawnSync(process.execPath, [cli, "link", "--as", MEMBER, "--run", String(RUN)], {
     encoding: "utf8",
     timeout: 20000,
-    env: { ...process.env, CHARRETTE_HOME: home, SWARM_ROOT: home, CLAUDE_CODE_SESSION_ID: "" },
+    env: { ...process.env, SWARMSTORM_HOME: home, SWARM_ROOT: home, CLAUDE_CODE_SESSION_ID: "" },
   });
   assert.deepEqual([second.status, second.stdout, second.stderr.trim()], [0, "", `link ${MEMBER}: pipe taken`]);
   assert.equal(serverLogLines(home).length, 0, "pipe taken is never in the server's log");

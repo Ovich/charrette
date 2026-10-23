@@ -46,7 +46,7 @@ const typescriptVersion = () => {
 
 const cruiser = () => {
   const ts = typescriptVersion();
-  const cache = join(homedir(), ".cache", "charrette-depgraph", `${cruiserVersion}-ts${ts}`);
+  const cache = join(homedir(), ".cache", "swarmstorm-depgraph", `${cruiserVersion}-ts${ts}`);
   const bin = join(cache, "node_modules", "dependency-cruiser", "bin", "dependency-cruiser.mjs");
   if (!existsSync(bin)) {
     mkdirSync(cache, { recursive: true });

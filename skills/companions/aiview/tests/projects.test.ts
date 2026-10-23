@@ -37,7 +37,7 @@ test("projectForCwd: a project with no paths never claims anything", () => {
 });
 
 test("projectFromDocsPath: the folder is the project, nested files included", () => {
-  const docs = abs("home", "charrette_appdata", "docs");
+  const docs = abs("home", "swarmstorm_appdata", "docs");
   assert.equal(projectFromDocsPath(path.join(docs, "CIIP", "a.spec.md"), docs), "CIIP");
   assert.equal(projectFromDocsPath(path.join(docs, "CIIP", "sub", "a.spec.md"), docs), "CIIP");
   // loose in the docs root, or outside it entirely: not filed under a project
@@ -46,7 +46,7 @@ test("projectFromDocsPath: the folder is the project, nested files included", ()
 });
 
 test("resolveProject: explicit wins, then the folder, then the row, then the fallback", () => {
-  const docs = abs("home", "charrette_appdata", "docs");
+  const docs = abs("home", "swarmstorm_appdata", "docs");
   const inDocs = path.join(docs, "CIIP", "a.spec.md");
   const outside = abs("JOBS", "PROFILE.md");
 
@@ -59,7 +59,7 @@ test("resolveProject: explicit wins, then the folder, then the row, then the fal
 test("resolveProject never prefix-matches the document's own path against a project", () => {
   // A document sitting inside C:\CIIP must NOT come out as CIIP by path — that is the
   // coupling the design removes. Only its folder under <docs>/ or its existing row decide.
-  const docs = abs("home", "charrette_appdata", "docs");
+  const docs = abs("home", "swarmstorm_appdata", "docs");
   const insideRepo = abs("CIIP", "portail", "docs", "note.spec.md");
   assert.equal(resolveProject({ absFile: insideRepo, docsRoot: docs, fallback: "derived" }), "derived");
 });

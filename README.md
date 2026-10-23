@@ -1,16 +1,16 @@
-# Charrette
+# Swarmstorm
 
 [![version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FOvich%2Fcharrette%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=version&prefix=v)](RELEASING.md)
 [![stars](https://img.shields.io/github/stars/Ovich/charrette)](https://github.com/Ovich/charrette/stargazers)
 [![last commit](https://img.shields.io/github/last-commit/Ovich/charrette)](https://github.com/Ovich/charrette/commits/main)
 [![licence](https://img.shields.io/github/license/Ovich/charrette)](LICENSE)
 
-*(French, from architecture studios: the intense working session where a design is
-drawn, argued over, and decided before anything expensive is built.)*
+*(Agents working one piece of work together on a shared board, a person deciding what holds.
+Formerly Charrette.)*
 
 Agent skills that settle what gets built before code is written. They sharpen the engineer's thinking rather than replace it: every design, plan and screen is drawn, argued and approved by a person before an agent acts on it. A design conversation ends in one plan, a screen in a working mockup, a pull request in an analysis with the decisions only a human can make. Every document renders live in aiview, the companion app. None of it lands in your repository.
 
-Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Charrette brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
+Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Swarmstorm brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
 
 Twenty-eight skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
 
@@ -42,7 +42,7 @@ A plan starts from whatever exists: an idea said in chat, a board, an agreed mod
 
 ## Iterate the loop
 
-Charrette is run iteratively. One pass of the loop is one iteration: it plans and builds a single increment, a feature or a bounded change that works and can be verified when the iteration ends. The plan is the iteration's plan, not the project's: it covers the increment and stops where the next one would begin, think of an agile approach. What the increment teaches feeds the next plan, so the design grows by increments and each plan is written with the last increment's learning in hand.
+Swarmstorm is run iteratively. One pass of the loop is one iteration: it plans and builds a single increment, a feature or a bounded change that works and can be verified when the iteration ends. The plan is the iteration's plan, not the project's: it covers the increment and stops where the next one would begin, think of an agile approach. What the increment teaches feeds the next plan, so the design grows by increments and each plan is written with the last increment's learning in hand.
 
 The thing to avoid is big design up front: an agent loves writing plans, embellished and polished, and they can fall apart at the end. A plan is sized to what a person can hold in mind, understand and approve in one reading.
 
@@ -100,16 +100,25 @@ An agent trace bench: a support assistant walked call by call, each step with th
 
 ## Install
 
-**Claude Code**, as a plugin. The skills answer to `charrette:`, as `/charrette:brainstorm` or `/charrette:pr-review`, so nothing collides with skills you already have:
+**Claude Code**, as a plugin. The skills answer to `swarmstorm:`, as `/swarmstorm:brainstorm` or `/swarmstorm:pr-review`, so nothing collides with skills you already have:
 
 ```
 /plugin marketplace add Ovich/charrette
-/plugin install charrette@charrette
+/plugin install swarmstorm@swarmstorm
+```
+
+**Installed as Charrette before?** The plugin was renamed: remove the old one, add the new, restart. Your documents and boards stay where they are (`~/charrette_appdata` keeps being read).
+
+```
+/plugin uninstall charrette@charrette
+/plugin marketplace remove charrette
+/plugin marketplace add Ovich/charrette
+/plugin install swarmstorm@swarmstorm
 ```
 
 **Any other agent**, from a clone. Node 22.5 or later, nothing else. Prompt:
 
-> Set up Charrette: clone `https://github.com/Ovich/charrette.git` into
+> Set up Swarmstorm: clone `https://github.com/Ovich/charrette.git` into
 > `<the checkout>`, build the bundled viewer, and make every skill under `skills/`, at
 > the root or one folder down in its group, discoverable to you (symlink or otherwise).
 > Then tell me the aiview URL and the skills you can reach by name.
@@ -134,7 +143,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 |---|---|---|
 | [interview](skills/interview/SKILL.md) | A design object has decisions nobody has resolved, or you want to be questioned about one until it is understood the same way | *"Interview me about this plan."* Decisions walked in dependency order, the codebase read before you are asked, a recommendation on every question. Every claim about a tool or a practice is researched from its sources; very small proofs of concept with the libraries, when you say yes to them. A short mode of three questions at most when the full interview is declined. |
 | [swarm](skills/swarm/SKILL.md) | Everyday work you want several agents on, no plan: you ask for a swarm, or the agent proposes one when a task splits or is long | *"Swarm this: the three endpoints and their tests."* This session orchestrates; a few workers, each in its own worktree, take the tasks it posts to them on the board, merge what they change, report and take the next, for as long as you keep giving work. You choose a pull request or a merge at the close. |
-| [swarmstorm](skills/swarmstorm/SKILL.md) | A swarm of role seats should work a topic for you, under a protocol you approve | *"Run a swarmstorm brainstorm on onboarding."* The agent recommends a protocol from what you want done, or a custom one, and you adjust its phases, its seats and each role. Seats post ideas blind, build on them, pre-mortem the options; debate the questions to decisions, a skeptic endorsing; or draft a text and read it as its readers would. A protocol or template a project keeps for itself (a cover letter, say) is its own `swarmstorm-<name>` skill, in the project. Each run has its record; a topic keeps one dossier across its runs. |
+| [brainswarm](skills/brainswarm/SKILL.md) | A swarm of role seats should work a topic for you, under a protocol you approve | *"Run a brainswarm brainstorm on onboarding."* The agent recommends a protocol from what you want done, or a custom one, and you adjust its phases, its seats and each role. Seats post ideas blind, build on them, pre-mortem the options; debate the questions to decisions, a skeptic endorsing; or draft a text and read it as its readers would. A protocol or template a project keeps for itself (a cover letter, say) is its own `brainswarm-<name>` skill, in the project. Each run has its record; a topic keeps one dossier across its runs. |
 | [whiteboard-defense](skills/whiteboard-defense/SKILL.md) | A system has shipped and you want to be able to explain and defend it to anyone who pulls you aside | *"Whiteboard me on the sync engine."* Hard questions on the system and on its stack, one at a time, open-book: you go read, come back, get pushed. A defense report with the gaps, the reading that closes them, the decisions an agent made without you, and the architecture leads the questions turned up. |
 
 ### Architecture
@@ -167,7 +176,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | Skill | Use case | Example ask |
 |---|---|---|
 | [execute-plan](skills/execute/execute-plan/SKILL.md) | An approved plan is ready, or was left mid-way by an earlier session | *"Execute the rate-limiting plan."* Keeps the tracker and the plan's decisions; the orchestration itself is orchestrate-plan's. Pauses only for your decisions, your checks, or an action that does not undo. Refuses a plan with no tracker. |
-| [orchestrate](skills/orchestrate/SKILL.md) | Loads whenever an agent runs other agents: a plan, a task swarm or a swarmstorm | Settles the charter with you, dispatches each member with its brief and role, watches them and steers a drift. |
+| [orchestrate](skills/orchestrate/SKILL.md) | Loads whenever an agent runs other agents: a plan, a task swarm or a brainswarm | Settles the charter with you, dispatches each member with its brief and role, watches them and steers a drift. |
 | [orchestrate-plan](skills/execute/orchestrate-plan/SKILL.md) | Loads with execute-plan, whenever a plan runs | Settles the mandate, then runs the plan phase by phase on the swarm board: each phase's slices written at its open, every seat dispatched at once with a brief that carries the testing prompt, the plan workers claiming their files, settling a shared one on the thread and merging under the board's lock. Re-runs each slice's check itself; a validator seat judges the merged result when the mandate asks. One draft pull request for the plan, marked ready only at the merge. |
 | [execute-slice](skills/execute/execute-slice/SKILL.md) | One slice document is handed to an agent to carry out | *"Do slice S12."* Stops on what the document cannot carry, shapes the code around the slice (the dependency graph shows the neighbourhood), then does the slice, naming everything for its purpose, and returns the branch and the run as evidence. |
 
@@ -196,7 +205,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | Skill | Use case | Example ask |
 |---|---|---|
 | [aiview](skills/companions/aiview/SKILL.md) | A viewer at `localhost:4321` and an index, driven by the agent from a CLI. Called by the other skills; directly, to show a document or query the index | *"Open docs/notes/cache-idea.md in aiview, tagged payments."* |
-| [swarm-board](skills/companions/swarm-board/SKILL.md) | The board agents running together share, for a plan, a task swarm or a swarmstorm: who is there, what each holds, their thread, drawn by aiview a tab per run. Called by the orchestrators and their members; directly, to read how the runs went | *"How did the swarm runs go this week?"* |
+| [swarm-board](skills/companions/swarm-board/SKILL.md) | The board agents running together share, for a plan, a task swarm or a brainswarm: who is there, what each holds, their thread, drawn by aiview a tab per run. Called by the orchestrators and their members; directly, to read how the runs went | *"How did the swarm runs go this week?"* |
 
 `write-diagrams`, `interview`, `orchestrate`, the tracker protocol in `write-plan` and the companion tools are the shared layer the others delegate to. `roadmap` sits above the loop: it names the next slot, and a board, a plan or a run finishing tells it to redraw. House rules in `AGENTS.md` win over general principles wherever the two disagree.
 
@@ -204,11 +213,11 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 
 | Root | Holds | Versioned |
 |---|---|---|
-| The checkout, or the plugin cache | `skills/<group>/<name>/SKILL.md`, one folder per skill under its group: the loop's phases `architecture`, `ui`, `plan`, `execute`, `review`, `project` for what a project has once and keeps, `verify` for its verification skill and the validation with the person, `workbench` for the pages worked on during development; `interview`, `orchestrate`, `swarm`, `swarmstorm` and `whiteboard-defense` at the root; supporting files alongside. `companions` for the two tools: `skills/companions/aiview/`, a CLI, the one server and the one UI, drawing the documents and the swarm board; `skills/companions/swarm-board/`, a CLI and a store, its board drawn by aiview | Yes, rebuildable |
-| The data home, `$CHARRETTE_HOME` or `charrette_appdata` in your OS home directory | `docs/<project>/*.md, *.html, *.pdf`, among them the project's roadmap and its foundation reference, and `aiview.sqlite`, the index and the active project | Never in a project repo. May be its own git repo, to sync between machines |
+| The checkout, or the plugin cache | `skills/<group>/<name>/SKILL.md`, one folder per skill under its group: the loop's phases `architecture`, `ui`, `plan`, `execute`, `review`, `project` for what a project has once and keeps, `verify` for its verification skill and the validation with the person, `workbench` for the pages worked on during development; `interview`, `orchestrate`, `swarm`, `brainswarm` and `whiteboard-defense` at the root; supporting files alongside. `companions` for the two tools: `skills/companions/aiview/`, a CLI, the one server and the one UI, drawing the documents and the swarm board; `skills/companions/swarm-board/`, a CLI and a store, its board drawn by aiview | Yes, rebuildable |
+| The data home, `$SWARMSTORM_HOME` or `swarmstorm_appdata` in your OS home directory | `docs/<project>/*.md, *.html, *.pdf`, among them the project's roadmap and its foundation reference, and `aiview.sqlite`, the index and the active project | Never in a project repo. May be its own git repo, to sync between machines |
 | Your project repository | `AGENTS.md`, grown by write-conventions. README and architecture docs, written by technical-writing | Yes, by you |
 
-Charrette stores its documents outside the repository to avoid doc rot: outdated documents influence the agent badly. Boards, plans, mockups and PR analyses are obsolete when the PR merges, so by default none is versioned and none lives in a project repository. For some types of documents, an architecture doc, an ADR, a spec the team keeps current, the codebase can be considered, and it is allowed: the index only points at files, and aiview serves a document from where it is.
+Swarmstorm stores its documents outside the repository to avoid doc rot: outdated documents influence the agent badly. Boards, plans, mockups and PR analyses are obsolete when the PR merges, so by default none is versioned and none lives in a project repository. For some types of documents, an architecture doc, an ADR, a spec the team keeps current, the codebase can be considered, and it is allowed: the index only points at files, and aiview serves a document from where it is.
 
 
 ## Updating
@@ -216,15 +225,15 @@ Charrette stores its documents outside the repository to avoid doc rot: outdated
 The plugin takes three steps. The third is not optional: an update applies only to a session started after it.
 
 ```
-/plugin marketplace update charrette
-/plugin update charrette@charrette
+/plugin marketplace update swarmstorm
+/plugin update swarmstorm@swarmstorm
 ```
 
 Then restart Claude Code. `/plugin marketplace update` alone refreshes the catalogue without touching the installed copy.
 
 A checkout takes a prompt, because three things move and only one is `git pull`:
 
-> Update Charrette in `<the checkout>`: pull, restart the viewer's server if one is
+> Update Swarmstorm in `<the checkout>`: pull, restart the viewer's server if one is
 > running, and repair skill discovery: links made against an older layout of `skills/`
 > dangle, most skills now sit one folder down, under their group. Leave the data home alone.
 > Then tell me the aiview URL and the skills you can reach by name.

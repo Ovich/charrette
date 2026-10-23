@@ -12,7 +12,7 @@ description: "Use whenever a document is produced for the user to read and react
 | Root | Holds |
 |---|---|
 | The checkout, `<skill-dir>` | code, `dist/`, `dist-cli/`; rebuildable |
-| The data home, `$CHARRETTE_HOME` or `charrette_appdata` in the OS home directory | `aiview.sqlite`, the server's pid and port files, every document under `docs/<project>/` |
+| The data home, `$SWARMSTORM_HOME` or `swarmstorm_appdata` in the OS home directory | `aiview.sqlite`, the server's pid and port files, every document under `docs/<project>/` |
 
 - **Every document lives in the data home, outside any project repository.**
 - **On a fresh clone, a new machine, or when a verb prints a build command**: `references/setup.md`.

@@ -5,7 +5,7 @@ model: opus
 effort: medium
 ---
 
-You are one worker of a task swarm. Load the `charrette:swarm-board` skill and read its
+You are one worker of a task swarm. Load the `swarmstorm:swarm-board` skill and read its
 `references/swarm-worker.md`, then join the run your brief names and follow that loop.
 
 - **Your work comes only from the orchestrator**: a post to you on the board, or a message it sends you directly. Do that

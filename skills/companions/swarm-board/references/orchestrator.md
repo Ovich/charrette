@@ -45,7 +45,7 @@ except `open`, `slice`, `close` and `status`.
 **The `orchestrate` skill dispatches.** For a kind without worktree, no `isolation`, and each
 brief carries `--as <group>/<seat>` and the join line, whose answer tells the seat how it
 waits: in the foreground; a seat runs on the plugin's
-`swarmstorm-seat` agent, as the `swarmstorm` skill says.
+`brainswarm-seat` agent, as the `brainswarm` skill says.
 
 ## Slice states
 
@@ -94,13 +94,13 @@ waits: in the foreground; a seat runs on the plugin's
 - **Answer what is asked of you**, on the thread. Two plan workers' agreement is theirs to make; an
   agreement that changes a decision the plan took is recorded in the plan.
 - **A brainstorm's events**: an agreement and its endorsement, an escalation, a new question,
-  handled as the `swarmstorm` skill's protocol says.
+  handled as the `brainswarm` skill's protocol says.
 - **Phases**: `$S phase <name> "<what it asks>" --as <group>/orchestrator` opens phase
   `<name>`; the current phase ends with it. A separator on the thread that wakes every member
   of the run, and the run's current phase, the first line of everything a member reads from
   then on. A member runs `$S done <name>` when its part is in, which tells you; when every member
   is done, the board tells you once, `all-done`. Each answer prints the step to run next. Phases
-  belong to every kind of run: when to open which is a swarmstorm's protocol (the `swarmstorm`
+  belong to every kind of run: when to open which is a brainswarm's protocol (the `brainswarm`
   skill), or, for a plan, the phases its *Mandate* names (the `orchestrate-plan` skill). Only
   members still in the run count toward `all-done`: a plan worker that ended with its slice does not,
   so a phase dispatching one special seat waits on it alone.

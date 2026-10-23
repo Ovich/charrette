@@ -226,7 +226,7 @@ test("the built bundle, alone in an empty folder, runs serve, answers a client a
   const built = spawn(process.execPath, [path.join(here, "..", "build.mjs"), "--outfile", out], { cwd: path.join(here, ".."), stdio: "ignore" });
   assert.equal(await new Promise((r) => built.on("exit", r)), 0);
   const home = path.join(dir, "home");
-  const env = { ...process.env, CHARRETTE_HOME: home };
+  const env = { ...process.env, SWARMSTORM_HOME: home };
   const serve = spawn(process.execPath, [out, "serve"], { cwd: path.dirname(out), env, stdio: ["ignore", "pipe", "pipe"] });
   const exited = new Promise<number | null>((r) => serve.on("exit", (code) => r(code)));
   const url = await new Promise<string>((r, j) => {

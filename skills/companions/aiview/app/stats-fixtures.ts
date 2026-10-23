@@ -1,5 +1,5 @@
 // `Stats` as `GET /api/stats` answers them, for the analytics views: the across view's closed runs of
-// charrette-app, and one run's answer each for a plan run, a brainstorm run, a run before the records
+// swarmstorm-app, and one run's answer each for a plan run, a brainstorm run, a run before the records
 // and an open run. The totals are written by hand, and on purpose they disagree with what summing or
 // counting the runs would give: the page reads them, it never counts (D34, D35).
 import type { MemberStats, RunStats, Stats, Totals } from "../../swarm-board/src/client/reader.ts";

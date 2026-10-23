@@ -7,7 +7,7 @@ const at = (hm: string): string => {
   return new Date(2026, 9, 7, h, m).toISOString();
 };
 
-export const APP = "/repos/charrette-app/.git";
+export const APP = "/repos/swarmstorm-app/.git";
 const RT = "refresh-tokens";
 const AL = "audit-log";
 const NM = "naming";
@@ -126,7 +126,7 @@ export const RUNS: RunSummary[] = [
 /** A brainstorm open beside the plans: its seats hold no file (D3). */
 export const BRAINSTORM: RunSummary = { run: 3, kind: "brainstorm", plan: NM, group: NM, code: "NM", title: "Naming the kinds", link: null, open: true, runners: 1, done: 0, of: 1 };
 
-/** Runs of charrette-app closed earlier: the Board lists them with the open ones (D34, D46). */
+/** Runs of swarmstorm-app closed earlier: the Board lists them with the open ones (D34, D46). */
 export const CLOSED: RunSummary[] = [
   { run: 4, kind: "plan", plan: LP, group: LP, code: "LP", title: "The login page", link: null, open: false, runners: 0, done: 4, of: 4 },
   { run: 5, kind: "brainstorm", plan: TT, group: TT, code: "TT", title: "Theme tokens", link: null, open: false, runners: 0, done: 2, of: 2 },
@@ -134,7 +134,7 @@ export const CLOSED: RunSummary[] = [
 
 export const LIVE: BoardSnapshot = {
   repo: APP,
-  name: "charrette-app",
+  name: "swarmstorm-app",
   runs: [...CLOSED, ...RUNS, BRAINSTORM],
   lock: null,
   lockHistory: [],
@@ -202,10 +202,10 @@ export const PHASED: BoardSnapshot = {
 export const ALL_CLOSED: BoardSnapshot = { ...LIVE, runs: CLOSED, roster: [], queues: {}, files: [], lock: null };
 
 /** A second repository on the board, one plan open: RepoList lists both (D39). */
-export const OTHER = "/repos/charrette-site/.git";
+export const OTHER = "/repos/swarmstorm-site/.git";
 export const SITE: BoardSnapshot = {
   repo: OTHER,
-  name: "charrette-site",
+  name: "swarmstorm-site",
   runs: [{ run: 7, kind: "plan", plan: "landing", group: "landing", code: "LA", title: "The landing page", link: null, open: true, runners: 1, done: 0, of: 2 }],
   lock: null,
   lockHistory: [],
