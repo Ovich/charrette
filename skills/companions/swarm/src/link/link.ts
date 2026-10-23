@@ -6,7 +6,7 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { bundleVersion, decode, encode, serverStateFile, type Activity, type Bye, type Call, type Frame, type ServerState } from "../wire.ts";
+import { bundleVersion, decode, encode, isAlive, serverLogFile, serverStateFile, type Activity, type Bye, type Call, type Refused, type Frame, type ServerState } from "../wire.ts";
 import { locate, observe, type Binding, type TranscriptCursor } from "./transcripts.ts";
 
 type RunId = number;
@@ -49,6 +49,31 @@ function readServerState(dataRoot: string): ServerState | null {
   }
 }
 
+/** Why a link stopped (D42): said on stderr, and in the server's log while the server answers. */
+export type LinkStop =
+  | { why: "refused"; reason: Refused["reason"] }
+  | { why: "no server"; forMs: number }
+  | { why: "ended" | "closed" | "finished" | "idle" | "pipe taken" | "server of another version" };
+
+function describeStop(stop: LinkStop): string {
+  if (stop.why === "refused") return `refused ${stop.reason}`;
+  if (stop.why === "no server") return `no server for ${Math.round(stop.forMs / 1000)} s`;
+  if (stop.why === "closed") return "run closed";
+  return stop.why;
+}
+
+/** Prints `link <member>: <reason>` to stderr; with `toServerLog`, also appends it to the server's log
+ *  when the server answers, its state file naming a live process (D42). */
+function sayStop(dataRoot: string, member: string, stop: LinkStop, toServerLog: boolean): void {
+  const line = `link ${member}: ${describeStop(stop)}`;
+  process.stderr.write(line + "\n");
+  const state = toServerLog ? readServerState(dataRoot) : null;
+  if (!state || !isAlive(state.pid)) return;
+  try {
+    fs.appendFileSync(serverLogFile(dataRoot), line + "\n");
+  } catch {}
+}
+
 const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** Does another link answer on this pipe? */
@@ -80,7 +105,8 @@ async function listenOnPipe(pipe: string, onPipe: (s: net.Socket) => void): Prom
 
 /** Runs one member's link until it exits: its member's `end`, a `refused`, no server for a minute
  *  after a drop, idle, or its agent finished (D15). Meanwhile it finds its member's transcript and
- *  sends the board what the agent is doing (D8, D10). Rejects only when no server state file appears at start. */
+ *  sends the board what the agent is doing (D8, D10). Resolves with why it stopped, said on stderr
+ *  (D42); rejects only when no server state file appears at start. */
 export async function runLink(opts: {
   dataRoot: string;
   member: string;
@@ -89,10 +115,15 @@ export async function runLink(opts: {
   /** where the transcript search reads the session and the harness root from; process.env by default */
   env?: NodeJS.ProcessEnv;
   timing?: Partial<LinkTiming>;
-}): Promise<void> {
+}): Promise<LinkStop> {
   const timing = { ...DEFAULT_TIMING, ...opts.timing };
   // D37: one link per member; a second, its pipe answering, exits at once, before anything else can fail it
-  if (await pipeAnswers(linkPipe(opts.dataRoot, opts.run, opts.member))) return;
+  const pipeTaken = (): LinkStop => {
+    const stop: LinkStop = { why: "pipe taken" };
+    sayStop(opts.dataRoot, opts.member, stop, false); // D37: stderr only, the link stays at exit 0
+    return stop;
+  };
+  if (await pipeAnswers(linkPipe(opts.dataRoot, opts.run, opts.member))) return pipeTaken();
 
   let state = readServerState(opts.dataRoot);
   for (const startedAt = Date.now(); !state && Date.now() - startedAt < timing.stateFileWaitMs; ) {
@@ -109,8 +140,8 @@ export async function runLink(opts: {
   let exiting = false;
   /** the last call on a pipe or growth of the transcript: what keeps the link from idling out */
   let lastStirAt = Date.now();
-  let finish!: () => void;
-  const finished = new Promise<void>((r) => (finish = r));
+  let finish!: (stop: LinkStop) => void;
+  const finished = new Promise<LinkStop>((r) => (finish = r));
 
   const sendUp = (f: Frame) => {
     if (socket && welcomed && socket.readyState === WebSocket.OPEN) socket.send(encode(f));
@@ -150,21 +181,23 @@ export async function runLink(opts: {
     if (read.activity.finished) {
       // the harness says the agent ended (E14): the last activity, then bye
       flushActivity(true);
-      return exit("finished");
+      return exit({ why: "finished" }, "finished");
     }
     flushActivity();
   };
 
-  const exit = (bye?: Bye["reason"]) => {
+  /** `bye`: the reason told the server, for a stop the link chose (D15) */
+  const exit = (stop: LinkStop, bye?: Bye["reason"]) => {
     if (exiting) return;
     exiting = true;
     if (bye) sendUp({ type: "bye", reason: bye });
+    sayStop(opts.dataRoot, opts.member, stop, stop.why !== "no server");
     clearInterval(idleCheck);
     clearInterval(watch);
     pipeServer?.close();
     for (const p of pipes) p.end(); // a result just written still reaches its CLI
     socket?.close();
-    finish();
+    finish(stop);
   };
 
   const onDown = (f: Frame) => {
@@ -173,13 +206,13 @@ export async function runLink(opts: {
       for (const { call } of unanswered.values()) sendUp(call); // D4: resent, answered from the cache
       flushActivity();
     } else if (f.type === "refused") {
-      exit();
+      exit(f.reason === "closed" ? { why: "closed" } : { why: "refused", reason: f.reason });
     } else if (f.type === "result") {
       const asked = unanswered.get(f.id);
       if (!asked) return; // already answered, or its pipe closed: never delivered twice
       unanswered.delete(f.id);
       if (!asked.pipe.destroyed) asked.pipe.write(encode(f) + "\n");
-      if (asked.call.method === "end" && f.ok) exit("ended");
+      if (asked.call.method === "end" && f.ok) exit({ why: "ended" }, "ended");
     }
   };
 
@@ -223,7 +256,7 @@ export async function runLink(opts: {
         if (exiting) return;
         if (welcomedThisTime) lastAnsweredAt = Date.now();
       }
-      if (Date.now() - lastAnsweredAt >= timing.reconnectGiveUpMs) return exit();
+      if (Date.now() - lastAnsweredAt >= timing.reconnectGiveUpMs) return exit({ why: "no server", forMs: Date.now() - lastAnsweredAt });
       await pause(timing.reconnectEveryMs);
       s = readServerState(opts.dataRoot);
     }
@@ -268,15 +301,17 @@ export async function runLink(opts: {
   };
 
   const pipeServer = await listenOnPipe(linkPipe(opts.dataRoot, opts.run, opts.member), onPipe);
-  if (!pipeServer) return; // one link per member per data home: this one is the second
+  if (!pipeServer) return pipeTaken(); // one link per member per data home: this one is the second
 
   const idleCheck = setInterval(() => {
-    if (unanswered.size === 0 && Date.now() - lastStirAt >= timing.idleMs) exit("idle");
+    if (unanswered.size === 0 && Date.now() - lastStirAt >= timing.idleMs) exit({ why: "idle" }, "idle");
   }, Math.min(60_000, Math.max(10, Math.floor(timing.idleMs / 4))));
 
   const watch = setInterval(watchTranscript, timing.watchEveryMs);
-  if (state.version !== bundleVersion()) return exit(); // D28: a server of another version would refuse it
-  void connectionLoop();
-  watchTranscript();
+  if (state.version !== bundleVersion()) exit({ why: "server of another version" }); // D28: a server of another version would refuse it
+  if (!exiting) {
+    void connectionLoop();
+    watchTranscript();
+  }
   return finished;
 }

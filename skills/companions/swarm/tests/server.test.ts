@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { openBoard } from "../src/board/board.ts";
 import { startBoardServer, stopBoardServer } from "../src/server/server.ts";
-import { decode, encode, serverStateFile, type Frame, type Hello, type MemberActivity, type RpcMethod, type ServerState } from "../src/wire.ts";
+import { decode, encode, serverLogFile, serverStateFile, SERVER_STARTER_ENV, type Frame, type Hello, type MemberActivity, type RpcMethod, type ServerState } from "../src/wire.ts";
 
 const REPO = "/repos/one/.git";
 const SEATS = [
@@ -397,4 +397,23 @@ test("a link lost and back within 30 s, across a restart or not, is never gone (
   skew += 40_000;
   await new Promise((r) => setTimeout(r, 1500));
   assert.equal(goneEvents(await value(reader, "snapshot", REPO)).length, 0, "back in time after a restart");
+});
+
+// ── who started it (swarm-relay D42) ──────────────────────────────────────────
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+test("a server's log starts with its data home, its pid, and its starter's pid and command line, else unknown (D42)", async () => {
+  const first = fs.readFileSync(serverLogFile(dir), "utf8").split("\n")[0];
+  const unknownOrProc = process.platform === "win32" ? "unknown" : "\\S.*";
+  assert.match(first, new RegExp(`^serve: home ${escapeRegExp(path.resolve(dir))}, pid ${process.pid}, started by ${process.ppid} ${unknownOrProc}$`));
+  await server!.close();
+  server = null;
+  const home = path.join(dir, "named");
+  process.env[SERVER_STARTER_ENV] = "node swarm.mjs join --run 72";
+  try {
+    server = await startBoardServer({ dataRoot: home });
+  } finally {
+    delete process.env[SERVER_STARTER_ENV];
+  }
+  assert.equal(fs.readFileSync(serverLogFile(home), "utf8").split("\n")[0], `serve: home ${path.resolve(home)}, pid ${process.pid}, started by ${process.ppid} node swarm.mjs join --run 72`);
 });

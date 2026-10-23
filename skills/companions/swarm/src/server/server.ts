@@ -6,7 +6,7 @@ import http from "node:http";
 import path from "node:path";
 import { WebSocketServer, type WebSocket } from "ws";
 import { openBoard, type Board, type Presence } from "../board/board.ts";
-import { RPC_METHODS, bundleVersion, decode, encode, liveStartLockHolder, serverLockHolder, serverStartLock, serverStateFile, type Call, type Frame, type Hello, type RpcMethod, type ServerState } from "../wire.ts";
+import { RPC_METHODS, bundleVersion, decode, encode, liveStartLockHolder, serverLockHolder, serverLogFile, serverStartLock, serverStateFile, SERVER_STARTER_ENV, type Call, type Frame, type Hello, type RpcMethod, type ServerState } from "../wire.ts";
 
 /** A resent call is answered from this cache for this long (D4). */
 const RESULT_CACHE_MS = 10 * 60 * 1000;
@@ -33,6 +33,7 @@ type ServerOptions = { dataRoot: string; host?: string; port?: number; now?: () 
 /** Starts the board server of `opts.dataRoot`, its start lock taken first (D40): while another live
  *  server holds it, this one refuses to start; a lock left by a dead process is replaced. */
 export async function startBoardServer(opts: ServerOptions): Promise<{ url: string; close(): Promise<void> }> {
+  logStart(opts.dataRoot);
   await takeStartLock(opts.dataRoot);
   try {
     return await runBoardServer(opts);
@@ -40,6 +41,23 @@ export async function startBoardServer(opts: ServerOptions): Promise<{ url: stri
     releaseStartLock(opts.dataRoot);
     throw e;
   }
+}
+
+/** D42: first in the log, who this server is and who started it, so a stray server can be traced. */
+function logStart(dataRoot: string): void {
+  fs.mkdirSync(dataRoot, { recursive: true });
+  fs.appendFileSync(serverLogFile(dataRoot), `serve: home ${path.resolve(dataRoot)}, pid ${process.pid}, started by ${process.ppid} ${starterCommandLine()}\n`);
+}
+
+/** The starter's command line: what a spawning CLI passed, else read from /proc where there is one, else "unknown". */
+function starterCommandLine(): string {
+  const passed = process.env[SERVER_STARTER_ENV];
+  if (passed) return passed;
+  try {
+    const read = fs.readFileSync(`/proc/${process.ppid}/cmdline`, "utf8").split("\0").filter(Boolean).join(" ");
+    if (read) return read;
+  } catch {}
+  return "unknown";
 }
 
 /** How often, and how many times, a start lock found empty (its taker mid-write) is read again. */

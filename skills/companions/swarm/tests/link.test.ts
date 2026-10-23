@@ -11,8 +11,8 @@ import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { linkPipe, runLink, type LinkTiming } from "../src/link/link.ts";
-import { bundleVersion, decode, encode, serverStateFile, type Call, type Frame } from "../src/wire.ts";
+import { linkPipe, runLink, type LinkStop, type LinkTiming } from "../src/link/link.ts";
+import { bundleVersion, decode, encode, serverLogFile, serverStateFile, type Call, type Frame } from "../src/wire.ts";
 import { bashCall, textLine, writeSubagent } from "./fixtures/transcripts.ts";
 
 const MEMBER = "plan-x/S1";
@@ -105,8 +105,9 @@ function startLink(home: string, timing: Partial<LinkTiming> = FAST, member = ME
 }
 function runLinkWith(home: string, env: NodeJS.ProcessEnv, timing: Partial<LinkTiming> = FAST, member = MEMBER) {
   let exited = false;
-  const done = runLink({ dataRoot: home, member, run: RUN, env, binding: { verb: "join", run: RUN, seat: "S1" }, timing }).then(() => {
+  const done = runLink({ dataRoot: home, member, run: RUN, env, binding: { verb: "join", run: RUN, seat: "S1" }, timing }).then((stop) => {
     exited = true;
+    return stop;
   });
   return { done, exited: () => exited };
 }
@@ -137,11 +138,37 @@ async function openPipe(home: string, member = MEMBER) {
 }
 
 const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Every line written to stderr from here until `restore` (D42: a link says why it stops there). */
+function captureStderr() {
+  const lines: string[] = [];
+  const write = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((chunk: string | Uint8Array, ...rest: unknown[]) => {
+    lines.push(...String(chunk).split("\n").filter(Boolean));
+    return (write as (...a: unknown[]) => boolean)(chunk, ...rest);
+  }) as typeof process.stderr.write;
+  return { lines, restore: () => void (process.stderr.write = write) };
+}
+const serverLogLines = (home: string): string[] => (fs.existsSync(serverLogFile(home)) ? fs.readFileSync(serverLogFile(home), "utf8").split("\n").filter(Boolean) : []);
+
+/** Runs `body`, then checks the link said `line` once on stderr, and in the server's log or not (D42). */
+async function saysWhy(line: RegExp, inServerLog: boolean, body: () => Promise<{ home: string; stop: LinkStop }>) {
+  const stderr = captureStderr();
+  let home: string;
+  try {
+    ({ home } = await body());
+  } finally {
+    stderr.restore();
+  }
+  assert.deepEqual(stderr.lines.filter((l) => l.startsWith("link ")).map((l) => line.test(l)), [true], `stderr: ${stderr.lines.join(" | ")}`);
+  assert.deepEqual(serverLogLines(home).filter((l) => line.test(l)).length, inServerLog ? 1 : 0, `server log: ${serverLogLines(home).join(" | ")}`);
+}
+
 async function until(what: string, ok: () => boolean, ms = 3000) {
   for (const start = Date.now(); !ok(); await pause(10)) if (Date.now() - start > ms) assert.fail(`timed out: ${what}`);
 }
 const callsOf = (frames: Frame[], id: string) => frames.filter((f) => f.type === "call" && f.id === id);
-const exitLink = async (server: { connections: StubConnection[] }, link: { done: Promise<void> }) => {
+const exitLink = async (server: { connections: StubConnection[] }, link: { done: Promise<LinkStop> }) => {
   server.connections.at(-1)!.send({ type: "refused", reason: "shutdown" });
   await link.done;
 };
@@ -180,8 +207,11 @@ for (const reason of ["secret", "version", "superseded", "shutdown", "closed"] a
   test(`hello names the member with supersede; refused ${reason} makes the link exit (D15, D27, D30)`, async () => {
     const server = await stubServer((f, conn) => f.type === "hello" && conn.send({ type: "refused", reason }));
     servers.push(server);
-    const link = startLink(dataHome(server.port));
-    await link.done;
+    const said = reason === "closed" ? "run closed" : `refused ${reason}`;
+    await saysWhy(new RegExp(`^link ${MEMBER}: ${said}$`), true, async () => {
+      const home = dataHome(server.port);
+      return { home, stop: await startLink(home).done };
+    });
     const hello = server.frames()[0];
     assert.equal(hello.type, "hello");
     assert.deepEqual(hello.type === "hello" && [hello.member, hello.supersede, hello.secret], [{ name: MEMBER, run: RUN }, true, "s3cret"]);
@@ -217,11 +247,13 @@ test("the server dropped and back: unanswered calls are resent, none answered tw
 test("no server answers for the give-up time after a drop: the link exits (D27)", async () => {
   const server = await stubServer();
   const home = dataHome(server.port);
-  const link = startLink(home, { ...FAST, reconnectGiveUpMs: 300 });
-  await openPipe(home);
-  await until("connected", () => server.connections.length === 1);
-  await server.stop();
-  await link.done;
+  await saysWhy(new RegExp(`^link ${MEMBER}: no server for \\d+ s$`), false, async () => {
+    const link = startLink(home, { ...FAST, reconnectGiveUpMs: 300 });
+    await openPipe(home);
+    await until("connected", () => server.connections.length === 1);
+    await server.stop();
+    return { home, stop: await link.done };
+  });
 });
 
 test("the member's end relayed: the link sends bye ended and exits (D15)", async () => {
@@ -230,8 +262,10 @@ test("the member's end relayed: the link sends bye ended and exits (D15)", async
   const home = dataHome(server.port);
   const link = startLink(home);
   const cli = await openPipe(home);
-  cli.call({ id: "e1", method: "end", args: [] });
-  await link.done;
+  await saysWhy(new RegExp(`^link ${MEMBER}: ended$`), true, async () => {
+    cli.call({ id: "e1", method: "end", args: [] });
+    return { home, stop: await link.done };
+  });
   await until("the end's result", () => cli.received.length === 1);
   assert.deepEqual(cli.received, [{ type: "result", id: "e1", ok: true, value: "end" }]);
   await until("bye ended", () => server.frames().some((f) => f.type === "bye" && f.reason === "ended"));
@@ -243,10 +277,12 @@ test("no call on any pipe for the idle time: the link exits (D15)", async () => 
   const home = dataHome(server.port);
   const link = startLink(home, { ...FAST, idleMs: 300 });
   const cli = await openPipe(home);
-  cli.call({ id: "r1", method: "roster", args: [] });
-  await pause(150);
-  assert.equal(link.exited(), false);
-  await link.done;
+  await saysWhy(new RegExp(`^link ${MEMBER}: idle$`), true, async () => {
+    cli.call({ id: "r1", method: "roster", args: [] });
+    await pause(150);
+    assert.equal(link.exited(), false);
+    return { home, stop: await link.done };
+  });
   await until("bye idle", () => server.frames().some((f) => f.type === "bye" && f.reason === "idle"));
 });
 
@@ -259,12 +295,12 @@ test("pipe names differ by data home; a second link of the same member exits at 
   const first = startLink(home);
   await openPipe(home);
   await until("connected", () => server.connections.length === 1);
-  await startLink(home).done;
+  await saysWhy(new RegExp(`^link ${MEMBER}: pipe taken$`), false, async () => ({ home, stop: await startLink(home).done }));
   assert.equal(first.exited(), false);
   await exitLink(server, first);
 });
 
-test("a member's link started twice as the CLI: one runs, the second exits 0 and prints nothing (D37)", { timeout: 30000 }, async () => {
+test("a member's link started twice as the CLI: one runs, the second exits 0, saying pipe taken on stderr alone (D37, D42)", { timeout: 30000 }, async () => {
   const server = await stubServer();
   servers.push(server);
   const home = dataHome(server.port);
@@ -277,7 +313,8 @@ test("a member's link started twice as the CLI: one runs, the second exits 0 and
     timeout: 20000,
     env: { ...process.env, CHARRETTE_HOME: home, SWARM_ROOT: home, CLAUDE_CODE_SESSION_ID: "" },
   });
-  assert.deepEqual([second.status, second.stdout, second.stderr], [0, "", ""]);
+  assert.deepEqual([second.status, second.stdout, second.stderr.trim()], [0, "", `link ${MEMBER}: pipe taken`]);
+  assert.equal(serverLogLines(home).length, 0, "pipe taken is never in the server's log");
   assert.equal(server.connections.length, 1, "the second link never reached the server");
   assert.equal(first.exited(), false, "the first link still runs");
   await exitLink(server, first);
@@ -391,10 +428,13 @@ test("finished: true in the transcript's meta.json: a last activity, bye finishe
   servers.push(server);
   const { root, env } = sessionRoot();
   writeSubagent(root, PROJECT, SESSION, "a1", [bashCall(JOIN_COMMAND)], {});
-  const link = runLinkWith(dataHome(server.port), env, { ...FAST, watchEveryMs: 20, activityGapMs: 3000 });
+  const home = dataHome(server.port);
+  const link = runLinkWith(home, env, { ...FAST, watchEveryMs: 20, activityGapMs: 3000 });
   await until("a first activity", () => activities(server.frames()).length === 1);
-  writeSubagent(root, PROJECT, SESSION, "a1", [bashCall(JOIN_COMMAND), textLine("done", usage(7))], { finished: true });
-  await link.done;
+  await saysWhy(new RegExp(`^link ${MEMBER}: finished$`), true, async () => {
+    writeSubagent(root, PROJECT, SESSION, "a1", [bashCall(JOIN_COMMAND), textLine("done", usage(7))], { finished: true });
+    return { home, stop: await link.done };
+  });
   await until("the bye reached the server", () => server.frames().some((f) => f.type === "bye"));
   const frames = server.frames();
   const last = activities(frames).at(-1)!;

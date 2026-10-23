@@ -4,9 +4,8 @@ import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
-import path from "node:path";
 import type { Board, RunId } from "../board/board.ts";
-import { RPC_METHODS, bundleVersion, decode, encode, liveStartLockHolder, serverStateFile, type Frame, type RpcMethod, type ServerState } from "../wire.ts";
+import { RPC_METHODS, bundleVersion, decode, encode, liveStartLockHolder, serverLogFile, serverStateFile, SERVER_STARTER_ENV, type Frame, type RpcMethod, type ServerState } from "../wire.ts";
 import { linkPipe } from "../link/link.ts";
 import type { Binding } from "../link/transcripts.ts";
 
@@ -47,8 +46,6 @@ function readServerState(dataRoot: string): ServerState | null {
 /** A state naming a live process of `swarmEntry`'s version. */
 const isCurrent = (s: ServerState | null, swarmEntry: string): boolean => !!s && s.version === bundleVersion(swarmEntry) && isAlive(s.pid);
 
-/** The server's own log, where `serve`'s errors land when the CLI started it. */
-const serverLog = (dataRoot: string): string => path.join(dataRoot, "swarm-server.log");
 
 /** The running server's state, started first when the state file names no live process or another
  *  version (D6, D28); a server that does not come up within 5 s fails with the D19 message. `swarmEntry`:
@@ -70,10 +67,10 @@ export async function ensureServer(dataRoot: string, swarmEntry: string = entry(
     let log: number | "ignore" = "ignore";
     try {
       fs.mkdirSync(dataRoot, { recursive: true });
-      fs.writeFileSync(serverLog(dataRoot), "");
-      log = fs.openSync(serverLog(dataRoot), "a");
+      fs.writeFileSync(serverLogFile(dataRoot), "");
+      log = fs.openSync(serverLogFile(dataRoot), "a");
     } catch {}
-    const child = spawn(process.execPath, [swarmEntry, "serve"], { detached: true, stdio: ["ignore", log, log], windowsHide: true, env: homeEnv(dataRoot) });
+    const child = spawn(process.execPath, [swarmEntry, "serve"], { detached: true, stdio: ["ignore", log, log], windowsHide: true, env: { ...homeEnv(dataRoot), [SERVER_STARTER_ENV]: process.argv.join(" ") } });
     child.on("exit", (code, signal) => (exited = signal ? `it was killed by ${signal}` : `it exited with code ${code}`));
     child.on("error", (e) => (exited = e.message));
     child.unref();
@@ -89,7 +86,7 @@ export async function ensureServer(dataRoot: string, swarmEntry: string = entry(
   let said = "";
   try {
     // the error a crash prints, else the server's last word
-    const lines = fs.readFileSync(serverLog(dataRoot), "utf8").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = fs.readFileSync(serverLogFile(dataRoot), "utf8").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     said = lines.find((l) => /^(\w*Error|swarm\b)[^:]*:/.test(l)) ?? lines.filter((l) => !/^Node\.js v/.test(l)).pop() ?? "";
   } catch {}
   const reason = said || exited || `it did not answer within ${START_TIMEOUT_MS / 1000} s`;

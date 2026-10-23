@@ -126,6 +126,15 @@ export function serverStateFile(dataRoot: string): string {
   return path.join(dataRoot, "swarm-server.json");
 }
 
+/** The server's own log, `<dataRoot>/swarm-server.log`: a started server's output, its start line and
+ *  every link's exit reason while it answers (D42). */
+export function serverLogFile(dataRoot: string): string {
+  return path.join(dataRoot, "swarm-server.log");
+}
+
+/** Set by a CLI spawning a server to its own command line, which the server's start line names (D42). */
+export const SERVER_STARTER_ENV = "SWARM_SERVER_STARTER";
+
 /** The lock a starting server takes beside its state file and holds while it runs, its pid inside
  *  (swarm-relay D40): one server per data home. */
 export function serverStartLock(dataRoot: string): string {
