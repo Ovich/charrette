@@ -46,7 +46,8 @@ by it.
    way other slices import:
    1. `$S merge-lock --onto <target>`. `held by …`: run `$S wait --mentions --timeout 540000`
       in the foreground for its merged event, then re-arm the listener in the background and run
-      `merge-lock` again.
+      `merge-lock` again. `… is checked out at …` (exit 5): git would refuse the push; do what
+      the answer says.
    2. Commit, then `git rebase <target>`.
    3. A conflict in a file another runner changed: resolve it. You merge second; the
       resolution is yours, but the other runner hears of it: `merged` (step 5) ends, for each

@@ -13,7 +13,7 @@ import { fullText, seqLine } from "./format.ts";
 import { nameHandle, unmatchedMentions } from "../board/mentions.ts";
 import { registerBoardDocument } from "./aiview-document.ts";
 import { unclaimedLines } from "./unclaimed.ts";
-import { git } from "./git.ts";
+import { git, worktreeHolding } from "./git.ts";
 import { conflictsOf, headReflogLength } from "./conflicts.ts";
 import { runLink } from "../link/link.ts";
 
@@ -821,6 +821,14 @@ ${rearm}` : rearm;
       if (await refusedPaused(p, "merge-lock")) break;
       // the branch merged into: a worktree does not say which branch it left, so the runner names it (D59)
       const onto = need("--onto");
+      // a branch checked out in a worktree refuses the push: say where, grant nothing (validation finding 4)
+      const holding = p.worktree ? worktreeHolding(p.worktree, onto) : null;
+      if (holding) {
+        process.exitCode = 5;
+        const line = `${onto} is checked out at ${holding}: ask the orchestrator to detach it, then run merge-lock again`;
+        emit({ runner: p.name, granted: false, checkedOutAt: holding, next: line }, line);
+        break;
+      }
       // what the branch wrote without a claim, committed or not, before the lock; a flag informs, never blocks
       const reconciled = p.worktree ? branchChangedIn(p.worktree, onto) : [];
       // what it held before the reconcile claims the rest: only those written without a claim are told
