@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cn } from "../../lib/utils.ts";
 
-/** Tag chip base — the grey pill. Kind chips are the colored KindChip component. */
+/** Tag chip base: the quiet pill. Kind chips are the coloured KindChip component. */
 export function Badge({
   className,
   active = false,
@@ -10,10 +10,8 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center whitespace-nowrap rounded-full border px-2 py-px text-[11px]",
-        active
-          ? "border-accent/35 bg-accent-soft text-accent"
-          : "border-border bg-surface-2 text-muted-foreground",
+        "inline-flex h-[22px] items-center whitespace-nowrap rounded-full border px-2 text-[12px]",
+        active ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-surface-2 hover:text-foreground",
         className,
       )}
       {...props}

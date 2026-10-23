@@ -59,11 +59,45 @@ const page = `<!doctype html>
 <title>${text(label)}</title>
 <style data-basecoat>${css}</style>
 <style data-json-tree>${treeCss}</style>
+<style data-identity>
+  /* aiview's identity on Basecoat's variables, so the bench reads as part of the viewer:
+     signal blue the one accent, cool greys, Inter at 13px. */
+  :root {
+    --radius: 8px;
+    --background: #f6f7f9; --foreground: #161a22;
+    --card: #ffffff; --card-foreground: #161a22; --popover: #ffffff; --popover-foreground: #161a22;
+    --primary: #3355e0; --primary-foreground: #ffffff;
+    --secondary: #eef0f3; --secondary-foreground: #161a22;
+    --muted: #eef0f3; --muted-foreground: #5b6474;
+    --accent: #e8edfd; --accent-foreground: #3355e0;
+    --destructive: #c7354a; --border: #e1e4ea; --input: #e1e4ea; --ring: #3355e0;
+    --sidebar: #fbfbfc; --sidebar-foreground: #161a22; --sidebar-primary: #3355e0; --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #e8edfd; --sidebar-accent-foreground: #3355e0; --sidebar-border: #e1e4ea; --sidebar-ring: #3355e0;
+    --ok: #17865a; --warn: #b86e00; --danger: #c7354a;
+    --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --default-font-family: var(--font-sans);
+    --font-mono: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+    --default-mono-font-family: var(--font-mono);
+  }
+  .dark {
+    --background: #0f1218; --foreground: #e7eaf0;
+    --card: #161a22; --card-foreground: #e7eaf0; --popover: #161a22; --popover-foreground: #e7eaf0;
+    --primary: #6d86ff; --primary-foreground: #0f1218;
+    --secondary: #1d222c; --secondary-foreground: #e7eaf0;
+    --muted: #1d222c; --muted-foreground: #98a1b2;
+    --accent: #1d2645; --accent-foreground: #6d86ff;
+    --destructive: #f0687c; --border: #262c38; --input: #262c38; --ring: #6d86ff;
+    --sidebar: #12151c; --sidebar-foreground: #e7eaf0; --sidebar-primary: #6d86ff; --sidebar-primary-foreground: #0f1218;
+    --sidebar-accent: #1d2645; --sidebar-accent-foreground: #6d86ff; --sidebar-border: #262c38; --sidebar-ring: #6d86ff;
+    --ok: #3cc28a; --warn: #e3a23b; --danger: #f0687c;
+  }
+</style>
 <style>
-  body { margin: 0; background: var(--background); color: var(--foreground); }
+  body { margin: 0; background: var(--background); color: var(--foreground);
+    font: 13px/1.5 var(--font-sans); -webkit-font-smoothing: antialiased; }
   .bench-bar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px;
-    padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--background); }
-  .bench-label { font-weight: 600; font-size: 15px; white-space: nowrap; }
+    min-height: 44px; padding: 6px 20px; border-bottom: 1px solid var(--border); background: var(--card); }
+  .bench-label { font-weight: 600; font-size: 13px; white-space: nowrap; }
   .bench-tools { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 8px; }
   .bench { padding: 16px; }
 </style>

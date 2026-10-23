@@ -237,3 +237,15 @@ test("pending: clear empties one document without touching another", () => {
   assert.equal(index.pendingFor(b.id).length, 1);
   assert.equal(index.allPending().length, 1);
 });
+
+test("pin: a document starts unpinned, pins and unpins, and keeps its pin when registered again", () => {
+  const abs = write("docs/b.workbench.html", "<title>Bench</title>");
+  const d = index.register(abs);
+  assert.equal(d.pinned, false);
+  assert.equal(index.setPinned(d.id, true), true);
+  assert.equal(index.get(d.id)!.pinned, true);
+  assert.equal(index.register(abs).pinned, true);
+  assert.equal(index.setPinned(d.id, false), true);
+  assert.equal(index.get(d.id)!.pinned, false);
+  assert.equal(index.setPinned(9999, true), false);
+});

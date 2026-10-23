@@ -201,7 +201,7 @@ test("a mark with a seq opens Conversation on that post (SL5)", () => {
   const mk = lane("refresh-tokens/S4").querySelector(".mk.m-agreement") as HTMLElement;
   fireEvent.click(mk);
   const seg = within(screen.getByRole("group", { name: "This run" }));
-  expect(seg.getByRole("button", { name: "Conversation" }).getAttribute("aria-pressed")).toBe("true");
+  expect(seg.getByRole("button", { name: "Analytics" }).getAttribute("aria-pressed")).toBe("false");
   expect(screen.getByRole("region", { name: "The conversation" })).toBeTruthy();
   expect(scrolled).toEqual([`seq-${agreement.seq}`]);
   expect(document.getElementById(`seq-${agreement.seq}`)).toBeTruthy();

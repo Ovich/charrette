@@ -31,3 +31,13 @@ export async function setActiveProject(project: string): Promise<string> {
 
 export const rawUrl = (id: number): string => `/api/raw/${id}?t=${Date.now()}`;
 export const assetUrl = (docId: number, rel: string): string => `/api/asset/${docId}/${rel}`;
+
+/** Pin or unpin a document in the viewer's menu; every open tab hears it as an index change. */
+export async function setPinned(id: number, pinned: boolean): Promise<void> {
+  const r = await fetch("/api/pin", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id, pinned }),
+  });
+  if (!r.ok) throw new Error(`POST /api/pin: ${r.status}`);
+}

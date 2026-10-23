@@ -129,6 +129,14 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
   const items = useMemo(() => (snapshot ? conversation(snapshot, { run: picked, follow: focus }) : []), [snapshot, picked, focus]);
   // a closed run picked reads "Archived <when> · read only · <done> of <of> slices" first, a brainstorm its seats
   const shown = useMemo(() => narrow(items, narrowing), [items, narrowing]);
+  // every phase the run opened, in order, whoever is followed: the phase strip's segments
+  const phases = useMemo(
+    () =>
+      snapshot && picked !== null
+        ? conversation(snapshot, { run: picked, follow: null }).flatMap((i) => (i.kind === "phase" ? [{ name: i.name, text: i.text }] : []))
+        : [],
+    [snapshot, picked],
+  );
   const archivedLine = useMemo(() => (archived ? { closed: archived.closed, summary: archived.kind === "brainstorm" ? seatCount(archived.of) : archived.kind === "task" ? workerCount(archived.of) : `${archived.done} of ${archived.of} slices` } : null), [archived]);
 
   useEffect(() => {
@@ -208,6 +216,7 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
             onPick={pickRun}
             analytics={across !== null}
             onAnalytics={() => showAcross(across ?? DEFAULT_SCOPE)}
+            closedCount={closedRuns.length}
           />
           {menuOpen && <ArchivePanel runs={searchArchive} total={closedRuns.length} onPick={pickRun} onClose={closeMenu} />}
           {missingRun !== null && <p className="notice">run {missingRun} is not on this board</p>}
@@ -218,18 +227,23 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
               No run on {snapshot.name} yet.
             </p>
           ) : selectedRun && runView === "analytics" ? (
-            <RunAnalytics key={selectedRun.run} repo={snapshot.repo} summary={selectedRun} onView={(v) => showRunView(selectedRun.run, v)} onOpenPost={openPost} />
+            <RunAnalytics key={selectedRun.run} repo={snapshot.repo} summary={selectedRun} onView={(v) => showRunView(selectedRun.run, v)} onOpenPost={openPost} phases={phases} />
           ) : (
             <>
-              {selectedRun && <RunViewSwitch view="conversation" line={summaryLine(selectedRun)} phase={selectedRun.phase ?? null} json={null} onView={(v) => showRunView(selectedRun.run, v)} />}
+              {selectedRun && <RunViewSwitch view="conversation" line={summaryLine(selectedRun)} phase={selectedRun.phase ?? null} phases={phases} json={null} onView={(v) => showRunView(selectedRun.run, v)} />}
               {/* the roster sits left of the conversation, under a run tab only: All has none */}
               <div className={selectedRun && members.length > 0 ? "run-body with-roster" : "run-body"}>
-                {selectedRun && <AgentStrip agents={members} hue={runHue(selectedRun.code)} follow={focus} onFollow={setFocus} />}
                 <div className="run-main">
                   <ConversationFilters items={items} narrow={narrowing} onNarrow={setNarrowing} />
                   <Conversation items={shown} archived={archivedLine} fresh={NONE} />
-                  {claims && <ClaimsRow rows={claims} />}
+                  {claims && !(selectedRun && members.length > 0) && <ClaimsRow rows={claims} />}
                 </div>
+                {selectedRun && members.length > 0 && (
+                  <aside className="side" data-component="RunRail">
+                    <AgentStrip agents={members} hue={runHue(selectedRun.code)} follow={focus} onFollow={setFocus} />
+                    {claims && <ClaimsRow rows={claims} />}
+                  </aside>
+                )}
               </div>
             </>
           )}

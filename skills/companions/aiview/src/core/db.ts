@@ -54,6 +54,8 @@ export interface Document {
   tags: string[];
   /** Exclusive membership: at most one group per doc. null = ungrouped. */
   group_slug: string | null;
+  /** Pinned by the person: shown in the viewer's menu under its kind. */
+  pinned: boolean;
   created_at: string;
   last_seen_at: string;
 }
@@ -105,6 +107,7 @@ interface Row {
   kind: string;
   tags: string;
   group_slug: string | null;
+  pinned: number;
   created_at: string;
   last_seen_at: string;
 }
@@ -142,6 +145,8 @@ export interface Index {
   setActiveProject(slug: string): string;
   remove(id: number): boolean;
   touch(id: number): void;
+  /** Pin or unpin a document; false when there is no such document. */
+  setPinned(id: number, pinned: boolean): boolean;
   /** Register work the document is waiting on; returns the pending id. */
   addPending(documentId: number, label: string, note?: string): number;
   /** Finish one unit of work — the row is deleted. Returns its document id, or null. */
@@ -179,6 +184,7 @@ export function openIndex(dbPath: string = SQLITE_PATH, root: string = STORE_ROO
   if (!cols.includes("tags")) db.exec("ALTER TABLE documents ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'");
   if (!cols.includes("kind")) db.exec("ALTER TABLE documents ADD COLUMN kind TEXT NOT NULL DEFAULT ''");
   if (!cols.includes("group_slug")) db.exec("ALTER TABLE documents ADD COLUMN group_slug TEXT");
+  if (!cols.includes("pinned")) db.exec("ALTER TABLE documents ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
   db.exec("CREATE TABLE IF NOT EXISTS groups (slug TEXT PRIMARY KEY, title TEXT)");
   db.exec(
     "CREATE TABLE IF NOT EXISTS projects (slug TEXT PRIMARY KEY, title TEXT, paths TEXT NOT NULL DEFAULT '[]')",
@@ -203,6 +209,7 @@ export function openIndex(dbPath: string = SQLITE_PATH, root: string = STORE_ROO
   const parse = (row: Row): Document => ({
     ...row,
     tags: JSON.parse(row.tags) as string[],
+    pinned: row.pinned === 1,
     abs_path: toAbs(row.file_path, root),
   });
 
@@ -421,6 +428,10 @@ export function openIndex(dbPath: string = SQLITE_PATH, root: string = STORE_ROO
       if (!row) return false;
       db.prepare("DELETE FROM documents WHERE id = ?").run(row.id);
       return true;
+    },
+
+    setPinned(id, pinned) {
+      return db.prepare("UPDATE documents SET pinned = ? WHERE id = ?").run(pinned ? 1 : 0, Number(id)).changes > 0;
     },
 
     touch(id) {

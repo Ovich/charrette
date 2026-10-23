@@ -19,7 +19,7 @@ export function DocPath({ path }: { path: string }) {
       data-component="DocPath"
       onClick={copy}
       title={copied ? "Path copied" : `Copy path\n${path}`}
-      className="inline-flex min-w-0 max-w-[38ch] shrink cursor-pointer items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-md border border-border bg-surface-2 py-0.5 pl-1.5 pr-2 font-mono text-[11px] text-muted-foreground hover:bg-surface hover:text-foreground"
+      className="inline-flex min-w-0 max-w-[38ch] shrink cursor-pointer items-center gap-1.5 overflow-hidden whitespace-nowrap h-7 rounded-md px-2 font-mono text-[11px] text-muted-foreground hover:bg-surface-2 hover:text-foreground"
     >
       {copied ? <Check size={12} className="shrink-0 text-ok" /> : <Copy size={12} className="shrink-0 opacity-60" />}
       {copied ? "Path copied" : truncatePath(path)}

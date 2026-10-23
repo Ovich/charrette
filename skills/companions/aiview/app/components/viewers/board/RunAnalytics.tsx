@@ -13,18 +13,21 @@ export function RunAnalytics({
   summary,
   onView,
   onOpenPost,
+  phases = [],
 }: {
   repo: string;
   summary: RunSummary;
   onView: (view: RunView) => void;
   onOpenPost: (seq: number) => void;
+  /** Every phase the run opened, for the strip. */
+  phases?: { name: string; text: string }[];
 }) {
   const { stats, body, error } = useStats(repo, { run: summary.run });
   const run = stats?.runs.find((r) => r.run === summary.run) ?? null;
   const state = error ? "error" : stats === null ? "loading" : (run?.kind ?? "loading");
   return (
     <>
-      <RunViewSwitch view="analytics" line={run && stats ? runLine(run, stats.totals) : summaryLine(summary)} phase={summary.phase ?? null} json={body} onView={onView} />
+      <RunViewSwitch view="analytics" line={run && stats ? runLine(run, stats.totals) : summaryLine(summary)} phase={summary.phase ?? null} phases={phases} json={body} onView={onView} />
       <section className="analytics" data-component="RunAnalytics" data-state={state}>
         {error ? (
           <p className="notice">{error}</p>

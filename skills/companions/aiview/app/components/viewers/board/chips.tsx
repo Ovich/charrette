@@ -16,6 +16,20 @@ export function RunnerTag({ name, plan = true }: { name: string; plan?: boolean 
   );
 }
 
+/** An agent's mark: a rounded square in its run's hue, its slice in two or three letters
+ *  ("S9", "W13", "OR"); the orchestrator's outlined. */
+export function AgentMark({ name }: { name: string }) {
+  const { code, slice } = runnerLabel(name);
+  const orch = slice === "orchestrator";
+  const m = slice.match(/^([a-z])[a-z-]*?(\d+)$/i);
+  const text = orch ? "OR" : m ? `${m[1]}${m[2]}`.toUpperCase() : slice.slice(0, 2).toUpperCase();
+  return (
+    <span className={orch ? "mark orch" : "mark"} style={{ "--h": runHue(code) } as CSSProperties} aria-hidden="true" data-component="AgentMark">
+      {text}
+    </span>
+  );
+}
+
 /** Each runner's funny name by `<plan>/<slice>` (D43), provided by App from the snapshot. */
 export const NicksContext = createContext<ReadonlyMap<string, string>>(new Map());
 

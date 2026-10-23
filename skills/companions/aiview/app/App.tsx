@@ -4,6 +4,7 @@ import { useDocuments } from "./hooks/useDocuments.ts";
 import { pointerHash, readPointer, type Pointer } from "../src/core/pointer.ts";
 import { Sidebar } from "./components/shell/Sidebar.tsx";
 import { TopBar } from "./components/shell/TopBar.tsx";
+import { DocumentsPanel } from "./components/docs/DocumentsPage.tsx";
 import { DocHeader } from "./components/docs/DocHeader.tsx";
 import { MarkdownView } from "./components/viewers/MarkdownView.tsx";
 import { PendingCards } from "./components/docs/PendingCards.tsx";
@@ -51,6 +52,9 @@ export function shouldLoad(
   return changedTick === 0 || changedId === null || changedId === currentId;
 }
 
+/** The Documents view is on, for this tab. */
+export const DOCUMENTS_VIEW_KEY = "aiview.documentsView";
+
 export function App() {
   const { docs, groups, projects, activeProject, startId, version, connection, changedTick, changedId, dataTick, dataId, shownTick, shown, showDoneTick } = useDocuments();
   const [pointer, setPointer] = useState<Pointer | null>(hashPointer);
@@ -63,6 +67,30 @@ export function App() {
   /** Set when a document was opened from a Composition label: which component to scroll to. */
   const [sourceTarget, setSourceTarget] = useState<{ id: number; component: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  /** Board picked in a project that has none: the empty board shows instead of a document. */
+  const [noBoard, setNoBoard] = useState(false);
+  /** The Documents view: the list panel left of the open document. Opening a document from the
+   *  panel keeps it; Board or a pinned item from the menu leaves it. Remembered for this tab. */
+  const [documentsShown, setDocumentsShownState] = useState(() => {
+    try {
+      return sessionStorage.getItem(DOCUMENTS_VIEW_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setDocumentsShown = (on: boolean) => {
+    setDocumentsShownState(on);
+    try {
+      sessionStorage.setItem(DOCUMENTS_VIEW_KEY, on ? "1" : "0");
+    } catch {
+      // storage unavailable: the view lasts this page only
+    }
+  };
+  const showDocuments = () => {
+    setNoBoard(false);
+    setDocumentsShown(true);
+  };
+  useEffect(() => setNoBoard(false), [activeProject]);
   /** Where this tab was before the agent's pointer moved it, as a hash: what the person
    *  was reading, and where they go back to once the question is answered. Set by the
    *  first pointer only, so a run of questions returns to the start and not to the
@@ -78,6 +106,7 @@ export function App() {
   const open = useCallback(
     (id: number) => {
       returnTo.current = null; // the person chose where to be: nothing to go back to
+      setNoBoard(false);
       setCurrentId(id);
       location.hash = `doc=${id}`;
       // Opening a document outside the active project moves the mode to it (D9),
@@ -187,11 +216,20 @@ export function App() {
     document.title = response?.document.title ?? "aiview";
   }, [response]);
 
+  // A document reached by a link or on load, outside the active project: the project
+  // follows it, as it does when the person opens one (D9). Only on a new document, so
+  // picking another project afterwards is not undone.
+  const shownDoc = response?.document;
+  useEffect(() => {
+    if (shownDoc && activeProject !== "*" && activeProject !== "" && shownDoc.project !== activeProject) pickProject(shownDoc.project);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownDoc?.id]);
+
   const doc = response?.document ?? null;
   const format = response?.format;
 
   return (
-    <div className="grid min-h-screen grid-cols-[320px_minmax(0,1fr)] max-md:grid-cols-1">
+    <div className="flex min-h-screen max-md:flex-col">
       <Sidebar
         docs={docs}
         groups={groups}
@@ -200,18 +238,55 @@ export function App() {
         connection={connection}
         version={version}
         currentId={currentId}
-        onOpen={open}
+        onOpen={(id) => {
+          setDocumentsShown(false); // Board and the pinned items leave the Documents view
+          open(id);
+        }}
         onPickProject={pickProject}
+        onEmptyBoard={() => {
+          setDocumentsShown(false);
+          setNoBoard(true);
+        }}
+        emptyBoard={noBoard}
+        documentsShown={documentsShown}
+        onDocuments={showDocuments}
       />
-      <div className="flex min-w-0 flex-col">
-        <TopBar doc={doc} groups={groups} printable={format === "markdown"} />
-        <main className="w-full px-7 pb-20 pt-8 max-md:px-4 max-md:pt-5">
-          {doc === null && !loading && (
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar
+          doc={noBoard ? null : doc}
+          here={noBoard ? "Board" : undefined}
+          groups={groups}
+          printable={!noBoard && format === "markdown"}
+          projects={projects}
+          activeProject={activeProject}
+          allDocs={docs}
+          onPickProject={pickProject}
+        />
+        <div className="flex min-w-0 flex-1 max-md:flex-col">
+        {documentsShown && <DocumentsPanel docs={docs} groups={groups} activeProject={activeProject} currentId={currentId} onOpen={open} />}
+        <main
+          className={
+            format === "swarm" || doc?.kind === "workbench"
+              ? "min-w-0 flex-1"
+              : format === "markdown"
+                ? "mx-auto w-full min-w-0 max-w-[1040px] flex-1 px-10 pb-20 pt-7 max-md:px-4 max-md:pt-5"
+                : "min-w-0 flex-1 px-10 pb-20 pt-7 max-md:px-4 max-md:pt-5"
+          }
+        >
+          {noBoard && (
+            <div data-component="EmptyBoard" className="grid place-items-center px-6 py-24 text-center text-muted-foreground">
+              <div>
+                <div className="mb-1 text-[15px] font-medium text-foreground">No board yet</div>
+                Your agent opens one when a plan or a swarm starts in this project.
+              </div>
+            </div>
+          )}
+          {!noBoard && doc === null && !loading && (
             <p className="text-muted-foreground">Pick a document on the left.</p>
           )}
-          {doc && (
+          {!noBoard && doc && (
             <>
-              <DocHeader doc={doc} />
+              {format === "markdown" && <DocHeader doc={doc} />}
               <PendingCards items={response!.pending ?? []} />
               {response!.content === null && format !== "pdf" && (
                 <p className="text-muted-foreground">
@@ -242,6 +317,7 @@ export function App() {
             </>
           )}
         </main>
+        </div>
       </div>
       {toast !== null && (
         <div

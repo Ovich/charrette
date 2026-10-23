@@ -172,13 +172,15 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
   useBenchRelay(benched ? frame : NO_FRAME, doc ?? NO_DOC, benched ? dataTick : 0);
   const served = withTheme(
     withSpotlight(bridged ?? withBridge(mode === "composition" ? withOverlay(html, { bindings, target }) : html)),
-    theme,
+    // a workbench is a tool, not a design under review: it follows the OS theme, no toggle
+    workbench ? "system" : theme,
   );
   const bound = bindings?.sources.length ?? 0;
 
   return (
     <div data-component="MockupFrame">
-      <div className="mb-2.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+      {(!workbench || pointed.length > 0 || controls.actions.length > 0) && (
+      <div className={workbench ? "flex flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-1.5 text-[12px] text-muted-foreground" : "mb-2.5 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground"}>
         {!workbench && (
           <>
             <span>viewport</span>
@@ -200,14 +202,18 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
             </ToggleGroup>
           </>
         )}
-        <span className={workbench ? undefined : "ml-3"}>theme</span>
-        <ToggleGroup type="single" value={theme} onValueChange={selectTheme} data-component="MockupThemeToggle">
-          {THEMES.map((t) => (
-            <ToggleGroupItem key={t} value={t}>
-              {t}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        {!workbench && (
+          <>
+            <span className="ml-3">theme</span>
+            <ToggleGroup type="single" value={theme} onValueChange={selectTheme} data-component="MockupThemeToggle">
+              {THEMES.map((t) => (
+                <ToggleGroupItem key={t} value={t}>
+                  {t}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </>
+        )}
         {bound > 0 && (
           <span className="font-mono" data-component="BoundCount">
             {bound} source{bound > 1 ? "s" : ""}
@@ -227,7 +233,7 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
         )}
         {pointed.length > 0 && (
           <span
-            className="ml-3 inline-flex items-center gap-1 rounded-md bg-[#4f46e5] px-2 py-0.5 font-medium text-white"
+            className="ml-3 inline-flex items-center gap-1 rounded-md bg-accent px-2 py-0.5 font-medium text-white"
             data-component="PointerChip"
           >
             pointing at {pointed.join(", ")}
@@ -248,6 +254,7 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
           </span>
         )}
       </div>
+      )}
       <div
         ref={stage}
         data-component="MockupStage"
@@ -269,7 +276,9 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
             className={
               full
                 ? "block h-screen w-full max-w-full border-0 bg-white"
-                : "block h-[calc(100vh-10rem)] w-full max-w-full rounded-[10px] border border-border bg-white shadow-lg transition-[width]"
+                : workbench
+              ? "block h-[calc(100vh-48px)] w-full max-w-full border-0 bg-background"
+              : "block h-[calc(100vh-10rem)] w-full max-w-full rounded-[8px] border border-border bg-white transition-[width]"
             }
           />
           {/* Shown while the pointer is over the mockup or a control in it has focus; a pointer

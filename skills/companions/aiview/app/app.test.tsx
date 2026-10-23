@@ -1,6 +1,6 @@
 // Component + pure-logic tests (vitest, jsdom). Visual acceptance runs against the mockup.
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
 afterEach(cleanup);
 import { applyFilters, applyScope } from "./hooks/useFilters.ts";
@@ -11,6 +11,7 @@ import { docActivity, sidebarEntries } from "./hooks/useSidebarEntries.ts";
 import { DocItem } from "./components/docs/DocItem.tsx";
 import { ProjectSelector } from "./components/shell/ProjectSelector.tsx";
 import { Sidebar } from "./components/shell/Sidebar.tsx";
+import { DocumentsPanel as DocumentsPage } from "./components/docs/DocumentsPage.tsx";
 import type { DocumentWithState } from "./lib/api.ts";
 import { readFileSync } from "node:fs";
 
@@ -20,6 +21,7 @@ const doc = (over: Partial<DocumentWithState>): DocumentWithState => ({
   abs_path: "C:\\JOBS\\docs\\x.brainstorm.md",
   project: "JOBS",
   title: "Board X",
+  pinned: false,
   kind: "brainstorm",
   tags: ["aiview"],
   group_slug: null,
@@ -108,7 +110,7 @@ describe("DocItem", () => {
     const onOpen = vi.fn();
     const d = doc({});
     render(<DocItem doc={d} active={false} onOpen={onOpen} />);
-    const item = screen.getByRole("button");
+    const item = document.querySelector('[data-component="DocItem"]') as HTMLElement;
     expect(item.getAttribute("title")).toBe(d.abs_path);
     fireEvent.click(item);
     expect(onOpen).toHaveBeenCalledWith(1);
@@ -223,15 +225,15 @@ describe("tag chips", () => {
       doc({ id: i + 1, tags: [`t${i}`], updated_at: at(i + 1) }),
     );
     render(
-      <Sidebar docs={docs} groups={{}} projects={{ JOBS: "JOBS" }} activeProject="JOBS"
-        connection="live" currentId={null} onOpen={() => {}} onPickProject={() => {}} />,
+      <DocumentsPage docs={docs} groups={{}} activeProject="JOBS" currentId={null} onOpen={() => {}} />,
     );
+    fireEvent.click(screen.getByLabelText("Kinds and tags"));
     const chips = () => [...document.querySelectorAll('[data-component="TagChips"] [role="button"]')].map((b) => b.textContent);
     expect(chips()).toHaveLength(TAGS_SHOWN);
     expect(chips()[0]).toBe(`t${TAGS_SHOWN + 2}`);
     fireEvent.click(screen.getByText("+ 3 more"));
     expect(chips()).toHaveLength(TAGS_SHOWN + 3);
-    fireEvent.click(screen.getByText("t0"));
+    fireEvent.click(within(document.querySelector('[data-component="TagChips"]') as HTMLElement).getByText("t0"));
     fireEvent.click(screen.getByText("fewer"));
     expect(chips()).toHaveLength(TAGS_SHOWN + 1);
     expect(chips()).toContain("t0");
@@ -309,8 +311,7 @@ describe("Sidebar — clicking a row's kind chip", () => {
   ];
   const render_ = (onOpen: (id: number) => void) =>
     render(
-      <Sidebar docs={docs} groups={{ g: "Group G" }} projects={{ JOBS: "JOBS" }} activeProject="JOBS"
-        connection="live" currentId={null} onOpen={onOpen} onPickProject={() => {}} />,
+      <DocumentsPage docs={docs} groups={{ g: "Group G" }} activeProject="JOBS" currentId={null} onOpen={onOpen} />,
     );
 
   test("a flat row: clicking its kind chip opens the document", () => {
@@ -418,7 +419,7 @@ describe("MockupFrame modes", () => {
     expect(onOpenSource).toHaveBeenCalledWith("tools.mockup.html", "ToolPrefix");
   });
 
-  test("a workbench keeps the theme alone, at full width, and leaves the stored choices for the next mockup", async () => {
+  test("a workbench has no toggle at all (the OS theme), fills the page, and leaves the stored choices for the next mockup", async () => {
     const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
     const { OVERLAY_MARK } = await import("./lib/overlay.ts");
     localStorage.setItem("aiview.viewport", "mobile");
@@ -427,7 +428,7 @@ describe("MockupFrame modes", () => {
     render(<MockupFrame html="<html><body><p>h</p></body></html>" bindings={bindings} workbench />);
     expect(document.querySelector('[data-component="MockupViewportToggle"]')).toBeNull();
     expect(document.querySelector('[data-component="MockupModeToggle"]')).toBeNull();
-    expect(document.querySelector('[data-component="MockupThemeToggle"]')).toBeTruthy();
+    expect(document.querySelector('[data-component="MockupThemeToggle"]')).toBeNull();
     expect(document.querySelector("iframe")!.getAttribute("srcdoc")).not.toContain(OVERLAY_MARK);
     expect((document.querySelector('[data-component="MockupStage"] > div') as HTMLElement).style.width).toBe("");
     expect(localStorage.getItem("aiview.viewport")).toBe("mobile");
@@ -773,7 +774,7 @@ describe("Sidebar footer: the way to the repository", () => {
     const bare = footer(null);
     expect(bare.querySelector('[data-component="Version"]')).toBeNull();
     expect(bare.querySelector('[data-component="GitHubLink"]')).not.toBeNull();
-    expect(bare.textContent).toContain("1 documents · JOBS");
+    expect(bare.textContent).toContain("1 documents");
   });
 });
 
@@ -810,5 +811,45 @@ describe("color scheme", () => {
     const stylesheet = readFileSync(`${import.meta.dirname}/styles.css`, "utf8");
     const root = stylesheet.match(/(?:^|\n):root\s*\{([^}]*)\}/)?.[1] ?? "";
     expect(root).toMatch(/(?:^|[;\s])color-scheme\s*:\s*light\s+dark\s*;/);
+  });
+});
+
+describe("pinned documents in the menu", () => {
+  test("one menu item per kind holding a pin, its documents by title; nothing pinned, nothing shown", async () => {
+    const { pinnedByKind, kindPlural } = await import("./components/shell/PinnedNav.tsx");
+    const docs = [
+      doc({ id: 1, kind: "workbench", title: "B bench", pinned: true }),
+      doc({ id: 2, kind: "workbench", title: "A bench", pinned: true }),
+      doc({ id: 3, kind: "mockup", title: "Shell", pinned: true }),
+      doc({ id: 4, kind: "plan", title: "Not pinned" }),
+    ];
+    expect(pinnedByKind(docs).map((k) => [k.kind, k.docs.map((d) => d.id)])).toEqual([["mockup", [3]], ["workbench", [2, 1]]]);
+    expect(pinnedByKind([doc({})])).toEqual([]);
+    expect(kindPlural("workbench")).toBe("Workbenches");
+    expect(kindPlural("mockup")).toBe("Mockups");
+  });
+
+  test("the sidebar shows the pinned bench under its kind and opens it on click; the row's pin does not open the row", () => {
+    const onOpen = vi.fn();
+    const docs = [doc({ id: 9, kind: "workbench", title: "AI bench", pinned: true }), doc({ id: 10, title: "Other" })];
+    render(
+      <Sidebar docs={docs} groups={{}} projects={{ JOBS: "JOBS" }} activeProject="JOBS"
+        connection="live" currentId={null} onOpen={onOpen} onPickProject={() => {}} />,
+    );
+    fireEvent.click(screen.getByLabelText("Keep the menu open")); // the rail shows icons only
+    fireEvent.click(screen.getByLabelText("Workbenches")); // pinned kinds start closed
+    const pinnedRow = document.querySelector('[data-component="PinnedDoc"]') as HTMLElement;
+    expect(pinnedRow.textContent).toBe("AI bench");
+    fireEvent.click(pinnedRow);
+    expect(onOpen).toHaveBeenCalledWith(9);
+    onOpen.mockClear();
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({}) })));
+    cleanup();
+    render(<DocumentsPage docs={docs} groups={{}} activeProject="JOBS" currentId={null} onOpen={onOpen} />);
+    const other = screen.getByText("Other").closest('[data-component="DocItem"]')!;
+    fireEvent.click(other.querySelector('[data-component="PinToggle"]')!);
+    expect(onOpen).not.toHaveBeenCalled();
+    expect((fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]![0]).toBe("/api/pin");
+    vi.unstubAllGlobals();
   });
 });

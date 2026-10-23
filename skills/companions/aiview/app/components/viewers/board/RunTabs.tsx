@@ -1,4 +1,4 @@
-// The board's top row (D7, mockup #643): ☰ opens the archive, All, one tab per open run, an
+// The board's top row (D7, mockup #643): Archive first, opening the closed runs, then one tab per open run, an
 // archived run picked as a tab with ×, and the merge lock at the row's end, always visible.
 // Analytics, beside the lock, opens the across-runs view; while it shows, no run tab is pressed.
 import type { BoardSnapshot } from "../../../../../swarm-board/src/client/reader.ts";
@@ -13,15 +13,26 @@ function TabCount({ tab }: { tab: RunTab }) {
   return <span className="of">{tab.kind === "brainstorm" ? seatCount(tab.of) : tab.kind === "task" ? workerCount(tab.of) : `${tab.done}/${tab.of}`}</span>;
 }
 
+/** The tab's status pill: live or quiet in its colour, the count after it. */
+function TabState({ tab }: { tab: RunTab }) {
+  return (
+    <span className={`st s-${tab.state}`} data-component="RunState" aria-label={tab.state}>
+      {tab.state}
+      {tab.of > 0 && " · "}
+      <TabCount tab={tab} />
+    </span>
+  );
+}
+
 function RunTabButton({ tab, picked, onPick }: { tab: RunTab; picked: boolean; onPick: () => void }) {
   return (
     <button className={tab.state === "closed" ? "run closed" : "run"} data-component="RunTab" aria-pressed={picked} onClick={onPick}>
-      <span className={`dot ${tab.state}`} aria-label={tab.state} />
       <span className="code" style={{ color: `hsl(${runHue(tab.code)} 55% 45%)` }}>
         {tab.code}
       </span>
       <span className="t">{tab.title}</span>
-      <TabCount tab={tab} />
+      <span className="kind">{tab.kind}</span>
+      <TabState tab={tab} />
     </button>
   );
 }
@@ -37,6 +48,7 @@ export function RunTabs({
   onPick,
   analytics,
   onAnalytics,
+  closedCount = 0,
 }: {
   tabs: RunTab[];
   archived: RunTab | null;
@@ -49,11 +61,13 @@ export function RunTabs({
   /** The across-runs view is shown. */
   analytics: boolean;
   onAnalytics: () => void;
+  /** How many closed runs the archive holds, on its pill. */
+  closedCount?: number;
 }) {
   return (
     <nav className="runs" data-component="RunTabs" aria-label="Runs">
       <button
-        className="menu"
+        className="run menu"
         aria-label="Archive"
         aria-expanded={menuOpen}
         onClick={(e) => {
@@ -64,9 +78,8 @@ export function RunTabs({
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
           <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
         </svg>
-      </button>
-      <button className="run" aria-pressed={!analytics && pick === null} onClick={() => onPick(null)}>
-        All
+        <span className="t">Archive</span>
+        {closedCount > 0 && <span className="n">{closedCount}</span>}
       </button>
       {tabs.map((t) => (
         <RunTabButton key={t.run} tab={t} picked={!analytics && pick === t.run} onPick={() => onPick(t.run)} />
@@ -77,9 +90,12 @@ export function RunTabs({
             {archived.code}
           </span>
           <span className="t">{archived.title}</span>
-          <TabCount tab={archived} />
-          <span className="of">archived</span>
-          <button className="x" aria-label="Close the archived run" onClick={() => onPick(null)}>
+          <span className="kind">{archived.kind}</span>
+          <span className="st">
+            archived{archived.of > 0 && " · "}
+            <TabCount tab={archived} />
+          </span>
+          <button className="x" aria-label="Close the archived run" onClick={() => onPick(tabs[0]?.run ?? null)}>
             ×
           </button>
         </span>

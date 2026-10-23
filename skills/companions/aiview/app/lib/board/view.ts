@@ -331,12 +331,12 @@ export function archive(snap: BoardSnapshot, query: string): ArchivedRun[] {
 }
 
 /** The tab the board opens on by itself (D17): the one open run; with none open, the most recently
- *  closed, as its archived tab; All (null) with two or more open, or no run at all. */
+ *  closed, as its archived tab; with two or more open, the newest; null with no run at all. */
 export function openingRun(snap: BoardSnapshot): RunId | null {
   const open = snap.runs.filter((r) => r.open);
   if (open.length === 1) return open[0].run;
   if (open.length === 0) return archive(snap, "")[0]?.run ?? null;
-  return null;
+  return Math.max(...open.map((r) => r.run));
 }
 
 /** A held file (D16): a post about a path that names one of its holders, by a member not holding it. */

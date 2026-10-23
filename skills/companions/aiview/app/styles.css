@@ -1,47 +1,69 @@
 @import "tailwindcss";
 
-/* Tokens from the approved mockup (docs/design/mockups/2026-08-23-aiview-app.mockup.html) */
-/* The OS decides the theme (aiview has no toggle). Declaring both schemes lets the
+/* Tokens: the Swarmstorm visual identity (signal blue on cool greys, Inter, 13px).
+   The OS decides the theme (aiview has no toggle). Declaring both schemes lets the
    browser resolve light-dark() (the kind chips) and draw native controls and scrollbars
-   in the dark one; without it every light-dark() resolves to its light side. */
+   in the dark one; without it every light-dark() resolves to its light side.
+   --accent is the one accent (the identity's --primary); --surface the sidebar,
+   --surface-2 the muted fill, --faint-foreground the idle grey. */
 :root {
   color-scheme: light dark;
-  --background: #ffffff;
-  --surface: #fafafa;
-  --surface-2: #f4f4f5;
-  --foreground: #18181b;
-  --muted-foreground: #71717a;
-  --faint-foreground: #a1a1aa;
-  --border: #e4e4e7;
-  --accent: #4f46e5;
-  --accent-soft: #eef2ff;
-  --ok: #16a34a;
+  --background: #f6f7f9;
+  --card: #ffffff;
+  --surface: #fbfbfc;
+  --surface-2: #eef0f3;
+  --foreground: #161a22;
+  --muted-foreground: #5b6474;
+  --faint-foreground: #8a93a3;
+  --border: #e1e4ea;
+  --accent: #3355e0;
+  --accent-foreground: #ffffff;
+  --accent-soft: #e8edfd;
+  --ok: #17865a;
+  --warn: #b86e00;
+  --danger: #c7354a;
+  --ok-soft: #e3f4ec;
+  --warn-soft: #fbf0de;
+  --danger-soft: #fbe7ea;
   --star: #eab308;
   --star-glow: #facc1599;
-  --radius: 10px;
+  --radius: 8px;
   --radius-sm: 6px;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.05);
+  --shadow-pop: 0 8px 28px rgb(16 24 40 / 0.14);
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #09090b;
-    --surface: #101013;
-    --surface-2: #1b1b1f;
-    --foreground: #f4f4f5;
-    --muted-foreground: #a1a1aa;
-    --faint-foreground: #63636b;
-    --border: #232327;
-    --accent: #818cf8;
-    --accent-soft: #1e1b3a;
-    --ok: #4ade80;
+    --background: #0f1218;
+    --card: #161a22;
+    --surface: #12151c;
+    --surface-2: #1d222c;
+    --foreground: #e7eaf0;
+    --muted-foreground: #98a1b2;
+    --faint-foreground: #6b7385;
+    --border: #262c38;
+    --accent: #6d86ff;
+    --accent-foreground: #0f1218;
+    --accent-soft: #1d2645;
+    --ok: #3cc28a;
+    --warn: #e3a23b;
+    --danger: #f0687c;
+    --ok-soft: #14291f;
+    --warn-soft: #2c2312;
+    --danger-soft: #2e171c;
     --star: #facc15;
     --star-glow: #facc15b3;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-pop: 0 8px 28px rgb(0 0 0 / 0.5);
   }
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-card: var(--card);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-accent-foreground: var(--accent-foreground);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-foreground: var(--foreground);
@@ -54,16 +76,17 @@
   --color-star: var(--star);
   --radius-md: var(--radius-sm);
   --radius-lg: var(--radius);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  --font-mono: ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 :focus-visible {
@@ -91,26 +114,28 @@ a:focus-visible > .star-glow {
 .md {
   @apply leading-relaxed;
 }
-.md h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 12px; }
-.md h2 { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; margin: 34px 0 10px; padding-bottom: 7px; border-bottom: 1px solid var(--border); }
-.md h3 { font-size: 15px; font-weight: 650; margin: 24px 0 8px; }
+.md h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; margin: 0 0 12px; }
+.md h2 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; margin: 34px 0 10px; padding-bottom: 7px; border-bottom: 1px solid var(--border); }
+.md h3 { font-size: 14px; font-weight: 600; margin: 24px 0 8px; }
+.md p, .md li { font-size: 14px; }
 .md p { margin: 0 0 12px; color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground)); }
 .md ul, .md ol { margin: 0 0 12px; padding-left: 22px; }
 .md li { margin-bottom: 3px; }
 .md a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .md code { font-family: var(--font-mono); font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
-.md pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; overflow-x: auto; margin: 0 0 14px; }
+.md pre { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; overflow-x: auto; margin: 0 0 14px; }
 .md pre code { background: none; border: 0; padding: 0; }
 .md blockquote { border-left: 3px solid var(--accent); margin: 0 0 12px; padding: 2px 14px; color: var(--muted-foreground); }
 .md img { max-width: 100%; }
 .md del { color: var(--muted-foreground); }
 .md hr { border: 0; border-top: 1px solid var(--border); margin: 20px 0; }
 .md table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; margin: 14px 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: block; overflow-x: auto; }
-.md thead { background: var(--surface); }
-.md th { text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted-foreground); padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.md table { background: var(--card); }
+.md thead { background: var(--background); }
+.md th { text-align: left; font-weight: 600; font-size: 12px; color: var(--muted-foreground); padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .md td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .md tr:last-child td { border-bottom: 0; }
-.md .mermaid-box { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 18px; margin: 0 0 14px; display: flex; justify-content: center; overflow-x: auto; }
+.md .mermaid-box { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 18px; margin: 0 0 14px; display: flex; justify-content: center; overflow-x: auto; }
 .md .mermaid-box svg { max-width: 100%; height: auto; }
 
 @media print {
@@ -123,7 +148,7 @@ a:focus-visible > .star-glow {
 /* Shiki renders both themes into one block (--shiki-light / --shiki-dark); the
    theme is chosen here, so an OS theme switch needs no re-render. The box keeps
    aiview's own surface — only the tokens come from the theme. */
-.md .shiki-box pre { background: var(--surface-2) !important; }
+.md .shiki-box pre { background: var(--card) !important; }
 .md .shiki-box code { background: none; border: 0; padding: 0; }
 .md .shiki-box span { color: var(--shiki-light); }
 @media (prefers-color-scheme: dark) {

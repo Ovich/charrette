@@ -36,7 +36,7 @@ export function KindChip({
       data-component="KindChip"
       data-tone={tone}
       className={cn(
-        "inline-flex items-center whitespace-nowrap rounded-[5px] border px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide",
+        "inline-flex items-center whitespace-nowrap rounded-full border px-[7px] text-[11px] font-medium leading-[18px]",
         // Without a handler the chip is decoration sitting on top of a clickable row,
         // so it must not be an event target at all: the click belongs to the row.
         onClick ? "cursor-pointer" : "pointer-events-none",

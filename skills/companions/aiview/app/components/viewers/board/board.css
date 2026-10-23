@@ -2,9 +2,8 @@
    every rule below sits under .board, the viewer's root, so .card, .item, .who and the like
    touch nothing else in aiview. The page drawn is mockup #643's, as swarm's page drew it. */
 
-/* The board's own tokens, which aiview has no use for: red means act now, amber waits */
-.board { --danger: #dc2626; --danger-glow: #ef444466; --amber: #b45309; }
-@media (prefers-color-scheme: dark) { .board { --danger: #f87171; --danger-glow: #f8717180; --amber: #fbbf24; } }
+/* Red (aiview's --danger) means act now, amber (aiview's --warn) waits */
+.board { --danger-glow: color-mix(in srgb, var(--danger) 45%, transparent); --amber: var(--warn); }
 
 /* ── The page, as the mockup 2026-10-07-swarm-board draws it ─────────────────────── */
 
@@ -482,3 +481,167 @@
 .board [data-component="SharedFilesList"] .holders { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 .board [data-component="SharedFilesList"] .apath { word-break: break-all; min-width: 160px; }
 .board [data-component="SharedFilesList"] td:last-child { min-width: 170px; }
+
+/* ── The Swarmstorm identity over the board: sentence case, sans for prose and times,
+   monospace for paths only, the signal blue on the open tab, no card around the page. ── */
+.board { height: calc(100vh - 48px); border: 0; border-radius: 0; background: var(--background); }
+.board .label, .board .who, .board .tag, .board .phase .label, .board .roster-group .ghead,
+.board .atoolbar .kchip, .board .archive .kchip, .board .analytics table.t th, .board .runhead .runphase .name {
+  text-transform: none; letter-spacing: 0;
+}
+.board .label { font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
+.board .roster-group .ghead { font-size: 12px; font-weight: 500; }
+.board .phase .label { font-size: 12px; color: var(--foreground); }
+.board .who { font-size: 11px; font-weight: 500; border-radius: 4px; }
+.board .tag { font-size: 11px; font-weight: 500; }
+.board .code { font-family: var(--font-sans); font-size: 11px; border: 0; background: var(--surface-2); color: var(--foreground); padding: 0 5px; border-radius: 4px; }
+.board .card .meta, .board .card .ages, .board .card .activity,
+.board .item .time, .board .event .time { font-family: var(--font-sans); font-size: 12px; font-variant-numeric: tabular-nums; }
+.board .card { background: var(--card); box-shadow: none; }
+.board .card:hover { box-shadow: 0 0 0 1px var(--border); }
+.board .card[aria-pressed="true"] { background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
+.board .card.done, .board .card.ended, .board .card.waiting { background: var(--surface); }
+.board .runs, .board .run-tabs { background: var(--card); }
+.board .runs .lockwrap { background: linear-gradient(to right, transparent, var(--card) 20px); }
+.board .run[aria-pressed="true"] { border-bottom-color: var(--accent); font-weight: 500; }
+.board .run .dot.quiet { background: var(--warn); }
+.board .run .code { font: 600 11px var(--font-sans); }
+.board .lock { height: 28px; padding: 0 10px; border-radius: 14px; font-size: 12px; background: var(--card); }
+.board .item .head { font-size: 13px; }
+.board .item .text { font-size: 14px; line-height: 1.6; }
+.board .rail { background: var(--surface); }
+.board .panel { background: var(--card); }
+/* full-bleed head: the tab row and the run line span the page, the body keeps a 20px gutter */
+.board > .content { padding: 0; }
+.board .runs { padding-left: 8px; min-height: 44px; }
+.board .runhead { padding: 0 20px; height: 44px; flex-wrap: nowrap; border-bottom: 1px solid var(--border); background: var(--card); }
+.board .runhead .seg { border: 0; background: var(--surface-2); border-radius: var(--radius-sm); padding: 2px; }
+.board .runhead .seg button { padding: 2px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+.board .runhead .seg button + button { border-left: 0; }
+.board .runhead .seg button[aria-pressed="true"] { background: var(--card); color: var(--foreground); }
+.board .runhead .runline { white-space: nowrap; }
+.board .run-body { padding: 0 20px; }
+.board .run-body.with-roster { gap: 20px; }
+.board > .content > .none, .board > .content > .notice { padding-left: 20px; padding-right: 20px; }
+
+/* ── The run page as the Swarmstorm board draws it: tabs with kind and state pills, the phase
+   bar, the conversation in the middle with each agent's mark, agents and files held in the
+   rail on the right. Agents only, no people. ── */
+.board .runs { align-items: stretch; padding: 0 12px; gap: 2px; }
+.board .run { height: 44px; padding: 0 10px; gap: 7px; }
+.board .run .t { max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+.board .run .kind { font-size: 11px; padding: 0 6px; border-radius: 4px; border: 1px solid var(--border); color: var(--muted-foreground); font-weight: 500; line-height: 18px; }
+.board .run .st { font-size: 11px; padding: 0 7px; border-radius: 10px; font-weight: 500; line-height: 18px; background: var(--surface-2); color: var(--muted-foreground); }
+.board .run .st .of { color: inherit; font-size: inherit; }
+.board .run .st.s-live { background: var(--ok-soft); color: var(--ok); }
+.board .run .st.s-quiet { background: var(--warn-soft); color: var(--warn); }
+.board .runs .lockwrap { gap: 6px; padding-left: 16px; }
+.board .menu.pill, .board .abtn, .board .lock { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 14px; font-size: 12px; color: var(--muted-foreground); background: var(--card); white-space: nowrap; }
+.board .menu.pill:hover, .board .abtn:hover { color: var(--foreground); }
+.board .menu.pill svg, .board .abtn svg { width: 13px; height: 13px; }
+.board .menu.pill .n { color: var(--foreground); }
+.board .menu.pill[aria-expanded="true"], .board .abtn[aria-pressed="true"] { color: var(--foreground); border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); }
+
+/* the phase bar: the current phase the one bold shape, the run line after it, the view switch at the end */
+.board .runhead { gap: 12px; height: auto; min-height: 48px; padding: 10px 20px; }
+.board .runhead .runphase { flex: 1 1 auto; min-width: 0; height: 28px; align-items: center; padding: 0 10px; border: 0; border-radius: var(--radius-sm);
+  background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent), 0 0 0 1px var(--accent); }
+.board .runhead .runphase .name { font-size: 13px; font-weight: 600; color: var(--foreground); }
+.board .runhead .runphase .said { color: var(--muted-foreground); }
+.board .runhead .runline { margin-left: auto; font-size: 12px; color: var(--muted-foreground); }
+.board .runhead .runphase + .runline { margin-left: 0; }
+.board .runhead .seg { flex: none; }
+
+/* body: conversation | rail */
+.board .run-body { padding: 0; }
+.board .run-body.with-roster { grid-template-columns: minmax(0, 1fr) 300px; gap: 0; }
+.board .run-main { padding: 0 20px; }
+.board .side { border-left: 1px solid var(--border); background: var(--card); overflow-y: auto; overscroll-behavior: contain; padding: 4px 12px 20px; min-height: 0; display: flex; flex-direction: column; }
+.board .side .agent-strip { overflow: visible; padding: 10px 0; flex: none; }
+.board .side .label.roster-head { color: var(--foreground); font-weight: 600; }
+.board .side .card { display: grid; border: 0; border-radius: var(--radius-sm); background: transparent; padding: 8px 8px 8px 14px; }
+.board .side .card::before { inset: 8px auto 8px 2px; border-radius: 2px; }
+.board .side .card:hover { background: var(--background); box-shadow: none; }
+.board .side .card[aria-pressed="true"] { background: var(--accent-soft); box-shadow: none; }
+.board .side .card.done, .board .side .card.ended { background: transparent; }
+.board .side .card .slice { font-weight: 500; }
+.board .side .cards { gap: 2px; }
+.board .side .claims-row { border-top: 0; padding: 6px 0 0; max-height: none; overflow: visible; }
+.board .side .claims-toggle { color: var(--foreground); font-size: 12px; font-weight: 600; padding: 8px 0 6px; }
+.board .side .claims-list { padding: 0; gap: 2px; }
+.board .side .claims-list li { flex-direction: column; gap: 2px; padding: 5px 6px; border-radius: var(--radius-sm); }
+.board .side .claims-list li:hover { background: var(--background); }
+.board .side .claims-list .path { width: auto; max-width: 100%; font-size: 11px; }
+
+/* toolbar over the conversation */
+.board .filters { height: 44px; padding: 0; gap: 4px; flex-wrap: nowrap; }
+.board .fchip { height: 26px; padding: 0 10px; border: 0; border-radius: 13px; font-weight: 500; color: var(--muted-foreground); }
+.board .fchip:hover { background: var(--surface-2); color: var(--foreground); }
+.board .fchip[aria-pressed="true"] { background: var(--foreground); color: var(--background); border: 0; }
+.board .fchip[aria-pressed="true"] .n { color: inherit; opacity: .75; }
+
+/* messages: the agent mark, the head, the time at the right */
+.board .stream { padding: 10px 0 28px; }
+.board .item { grid-template-columns: 28px minmax(0, 1fr) auto; column-gap: 12px; padding: 9px 10px; border-left: 0; border-radius: var(--radius-sm); }
+.board .item .mark { grid-column: 1; grid-row: 1 / span 2; }
+.board .item .head { grid-column: 2; grid-row: 1; }
+.board .item .time { grid-column: 3; grid-row: 1; font-size: 12px; color: var(--muted-foreground); }
+.board .item .text { grid-column: 2 / 4; }
+.board .item.cont { padding-top: 0; }
+.board .item.act { box-shadow: inset 3px 0 0 var(--danger); background: var(--danger-soft); border-left: 0; }
+.board .item.wait { box-shadow: inset 3px 0 0 var(--warn); border-left: 0; }
+.board .item.decided .text { padding: 8px 12px; border-radius: var(--radius-sm); background: var(--ok-soft); box-shadow: inset 3px 0 0 var(--ok); }
+.board .mark { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; font: 600 10px var(--font-sans); color: #fff; background: hsl(var(--h) 62% 52%); }
+.board .mark.orch { background: var(--card); color: hsl(var(--h) 55% 45%); box-shadow: inset 0 0 0 1.5px hsl(var(--h) 62% 52%); }
+.board .event { grid-template-columns: 28px minmax(0, 1fr) auto; column-gap: 12px; padding: 4px 10px; color: var(--muted-foreground); }
+.board .event::before { content: ""; grid-column: 1; grid-row: 1; justify-self: center; align-self: center; width: 8px; height: 8px; border-radius: 50%; background: var(--faint-foreground); }
+.board .event .head { grid-column: 2; grid-row: 1; }
+.board .event .time { grid-column: 3; grid-row: 1; font-size: 12px; }
+.board .event .text { grid-column: 2 / 4; }
+.board .phase .label { font-size: 13px; }
+@media (max-width: 1100px) { .board .run-body.with-roster { grid-template-columns: minmax(0, 1fr) 260px; } }
+@media (max-width: 860px) {
+  .board .run-body.with-roster { grid-template-columns: minmax(0, 1fr); }
+  .board .side { border-left: 0; border-top: 1px solid var(--border); }
+}
+
+/* the phase strip: every phase the run opened, the done ones green and narrow, the current one blue and wide */
+.board .runhead { flex-wrap: wrap; row-gap: 8px; }
+.board .runhead .phases { flex: 1 1 100%; min-width: 0; display: flex; gap: 6px; }
+.board .pseg { display: flex; align-items: center; gap: 8px; min-width: 0; height: 28px; padding: 0 10px; border-radius: var(--radius-sm); white-space: nowrap; overflow: hidden; }
+.board .pseg .name { font-size: 13px; font-weight: 600; color: var(--foreground); overflow: hidden; text-overflow: ellipsis; }
+.board .pseg .said { font-size: 12.5px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; }
+.board .pseg.done { flex: 0 1 auto; background: var(--ok-soft); box-shadow: inset 3px 0 0 var(--ok); max-width: 220px; }
+.board .pseg.earlier { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--ok); cursor: help; }
+.board .pseg.earlier .name { color: var(--muted-foreground); }
+.board .pseg.done .name { font-weight: 500; }
+.board .pseg.done .ok { color: var(--ok); font-size: 12px; }
+.board .pseg.now { flex: 1 1 auto; background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent), 0 0 0 1px var(--accent); }
+.board .runhead .phases + .runline { margin-left: 0; }
+.board .runhead .phases ~ .seg { margin-left: auto; }
+/* the phase row: phases take the row, the run's Analytics pill at its end */
+.board .runhead { flex-wrap: nowrap; }
+.board .runhead .phases { flex: 1 1 auto; }
+.board .runhead .runphase { flex: 1 1 auto; }
+.board .runhead .abtn { margin-left: auto; flex: none; }
+.board .runtools { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 8px; }
+.board .runtools .runline { font-size: 12px; color: var(--muted-foreground); white-space: nowrap; }
+.board .runtools .abtn { margin-left: 0; }
+.board .abtn.close { width: 28px; padding: 0; justify-content: center; font-size: 16px; line-height: 1; }
+/* the analytics pages keep the page gutter */
+.board .analytics { padding-left: 20px; padding-right: 20px; }
+/* the phases keep their width; on analytics the run line gives way, its full text on hover */
+.board .pseg.done { flex-shrink: 0; }
+.board .pseg.now { min-width: 140px; }
+.board .runtools { flex: 0 1 auto; min-width: 0; }
+.board .runtools .runline { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.board .runtools > button { flex: none; }
+.board .pseg .name { flex-shrink: 0; }
+.board .pseg .said { min-width: 0; }
+/* Archive, a tab at the row's start like a menu entry; its drawer opens inside the board, never under the menu */
+.board .run.menu { gap: 6px; color: var(--muted-foreground); }
+.board .run.menu svg { width: 14px; height: 14px; }
+.board .run.menu .n { font-size: 12px; color: var(--muted-foreground); }
+.board .run.menu[aria-expanded="true"] { color: var(--foreground); border-bottom-color: var(--accent); }
+.board { position: relative; }
+.board .drawer { position: absolute; inset: 0 auto 0 0; }

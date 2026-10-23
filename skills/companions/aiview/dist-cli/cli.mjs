@@ -165,6 +165,7 @@ function openIndex(dbPath = SQLITE_PATH, root = STORE_ROOT) {
   if (!cols.includes("tags")) db.exec("ALTER TABLE documents ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'");
   if (!cols.includes("kind")) db.exec("ALTER TABLE documents ADD COLUMN kind TEXT NOT NULL DEFAULT ''");
   if (!cols.includes("group_slug")) db.exec("ALTER TABLE documents ADD COLUMN group_slug TEXT");
+  if (!cols.includes("pinned")) db.exec("ALTER TABLE documents ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
   db.exec("CREATE TABLE IF NOT EXISTS groups (slug TEXT PRIMARY KEY, title TEXT)");
   db.exec(
     "CREATE TABLE IF NOT EXISTS projects (slug TEXT PRIMARY KEY, title TEXT, paths TEXT NOT NULL DEFAULT '[]')"
@@ -183,6 +184,7 @@ function openIndex(dbPath = SQLITE_PATH, root = STORE_ROOT) {
   const parse2 = (row) => ({
     ...row,
     tags: JSON.parse(row.tags),
+    pinned: row.pinned === 1,
     abs_path: toAbs(row.file_path, root)
   });
   const parseProject = (row) => ({
@@ -357,6 +359,9 @@ function openIndex(dbPath = SQLITE_PATH, root = STORE_ROOT) {
       if (!row) return false;
       db.prepare("DELETE FROM documents WHERE id = ?").run(row.id);
       return true;
+    },
+    setPinned(id, pinned) {
+      return db.prepare("UPDATE documents SET pinned = ? WHERE id = ?").run(pinned ? 1 : 0, Number(id)).changes > 0;
     },
     touch(id) {
       db.prepare("UPDATE documents SET last_seen_at = ? WHERE id = ?").run(now(), id);
@@ -9717,6 +9722,26 @@ function startServer(index, { port, open, startDoc, toolRoot = TOOL_ROOT, writeS
       req.on("end", () => {
         sse.broadcast({ type: "index" });
         json(res, { ok: true });
+      });
+      return;
+    }
+    if (p === "/api/pin" && req.method === "POST") {
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+        if (body.length > 4096) req.destroy();
+      });
+      req.on("end", () => {
+        let id, pinned;
+        try {
+          ({ id, pinned } = JSON.parse(body));
+        } catch {
+          return json(res, { error: "bad json" }, 400);
+        }
+        if (typeof id !== "number" || typeof pinned !== "boolean") return json(res, { error: "id and pinned required" }, 400);
+        if (!index.setPinned(id, pinned)) return json(res, { error: `no such document: ${id}` }, 404);
+        sse.broadcast({ type: "index" });
+        json(res, { id, pinned });
       });
       return;
     }

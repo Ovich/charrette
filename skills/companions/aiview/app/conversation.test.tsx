@@ -81,13 +81,13 @@ test("decided and talk carry no edge class; a plain message no word", () => {
   expect(talk.querySelector(".what")).toBeNull();
 });
 
-test("the stylesheet: an item has no fill but the open flag's tint; act a solid red edge, wait a dashed one", () => {
+test("the stylesheet: an item has no fill but the open flag's tint and act's; act a red edge, wait an amber one", () => {
   const css = readFileSync(join(__dirname, "components/viewers/board/board.css"), "utf8");
   // every rule whose selector is the item itself, with any of its classes, under the board's root
   const itemRules = [...css.matchAll(/^\.board (\.item(?:\.[\w-]+)*)\s*\{([^}]*)\}/gm)].map((m) => ({ selector: m[1], body: m[2] }));
-  expect(itemRules.filter((r) => /background/.test(r.body)).map((r) => r.selector)).toEqual([".item.flag.open"]);
-  expect(css).toContain(".board .item.act { border-left: 2px solid var(--danger); }");
-  expect(css).toContain(".board .item.wait { border-left: 2px dashed var(--amber); }");
+  expect(itemRules.filter((r) => /background/.test(r.body)).map((r) => r.selector)).toEqual([".item.flag.open", ".item.act"]);
+  expect(css).toContain(".board .item.act { box-shadow: inset 3px 0 0 var(--danger);");
+  expect(css).toContain(".board .item.wait { box-shadow: inset 3px 0 0 var(--warn);");
 });
 
 test("every special word carries its tip, focusable (D9)", () => {

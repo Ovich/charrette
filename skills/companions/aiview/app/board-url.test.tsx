@@ -25,7 +25,7 @@ const reload = () => {
 const tabs = () => within(screen.getByRole("navigation", { name: "Runs" }));
 const tabOf = (title: string) => tabs().getByText(title).closest("button")!;
 const runView = () => within(screen.getByRole("group", { name: "This run" }));
-const pressedView = () => runView().getAllByRole("button").find((b) => b.getAttribute("aria-pressed") === "true")?.textContent;
+const pressedView = () => (runView().getByRole("button", { name: "Analytics" }).getAttribute("aria-pressed") === "true" ? "Analytics" : "Conversation");
 const acrossShown = () => screen.queryByText("Across runs") !== null;
 
 test("the URL keeps the views: run=<id>&view=analytics reopens that run on Analytics after a reload; the across view's period and kinds reopen; a picked tab opens on Conversation; picking a run tab or All leaves the across view (D31, SL4, SL5)", () => {
@@ -61,14 +61,14 @@ test("the URL keeps the views: run=<id>&view=analytics reopens that run on Analy
   expect(screen.getByRole("button", { name: "brainstorm" }).getAttribute("aria-pressed")).toBe("false");
   expect(source.asks.at(-1)).toEqual({ period: "7d", kinds: ["plan"] });
 
-  // a run tab leaves the across view, and so does All
+  // a run tab leaves the across view
   fireEvent.click(tabOf("Audit log"));
   expect(acrossShown()).toBe(false);
   expect(pressedView()).toBe("Conversation");
   expect(location.hash).not.toContain("across=1");
   fireEvent.click(tabs().getByRole("button", { name: "Analytics" }));
   expect(acrossShown()).toBe(true);
-  fireEvent.click(tabs().getByText("All"));
+  fireEvent.click(tabOf("Sessions with refresh tokens"));
   expect(acrossShown()).toBe(false);
   expect(location.hash).not.toContain("across=1");
   reload();

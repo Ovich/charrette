@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "../../lib/utils.ts";
 import type { DocumentWithState } from "../../lib/api.ts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible.tsx";
 import { DocItem } from "./DocItem.tsx";
 
+/** A piece of work: its title and count as one row, its documents under a rule. No card. */
 export function DocGroup({
   title,
   docs,
@@ -20,31 +21,24 @@ export function DocGroup({
 }) {
   const containsCurrent = docs.some((d) => d.id === currentId);
   const [open, setOpen] = useState(containsCurrent);
+  const shown = open || containsCurrent;
   return (
-    <Collapsible open={open || containsCurrent} onOpenChange={setOpen} data-component="DocGroup" asChild>
-      <div className="mb-2 overflow-hidden rounded-lg border border-border bg-background shadow-(--shadow-sm)">
+    <Collapsible open={shown} onOpenChange={setOpen} data-component="DocGroup" asChild>
+      <div className="mb-px">
         <CollapsibleTrigger asChild>
-          <button
-            className={cn(
-              "flex w-full cursor-pointer select-none items-center gap-1.5 px-2.5 py-2 text-left text-[12.5px] font-semibold hover:bg-surface-2",
-            )}
-          >
-            <ChevronDown
+          <button className="flex h-8 w-full cursor-pointer select-none items-center gap-1.5 rounded-md px-1.5 text-left font-medium hover:bg-surface-2">
+            <ChevronRight
               size={14}
-              className={cn("shrink-0 text-faint-foreground transition-transform motion-reduce:transition-none", !(open || containsCurrent) && "-rotate-90")}
+              className={cn("shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", shown && "rotate-90")}
             />
-            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{title}</span>
-            <span className="ml-auto rounded-full bg-surface-2 px-1.5 font-mono text-[10.5px] text-faint-foreground">
-              {docs.length}
-            </span>
+            <span className="min-w-0 truncate">{title}</span>
+            <span className="ml-auto pl-2 text-[12px] font-normal text-muted-foreground">{docs.length}</span>
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="border-t border-border">
-            {docs.map((d, i) => (
-              <div key={d.id} className={cn(i > 0 && "border-t border-border")}>
-                <DocItem doc={d} active={d.id === currentId} grouped showProject={showProject} onOpen={onOpen} />
-              </div>
+          <div className="mb-1 ml-[13px] border-l border-border pl-1.5">
+            {docs.map((d) => (
+              <DocItem key={d.id} doc={d} active={d.id === currentId} grouped showProject={showProject} onOpen={onOpen} />
             ))}
           </div>
         </CollapsibleContent>

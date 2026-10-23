@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { hhmm, type Item } from "../../../lib/board/view.ts";
-import { RichText, RunnerName } from "./chips.tsx";
+import { AgentMark, RichText, RunnerName } from "./chips.tsx";
 import { PostBody } from "./PostBody.tsx";
 
 type Said = Exclude<Item, { kind: "event" | "phase" }>;
@@ -32,6 +32,7 @@ function SaidItem({ item, fresh, seqs }: { item: Said; fresh: boolean; seqs: Rea
       <span className="time" title={item.at}>
         {hhmm(item.at)}
       </span>
+      {!item.joined && <AgentMark name={item.from} />}
       {!item.joined && (
         <div className="head">
           <RunnerName name={item.from} />

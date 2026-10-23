@@ -46,21 +46,17 @@ const tabOf = (title: string) => tabs().getByText(title).closest("button")!;
 
 // ── RunTabs ────────────────────────────────────────────────────────────────────────
 
-test("the tab row: All, then each open run with its code, title and slices done/total, a brainstorm its seats; no closed run (SL10)", () => {
+test("the tab row: Archive with its count, then each open run with its code, title and slices done/total, a brainstorm its seats; no closed run, no All (SL10)", () => {
   show([APP], null);
   const names = tabs().getAllByRole("button").map((b) => b.textContent);
-  expect(names[1]).toBe("All");
+  expect(names[0]).toBe(`Archive${CLOSED.length}`);
+  expect(tabs().queryByText("All")).toBeNull();
   // the run tabs, then the Analytics pill drawn beside the merge lock at the row's end (SL4)
   // a brainstorm's slice rows are seats, never slices to merge: never "0/1"
-  expect(names.slice(2)).toEqual(["RTSessions with refresh tokens2/7", "ALAudit log0/3", "NMNaming the kinds1 seat", "Analytics", "merge lock free"]);
+  expect(names.slice(1, -2)).toEqual(["RTSessions with refresh tokensplanlive · 2/7", "ALAudit logplanlive · 0/3", "NMNaming the kindsbrainstormlive · 1 seat"]);
+  expect(names.slice(-2)).toEqual(["Analytics", "merge lock free"]);
   for (const r of CLOSED) expect(tabs().queryByText(r.title)).toBeNull();
-  expect(pressed()?.textContent).toBe("All");
-});
-
-test("All shows every open run's items, none of a closed run", () => {
-  show([APP], null);
-  for (const said of [/staying a number/, /yes, I add it\./, /reads better than/]) expect(convo().getByText(said)).toBeTruthy();
-  expect(convo().queryByText(/Two names per token/)).toBeNull();
+  expect(pressed()).toBe(tabOf("Naming the kinds"));
 });
 
 test("a run in the URL picks its tab; the tab keeps its items and those naming its members (D14)", () => {
@@ -72,13 +68,13 @@ test("a run in the URL picks its tab; the tab keeps its items and those naming i
   expect(convo().queryByText(/reads better than/)).toBeNull();
 });
 
-test("picking a tab narrows the conversation; All widens it again", () => {
+test("picking a tab narrows the conversation to that run", () => {
   show([APP], null);
   fireEvent.click(tabOf("Naming the kinds"));
   expect(pressed()).toBe(tabOf("Naming the kinds"));
   expect(convo().getByText(/reads better than/)).toBeTruthy();
   expect(convo().queryByText(/staying a number/)).toBeNull();
-  fireEvent.click(tabs().getByText("All"));
+  fireEvent.click(tabOf("Sessions with refresh tokens"));
   expect(convo().getByText(/staying a number/)).toBeTruthy();
 });
 
@@ -89,20 +85,20 @@ test("a run's code in its tab carries no tip (D9)", () => {
   expect(code.closest("[data-tip]")).toBeNull();
 });
 
-test("a closed run in the URL opens as an archived tab, read only, × back to All", () => {
+test("a closed run in the URL opens as an archived tab, read only, × back to the first open run", () => {
   show([APP], 4);
   const archived = screen.getByText("The login page").closest('[data-component="ArchivedTab"]') as HTMLElement;
   expect(archived.getAttribute("aria-pressed")).toBe("true");
-  expect(within(archived).getByText("archived")).toBeTruthy();
+  expect(within(archived).getByText(/^archived/)).toBeTruthy();
   expect(convo().getByText(/read only · 4 of 4 slices/)).toBeTruthy();
   expect(convo().getByText(/merged 9f0c1d2/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Close the archived run" }));
-  expect(pressed()?.textContent).toBe("All");
+  expect(pressed()).toBe(tabOf("Sessions with refresh tokens"));
 });
 
-test("an unknown run picks All and says so", () => {
+test("an unknown run picks no tab and says so", () => {
   show([APP], 99);
-  expect(pressed()?.textContent).toBe("All");
+  expect(pressed()).toBeUndefined();
   expect(screen.getByText("run 99 is not on this board")).toBeTruthy();
 });
 
@@ -181,11 +177,6 @@ test("a click outside closes the archive; one inside does not", () => {
 });
 
 // ── AgentStrip ───────────────────────────────────────────────────────────────────
-
-test("the agent strip is hidden on All", () => {
-  show([APP], null);
-  expect(strip()).toBeNull();
-});
 
 test("under a closed run, its members as they ended, a card still followed", () => {
   const was = LIVE.roster.find((r) => r.state === "ended")!;
@@ -351,15 +342,15 @@ test("a gone member's card reads as gone, its lost link named", () => {
 const SHARED: BoardSnapshot = { ...LIVE, files: [...LIVE.files, { path: "src/shared.ts", holders: ["refresh-tokens/S3", "audit-log/S1"], interface: true }] };
 
 test("the claims row is collapsed, counting files and those shared", () => {
-  show([APP], null, [SHARED]);
+  show([APP], 1, [SHARED]);
   const toggle = screen.getByRole("button", { name: /Claims/ });
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
-  expect(toggle.textContent).toContain(`${SHARED.files.length} files · 1 shared`);
+  expect(toggle.textContent).toContain("7 files · 1 shared");
   expect(screen.queryByText("src/shared.ts")).toBeNull();
 });
 
 test("opened, a plain list: one file per line with its holders, a shared one marked shared and uncoloured", () => {
-  show([APP], null, [SHARED]);
+  show([APP], 1, [SHARED]);
   fireEvent.click(screen.getByRole("button", { name: /Claims/ }));
   const row = screen.getByText("src/shared.ts").closest("li")!;
   expect(row.querySelectorAll('[data-component="RunnerTag"]').length).toBe(2);
@@ -431,22 +422,19 @@ test("RepoList shows with two repositories, not with one; picking the second ask
   const repos = within(screen.getByRole("navigation", { name: "Repositories" }));
   fireEvent.click(repos.getByText("swarmstorm-site"));
   expect(source.calls.at(-1)).toEqual({ repo: OTHER, run: null });
-  expect(pressed()?.textContent).toBe("All");
   expect(tabs().getByText("The landing page")).toBeTruthy();
 });
 
 // ── The tab the board opens on by itself (D17) ──────────────────────────────────────
 
-test("one open run: the board opens on its tab; All stays clickable", () => {
+test("one open run: the board opens on its tab", () => {
   show([OTHER], null, [SITE]);
   expect(pressed()).toBe(tabOf("The landing page"));
-  fireEvent.click(tabs().getByText("All"));
-  expect(pressed()?.textContent).toBe("All");
 });
 
-test("two or more open runs: the board opens on All", () => {
+test("two or more open runs: the board opens on the newest", () => {
   show([APP], null);
-  expect(pressed()?.textContent).toBe("All");
+  expect(pressed()).toBe(tabOf("Naming the kinds"));
 });
 
 test("no open run: the board opens on the most recently closed, as its archived tab, a brainstorm counting its seats, in its tab and its archived line (SL10, SL11)", () => {
@@ -459,9 +447,9 @@ test("no open run: the board opens on the most recently closed, as its archived 
   expect(convo().queryByText(/slices/)).toBeNull();
 });
 
-test("no run at all: All, and the board says it has none yet", () => {
+test("no run at all: no tab, and the board says it has none yet", () => {
   show([OTHER], null, [{ ...SITE, runs: [], events: [], roster: [] }]);
-  expect(pressed()?.textContent).toBe("All");
+  expect(pressed()).toBeUndefined();
   expect(screen.getByText("No run on swarmstorm-site yet.")).toBeTruthy();
 });
 
@@ -471,11 +459,11 @@ test("a run from the URL wins over the opening rule", () => {
 });
 
 test("the person's pick wins: a board that changes later does not move the tab", () => {
-  const { rerender } = show([OTHER], null, [SITE]);
-  fireEvent.click(tabs().getByText("All"));
-  source.boards = { [OTHER]: { ...SITE, events: [...SITE.events] } };
-  rerender(<BoardView repos={[OTHER]} run={null} />);
-  expect(pressed()?.textContent).toBe("All");
+  const { rerender } = show([APP], null);
+  fireEvent.click(tabOf("Audit log"));
+  source.boards = { [APP]: { ...LIVE, events: [...LIVE.events] } };
+  rerender(<BoardView repos={[APP]} run={null} />);
+  expect(pressed()).toBe(tabOf("Audit log"));
 });
 
 test("the run's head shows its current phase, name and text; a run with no phase yet shows none", () => {

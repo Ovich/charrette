@@ -166,6 +166,27 @@ export function startServer(
       });
       return;
     }
+    // Pinning is the person's, from the viewer: the index stores it, every tab hears it.
+    if (p === "/api/pin" && req.method === "POST") {
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+        if (body.length > 4096) req.destroy(); // an id and a flag, not a payload
+      });
+      req.on("end", () => {
+        let id: unknown, pinned: unknown;
+        try {
+          ({ id, pinned } = JSON.parse(body) as { id?: unknown; pinned?: unknown });
+        } catch {
+          return json(res, { error: "bad json" }, 400);
+        }
+        if (typeof id !== "number" || typeof pinned !== "boolean") return json(res, { error: "id and pinned required" }, 400);
+        if (!index.setPinned(id, pinned)) return json(res, { error: `no such document: ${id}` }, 404);
+        sse.broadcast({ type: "index" } satisfies IndexEventPayload);
+        json(res, { id, pinned });
+      });
+      return;
+    }
     // The one place the active project is written: the UI posts here, and so does
     // the CLI whenever a server is up, so the broadcast is never a second path.
     if (p === "/api/active" && req.method === "POST") {

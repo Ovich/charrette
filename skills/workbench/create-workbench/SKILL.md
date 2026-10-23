@@ -85,7 +85,10 @@ Each answer is written into the bench skill's head as it lands.
   and the page carry whatever the bench needs.
 - **Controls are Basecoat**, shadcn's design system in plain HTML, inlined by `page.mjs`:
   `class="btn" data-variant="outline" data-size="sm"`, `card`, `tabs`, `badge`, `input`,
-  `select`. Basecoat carries no Tailwind utilities, so layout is the page's own CSS. The
+  `select`. Basecoat carries no Tailwind utilities, so layout is the page's own CSS.
+  `page.mjs` sets Basecoat's variables to aiview's identity, so the bench reads as part of
+  the viewer: the bench's CSS colours through those variables (`--primary`, `--muted`,
+  `--border`, `--ok`, `--warn`, `--danger`), never a colour of its own beyond data hues. The
   product the bench shows (a document, a screen, a card) is drawn in the project's design
   language, from the `design-prototype` skill's reference when there is one.
 - **JSON is always shown through `jsonTree`**, the reader `page.mjs` inlines, with its toolbar
