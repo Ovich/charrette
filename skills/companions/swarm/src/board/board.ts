@@ -1049,7 +1049,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     // E12: a member stopped with no call open (its last line a background task's result) is quiet too; D36: the reason
     // names the missing signal, the link, and the last call
     const lastCall = open ? `${open} (open ${Math.floor((t - Number(a.open_since)) / 60000)} min)` : last;
-    const reason = `no progress for ${Math.floor((t - progressed) / 1000)}s, link ${link.connected ? "alive" : "lost"}${lastCall ? `; last ${lastCall}` : ""}`;
+    const reason = `no progress for ${Math.floor((t - progressed) / 1000)}s, link ${link.connected ? "alive" : "down"}${lastCall ? `; last ${lastCall}` : ""}`;
     return { member, state: "quiet", doing: open ?? last, since: progressed, reason };
   };
   /** The states of a run's live members (not ended), keyed by member. */

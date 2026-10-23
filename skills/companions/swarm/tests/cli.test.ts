@@ -263,7 +263,7 @@ test("status --json lists each open run with its kind; the text names the kind (
   assert.equal(s.runs, 1);
   const nick = s.open[0]?.members[0]?.nick as string;
   assert.match(nick, /^[A-Z][a-z]+ [A-Z][a-z]+$/, "the orchestrator's funny name, given at open (D17)");
-  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null, state: "quiet", activity: null }], lastActivity: s.open[0].lastActivity, forgotten: false }]);
+  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null, state: "quiet", activity: null, progressAt: s.open[0].members[0].progressAt, aliveAt: null }], lastActivity: s.open[0].lastActivity, forgotten: false }]);
   assert.match(run("status").stdout, new RegExp(`run ${id}  plan  review-tool  A plan`));
 });
 
@@ -1058,16 +1058,19 @@ test("open starts no poller process, and the hidden poll verb is gone (US6, D13)
   assert.notEqual(poll.status, 0, "poll is no verb");
 });
 
-test("status and roster print each member's state and what it is doing", () => {
+test("status and roster print each member's state, what it is doing, and its two ages, progressAt and aliveAt (D38)", () => {
   const id = openRun();
+  const before = Date.now();
   assert.equal(run("join", "--run", String(id), "--slice", "S3", "--doing", "page").status, 0);
-  // no activity yet from its link: no evidence of work, so quiet, nothing open (swarm-relay D33)
-  assert.match(run("roster").stdout, /review-tool\/S3  run \d+  quiet  doing: page/);
+  // no activity yet from its link: no evidence of work, so quiet, nothing open (swarm-relay D33); never linked: link never
+  assert.match(run("roster").stdout, /review-tool\/S3  run \d+  quiet  progress \d+s ago, link never  doing: page/);
   const roster = JSON.parse(run("roster", "--json").stdout).roster.find((r: { name: string }) => r.name === "review-tool/S3");
-  assert.deepEqual([roster.state, roster.activity], ["quiet", null]);
-  assert.match(run("status").stdout, /^  review-tool\/S3  quiet$/m);
+  assert.deepEqual([roster.state, roster.activity, roster.aliveAt], ["quiet", null, null]);
+  assert.ok(roster.progressAt >= before - 1000 && roster.progressAt <= Date.now(), "progress counts from the join");
+  assert.match(run("status").stdout, /^  review-tool\/S3  quiet  progress \d+s ago, link never$/m);
   const status = JSON.parse(run("status", "--json").stdout).open.find((r: { run: number }) => r.run === id);
-  assert.equal(status.members.find((m: { name: string }) => m.name === "review-tool/S3").state, "quiet");
+  const s3 = status.members.find((m: { name: string }) => m.name === "review-tool/S3");
+  assert.deepEqual([s3.state, s3.progressAt, s3.aliveAt], ["quiet", roster.progressAt, null]);
 });
 
 test("on a plan run too: the current phase heads wait, deliver and read, follows the roster at join, and sits beside the title in roster and status", () => {

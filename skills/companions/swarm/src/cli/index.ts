@@ -197,17 +197,18 @@ const ago = (at: number | null): string => {
   const s = Math.max(0, Math.floor((Date.now() - at) / 1000));
   return s < 120 ? `${s}s` : s < 7200 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h`;
 };
-/** A member's state (swarm-relay D9), the tool it is in or last ran, and its two ages (D38):
- *  `busy (Bash npm test)  progress 12s ago, link 0s ago`. */
-const stateLine = (r: Pick<RosterEntry, "state" | "activity" | "progressAt" | "aliveAt">): string =>
-  `${r.state}${r.activity ? ` (${r.activity})` : ""}  progress ${ago(r.progressAt)}${r.progressAt == null ? "" : " ago"}, link ${ago(r.aliveAt)}${r.aliveAt == null ? "" : " ago"}`;
+/** A member's state (swarm-relay D9) and the tool it is in or last ran: `busy (Bash npm test)`; with `ages`, its two
+ *  ages after it (D38): `busy (Bash npm test)  progress 12s ago, link 0s ago`. */
+const stateLine = (r: Pick<RosterEntry, "state" | "activity" | "progressAt" | "aliveAt">, ages = false): string =>
+  `${r.state}${r.activity ? ` (${r.activity})` : ""}` +
+  (ages ? `  progress ${ago(r.progressAt)}${r.progressAt == null ? "" : " ago"}, link ${ago(r.aliveAt)}${r.aliveAt == null ? "" : " ago"}` : "");
 
-const rosterLine = (r: RosterEntry): string => {
+const rosterLine = (r: RosterEntry, ages = false): string => {
   const files = r.files.map((f) => (f.interface ? `${f.path} (interface)` : f.path)).join(", ");
   // the funny name beside the runner (D43); an orchestrator is its name alone
   const who = r.slice === "orchestrator" ? r.name : `${r.nick} · ${r.name}`;
   const on = r.subscriptions.length ? `  on: ${formatSubscriptions(r.subscriptions)}` : "";
-  return `${who}${r.stale ? " (stale)" : ""}  run ${r.run}  ${stateLine(r)}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}${on}`;
+  return `${who}${r.stale ? " (stale)" : ""}  run ${r.run}  ${stateLine(r, ages)}  doing: ${r.doing || "-"}${files ? `  files: ${files}` : ""}${on}`;
 };
 
 /** The run's current phase as the header of what a member reads: `phase <name>: <text>`; null before the first phase. */
@@ -774,7 +775,7 @@ ${rearm}` : rearm;
           const run = runs.get(r.run);
           if (run && r.run !== shown) console.log(`run ${run.id}  ${run.title}${phaseSuffix(run.phase, progress.get(run.id) ?? null)}`);
           shown = r.run;
-          console.log(rosterLine(r));
+          console.log(rosterLine(r, true));
         }
       });
       break;
@@ -915,7 +916,7 @@ ${rearm}` : rearm;
         for (const [i, r] of runs.entries()) {
           console.log(`run ${r.id}  ${r.kind}  ${r.plan}  ${r.title}${phaseSuffix(r.phase, open[i].progress)}  ${r.repo}`);
           for (const s of r.slices) console.log(`  ${s.id} ${s.state}  ${s.title}${s.blockers.length ? `  blocked by ${s.blockers.join(", ")}` : ""}`);
-          for (const m of open[i].members) console.log(`  ${m.name}  ${stateLine(m)}`);
+          for (const m of open[i].members) console.log(`  ${m.name}  ${stateLine(m, true)}`);
           const idle = open[i].idleMs;
           if (idle >= FORGOTTEN_MS)
             console.log(`  no activity for ${Math.floor(idle / 86400000)} d: likely left open; ask the person, then archive it: ${cli} close --run ${r.id}`);
