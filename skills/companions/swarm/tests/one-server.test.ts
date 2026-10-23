@@ -87,10 +87,11 @@ function servesOf(launcher: string): number[] {
     .map((l) => Number(l.split(/\s+/)[0]));
 }
 
-/** `servesOf` once every serve that lost the start lock has had time to exit. */
+/** `servesOf` once every serve that lost the start lock has had time to exit: a listing takes a second or
+ *  more on Windows under a full suite's load, so the window allows several. */
 async function settledServesOf(launcher: string, expected: number): Promise<number[]> {
   let pids = servesOf(launcher);
-  for (const end = Date.now() + 5000; pids.length !== expected && Date.now() < end; pids = servesOf(launcher)) await new Promise((r) => setTimeout(r, 200));
+  for (const end = Date.now() + 20_000; pids.length !== expected && Date.now() < end; pids = servesOf(launcher)) await new Promise((r) => setTimeout(r, 200));
   return pids;
 }
 

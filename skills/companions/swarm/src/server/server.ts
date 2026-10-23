@@ -85,8 +85,34 @@ async function takeStartLock(dataRoot: string): Promise<void> {
       continue;
     }
     // its holder is dead, or it never got a pid: stale, replaced
-    fs.rmSync(lock, { force: true });
+    await removeStaleStartLock(dataRoot, holder);
     emptyReads = 0;
+  }
+}
+
+/** How old a stale lock's breaker must be to be taken for abandoned: its taker died mid-replace. */
+const BREAKER_STALE_MS = 5_000;
+
+/** Removes the start lock if it still names `seen`, the stale holder read, under a breaker file: two
+ *  servers that both read the same stale lock would otherwise each remove it, the second removing the
+ *  lock the first had just taken, and both would run (D40). */
+async function removeStaleStartLock(dataRoot: string, seen: number | null): Promise<void> {
+  const breaker = `${serverStartLock(dataRoot)}.break`;
+  try {
+    fs.writeFileSync(breaker, String(process.pid), { flag: "wx" });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+    // another server is replacing it: read the lock again after it
+    try {
+      if (Date.now() - fs.statSync(breaker).mtimeMs > BREAKER_STALE_MS) fs.rmSync(breaker, { force: true });
+    } catch {}
+    await new Promise((r) => setTimeout(r, LOCK_READ_RETRY_MS));
+    return;
+  }
+  try {
+    if (serverLockHolder(dataRoot) === seen) fs.rmSync(serverStartLock(dataRoot), { force: true });
+  } finally {
+    fs.rmSync(breaker, { force: true });
   }
 }
 
