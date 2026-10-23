@@ -12,7 +12,7 @@ import { statsOf, summarize, type Stats, type StatsScope } from "./stats.ts";
 import { type Kind, profileOf } from "./kinds.ts";
 import { type EventName, type Subscription, EVENTS, formatSubscriptions, mentions as mentionsMe, parseSubscriptions as parseOn, wakes } from "./events.ts";
 import { funnyName } from "./names.ts";
-import { BUSY_MAX_MS, IDLE_MS, LINK_LOST_MS, READINGS_KEPT_MS, STALLED_AGAIN_MS, STALL_MS_DEFAULT } from "./liveness.ts";
+import { BUSY_MAX_MS, IDLE_MS, LINK_LOST_MS, NO_TRANSCRIPT_MS, READINGS_KEPT_MS, STALLED_AGAIN_MS, STALL_MS_DEFAULT } from "./liveness.ts";
 import type { MemberActivity } from "../wire.ts";
 
 export type RunId = number;
@@ -985,8 +985,8 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   const sameSub = (a: Subscription, b: Subscription): boolean => a.event === b.event && a.scope === b.scope;
 
   // ── liveness: member states from activity (swarm-relay D9, D11, D12, D31) ─────────────
-  /** Since when every member of a run (the orchestrator aside) has been waiting, and the idles posted since. */
-  const idleSince = new Map<RunId, { since: number; posts: number }>();
+  /** Since when every member of a run (the orchestrator aside) has been waiting, and when its last idle was posted. */
+  const idleSince = new Map<RunId, { since: number; postedAt: number | null }>();
   /** The presence each run's tick last gave: the snapshot and the roster read states through it. */
   const presenceOf = new Map<RunId, Presence>();
   const noPresence: Presence = () => ({ connected: false, lostAt: null });
@@ -1004,8 +1004,12 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
     if (a && Number(a.finished) === 1) return { member, state: "gone", doing: null, since: Number(a.at), reason: "its agent finished without end" };
     const link = presence(member);
     if (!link.connected && link.lostAt != null && t - link.lostAt >= LINK_LOST_MS) return { member, state: "gone", doing: null, since: link.lostAt, reason: "its link was lost" };
-    // no activity yet (no link has spoken): the board's own wait flags only
-    if (!a) return inWait ? { member, state: "waiting", doing: null, since: null } : { member, state: "working", doing: null, since: null, reason: "no activity yet" };
+    // no activity (no link has spoken): presence only, never working without evidence (D9, D33)
+    if (!a) {
+      if (inWait) return { member, state: "waiting", doing: null, since: null };
+      const joined = Date.parse(String(p.joined_at));
+      return { member, state: "quiet", doing: null, since: joined, reason: t - joined >= NO_TRANSCRIPT_MS ? "no transcript found" : "no activity yet" };
+    }
     const open = a.open_tool == null ? null : `${a.open_tool} ${String(a.open_target ?? "")}`.trim();
     // D31: waiting is a foreground wait, its open call being that wait; a background listener is not
     if (open && inWait && /\bwait\b/.test(String(a.open_target ?? ""))) return { member, state: "waiting", doing: open, since: Number(a.open_since) };
@@ -1488,7 +1492,16 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           }
           // D11: stalled per member, to the orchestrator alone; never while paused
           const a = activityOf(run, st.member);
-          if (!a) continue;
+          if (!a) {
+            // D33: no link activity 30 s after the join: named once to the orchestrator
+            const p = db.prepare("SELECT joined_at FROM participants WHERE run = ? AND slice = ? AND ended_at IS NULL").get(run, st.member) as Row | undefined;
+            if (p && t - Date.parse(String(p.joined_at)) >= NO_TRANSCRIPT_MS) {
+              const warned = db.prepare("INSERT OR IGNORE INTO liveness_warned (run, member, cond) VALUES (?, ?, 'none')").run(run, st.member);
+              if (Number(warned.changes) === 1)
+                insertMessage(orch, `no transcript found for ${orch.plan}/${st.member}: its state is presence only`, null, "event", [orch.name], { event: EVENTS.liveness.name });
+            }
+            continue;
+          }
           if (st.state !== "quiet" || r.paused != null) {
             if (a.stalled_at != null) {
               db.prepare("UPDATE member_activity SET stalled_at = NULL WHERE run = ? AND member = ?").run(run, st.member);
@@ -1504,11 +1517,12 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
         const allWaiting = r.paused == null && others.length > 0 && others.every((st) => st.state === "waiting");
         if (!allWaiting) idleSince.delete(run);
         else {
-          const idle = idleSince.get(run) ?? { since: t, posts: 0 };
+          // D34: once when it begins, then only after IDLE_MS while it lasts; a member moving resets it
+          const idle = idleSince.get(run) ?? { since: t, postedAt: null };
           idleSince.set(run, idle);
           const held = t - idle.since;
-          if (held >= (idle.posts + 1) * IDLE_MS) {
-            idle.posts = Math.floor(held / IDLE_MS);
+          if (idle.postedAt == null || t - idle.postedAt >= IDLE_MS) {
+            idle.postedAt = t;
             insertMessage(orch, `idle ${Math.floor(held / 1000)}s: every member is waiting; ${where}`, null, "event", [orch.name], { event: EVENTS.idle.name });
           }
         }

@@ -195,22 +195,60 @@ test("gone: posted at the tick after an activity with finished and no end, and a
   assert.equal(events("gone").length, 2);
 });
 
-test("idle fires only when every member but the orchestrator is waiting (D31), every 15 s; a closed run's tick answers false", async () => {
+test("idle once when every member but the orchestrator turns waiting (D31, D34), again only after 15 min while it lasts, anew after a member moves; a closed run's tick answers false", async () => {
   const { run, a, b } = setup();
   const base = Date.now() + 60_000;
   const wa = board.wait(a, { mentionsOnly: true, timeoutMs: 400 });
   const wb = board.wait(b, { mentionsOnly: true, timeoutMs: 400 });
-  const waitCall = (m: string) => ({ name: "Bash", target: `node swarm.mjs wait --mentions --as idea/${m}`, since: base });
+  const waitCall = (m: string, since = base) => ({ name: "Bash", target: `node swarm.mjs wait --mentions --as idea/${m}`, since });
+  const idles = () => events("idle").map((e) => [e.body.split(":")[0], e.mentions]);
   board.recordActivity(run.id, "a", act({ grewAt: base, openTool: waitCall("a") }), at(base, 0));
   // b holds its wait in the background while it works: not waiting, no idle
   board.recordActivity(run.id, "b", act({ grewAt: base, openTool: { name: "Bash", target: "npm test", since: base } }), at(base, 0));
   for (const s of [0, 15, 30]) board.livenessTick(run.id, at(base, s), presence);
   assert.equal(events("idle").length, 0);
   board.recordActivity(run.id, "b", act({ grewAt: base, openTool: waitCall("b") }), at(base, 31));
-  for (const s of [31, 45, 46, 61]) board.livenessTick(run.id, at(base, s), presence);
-  assert.deepEqual(events("idle").map((e) => [e.body.split(":")[0], e.mentions]), [["idle 15s", ["idea/orchestrator"]], ["idle 30s", ["idea/orchestrator"]]]);
+  for (const s of [31, 45, 60, 600, 31 + 15 * 60 - 1]) board.livenessTick(run.id, at(base, s), presence);
+  assert.deepEqual(idles(), [["idle 0s", ["idea/orchestrator"]]]);
+  board.livenessTick(run.id, at(base, 31 + 15 * 60), presence);
+  assert.deepEqual(idles().map(([b]) => b), ["idle 0s", "idle 900s"]);
+  // b moves, then waits again: idle anew at once
+  const t2 = 31 + 15 * 60 + 5;
+  board.recordActivity(run.id, "b", act({ grewAt: base + t2 * 1000 }), at(base, t2));
+  board.livenessTick(run.id, at(base, t2), presence);
+  board.recordActivity(run.id, "b", act({ grewAt: base + t2 * 1000, openTool: waitCall("b", base + (t2 + 1) * 1000) }), at(base, t2 + 1));
+  board.livenessTick(run.id, at(base, t2 + 1), presence);
+  board.livenessTick(run.id, at(base, t2 + 60), presence);
+  assert.deepEqual(idles().map(([b]) => b), ["idle 0s", "idle 900s", "idle 0s"]);
   await Promise.all([wa, wb]);
   board.closeRun(run.id);
-  assert.equal(board.livenessTick(run.id, at(base, 62), presence), false);
-  assert.equal(board.livenessTick(999, at(base, 62), presence), false);
+  assert.equal(board.livenessTick(run.id, at(base, t2 + 61), presence), false);
+  assert.equal(board.livenessTick(999, at(base, t2 + 61), presence), false);
+});
+
+test("no transcript: a member with no link activity 30 s after its join is named once to the orchestrator; waiting in a board wait, else quiet, never working (D33)", async () => {
+  const { run, a } = setup();
+  const base = Date.now() + 60_000;
+  const warnings = () => events("liveness").map((e) => [e.body, e.mentions]);
+  // before 30 s: no evidence of work, so not working, and no warning yet
+  assert.deepEqual([stateOf(run.id, "b", at(base, -59)).state, stateOf(run.id, "b", at(base, -59)).reason], ["quiet", "no activity yet"]);
+  board.livenessTick(run.id, at(base, -59), presence);
+  assert.equal(warnings().length, 0);
+  // a in a board wait, b not: both past 30 s with no activity
+  const held = board.wait(a, { mentionsOnly: true, timeoutMs: 300 });
+  for (const s of [0, 15, 900]) board.livenessTick(run.id, at(base, s), presence);
+  assert.deepEqual(warnings(), [
+    ["no transcript found for idea/a: its state is presence only", ["idea/orchestrator"]],
+    ["no transcript found for idea/b: its state is presence only", ["idea/orchestrator"]],
+  ]);
+  assert.equal(stateOf(run.id, "a", at(base, 1)).state, "waiting");
+  const b = stateOf(run.id, "b", at(base, 1));
+  assert.deepEqual([b.state, b.reason], ["quiet", "no transcript found"]);
+  await held;
+  assert.deepEqual([stateOf(run.id, "a", at(base, 2)).state, stateOf(run.id, "a", at(base, 2)).reason], ["quiet", "no transcript found"]);
+  // activity arrives: the member reads from it, and the warning is not posted again
+  board.recordActivity(run.id, "b", act({ grewAt: base + 3000 }), at(base, 3));
+  assert.equal(stateOf(run.id, "b", at(base, 4)).state, "working");
+  board.livenessTick(run.id, at(base, 1000), presence);
+  assert.equal(warnings().length, 2);
 });

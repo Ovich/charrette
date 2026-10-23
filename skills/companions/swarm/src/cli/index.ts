@@ -242,7 +242,7 @@ const self = (): string[] => ["node", shellWord(process.argv[1].replace(/\\/g, "
 /** How a member listens, the one source the docs point at: a seat waits in the foreground (a subagent
  *  that ends its turn is gone, no background listener wakes it); the orchestrator and a slice runner
  *  listen in the background while they work. */
-/** The last line of join and open (D32, AGENTS rule 10): the member's link, run as its agent's own
+/** The link line of join and open, before any listener or wait line (D32, swarm-relay D33, AGENTS rule 10): the member's link, run as its agent's own
  *  background task, so a stopped agent takes it down; a verb that finds none spawns one detached. */
 const startLinkLine = (member: BoardMember): string =>
   `start your link now, in the background (your harness's background task): ${[...self(), ...linkVerbArgs(member).map(shellWord)].join(" ")}`;
@@ -580,7 +580,8 @@ ${USAGE}`);
       });
       // the member's link, from now on how its verbs reach the board (D29), started by its agent (D32)
       const link = startLinkLine({ name: runner.name, run: runner.run });
-      // the runner's next step, last: the open phase it owes, then its listener (D61)
+      // the runner's next step, after its link: the open phase it owes, then its listener (D61); the link
+      // comes first, so the agent starts it before a wait blocks it (swarm-relay D33)
       const next = await nextStep(runner);
       // a kind without worktree: the checkout is shared, so every call names the member (D21, D36)
       const shared = !profileOf(runner.kind).worktree;
@@ -590,15 +591,15 @@ ${USAGE}`);
       const drawing = profileOf(runner.kind).member === "seat" ? SEAT_POSTS_DRAW : null;
       // the run's current phase after the roster: a late or restarted member starts in it
       const phase = await phaseHeader(runner.run);
-      emit({ runner: runner.name, nick: runner.nick, roster, phase, ...(shared ? { as: runner.name, commands } : {}), ...(drawing ? { drawing } : {}), next, link }, () => {
+      emit({ runner: runner.name, nick: runner.nick, roster, phase, ...(shared ? { as: runner.name, commands } : {}), ...(drawing ? { drawing } : {}), link, next }, () => {
         console.log(`you are ${runner.name}, ${runner.nick}: @${runner.slice} or @${runner.nick.replace(/\s+/g, "")} mentions you`);
         for (const r of roster) console.log(rosterLine(r));
         if (phase) console.log(phase);
         if (as) console.log(as);
         for (const c of commands ?? []) console.log(c);
         if (drawing) console.log(drawing);
-        console.log(next);
         console.log(link);
+        console.log(next);
       });
       break;
     }

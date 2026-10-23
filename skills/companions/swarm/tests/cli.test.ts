@@ -83,7 +83,7 @@ test("open then join prints the roster", () => {
   const r = run("join", "--run", String(id), "--slice", "S3", "--doing", "the page", "--file", "src/page.ts:interface", "--file", "src/a.ts");
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /you are review-tool\/S3/);
-  assert.match(r.stdout, /review-tool\/S3 {2}run \d+ {2}working {2}doing: the page {2}files: src\/page\.ts \(interface\), src\/a\.ts/);
+  assert.match(r.stdout, /review-tool\/S3 {2}run \d+ {2}quiet {2}doing: the page {2}files: src\/page\.ts \(interface\), src\/a\.ts/);
   assert.match(r.stdout, /review-tool\/orchestrator/);
 });
 
@@ -263,7 +263,7 @@ test("status --json lists each open run with its kind; the text names the kind (
   assert.equal(s.runs, 1);
   const nick = s.open[0]?.members[0]?.nick as string;
   assert.match(nick, /^[A-Z][a-z]+ [A-Z][a-z]+$/, "the orchestrator's funny name, given at open (D17)");
-  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null, state: "working", activity: null }], lastActivity: s.open[0].lastActivity, forgotten: false }]);
+  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null, state: "quiet", activity: null }], lastActivity: s.open[0].lastActivity, forgotten: false }]);
   assert.match(run("status").stdout, new RegExp(`run ${id}  plan  review-tool  A plan`));
 });
 
@@ -353,17 +353,20 @@ const LISTEN = (runner: string): string =>
 const START_LINK = (member: string, run: string): string =>
   `start your link now, in the background (your harness's background task): node ${CLI.replace(/\\/g, "/")} link --run ${run} --as ${member}`;
 
-test("join prints the line that starts the listener, the exact command with --as, then the link line last; --json carries them as next and link (D61, D32)", () => {
+test("join prints the link line, then the line that starts the listener, the exact command with --as, last; --json carries them as link then next (D61, D32, swarm-relay D33)", () => {
   const id = String(openRun());
   const r = run("join", "--run", id, "--slice", "S5", "--doing", "y");
   assert.equal(r.status, 0, r.stderr);
   const lines = r.stdout.trimEnd().split("\n");
-  assert.equal(lines.at(-2), LISTEN("review-tool/S5"));
-  assert.equal(lines.at(-1), START_LINK("review-tool/S5", id));
+  // the agent starts its link before a wait could block it
+  assert.equal(lines.at(-2), START_LINK("review-tool/S5", id));
+  assert.equal(lines.at(-1), LISTEN("review-tool/S5"));
   assert.equal(lines.filter((l) => l.startsWith("start your listener")).length, 1);
   const json = JSON.parse(run("join", "--run", id, "--slice", "S3", "--doing", "x", "--json").stdout);
   assert.equal(json.next, LISTEN("review-tool/S3"));
   assert.equal(json.link, START_LINK("review-tool/S3", id));
+  const keys = Object.keys(json);
+  assert.ok(keys.indexOf("link") < keys.indexOf("next"), keys.join(","));
 });
 
 test("merged ends, for each merged path another runner holds or held, on the line that tells them; --json carries the lines as tell (D63)", () => {
@@ -688,8 +691,8 @@ test("a seat joining from the shared checkout is told its --as and its next comm
   }
   assert.doesNotMatch(r.stdout, /--slice/);
   // a seat waits in the foreground, never a background listener
-  assert.match(lines.at(-2)!, /^wait now, in the foreground \(never a background listener.* wait --mentions --as idea\/architect$/);
-  assert.equal(lines.at(-1), START_LINK("idea/architect", String(id)));
+  assert.equal(lines.at(-2), START_LINK("idea/architect", String(id)));
+  assert.match(lines.at(-1)!, /^wait now, in the foreground \(never a background listener.* wait --mentions --as idea\/architect$/);
   const json = JSON.parse(run("join", "--run", String(id), "--seat", "skeptic", "--doing", "doubting", "--json").stdout);
   assert.equal(json.as, "idea/skeptic");
   assert.equal(json.commands.length, 4);
@@ -1022,7 +1025,7 @@ test("how a member listens: a seat's wait re-arms in the foreground, the orchest
   const orch = run("wait", "--mentions", "--as", "idea/orchestrator", "--timeout", "3000").stdout;
   assert.match(orch, /start this listener again, in the background: node .* wait --mentions --as idea\/orchestrator/);
   const runner = run("join", "--run", String(openRun()), "--slice", "S3", "--doing", "x").stdout.trimEnd().split("\n");
-  assert.match(runner.at(-2)!, /^start your listener now, in the background/);
+  assert.match(runner.at(-1)!, /^start your listener now, in the background/);
 });
 
 test("open --transcript, slice --transcript and the seats file's transcript are refused as unknown, and the help names none (D24)", () => {
@@ -1058,13 +1061,13 @@ test("open starts no poller process, and the hidden poll verb is gone (US6, D13)
 test("status and roster print each member's state and what it is doing", () => {
   const id = openRun();
   assert.equal(run("join", "--run", String(id), "--slice", "S3", "--doing", "page").status, 0);
-  // no activity yet from its link: working, nothing open
-  assert.match(run("roster").stdout, /review-tool\/S3  run \d+  working  doing: page/);
+  // no activity yet from its link: no evidence of work, so quiet, nothing open (swarm-relay D33)
+  assert.match(run("roster").stdout, /review-tool\/S3  run \d+  quiet  doing: page/);
   const roster = JSON.parse(run("roster", "--json").stdout).roster.find((r: { name: string }) => r.name === "review-tool/S3");
-  assert.deepEqual([roster.state, roster.activity], ["working", null]);
-  assert.match(run("status").stdout, /^  review-tool\/S3  working$/m);
+  assert.deepEqual([roster.state, roster.activity], ["quiet", null]);
+  assert.match(run("status").stdout, /^  review-tool\/S3  quiet$/m);
   const status = JSON.parse(run("status", "--json").stdout).open.find((r: { run: number }) => r.run === id);
-  assert.equal(status.members.find((m: { name: string }) => m.name === "review-tool/S3").state, "working");
+  assert.equal(status.members.find((m: { name: string }) => m.name === "review-tool/S3").state, "quiet");
 });
 
 test("on a plan run too: the current phase heads wait, deliver and read, follows the roster at join, and sits beside the title in roster and status", () => {
@@ -1104,7 +1107,7 @@ test("a member owing the open phase is told to do it before any wait: at join, a
   const early = joinSeat(id, "architect");
   assert.equal(early.status, 0, early.stderr);
   assert.doesNotMatch(early.stdout, /is open and asks/);
-  assert.match(early.stdout.trimEnd().split("\n").at(-2)!, /^wait now, in the foreground .* wait --mentions --as idea\/architect$/);
+  assert.match(early.stdout.trimEnd().split("\n").at(-1)!, /^wait now, in the foreground .* wait --mentions --as idea\/architect$/);
 
   run("phase", "ping", "say", "hi", "--as", "idea/orchestrator");
   const owed = /^phase ping is open and asks: say hi\. Read the whole phase first: node \S+ thread --as idea\/skeptic\. Do your part now, then: node \S+ done ping --as idea\/skeptic$/m;
@@ -1112,8 +1115,8 @@ test("a member owing the open phase is told to do it before any wait: at join, a
   const late = joinSeat(id, "skeptic");
   assert.equal(late.status, 0, late.stderr);
   const lines = late.stdout.trimEnd().split("\n");
-  assert.match(lines.at(-3)!, owed);
-  assert.match(lines.at(-2)!, /^only then wait, in the foreground .* wait --mentions --as idea\/skeptic$/);
+  assert.match(lines.at(-2)!, owed);
+  assert.match(lines.at(-1)!, /^only then wait, in the foreground .* wait --mentions --as idea\/skeptic$/);
   assert.match(JSON.parse(run("deliver", "--as", "idea/skeptic", "--json").stdout).next, owed);
   const posted = run("post", "hello", "--as", "idea/skeptic");
   assert.match(posted.stdout, owed);
