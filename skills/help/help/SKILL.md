@@ -1,13 +1,19 @@
 ---
 name: help
-description: "Use when a person asks how this collection works, at any moment: mid-run ('what is the board telling me', 'why did the swarm stop', 'what does build-verify do'), about a skill, a document or a verb they meet, or in general ('what is swarmstorm', 'how do I start', 'what can it do here'), and just after installing it. Explains the part of the collection their question or their current work touches, in their context; readies the project when something is missing; gives a tour only when the question is broad. Not for running the skill it explains, and not for offering a skill unasked (next-step)."
+description: "Use whenever the person needs to understand what is going on in this collection: they ask (how something works, what a term or a verb's answer means, what is happening in a run, what can be done here, how to start), they call help, or you notice they do not follow (a term they misuse or ask about, surprise at what a run or a skill does, a choice they cannot make for lack of the picture). Explains what you are doing together and how this part of the landscape works, from the current work and its content, then guides them on; readies the project when something is missing. Not for running the skill it explains, and not for offering a skill unasked (next-step)."
 ---
 
 # Help
 
-**Answer from where the person is, never from a manual.** Their question, and what is going on now
-(the skill in use, the run on the board, the document open, the last answer a verb printed), say
-which part of the collection to explain. Explain that part, in their terms, then go back to the work.
+**Explain what you are doing together and how it works, from where the person is, never from a
+manual.** Their question, or what they did not follow, and what is going on now (the skill in use,
+the run on the board, the document open, the last answer a verb printed) say which part of the
+landscape to explain: what is happening, why, how the pieces fit, what can be done next. Explain
+that, in their terms and with this work's own content, then guide them on.
+
+**Unasked, explain as you go**: when the person misuses a term, is surprised by what a run or a
+skill did, or cannot choose for lack of the picture, give the few lines they miss at that point,
+without stopping the work, then carry on.
 
 ## Read the context first
 
