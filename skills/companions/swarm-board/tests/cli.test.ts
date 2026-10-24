@@ -848,8 +848,10 @@ test("phase opens a phase: prints its seq, then the listener and the next phase 
   assert.equal(run("join", "--run", String(id), "--seat", first, "--doing", "x").status, 0);
   const r = run("phase", "diverge", "every", "idea", "--as", "idea/orchestrator");
   assert.equal(r.status, 0, r.stderr);
-  const [seq, next] = r.stdout.trim().split("\n");
+  const [seq, brief, next] = r.stdout.trim().split("\n");
   assert.match(seq, /^#\d+$/);
+  // the person hears of every phase in the session they talk to (rule 10)
+  assert.equal(brief, "brief the person: the list of what is done since the session began, one short phrase each, then what comes next");
   assert.match(next, /wait --mentions --as idea\/orchestrator.*open the next phase: .* phase <name> "<text>" --as idea\/orchestrator/);
   assert.match(next, new RegExp(`close --run ${id}`));
   assert.doesNotMatch(next, /end(s|ing)? (a|the|one) phase/);

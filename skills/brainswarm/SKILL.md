@@ -7,7 +7,7 @@ description: "Use when a person wants a swarm of role seats to work a topic on t
 
 You are the **orchestrator**: you run role seats on the swarm board under one protocol, and you
 alone write the run's documents. The board's verbs are the `swarm-board` skill's, orchestrator side;
-the protocols, the setup interview, dispatch, charter, roles and findings are the `orchestrate`
+the protocols, the run's proposal, dispatch, charter, roles and findings are the `orchestrate`
 skill's.
 
 - **The run goes to its end without the person.** They approve the strategy before and read the
@@ -18,9 +18,9 @@ skill's.
 
 ## Choose the protocol
 
-**The protocol is chosen as the `orchestrate` skill's *The protocol* says**, among those that run
-on a brainswarm: brainstorm, debate, editorial, the project's own, or a custom one; its file read
-before the strategy. **Protocols, templates and seats are defaults**: the person adjusts the phases,
+**The run is proposed as the `orchestrate` skill's *Propose the run* says**, built on the closest
+example that runs on a brainswarm (brainstorm, debate, editorial, the project's own), its file read
+before the strategy, its changes named. **Protocols, templates and seats are defaults**: the person adjusts the phases,
 the seats and each role in the strategy. **A change for one run lives in the dossier.**
 
 - **When the strategy is settled, explain `keep` in a few lines**: the setup (phases, seats,
@@ -45,14 +45,14 @@ the seats and each role in the strategy. **A change for one run lives in the dos
 
 ## The strategy
 
-The dossier's `field: value` table, settled through the `orchestrate` skill's setup interview and
-its `references/charter.md`, every field the person's to change. The protocol adds fields; a
+The dossier's `field: value` table, the approved proposal written down as the `orchestrate` skill's
+`references/charter.md` says, every field the person's to change. The protocol adds fields; a
 template fills them.
 
 | Field | Content | Recommended |
 |---|---|---|
-| protocol | from the table above, its template, or `custom` | from what the person wants done |
-| phases | each phase as this run runs it: who acts, the moves, the message that opens it; a custom protocol's in full, as a `protocol.md` phase table | the protocol's |
+| protocol | the example it is built on (or its template), and its changes with their reasons | from what the person wants done |
+| phases | each phase as this run runs it: who acts, the moves, the message that opens it; in full when they depart from the example's, as a `protocol.md` phase table | the example's |
 | loop | when the protocol has a cycle: `until <goal> · cap <n>`, `<n>`, or `unbounded` | the protocol's goal and cap |
 | questions | what the seats work, one row each | 1 to 3 |
 | seats | per seat: id, role prompt in full (the `orchestrate` skill's `references/roles.md`), effort, `on` | the protocol's or template's, every seat's effort `low` unless the person keeps the rows' |
@@ -93,7 +93,7 @@ Take seat `<seat id>` in run `<run id>`, protocol `<protocol>` of the `orchestra
 
 **Evidence**: <this seat's>. **Dossier**: `<path>`, sections <the ones this seat reads>. **Record**: `<path>`, read at the start of every phase.
 
-**Your parts**: <per phase, what its message asks of you; a phase that asks nothing: `done` at once>. **The phases** (a custom protocol only): <the strategy's phase table>.
+**Your parts**: <per phase, what its message asks of you; a phase that asks nothing: `done` at once>. **The phases** (when the run's depart from the example's): <the strategy's phase table>.
 
 **The thread**: every post reaches every seat. Before a post that decides or adds, read the whole phase (`$S thread`) and open on what you take from whom (#seq) and what you set aside, with why. Answer a point that touches your work. End a hand-off by mentioning whoever acts next; a point for everyone mentions `@swarm`. Before long work, `$S doing "<what>"`.
 

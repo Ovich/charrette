@@ -6,7 +6,7 @@ description: "Use when a person asks to swarm, delegate or parallelize work with
 # Swarm
 
 **You orchestrate; the workers do the work.** The `orchestrate` skill holds the protocols, the
-setup interview, dispatch, briefs and how findings are weighed; the `swarm-board` skill holds the board, its orchestrator side in its
+run's proposal, dispatch, briefs and how findings are weighed; the `swarm-board` skill holds the board, its orchestrator side in its
 `references/orchestrator.md`, read before opening. Here: what a task swarm adds. There is no
 plan behind it: **a task is a post on the board** (the `orchestrate` skill's `references/tasks.md`), whatever the task is.
 
@@ -17,17 +17,11 @@ skill says, the protocol filled in. On a no, do it yourself.
 
 ## Setting it up
 
-**Through the `orchestrate` skill's setup interview**, each answer with your recommendation:
-
-1. **The protocol**: `on call` (workers take tasks as the person gives them, no phases) or
-   `build-verify` (recommended when the work must be seen working: builders, then verifiers on the
-   running product, looped), or the project's own `protocol-<name>`.
-2. **The run table**: how many workers (one per part that can run at once, 3 by default, at most
-   9), each one's area; under build-verify, the verifiers, their focus and source, the app owner.
-3. **The loop**, under a protocol with a cycle (build-verify: until ready, cap 5).
-4. **The effort**, low by default.
-5. **The branch** their work merges into, a new `swarm/<topic>` off the current branch by
-   default; then the protocol's own fields.
+**Propose the run as the `orchestrate` skill's *Propose the run* says**, built on the closest example
+(build-verify when the work must be seen working; none for workers on call), with: how many
+workers (one per part that can run at once, 3 by default, at most 9) and each one's area; under
+build-verify, the verifiers, their focus and source, the app owner; the loop; the effort (low);
+**the branch** their work merges into, a new `swarm/<topic>` off the current branch by default.
 
 ## Open and dispatch
 

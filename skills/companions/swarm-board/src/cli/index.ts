@@ -554,8 +554,11 @@ ${USAGE}`);
       // the orchestrator's next step (rule 10): its listener hears each member's done; the board says when all are in
       const cli = self().join(" ");
       const next = `phase ${name} is open; listen for each member's done in the background: ${cli} wait --mentions --as ${shellWord(p.name)}. When the board says every member is done, open the next phase: ${cli} phase <name> "<text>" --as ${shellWord(p.name)}; after the last, ${cli} close --run ${m.run}`;
-      emit({ seq: m.seq, run: m.run, phase: name, next }, () => {
+      // the person follows from the session they talk to, not the board: a few lines there at every phase (rule 10)
+      const brief = "brief the person: the list of what is done since the session began, one short phrase each, then what comes next";
+      emit({ seq: m.seq, run: m.run, phase: name, brief, next }, () => {
         console.log(seqLine(m));
+        console.log(brief);
         console.log(next);
       });
       break;

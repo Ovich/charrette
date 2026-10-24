@@ -37,8 +37,8 @@ Beyond the shared ones (the protocol, the run table, the loop, the effort):
 ## The loop
 
 **Cycle**: build → verify. **Goal** (recommended): the judged verdict `ready`, no blocker or major
-standing. **Cap**: 5 iterations. Asked as the `orchestrate` skill's setup interview asks every
-loop: until the goal (with its cap), N iterations, or unbounded.
+standing. **Cap**: 5 iterations. Proposed as the `orchestrate` skill's *Propose the run* says: until
+the goal (with its cap), N iterations, or unbounded.
 
 ## Phases
 

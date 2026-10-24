@@ -1,8 +1,8 @@
 # The charter
 
-**The charter is the setup interview's answers** (`SKILL.md`, *The setup interview*): asked one
-at a time, the recommended answer first, unless the kind's skill asks a field in its own message
-(a plan's phases, seats and verify). Write the answers into the kind's document, in its charter
+**The charter is the approved proposal** (`SKILL.md`, *Propose the run*), adjusted where the person
+adjusted it; a field the kind's skill asks in its own message (a plan's phases, seats and verify)
+is asked there. Write the answers into the kind's document, in its charter
 section, as `field: value` lines, and into its one line, where the kind keeps one. **Only the
 person amends the charter**: a field you think should change is a pause, with your reason, never
 a decision of yours. An amendment mid-work overwrites its field in both places, the decision's id
@@ -10,7 +10,7 @@ beside it (`pace: run through, the person merges (D41)`), and reaches the next b
 
 **Every kind's charter holds**, in this order:
 
-- `protocol:` the protocol's name, a project protocol's skill name, or `custom` with its phases;
+- `protocol:` the base it is built on, and its changes, each with its reason;
 - `run:` the run table, as approved;
 - `loop:` when the protocol has a cycle: `until <goal> · cap <n>`, `<n>`, or `unbounded`;
 - `effort:` the members' effort, `low` recommended, the person choosing another level for all,

@@ -49,8 +49,8 @@ its `protocol.md`.
 
 ## A protocol
 
-A new way for members to work: its own phases. It usually starts as a custom protocol in one
-run's charter. Its `SKILL.md` holds what goes in and comes out, in one paragraph; the kinds it
+A new way for members to work: its own phases. It usually starts as one run's tuned proposal,
+whose changes proved worth keeping. Its `SKILL.md` holds what goes in and comes out, in one paragraph; the kinds it
 runs on; the charter fields it adds to the shared ones, each with its recommended value; **the
 loop** when phases repeat (the cycle, the goal it proposes, the cap), or that it has none; the
 phase table (phase, who, may, may not, the orchestrator after); the rules that hold in every phase; the phase messages,

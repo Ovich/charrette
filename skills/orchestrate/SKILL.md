@@ -1,19 +1,20 @@
 ---
 name: orchestrate
-description: "Use when an agent orchestrates other agents on a piece of work, of any kind (a plan, a task swarm, a brainswarm): choosing the run's protocol (build-verify, brainstorm, debate, editorial, a project's own), settling the charter with the person, dispatching each member with its brief and role, watching them, judging their findings and steering a drift. Not for the duties one kind adds (orchestrate-plan for a plan, swarm for a task swarm, brainswarm for a seat swarm), and not for the board they talk on (swarm-board)."
+description: "Use when an agent orchestrates other agents on a piece of work, of any kind (a plan, a task swarm, a brainswarm): proposing a run tuned to the work, built on the closest protocol (build-verify, brainstorm, debate, editorial, a project's own), settling it with the person, dispatching each member with its brief and role, watching them, judging their findings and steering a drift. Not for the duties one kind adds (orchestrate-plan for a plan, swarm for a task swarm, brainswarm for a seat swarm), and not for the board they talk on (swarm-board)."
 ---
 
 # Orchestrate
 
 **This session holds the kind's document, its charter, the briefs and the decisions; members do the work.** A member never edits the kind's document or its charter.
 
-## The protocol
+## Propose the run
 
-**A protocol is how a run's members work together**: its seats, its phases, what each may do in
-each, the phases that repeat and the goal that ends them. It is chosen before the charter, and
-the kind's skill runs it.
+**Protocols are worked examples, never a menu**: each is a proven way for members to work (its
+seats, its phases, what each may do, the phases that repeat and the goal that ends them) and the
+rules it learnt. Once the person and you are aligned on the work, however you got there, **propose
+one run tuned to it, built on the closest example**.
 
-| Protocol | When | Kinds | File |
+| Example | When it fits | Kinds | File |
 |---|---|---|---|
 | build-verify | code changed, then judged in the running product, until it holds | task swarm, plan | `references/protocols/build-verify/protocol.md` |
 | brainstorm | options, many and varied, before choosing | brainswarm | `references/protocols/brainstorm/protocol.md` |
@@ -21,36 +22,23 @@ the kind's skill runs it.
 | editorial | a text for a given reader: a letter, a proposal, a README | brainswarm | `references/protocols/editorial/protocol.md` |
 
 - **The project's own come first**: its `protocol-<name>` skills in its local skills folder
-  (`.claude/skills/` when it has no other), and its older `brainswarm-<name>` skills, read the
-  same way; each a protocol, or a template over one above. Read the one that fits before the
-  charter.
-- **Recommend from what the person wants done**: the protocol that fits, its template when one
-  matches, with the reason; none fits: a **custom protocol** built on the closest one, its
-  phases written into the charter. A task swarm with no protocol is workers on call, taking
-  tasks as they come.
-- **Read the protocol's `protocol.md` before the charter**; a protocol's other files are read
-  where it says.
-- **A setup worth running again is kept** as the project's `protocol-<name>` skill, on the
-  person's yes: read `references/protocols/new-protocol.md` first.
-
-## The setup interview
-
-**The person settles the run before the first dispatch, through the `interview` skill**, one
-question at a time, each proposed with your recommendation and its reason, in this order:
-
-1. **The protocol**, as above.
-2. **The run, as one table**: each phase, who acts in it, every seat's role and area, the special
-   seats (a verifier, a skeptic). The person adjusts phases, seats and roles; the table is shown
-   again after each change.
-3. **The loop**, when the protocol has a cycle (its file names the phases that repeat and the
-   goal it proposes): **until the goal**, with a cap (recommended where the protocol has a goal);
-   **N iterations**, then the report; or **unbounded**, until the person stops it. Written
-   `loop: until ready · cap 5`, `loop: 3`, `loop: unbounded`.
-4. **The members' effort**, `low` recommended.
-5. **The protocol's own fields**, then the kind's.
-
-The answers are the charter. Read `references/charter.md` before the first question; the kind's
-skill says where the charter is written.
+  (`.claude/skills/` when it has no other), and its older `brainswarm-<name>` skills.
+- **Read the closest one's `protocol.md`** before proposing; its other files where it says.
+- **The proposal is one message**: `Based on <protocol>, with these changes:`, each change against
+  the example with its reason (a seat added, a phase dropped, a cap lowered); then the run as one
+  table (each phase, who acts in it, every seat's role and area, the special seats); then the
+  loop, when it repeats (`until <goal> · cap <n>`, `<n>`, or `unbounded`), and the members'
+  effort (`low` recommended); then the example's own fields. It ends on `Go, or adjust?`
+- **The base's rules hold unless the proposal says it drops one**: a verifier walks a copy of the
+  data, the judged findings table, a fix task names its ids. Nothing departs from the example
+  without being named.
+- **The person says go, or adjusts lines**: only what they change is talked through, one point at
+  a time, through the `interview` skill, the table shown again after. A task swarm with no
+  example is workers on call, taking tasks as they come.
+- **The approved proposal is the charter** (`references/charter.md`, read before the first
+  proposal), the base named in it and on the board (`open --protocol <base>`).
+- **A run worth repeating is kept** as the project's `protocol-<name>` skill, on the person's
+  yes: read `references/protocols/new-protocol.md` first; the next proposal builds on it.
 
 **A loop runs as its charter says**: each repeated phase's message names its iteration (`verify
 3 of 5`); the judged findings table ends on the goal's state; the goal met closes the loop; at
@@ -60,7 +48,7 @@ the close. Never an iteration the charter did not grant.
 ## Handing the run off
 
 **A run that builds code, or any run longer than a sitting, is handed to an orchestrator of its
-own** once the setup interview is done: this session stays with the person and can hold several
+own** once the proposal is approved: this session stays with the person and can hold several
 runs at once. How, per harness (Claude Code, Codex, Cursor) and when nesting is refused:
 `references/handoff.md`, read before the first handoff. A small run (one or two members, or one
 the person wants to steer closely) is orchestrated here.
