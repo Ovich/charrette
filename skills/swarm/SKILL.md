@@ -19,7 +19,7 @@ skill says, the protocol filled in. On a no, do it yourself.
 
 **Propose the run as the `orchestrate` skill's *Propose the run* says**, built on the closest example
 (build-verify when the work must be seen working; none for workers on call), with: how many
-workers (one per part that can run at once, 3 by default, at most 9) and each one's area; under
+workers, sized from the estimate of the work as *Propose the run* says, and each one's area; under
 build-verify, the verifiers, their focus and source, the app owner; the loop; the effort (low);
 **the branch** their work merges into, a new `swarm/<topic>` off the current branch by default.
 

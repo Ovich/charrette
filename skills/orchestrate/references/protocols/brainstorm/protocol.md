@@ -7,7 +7,7 @@ its pre-mortem, ranked against the criteria.
 interview asks no loop question.
 
 **Record**: the `brainstorm` skill's board (`documents.md`), its sections as that skill orders them. Swarm kind
-`brainstorm`. **Seats**: 3 to 4, roles chosen for different angles on the topic (a user, a
+`brainstorm`. **Seats**: one per angle the topic needs, roles chosen so each sees what the others would not (a user, a
 builder, an operator, an outsider), no skeptic: judgment has its own phase. `on` none.
 
 | Phase | Seats may | Seats may not | You, after |

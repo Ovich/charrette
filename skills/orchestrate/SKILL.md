@@ -24,6 +24,17 @@ one run tuned to it, built on the closest example**.
 - **The project's own come first**: its `protocol-<name>` skills in its local skills folder
   (`.claude/skills/` when it has no other), and its older `brainswarm-<name>` skills.
 - **Read the closest one's `protocol.md`** before proposing; its other files where it says.
+- **Estimate the work first, and size the run from it**: the work cut into tasks of one member's
+  context each (`references/tasks.md`), how many can run in the same phase without waiting on
+  each other, and how many phases that makes. **The seats are that width**; the example's tuning
+  follows the same estimate (its rounds, its verifiers, its loop's cap). For a brainswarm, the
+  estimate is the viewpoints the question needs, one seat each that would catch what the others
+  would not. The proposal states it in one line: `≈ 12 tasks, 4 at once, 3 rounds → 4 builders`.
+- **The person's number wins**: asked for more seats than proposed, re-cut the work finer so
+  every seat has work in the first phase (`references/tasks.md`, *Cutting*), never seats left
+  idle; asked for fewer, fold tasks together. When the finer cut costs something (tasks sharing
+  files, waiting on each other, too small to be worth a member), say so in one line and go on
+  unless they change their mind.
 - **The proposal is one message**: `Based on <protocol>, with these changes:`, each change against
   the example with its reason (a seat added, a phase dropped, a cap lowered); then the run as one
   table (each phase, who acts in it, every seat's role and area, the special seats); then the

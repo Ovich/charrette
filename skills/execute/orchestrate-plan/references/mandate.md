@@ -18,8 +18,9 @@ message, each proposed from the work with its reason:
   wait on, is any missing. A phase narrower than the seats is pointed out with the offer to
   merge or shrink it. An extra (a baseline, a cross-review, a gate) is offered with its cost and
   is in only on a yes.
-- **`seats:`** the number of seats working at once, proposed as the widest phase: **4** for a
-  normal plan, 2–3 small, 5–6 large; 1 when the work is strictly sequential.
+- **`seats:`** the number of seats working at once, sized from the estimate of the work (the
+  `orchestrate` skill's *Propose the run*): the widest phase's tasks; the person's number wins, the
+  phases' tasks re-cut to it.
 - **`verify:`** `after each phase`, `at the end`, or `off`; on, the plan runs the `orchestrate`
   skill's build-verify protocol, and **`loop:`** is asked with it: how many fix phases a verify may
   add beyond the plan's own (`until ready · cap 3` recommended). Look for a `verify-<app>-<focus>`

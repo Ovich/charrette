@@ -6,8 +6,9 @@ are cut.
 ## The seats
 
 - **The plan runs on N seats**, `seat1` … `seat<N>`, plus the validator when the person wants
-  one. N is the mandate's `seats:` field: propose it from the work, **4 for a normal plan**, 2–3
-  for a small one, 5–6 for a large one, and settle it with the person.
+  one. N is the mandate's `seats:` field, sized from the estimate of the work as the `orchestrate`
+  skill's *Propose the run* says: the widest phase's tasks; the person's number wins, the tasks
+  re-cut to it.
 - **A seat is a place in the swarm, not an agent.** Each phase dispatches a fresh subagent into
   it; what it learned reaches the next phase through the board's thread and its report.
 
@@ -24,7 +25,7 @@ are cut.
   step; work of yours (a baseline, a check) is an orchestrator step. Neither is called a phase,
   and neither is added unless the person asks for it: offer it with its cost, never as a
   default.
-- **Every seat works in every phase**, one task each, at most nine seats, a special seat's
+- **Every seat works in every phase**, one task each, a special seat's
   phase excepted: a phase has at most N tasks. **A phase with fewer tasks than seats is said
   to the person**, with why, and with the offer to merge it into its neighbour or shrink it.
 - **A special seat runs alone in its own phase**, no other seat working in it: the validator,
