@@ -74,7 +74,7 @@ export function NavItem({
       aria-label={label}
       title={title ?? label}
       className={cn(
-        "flex h-8 w-full shrink-0 cursor-pointer items-center gap-2.5 overflow-hidden rounded-md px-2 text-left whitespace-nowrap text-muted-foreground hover:bg-surface-2 hover:text-foreground",
+        "flex h-8 w-full shrink-0 max-md:w-auto cursor-pointer items-center gap-2.5 overflow-hidden rounded-md px-2 text-left whitespace-nowrap text-muted-foreground hover:bg-surface-2 hover:text-foreground",
         active && "bg-accent-soft font-medium text-accent hover:bg-accent-soft hover:text-accent",
       )}
     >
@@ -187,12 +187,12 @@ export function Sidebar({
           setHovered(true);
         }}
         className={cn(
-          "group/menu sticky top-0 z-40 flex h-screen flex-col overflow-hidden border-r border-border bg-surface transition-[width,box-shadow] duration-150 motion-reduce:transition-none max-md:static max-md:h-auto max-md:w-full",
+          "group/menu sticky top-0 z-40 flex h-screen flex-col overflow-hidden border-r border-border bg-surface transition-[width,box-shadow] duration-150 motion-reduce:transition-none max-md:static max-md:h-12 max-md:w-full max-md:flex-row max-md:items-center max-md:border-r-0 max-md:border-b max-md:shadow-none",
           open ? "w-[248px]" : "w-14 [&_.nav-text]:hidden",
           open && !kept && "shadow-(--shadow-pop)",
         )}
       >
-        <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-4 font-semibold">
+        <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-4 font-semibold max-md:border-b-0 max-md:px-3">
           <Logo />
           <span className="nav-text">aiview</span>
           <span className="nav-text ml-auto flex items-center gap-1">
@@ -210,7 +210,7 @@ export function Sidebar({
           </span>
         </div>
 
-        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2 pt-3" aria-label="Views">
+        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2 pt-3 max-md:flex-row max-md:items-center max-md:overflow-x-auto max-md:overflow-y-hidden max-md:pt-0 max-md:[&>div[aria-hidden]]:hidden" aria-label="Views">
           <NavItem
             component="BoardNav"
             icon={<BoardIcon />}
@@ -230,7 +230,7 @@ export function Sidebar({
           <PinnedNav docs={inScope} currentId={documentsShown || boardShown ? null : currentId} onOpen={(id) => go(() => onOpen(id))()} folded={!open} />
         </nav>
 
-        <div data-component="SidebarFooter" className="flex h-10 shrink-0 items-center gap-1.5 border-t border-border px-4 text-[12px] text-muted-foreground">
+        <div data-component="SidebarFooter" className="flex h-10 shrink-0 items-center gap-1.5 border-t border-border px-4 text-[12px] max-md:border-t-0 max-md:px-3 text-muted-foreground">
           <span className="nav-text min-w-0 truncate">
             {listed} documents{scoped ? "" : ` · ${Object.keys(projects).length} projects`}
           </span>

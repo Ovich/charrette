@@ -1,5 +1,6 @@
 import type { Document, DocumentWithState } from "../../lib/api.ts";
 import { Button } from "../ui/button.tsx";
+import { cn } from "../../lib/utils.ts";
 import { DocPath } from "../docs/DocPath.tsx";
 import { ProjectSelector } from "./ProjectSelector.tsx";
 import { PinToggle } from "../docs/PinToggle.tsx";
@@ -32,10 +33,10 @@ export function TopBar({
       data-component="TopBar"
       className="topbar sticky top-0 z-20 flex h-12 min-w-0 shrink-0 items-center gap-2 border-b border-border bg-card px-4 max-md:px-3"
     >
-      <div className="min-w-0 shrink max-sm:max-w-[45%] [&_button]:max-w-full">
+      <div className="min-w-0 shrink max-sm:min-w-[112px] max-sm:max-w-[45%] [&_button]:max-w-full">
         <ProjectSelector projects={projects} active={activeProject} docs={allDocs} onPick={onPickProject} />
       </div>
-      <span className="flex min-w-0 shrink items-center gap-2 font-medium">
+      <span className="flex min-w-0 shrink items-center gap-2 font-medium max-md:flex-1 max-md:overflow-hidden">
         {groupTitle && (
           <>
             <span className="text-muted-foreground">/</span>
@@ -49,12 +50,12 @@ export function TopBar({
           </>
         )}
       </span>
-      <div className="ml-auto flex min-w-0 items-center gap-1.5">
+      <div className="ml-auto flex min-w-0 items-center gap-1.5 max-md:shrink-0">
         {doc && doc.kind !== "swarm" && (
-          <PinToggle id={doc.id} pinned={doc.pinned} label className={doc.pinned ? "h-7 px-2 text-[12px] text-accent hover:bg-surface-2" : "h-7 px-2 text-[12px] hover:bg-surface-2"} />
+          <PinToggle id={doc.id} pinned={doc.pinned} label className={cn("h-7 shrink-0 px-2 text-[12px] hover:bg-surface-2 max-sm:gap-0 max-sm:text-[0px]", doc.pinned && "text-accent")} />
         )}
         {doc && doc.kind !== "swarm" && (
-          <span className="flex min-w-0 max-md:hidden">
+          <span className="flex min-w-0 max-md:w-7 max-md:shrink-0 max-md:overflow-hidden">
             <DocPath path={doc.abs_path} />
           </span>
         )}

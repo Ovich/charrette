@@ -691,7 +691,13 @@
 
 /* narrow screens (T2): every view stays usable at ≤860px and ≤480px; desktop untouched. Keep this the last block. */
 @media (max-width: 860px) {
-  .board { height: auto; min-height: calc(100vh - 8rem); }
+  .board { height: auto; min-height: calc(100vh - 8rem); flex-direction: column; }
+  /* the Repositories rail becomes one scrolling row above the tabs, never a side column */
+  .board .rail { width: auto; flex-direction: row; align-items: center; gap: 4px; padding: 6px 10px; border-right: 0; border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+  .board .rail .label { display: none; }
+  .board .rail-row { width: auto; flex: none; white-space: nowrap; }
+  .board .rail-row .t { max-width: 160px; }
+  .board > * { min-width: 0; }
   .board .runs { scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
   .board .runhead { flex-wrap: wrap; }
   .board .runhead .phases { flex: 1 1 100%; overflow-x: auto; scrollbar-width: thin; }
