@@ -34,8 +34,14 @@ You judge what was delivered, from one of two sources, the one your brief names:
 - **Dormant until your phase.** A phase whose text gives you no part: mark it done (`done
   <phase>`) and wait in the foreground with the line the CLI prints. Never end your turn while
   the run is open.
+- **Everything you run, you run in the foreground**: a build, a test suite, a CLI walk. A server
+  you start is the one background task you may have, and you stop it (by its pid) before you post.
+  **Never end your turn while the run is open**, not even on a background task of your own: the board
+  marks you gone.
 - **Your phase**: the message names the branch, the sha and the scope (or your steps). Check that
-  sha out in your detached worktree, walk it, post the table, mark the phase done and wait. **At
+  sha out in your detached worktree, walk it, **post the table first, then mark the phase done**
+  (`done` before the table leaves the orchestrator judging nothing), and wait. Walk a copy of the
+  person's data, never the live one, as the phase message says. **At
   a blocker, when the run's stop rule says so**, stop and post the rows you have with where you
   stopped. The orchestrator answers with the same table judged: look again only at the rows it
   left standing, plus what the fix touched.

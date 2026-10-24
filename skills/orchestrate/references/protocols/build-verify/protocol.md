@@ -50,7 +50,12 @@ loop: until the goal (with its cap), N iterations, or unbounded.
 - **Build 1 is the work asked**; every later build is the judged table's rows that stand.
 - **A verifier stopped by a blocker posts its partial table at once**, with where it stopped;
   you may open a short build for that row alone, then a verify that resumes the walk.
-- **A builder never runs the product.** A check that needs it asks the app owner on the thread.
+- **A builder never runs the product the verifiers walk.** A task whose done-when needs to see its
+  own change running (a screen at a width) runs **a private preview of its own build on a spare port**
+  its task names, stopped right after; anything else asks the app owner on the thread.
+- **A verify walks a copy of the person's data**, never the live one: the product served on the
+  verifier's port reads a copy (for aiview and swarm, a `SWARMSTORM_HOME` copied into a temp folder),
+  so a migration or a write a walk triggers never lands on what the person uses.
 - **A question between seats is answered on the thread**, by the seat it names; an agreement
   two builders make on a shared file binds, as the `swarm-board` skill says.
 
@@ -60,6 +65,8 @@ loop: until the goal (with its cap), N iterations, or unbounded.
   boundary** (what not to touch). A fix task names the ids it fixes: `@w1 FIX F1 + F4: …`.
 - **One task per builder per post**, written as the `swarm-board` skill's thread says: goal,
   contract, files, done-when, as short headed parts.
+- **Tasks are posted once the builders have joined** (a seat's task posted earlier still reaches it
+  on its first wait, but the run reads cleaner in order).
 - **The verify message scopes the pass in numbered steps**: the branch and its sha, what build
   `<k>` merged, the journeys or calls to walk, what to compare, what to report, and the rows of
   the last judged table to look at again. An `instructed` verifier gets every step; a skill's

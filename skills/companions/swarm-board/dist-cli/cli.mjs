@@ -2092,7 +2092,9 @@ async function openBoard(dbPath = SQLITE_PATH) {
             );
             return Number(existing.id);
           }
-          const ins = db.prepare("INSERT INTO participants (run, slice, worktree, doing, files, since_seq, joined_at, nick, subs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(run2, slice, where, doing, JSON.stringify(files), lastSeq(), now(), fresh(), subs);
+          const earliest = db.prepare("SELECT MIN(seq) AS seq FROM messages WHERE run = ? AND mentions LIKE ?").get(run2, `%"${String(r.plan)}/${slice}"%`);
+          const since = earliest?.seq != null ? Math.min(lastSeq(), Number(earliest.seq) - 1) : lastSeq();
+          const ins = db.prepare("INSERT INTO participants (run, slice, worktree, doing, files, since_seq, joined_at, nick, subs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(run2, slice, where, doing, JSON.stringify(files), since, now(), fresh(), subs);
           return Number(ins.lastInsertRowid);
         });
         const runner = participantById(id);

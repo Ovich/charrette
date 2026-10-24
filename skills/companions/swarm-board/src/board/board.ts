@@ -1378,9 +1378,15 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
           );
           return Number(existing.id);
         }
+        // a post that already names this seat (a task posted before the member joined) is still
+        // the member's to read: its cursor starts just before the earliest one, else at now
+        const earliest = db
+          .prepare("SELECT MIN(seq) AS seq FROM messages WHERE run = ? AND mentions LIKE ?")
+          .get(run, `%"${String(r.plan)}/${slice}"%`) as Row | undefined;
+        const since = earliest?.seq != null ? Math.min(lastSeq(), Number(earliest.seq) - 1) : lastSeq();
         const ins = db
           .prepare("INSERT INTO participants (run, slice, worktree, doing, files, since_seq, joined_at, nick, subs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-          .run(run, slice, where, doing, JSON.stringify(files), lastSeq(), now(), fresh(), subs);
+          .run(run, slice, where, doing, JSON.stringify(files), since, now(), fresh(), subs);
         return Number(ins.lastInsertRowid);
       });
       const runner = participantById(id);
