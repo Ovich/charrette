@@ -517,3 +517,23 @@ export function claimRows(snap: BoardSnapshot, run: RunId | null): { path: strin
   const inRun = (holder: string): boolean => !members || members.has(holder);
   return snap.files.filter((f) => f.holders.some(inRun)).map((f) => ({ path: f.path, holders: f.holders, shared: f.holders.length > 1 }));
 }
+
+export type MergedFileRow = { path: string; mergers: string[] };
+
+/** A run's merged files, from its merged events' `files:` line: each path once, in first-merged
+ *  order, with every member that merged it, in order. A merge with no files (`-`) adds none. */
+export function mergedFileRows(snap: BoardSnapshot, run: RunId): MergedFileRow[] {
+  const rows = new Map<string, MergedFileRow>();
+  for (const e of snap.events) {
+    if (e.run !== run || e.kind !== "event" || eventLine(e.body).word !== "merged") continue;
+    const filesLine = e.body.split(/\r?\n/).find((l) => l.startsWith("files: "));
+    if (!filesLine) continue;
+    for (const path of filesLine.slice("files: ".length).split(", ").map((p) => p.trim())) {
+      if (!path || path === "-") continue;
+      const row = rows.get(path) ?? { path, mergers: [] };
+      if (!row.mergers.includes(e.from)) row.mergers.push(e.from);
+      rows.set(path, row);
+    }
+  }
+  return [...rows.values()];
+}

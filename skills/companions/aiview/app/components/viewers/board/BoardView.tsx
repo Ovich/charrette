@@ -4,7 +4,7 @@
 // Analytics, and the across-runs view. aiview's theme; board.css reaches only `.board`.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBoard } from "../../../hooks/useBoard.ts";
-import { agents, archive, claimRows, conversation, narrow, nicksOf, openingRun, runHue, runTabs, seatCount, workerCount, type Narrow, type Pick, type RunId } from "../../../lib/board/view.ts";
+import { agents, archive, claimRows, conversation, mergedFileRows, narrow, nicksOf, openingRun, runHue, runTabs, seatCount, workerCount, type Narrow, type Pick, type RunId } from "../../../lib/board/view.ts";
 import {
   boardFieldsOf,
   DEFAULT_SCOPE,
@@ -23,6 +23,7 @@ import { NicksContext } from "./chips.tsx";
 import { AgentStrip } from "./AgentStrip.tsx";
 import { ArchivePanel } from "./ArchivePanel.tsx";
 import { ClaimsRow } from "./ClaimsRow.tsx";
+import { MergedFilesRow } from "./MergedFilesRow.tsx";
 import { RepoList } from "./RepoList.tsx";
 import { RunAnalytics } from "./RunAnalytics.tsx";
 import { RunTabs } from "./RunTabs.tsx";
@@ -175,7 +176,10 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
   const selectedRun = snapshot.runs.find((r) => r.run === picked) ?? null;
   // the agent strip under a picked run, open or closed; the claims row hidden under a closed one (D7)
   const members = picked === null ? [] : agents(snapshot, picked);
-  const claims = selectedRun && !selectedRun.open ? null : claimRows(snapshot, picked);
+  const runClosed = !!selectedRun && !selectedRun.open;
+  const claims = runClosed ? null : claimRows(snapshot, picked);
+  // a closed run shows, in the claims row's place, the files its merges changed
+  const mergedFiles = runClosed ? mergedFileRows(snapshot, selectedRun.run) : null;
   return (
     <NicksContext.Provider value={nicks}>
       <div className="board" data-component="BoardView" data-state={snapshot.runs.length === 0 ? "no run yet" : "board"}>
@@ -219,6 +223,7 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
                   <ConversationFilters items={items} narrow={narrowing} onNarrow={setNarrowing} />
                   <Conversation items={shown} archived={archivedLine} fresh={NONE} />
                   {claims && <ClaimsRow rows={claims} />}
+                  {mergedFiles && mergedFiles.length > 0 && <MergedFilesRow rows={mergedFiles} />}
                 </div>
               </div>
             </>

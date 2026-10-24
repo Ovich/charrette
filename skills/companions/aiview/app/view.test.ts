@@ -1,7 +1,7 @@
 // The board page's view model (plan D1, D7, D8, D13-D16, D18, D20), on snapshots built here.
 import { describe, expect, test } from "vitest";
 import type { BoardSnapshot, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm-board/src/client/reader.ts";
-import { agents, archive, claimRows, conversation, feed, filters, flagAnswer, flagOf, mentionCtx, mergedRecipients, narrow, runTabs, type Item } from "./lib/board/view.ts";
+import { agents, archive, claimRows, conversation, feed, filters, flagAnswer, flagOf, mentionCtx, mergedFileRows, mergedRecipients, narrow, runTabs, type Item } from "./lib/board/view.ts";
 import { PHASE, PHASED } from "./board-fixtures.ts";
 
 const AT = "2026-10-14T10:00:00Z";
@@ -287,6 +287,31 @@ describe("the filters and the feed (kept for the filter row's return)", () => {
     expect(feed(events, "talk", null, ctx).map((e) => e.body)).toEqual(["talk", "@AL·S1 agreed", "beta alone"]);
     expect(feed(events, "agreements", null, ctx).map((e) => e.body)).toEqual(["@AL·S1 agreed"]);
     expect(feed(events, "all", "alpha/S1", ctx).map((e) => e.body)).toEqual(["talk", "joined: x", "@AL·S1 agreed"]);
+  });
+});
+
+describe("mergedFileRows: a closed run's files", () => {
+  const merged = (runId: number, from: string, files: string): SnapshotEvent =>
+    item(runId, from, `merged abc: rebase your branch onto it.\nfiles: ${files}`, { kind: "event", event: "merged" });
+
+  test("each path once, first-merged order, with every member that merged it", () => {
+    const events = [
+      merged(3, "gamma/S1", "a.ts, b.ts"),
+      merged(3, "gamma/S2", "b.ts, c.ts"),
+      merged(3, "gamma/S1", "a.ts"),
+      merged(1, "alpha/S1", "z.ts"),
+      merged(3, "gamma/S3", "-"),
+      item(3, "gamma/S1", "files: not.ts"),
+    ];
+    expect(mergedFileRows(board(RUNS, ROSTER, events), 3)).toEqual([
+      { path: "a.ts", mergers: ["gamma/S1"] },
+      { path: "b.ts", mergers: ["gamma/S1", "gamma/S2"] },
+      { path: "c.ts", mergers: ["gamma/S2"] },
+    ]);
+  });
+
+  test("a run with no merge has none", () => {
+    expect(mergedFileRows(board(RUNS, ROSTER, []), 3)).toEqual([]);
   });
 });
 
