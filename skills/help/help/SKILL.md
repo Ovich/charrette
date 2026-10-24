@@ -1,6 +1,6 @@
 ---
 name: help
-description: "Use whenever the person needs to understand what is going on in this collection: they ask (how something works, what a term or a verb's answer means, what is happening in a run, what can be done here, how to start), they call help, or you notice they do not follow (a term they misuse or ask about, surprise at what a run or a skill does, a choice they cannot make for lack of the picture). Explains what you are doing together and how this part of the landscape works, from the current work and its content, then guides them on; readies the project when something is missing. Not for running the skill it explains, and not for offering a skill unasked (next-step)."
+description: "Use whenever the person needs to understand what is going on in this collection: they ask (how something works, what a term or a verb's answer means, what is happening in a run, what can be done here, how to start), they call help, or you notice they do not follow (a term they misuse or ask about, surprise at what a run or a skill does, a choice they cannot make for lack of the picture). Explains what you are doing together and how this part of the landscape works, from the current work and its content, then guides them on. Not for running the skill it explains, and not for offering a skill unasked (next-step)."
 ---
 
 # Help
