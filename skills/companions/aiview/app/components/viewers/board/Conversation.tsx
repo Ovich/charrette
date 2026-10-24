@@ -54,17 +54,24 @@ function BoardEventLine({ item, fresh }: { item: BoardEventItem; fresh: boolean 
       </span>
       <div className="head">
         <AgentLabel name={item.from} />
-      </div>
-      {/* the text below its author, as a message's (D8) */}
-      <div className="text">
-        {item.tip ? (
-          <span className="tip" tabIndex={0} data-tip={item.tip}>
-            <RichText text={item.text} mentions={false} />
+        {item.word && (
+          <span className={`eword ${item.tone}`} data-component="EventWord" {...(item.tip ? { tabIndex: 0, "data-tip": item.tip } : {})}>
+            {item.word}
           </span>
-        ) : (
-          <RichText text={item.text} mentions={false} />
         )}
       </div>
+      {/* the text below its author, as a message's (D8); the word above says what happened */}
+      {(item.word ? item.rest : item.text) && (
+        <div className="text">
+          {!item.word && item.tip ? (
+            <span className="tip" tabIndex={0} data-tip={item.tip}>
+              <RichText text={item.text} mentions={false} />
+            </span>
+          ) : (
+            <RichText text={item.word ? item.rest : item.text} mentions={false} />
+          )}
+        </div>
+      )}
     </li>
   );
 }

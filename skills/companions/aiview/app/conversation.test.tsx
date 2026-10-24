@@ -105,12 +105,15 @@ test("every special word carries its tip, focusable (D9)", () => {
   expect(tipOf(/^✔ agreed with/)).toBe(TIPS.agreement);
 });
 
-test("a board event explains itself on hover and on keyboard focus (D9)", () => {
+test("a board event says what happened in one coloured word beside the role, its tip on hover and focus (D9)", () => {
   const { li } = show();
-  const merged = li(/merged abc/).querySelector("[data-tip]") as HTMLElement;
+  const merged = li(/^abc/).querySelector("[data-tip]") as HTMLElement;
+  expect(merged.textContent).toBe("merged");
+  expect(merged.closest(".head")).not.toBeNull();
+  expect(merged.className).toContain("ok");
   expect(merged.dataset.tip).toBe(TIPS.merged);
   expect(merged.getAttribute("tabindex")).toBe("0");
-  expect((li(/joined: the page/).querySelector("[data-tip]") as HTMLElement).dataset.tip).toBe(TIPS.joined);
+  expect((li(/^the page/).querySelector("[data-tip]") as HTMLElement).dataset.tip).toBe(TIPS.joined);
   const box = screen.getByRole("tooltip", { hidden: true });
   fireEvent.mouseOver(merged);
   expect(box.hidden).toBe(false);
@@ -199,7 +202,7 @@ test("messages run the full width: no measure caps a message's text", () => {
 
 test("a board event's text sits below its author line, as a message's does", () => {
   const { li } = show();
-  const event = li(/merged abc/);
+  const event = li(/^abc/);
   const head = event.querySelector(":scope > .head")!;
   const text = event.querySelector(":scope > .text")!;
   expect(head.querySelector('[data-component="AgentLabel"]')).not.toBeNull();

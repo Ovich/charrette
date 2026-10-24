@@ -194,6 +194,26 @@ export function feed(events: SnapshotEvent[], filter: string, runner: string | n
 const EVENT_WORDS = ["opened", "dispatched", "joined", "claimed", "refused", "waiting", "woken", "merge lock", "merged", "ended", "stopped", "resumed", "closed"];
 const STRONG = new Set(["refused", "merge lock", "stopped"]);
 
+/** How an event's word is coloured: done and joined go green, work under way blue, a refusal red, an end grey. */
+export type EventTone = "ok" | "work" | "act" | "end";
+const TONES: Record<string, EventTone> = {
+  opened: "ok", joined: "ok", merged: "ok", resumed: "ok",
+  doing: "work", dispatched: "work", claimed: "work", waiting: "work", woken: "work",
+  refused: "act", "merge lock": "act", stopped: "act",
+  ended: "end", closed: "end",
+};
+
+/** An event as its line reads: the one word that says what happened, its tone, and the rest.
+ *  "run 76 opened: …" and "doing: …" have their word too. */
+export function eventWord(body: string): { word: string | null; tone: EventTone; rest: string } {
+  const flat = body.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).join(" · ");
+  const run = /^run \d+(?: \([^)]*\))? (opened|closed|resumed|stopped)\b:?\s*/.exec(flat);
+  if (run) return { word: run[1], tone: TONES[run[1]], rest: flat.slice(run[0].length) };
+  if (/^doing\b:?/.test(flat)) return { word: "doing", tone: "work", rest: flat.replace(/^doing\b:?\s*/, "") };
+  const { word, rest } = eventLine(flat);
+  return { word, tone: (word && TONES[word]) || "end", rest };
+}
+
 /** "merged abc: rebase onto abc." → the tag word, whether it is strong, and the rest on one line. */
 export function eventLine(body: string): { word: string | null; strong: boolean; rest: string } {
   const flat = body.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).join(" · ");
@@ -235,7 +255,7 @@ export type ItemKind = "message" | "flag" | "urgent" | "held" | "question" | "qu
 export type Tier = "act" | "wait" | "decided" | "talk";
 export type Item =
   | { kind: ItemKind; tier: Tier; seq: number; at: string; run: RunId; from: string; word: string | null; tip: string | null; text: string; joined: boolean; state: string | null; about: string | null }
-  | { kind: "event"; seq: number; at: string; run: RunId; from: string; text: string; tip: string | null; about: string | null }
+  | { kind: "event"; seq: number; at: string; run: RunId; from: string; text: string; tip: string | null; about: string | null; word: string | null; tone: EventTone; rest: string }
   /** The orchestrator opened phase `name` (`swarm phase`), the current one ending with it: a separator across the conversation. */
   | { kind: "phase"; seq: number; at: string; run: RunId; from: string; name: string; text: string; about: null };
 
@@ -386,7 +406,8 @@ function itemOf(snap: BoardSnapshot, e: SnapshotEvent, run: RunSummary, ctx: Men
   }
   if (e.kind === "event") {
     const word = eventLine(e.body).word;
-    return { ...base, kind: "event", text: e.body, tip: (word ? EVENT_TIPS[word] : undefined) ?? (e.event ? EVENT_TIPS[e.event] : undefined) ?? null };
+    const said = eventWord(e.body);
+    return { ...base, kind: "event", text: e.body, ...said, tip: (word ? EVENT_TIPS[word] : undefined) ?? (e.event ? EVENT_TIPS[e.event] : undefined) ?? null };
   }
   if (e.kind === "urgent") return said("urgent", "act", "! urgent", TIPS.urgent);
   if (e.kind === "agreement") {

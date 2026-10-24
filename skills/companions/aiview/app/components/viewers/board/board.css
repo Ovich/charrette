@@ -657,3 +657,10 @@
 /* the phase strip takes the room that is left, never the tools' */
 .board .runhead .phases, .board .runhead .runphase { flex: 1 1 0; }
 .board .runtools { flex-shrink: 0; max-width: 60%; }
+/* an event's word, beside the agent's role, in its tone */
+.board .eword { font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 10px; line-height: 18px; white-space: nowrap; }
+.board .eword.ok { background: var(--ok-soft); color: var(--ok); }
+.board .eword.work { background: var(--accent-soft); color: var(--accent); }
+.board .eword.act { background: var(--danger-soft); color: var(--danger); }
+.board .eword.end { background: var(--surface-2); color: var(--muted-foreground); }
+.board .event .head { gap: 8px; }
