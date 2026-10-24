@@ -1,6 +1,6 @@
 ---
 name: help
-description: "Use whenever the person needs to understand what is going on in this collection: they ask (how something works, what a term or a verb's answer means, what is happening in a run, what can be done here, how to start), they call help, or you notice they do not follow (a term they misuse or ask about, surprise at what a run or a skill does, a choice they cannot make for lack of the picture). Explains what you are doing together and how this part of the landscape works, from the current work and its content, then guides them on. Not for running the skill it explains, and not for offering a skill unasked (next-step)."
+description: "Use whenever the person needs to understand what is going on in this collection: they ask (how something works, what a term or a verb's answer means, what is happening in a run, what can be done here, how to start), they call help, or, unasked, the moment you notice they do not know or do not understand something of this ecosystem (a term they misuse or ask about, surprise at what a run or a skill does, a choice they cannot make for lack of the picture). Explains, in simple terms, what you are doing together and how this part of the landscape works, from the current work and its content, then guides them on. Not for running the skill it explains, and not for offering a skill unasked (next-step)."
 ---
 
 # Help
@@ -14,6 +14,18 @@ that, in their terms and with this work's own content, then guide them on.
 **Unasked, explain as you go**: when the person misuses a term, is surprised by what a run or a
 skill did, or cannot choose for lack of the picture, give the few lines they miss at that point,
 without stopping the work, then carry on.
+
+## Simple terms, always
+
+**Write for a tired engineer: someone smart who has no energy left for decoding.** This rule has
+no exception.
+
+- **Short sentences, plain words.** One idea per sentence.
+- **No jargon left unexplained.** A term of this collection (seat, phase, task, protocol, verifier,
+  board, data home) gets a plain meaning the first time, then is used the same way.
+- **Concrete before abstract**: what is happening in their work first, the general rule after,
+  if at all.
+- **The answer first**, then only what they need to act on it. Nothing they did not ask about.
 
 ## Read the context first
 
