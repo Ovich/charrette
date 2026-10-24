@@ -210,16 +210,16 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
               {selectedRun && <RunViewSwitch view="conversation" line={summaryLine(selectedRun)} phase={selectedRun.phase ?? null} phases={phases} json={null} onView={(v) => showRunView(selectedRun.run, v)} />}
               {/* the roster sits left of the conversation, under a run tab only: All has none */}
               <div className={selectedRun && members.length > 0 ? "run-body with-roster" : "run-body"}>
-                <div className="run-main">
-                  <ConversationFilters items={items} narrow={narrowing} onNarrow={setNarrowing} />
-                  <Conversation items={shown} archived={archivedLine} fresh={NONE} />
-                  {claims && <ClaimsRow rows={claims} />}
-                </div>
                 {selectedRun && members.length > 0 && (
                   <aside className="side" data-component="RunRail">
                     <AgentStrip agents={members} hue={runHue(selectedRun.code)} follow={focus} onFollow={setFocus} />
                   </aside>
                 )}
+                <div className="run-main">
+                  <ConversationFilters items={items} narrow={narrowing} onNarrow={setNarrowing} />
+                  <Conversation items={shown} archived={archivedLine} fresh={NONE} />
+                  {claims && <ClaimsRow rows={claims} />}
+                </div>
               </div>
             </>
           )}

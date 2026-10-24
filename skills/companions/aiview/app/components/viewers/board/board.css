@@ -671,3 +671,8 @@
 .board .run-main .claims-row[data-expanded="true"] { display: flex; flex-direction: column; max-height: 30vh; overflow: hidden; }
 .board .run-main .claims-row .claims-toggle { flex: none; }
 .board .run-main .claims-row .claims-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* the agents on the left, the conversation and the claims on the right */
+.board .run-body.with-roster { grid-template-columns: 300px minmax(0, 1fr); }
+.board .side { border-left: 0; border-right: 1px solid var(--border); }
+@media (max-width: 1100px) { .board .run-body.with-roster { grid-template-columns: 260px minmax(0, 1fr); } }
+@media (max-width: 860px) { .board .run-body.with-roster { grid-template-columns: minmax(0, 1fr); } .board .side { border-right: 0; border-bottom: 1px solid var(--border); } }
