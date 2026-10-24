@@ -57,10 +57,18 @@ skill says where the charter is written.
 the cap without it, pause and give the person the choice: one more iteration, a raised cap, or
 the close. Never an iteration the charter did not grant.
 
+## Handing the run off
+
+**A run that builds code, or any run longer than a sitting, is handed to an orchestrator of its
+own** once the setup interview is done: this session stays with the person and can hold several
+runs at once. How, per harness (Claude Code, Codex, Cursor) and when nesting is refused:
+`references/handoff.md`, read before the first handoff. A small run (one or two members, or one
+the person wants to steer closely) is orchestrated here.
+
 ## Dispatch
 
 - **One member per seat**, given its work as tasks (`references/tasks.md`, read before the first task), on a subagent definition carrying the charter's model and effort; the dispatch passes its model, and its effort where the `Agent` tool takes one; otherwise effort is carried by the subagent definition the dispatch names (`effort:` in its frontmatter). A dispatch naming neither inherits the session's level. **When no subagent definition carries the charter's model and effort, say so to the person before dispatching**, naming the nearest one; never dispatch on another level silently.
-- **The member's agent follows its seat, never `general-purpose`**: every builder (a task swarm's, a plan's) on the plugin's `swarm-worker`, a brainswarm seat on `brainswarm-seat`, any verification (a verifier seat, one pass, the proof of a new verify skill) on `verifier` (`subagent_type: "swarmstorm:<agent>"`). It holds the rules every brief of that kind would otherwise have to repeat.
+- **The member's agent follows its seat, never `general-purpose`**: every builder (a task swarm's, a plan's) on the plugin's `swarm-worker`, a brainswarm seat on `brainswarm-seat`, a handed-off run on `orchestrator` (or a fork), any verification (a verifier seat, one pass, the proof of a new verify skill) on `verifier` (`subagent_type: "swarmstorm:<agent>"`). It holds the rules every brief of that kind would otherwise have to repeat.
 - **The brief is the only thing sent.** Read `references/brief.md` before the first dispatch.
 - **Check blockers before every dispatch.**
 - **Every ready member's `Agent` call goes in one message**, each in the background, nothing between them.
