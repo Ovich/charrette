@@ -43,27 +43,39 @@ function statusOf(p: SnapshotRunner, activity: MemberActivity | null, now: numbe
 }
 
 /** The tool the member has open (busy) or called last, and why it is quiet when the server says. */
-function ActivityLine({ activity }: { activity: MemberActivity }) {
+function activityText(activity: MemberActivity): string {
   const tool = activity.doing ? (activity.state === "busy" ? activity.doing : `last: ${activity.doing}`) : null;
-  const text = [tool, activity.state === "quiet" || activity.state === "gone" ? activity.reason : null].filter(Boolean).join(" · ");
+  return [tool, activity.state === "quiet" || activity.state === "gone" ? activity.reason : null].filter(Boolean).join(" · ");
+}
+
+/** The activity line, kept off the card face: its text reads in the card's hover title. */
+function ActivityLine({ activity }: { activity: MemberActivity }) {
+  const text = activityText(activity);
   if (!text) return null;
   return (
-    <span className="activity" data-component="MemberActivity" data-state={activity.state}>
+    <span className="activity" data-component="MemberActivity" data-state={activity.state} hidden>
       {text}
     </span>
   );
 }
 
 /** Since the member's last progress and since its last sign of life (swarm-relay#D38); nothing when the server sends neither. */
-function MemberAges({ activity, now }: { activity: MemberActivity; now: number }) {
-  const ages = [
+function agesText(activity: MemberActivity, now: number): string {
+  return [
     typeof activity.progressAt === "number" ? `progress ${ageSince(activity.progressAt, now)}` : null,
     typeof activity.aliveAt === "number" ? `alive ${ageSince(activity.aliveAt, now)}` : null,
-  ].filter(Boolean);
-  if (ages.length === 0) return null;
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** The two ages, kept off the card face: their text reads in the card's hover title. */
+function MemberAges({ activity, now }: { activity: MemberActivity; now: number }) {
+  const ages = agesText(activity, now);
+  if (!ages) return null;
   return (
-    <span className="ages" data-component="MemberAges">
-      {ages.join(" · ")}
+    <span className="ages" data-component="MemberAges" hidden>
+      {ages}
     </span>
   );
 }
@@ -82,8 +94,13 @@ function AgentCard({ p, hue, followed, onFollow, now }: { p: SnapshotRunner; hue
   const orch = p.slice === ORCHESTRATOR;
   const activity = p.state === "ended" || p.state === "done" ? null : activityOf(p);
   const status = statusOf(p, activity, now);
+  const ended = p.state === "ended" || p.state === "done";
+  // the face keeps one doing line only while the member works; the rest waits in the hover title
+  const showsDoing = !ended && !!p.doing && (activity ? activity.state === "busy" || activity.state === "working" : true);
+  const hoverTitle = [p.doing, activity && agesText(activity, now), activity && activityText(activity)].filter(Boolean).join("\n");
   return (
     <button
+      title={hoverTitle || undefined}
       className={["card", orch && "orch", p.state, activity?.state === "gone" && "gone"].filter(Boolean).join(" ")}
       style={{ "--h": hue, "--s": 60 } as CSSProperties}
       aria-pressed={followed}
@@ -100,7 +117,7 @@ function AgentCard({ p, hue, followed, onFollow, now }: { p: SnapshotRunner; hue
       </span>
       <span className="slice">{orch ? "orchestrator" : p.title ? `${p.slice} · ${p.title}` : p.slice}</span>
       {!!p.unread && <span className="unread" data-component="UnreadCount">{p.unread} unread</span>}
-      <span className="doing">{p.doing}</span>
+      {showsDoing && <span className="doing">{p.doing}</span>}
       {activity && <MemberAges activity={activity} now={now} />}
       {activity && <ActivityLine activity={activity} />}
     </button>

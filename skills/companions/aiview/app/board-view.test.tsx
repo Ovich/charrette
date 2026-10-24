@@ -339,6 +339,21 @@ test("a gone member's card reads as gone, its lost link named", () => {
   expect(agesOf(card)!.textContent).toBe("progress 2 min · alive 40 s");
 });
 
+test("a card keeps its ages and tool off its face, in its hover title", () => {
+  show([APP], 1, [withActivity({ state: "busy", doing: "Bash", since: minutesAgo(3), tokens: null, movedAt: null, progressAt: minutesAgo(4), aliveAt: Date.now() - 20000 })]);
+  const card = activeCard();
+  expect((agesOf(card) as HTMLElement).hidden).toBe(true);
+  expect((card.querySelector('[data-component="MemberActivity"]') as HTMLElement).hidden).toBe(true);
+  expect(card.title).toContain("progress 4 min · alive 20 s");
+  expect(card.title).toContain("Bash");
+  expect(card.querySelector(".doing")).toBeTruthy();
+});
+
+test("a waiting card shows no doing line on its face", () => {
+  show([APP], 1, [withActivity({ state: "waiting", doing: "swarm wait", since: null, tokens: null, movedAt: null })]);
+  expect(activeCard().querySelector(".doing")).toBeNull();
+});
+
 // ── ClaimsRow ────────────────────────────────────────────────────────────────────
 
 const SHARED: BoardSnapshot = { ...LIVE, files: [...LIVE.files, { path: "src/shared.ts", holders: ["refresh-tokens/S3", "audit-log/S1"], interface: true }] };

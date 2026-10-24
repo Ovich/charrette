@@ -676,3 +676,6 @@
 .board .side { border-left: 0; border-right: 1px solid var(--border); }
 @media (max-width: 1100px) { .board .run-body.with-roster { grid-template-columns: 260px minmax(0, 1fr); } }
 @media (max-width: 860px) { .board .run-body.with-roster { grid-template-columns: minmax(0, 1fr); } .board .side { border-right: 0; border-bottom: 1px solid var(--border); } }
+/* agent cards at a glance (T1): mark, nick, role line, state chip, one truncated doing line; ages and tool in the title */
+.board .agent-strip .card .doing { display: block; -webkit-line-clamp: unset; min-height: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board .agent-strip .card .ages[hidden], .board .agent-strip .card .activity[hidden] { display: none; }
