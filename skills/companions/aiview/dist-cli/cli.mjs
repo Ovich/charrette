@@ -10579,7 +10579,8 @@ function cmdPath() {
     process.exit(1);
   }
   const index = openIndex();
-  const slug = args.flag("--project") ?? index.activeProject();
+  const cwdProject = projectForCwd(process.cwd(), index.allProjects())?.slug ?? null;
+  const slug = args.flag("--project") ?? cwdProject ?? index.activeProject();
   const known = index.allProjects().map((p) => p.slug);
   index.close();
   if (slug === ALL_PROJECTS) {
@@ -11161,69 +11162,78 @@ function cmdPlan() {
     }
   );
 }
-switch (args.verb) {
-  case "pending":
-    cmdPending();
-    break;
-  case "status":
-    cmdStatus();
-    break;
-  case "path":
-    cmdPath();
-    break;
-  case "init":
-    cmdInit();
-    break;
-  case "components":
-    cmdComponents();
-    break;
-  case "show":
-    cmdShow();
-    break;
-  case "check":
-    cmdCheck();
-    break;
-  case "mermaid-check":
-    await cmdMermaidCheck();
-    break;
-  case "tracker":
-    cmdTracker();
-    break;
-  case "plan":
-    cmdPlan();
-    break;
-  case "add":
-    cmdAdd();
-    break;
-  case "update":
-    cmdUpdate();
-    break;
-  case "list":
-    cmdList();
-    break;
-  case "remove":
-    cmdRemove();
-    break;
-  case "move":
-    cmdMove();
-    break;
-  case "project":
-    cmdProject();
-    break;
-  case "use":
-    cmdUse();
-    break;
-  case "open":
-    cmdOpen();
-    break;
-  case "serve":
-    await cmdServe();
-    break;
-  case "board":
-    cmdBoard();
-    break;
-  default:
-    console.error(USAGE);
-    process.exit(1);
+async function runVerb() {
+  switch (args.verb) {
+    case "pending":
+      cmdPending();
+      break;
+    case "status":
+      cmdStatus();
+      break;
+    case "path":
+      cmdPath();
+      break;
+    case "init":
+      cmdInit();
+      break;
+    case "components":
+      cmdComponents();
+      break;
+    case "show":
+      cmdShow();
+      break;
+    case "check":
+      cmdCheck();
+      break;
+    case "mermaid-check":
+      await cmdMermaidCheck();
+      break;
+    case "tracker":
+      cmdTracker();
+      break;
+    case "plan":
+      cmdPlan();
+      break;
+    case "add":
+      cmdAdd();
+      break;
+    case "update":
+      cmdUpdate();
+      break;
+    case "list":
+      cmdList();
+      break;
+    case "remove":
+      cmdRemove();
+      break;
+    case "move":
+      cmdMove();
+      break;
+    case "project":
+      cmdProject();
+      break;
+    case "use":
+      cmdUse();
+      break;
+    case "open":
+      cmdOpen();
+      break;
+    case "serve":
+      await cmdServe();
+      break;
+    case "board":
+      cmdBoard();
+      break;
+    default:
+      console.error(USAGE);
+      process.exit(1);
+  }
+}
+try {
+  await runVerb();
+} catch (err) {
+  if (process.env.AIVIEW_DEBUG === "1") throw err;
+  console.error(`aiview ${args.verb}: ${err instanceof Error ? err.message : String(err)}`);
+  process.exit(1);
 }
 if (MUTATES_INDEX.has(args.verb ?? "")) notifyIndexChanged();
