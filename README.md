@@ -123,7 +123,7 @@ An agent trace bench: a support assistant walked call by call, each step with th
 > the root or one folder down in its group, discoverable to you (symlink or otherwise).
 > Then tell me the aiview URL and the skills you can reach by name.
 
-Then ask in plain language. Each skill states when it applies and maps your request onto its flow. Ask *"how does this work?"* at any moment: the agent explains the part your question or your current work touches; new here, it readies the project and shows what the collection can do with it.
+Then ask in plain language. Each skill states when it applies and maps your request onto its flow. Ask *"how does this work?"* at any moment: the agent explains the part your question or your current work touches, or unasked when it sees you don't follow.
 
 ## Skills
 
@@ -133,7 +133,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 
 | Skill | Use case | Example ask |
 |---|---|---|
-| [help](skills/help/help/SKILL.md) | At any moment you want to know how the collection works: mid-run, about a term or a verb's answer, or as a new user | *"Why did the swarm stop?"* The run's state read and explained, who waits on whom, what unblocks it. *"What is a verifier?"* One sentence, then what it means in your run. *"How do I start?"* The project readied (Node, data home, project, viewer) and a one-screen tour from your own work. |
+| [help](skills/help/help/SKILL.md) | At any moment you want to know how the collection works: mid-run, about a term or a verb's answer, or as a new user | *"Why did the swarm stop?"* The run's state read and explained, who waits on whom, what unblocks it. *"What is a verifier?"* One sentence, then what it means in your run. *"What can it do here?"* A one-screen tour from your own work. |
 | [next-step](skills/help/next-step/SKILL.md) | Always on: the agent notices the moment a skill would help and offers it in one line | You hesitate on a choice: *"Want me to interview you on this?"*; you agree on a build: *"Run it as build-verify: 3 builders, 1 verifier, until ready. Go?"* A no ends it for that subject. |
 
 ### Project: what a project has once and keeps

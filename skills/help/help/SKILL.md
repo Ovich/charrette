@@ -34,18 +34,6 @@ without stopping the work, then carry on.
 - **Then hand back**: the work continues where it was. A skill the explanation points to is
   offered as the `next-step` skill offers, never run unasked.
 
-## When something is not ready
-
-Asked about a step that cannot run, or the person is new: check, one line each, fixed on the spot
-or said with the one command that fixes it:
-
-1. **Node 22.5 or later** (`node --version`).
-2. **aiview's data home**: `aiview status --json` (the `aiview` skill's tool); none yet, `aiview
-   init`; where it lives (`home`), in one line: documents never go into the repository.
-3. **The project declared**: no `cwdProject` → declare it as the `aiview` skill's
-   `references/projects.md` says, its slug proposed from the folder's name, on the person's yes.
-4. **The viewer**: `aiview board` prints its link, starting the server when none runs.
-
 ## When the question is broad
 
 "What can it do", "how do I start": one screen, each line a kind of help with an example drawn
