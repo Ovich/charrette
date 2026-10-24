@@ -93,7 +93,7 @@
   .board *, .board *::before { animation: none !important; transition: none !important; }
 }
 
-/* SL7: the board page, the RepoList rail beside a column: tabs, agent strip, conversation (flex 1), claims row */
+/* SL7: the board page, one column: tabs, agent strip, conversation (flex 1), claims row */
 /* in aiview the board fills the document area, at the height of the frame it replaced */
 .board { height: calc(100vh - 10rem); display: flex; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); overflow: hidden; }
 .board > .content { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
@@ -676,9 +676,6 @@
 .board .side { border-left: 0; border-right: 1px solid var(--border); }
 @media (max-width: 1100px) { .board .run-body.with-roster { grid-template-columns: 260px minmax(0, 1fr); } }
 @media (max-width: 860px) { .board .run-body.with-roster { grid-template-columns: minmax(0, 1fr); } .board .side { border-right: 0; border-bottom: 1px solid var(--border); } }
-/* agent cards at a glance (T1): mark, nick, role line, state chip, one truncated doing line; ages and tool in the title */
-.board .agent-strip .card .doing { display: block; -webkit-line-clamp: unset; min-height: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.board .agent-strip .card .ages[hidden], .board .agent-strip .card .activity[hidden] { display: none; }
 /* the run tabs scroll in their own strip, the tools beside it never over it (T8, v1-F2); narrow, the tools wrap below */
 .board .runs { overflow: visible; padding-left: 0; }
 .board .runs .tabstrip { flex: 1 1 auto; min-width: 0; display: flex; align-items: stretch; gap: 2px; padding-left: 8px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }

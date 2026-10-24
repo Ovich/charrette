@@ -217,9 +217,20 @@ export function openIndex(dbPath: string = SQLITE_PATH, root: string = STORE_ROO
   db.exec("CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
   const projectCols = (db.prepare("PRAGMA table_info(projects)").all() as { name: string }[]).map((c) => c.name);
   if (!projectCols.includes("board_repos")) db.exec("ALTER TABLE projects ADD COLUMN board_repos TEXT NOT NULL DEFAULT '[]'");
+  // the project is its repository: one board; a repo written as its folder or its .git, or gone from disk, is read once
   const boardReposOf = (slug: string): string[] => {
     const row = db.prepare("SELECT board_repos FROM projects WHERE slug = ?").get(slug) as { board_repos: string } | undefined;
-    return row ? (JSON.parse(row.board_repos) as string[]) : [];
+    if (!row) return [];
+    const seen = new Set<string>();
+    const repos: string[] = [];
+    for (const r of JSON.parse(row.board_repos) as string[]) {
+      const folder = path.resolve(r).replace(/[\\/]\.git$/i, "");
+      const key = process.platform === "win32" ? folder.toLowerCase() : folder;
+      if (seen.has(key) || !fs.existsSync(folder)) continue;
+      seen.add(key);
+      repos.push(r);
+    }
+    return repos;
   };
   const addRepo = (slug: string, repo: string): string[] => {
     db.prepare("INSERT INTO projects (slug, title, paths) VALUES (?, NULL, '[]') ON CONFLICT(slug) DO NOTHING").run(slug);

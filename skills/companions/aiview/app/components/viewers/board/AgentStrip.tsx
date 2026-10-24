@@ -34,8 +34,8 @@ function statusOf(p: SnapshotRunner, activity: MemberActivity | null, now: numbe
   if (p.state === "ended" || p.state === "done") return { text: p.ended ? `ended ${hhmm(p.ended)}` : "ended", className: "ended" };
   if (activity) {
     const label = isStalled(activity) ? "stalled" : activity.state;
-    // the state word only: how long it has held goes in the hover title (stateHeldFor)
-    return { text: label, className: label };
+    const timed = (activity.state === "busy" || activity.state === "quiet") && activity.since !== null;
+    return { text: timed ? `${label} · ${minutesSince(activity.since!, now)}` : label, className: label };
   }
   if (p.stale) return { text: `quiet ${Math.max(1, Math.round((now - Date.parse(p.lastCall)) / 60000))} min`, className: "quiet" };
   const doing = p.listening && p.slice !== ORCHESTRATOR ? "listening" : p.state;
@@ -54,12 +54,12 @@ function activityText(activity: MemberActivity): string {
   return [tool, activity.state === "quiet" || activity.state === "gone" ? activity.reason : null].filter(Boolean).join(" · ");
 }
 
-/** The activity line, kept off the card face: its text reads in the card's hover title. */
+/** The activity line on the card face; its text also reads in the hover title. */
 function ActivityLine({ activity }: { activity: MemberActivity }) {
   const text = activityText(activity);
   if (!text) return null;
   return (
-    <span className="activity" data-component="MemberActivity" data-state={activity.state} hidden>
+    <span className="activity" data-component="MemberActivity" data-state={activity.state}>
       {text}
     </span>
   );
@@ -75,12 +75,12 @@ function agesText(activity: MemberActivity, now: number): string {
     .join(" · ");
 }
 
-/** The two ages, kept off the card face: their text reads in the card's hover title. */
+/** The two ages on the card face; also in the hover title. */
 function MemberAges({ activity, now }: { activity: MemberActivity; now: number }) {
   const ages = agesText(activity, now);
   if (!ages) return null;
   return (
-    <span className="ages" data-component="MemberAges" hidden>
+    <span className="ages" data-component="MemberAges">
       {ages}
     </span>
   );
@@ -101,8 +101,8 @@ function AgentCard({ p, hue, followed, onFollow, now }: { p: SnapshotRunner; hue
   const activity = p.state === "ended" || p.state === "done" ? null : activityOf(p);
   const status = statusOf(p, activity, now);
   const ended = p.state === "ended" || p.state === "done";
-  // the face keeps one doing line only while the member works; the rest waits in the hover title
-  const showsDoing = !ended && !!p.doing && (activity ? activity.state === "busy" || activity.state === "working" : true);
+  // the face shows the doing line, ages and tool; the hover title repeats them
+  const showsDoing = !ended && !!p.doing;
   const hoverTitle = [p.doing, activity && stateHeldFor(activity, now), activity && agesText(activity, now), activity && activityText(activity)].filter(Boolean).join("\n");
   return (
     <button

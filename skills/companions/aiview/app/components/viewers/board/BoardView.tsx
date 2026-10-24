@@ -1,5 +1,4 @@
-// The project's board, drawn by aiview (companions-merge §3): the repositories when the document
-// names several, the tab row (☰ archive, All, the open runs, the merge lock at its end), the picked
+// The project's board, drawn by aiview (companions-merge §3): one board per project, the tab row (☰ archive, All, the open runs, the merge lock at its end), the picked
 // run's switch between its conversation (the agent roster left of the conversation, the claims row) and its
 // Analytics, and the across-runs view. aiview's theme; board.css reaches only `.board`.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -24,7 +23,6 @@ import { AgentStrip } from "./AgentStrip.tsx";
 import { ArchivePanel } from "./ArchivePanel.tsx";
 import { ClaimsRow } from "./ClaimsRow.tsx";
 import { MergedFilesRow } from "./MergedFilesRow.tsx";
-import { RepoList } from "./RepoList.tsx";
 import { RunAnalytics } from "./RunAnalytics.tsx";
 import { RunTabs } from "./RunTabs.tsx";
 import { RunViewSwitch } from "./RunViewSwitch.tsx";
@@ -156,14 +154,6 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
     setPostToShow(seq);
   };
   const closeMenu = useCallback(() => setMenuOpen(false), []);
-  const pickRepo = (repo: string): void => {
-    setQuery({ repo, run: null });
-    setPick(ALL);
-    // the person's pick of a repository opens it on All, as before D17
-    setOpened(true);
-    setNarrowing((n) => ({ ...n, file: null }));
-    setMenuOpen(false);
-  };
 
   const notYet = (state: "error" | "loading", text: string) => (
     <div className="board" data-component="BoardView" data-state={state}>
@@ -172,7 +162,6 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
   );
   if (board.error && missingRun === null) return notYet("error", board.error);
   if (!snapshot) return notYet("loading", "Loading the board…");
-  const listed = board.repos.filter((r) => repos.includes(r.repo));
   const selectedRun = snapshot.runs.find((r) => r.run === picked) ?? null;
   // the agent strip under a picked run, open or closed; the claims row hidden under a closed one (D7)
   const members = picked === null ? [] : agents(snapshot, picked);
@@ -184,7 +173,6 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
     <NicksContext.Provider value={nicks}>
       <div className="board" data-component="BoardView" data-state={snapshot.runs.length === 0 ? "no run yet" : "board"}>
         <TipLayer />
-        {repos.length >= 2 && <RepoList repos={listed} selected={snapshot.repo} onSelect={pickRepo} />}
         <div className="content">
           <RunTabs
             tabs={tabs}

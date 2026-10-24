@@ -274,9 +274,9 @@ const minutesAgo = (m: number) => Date.now() - m * 60000;
 
 test.each([
   ["working", { state: "working", doing: "Edit", since: null }, /^working$/, "last: Edit"],
-  ["busy", { state: "busy", doing: "browser_click /jobs", since: minutesAgo(3) }, /^busy$/, "browser_click /jobs"],
+  ["busy", { state: "busy", doing: "browser_click /jobs", since: minutesAgo(3) }, /^busy · 3 min$/, "browser_click /jobs"],
   ["waiting", { state: "waiting", doing: "swarm wait", since: null }, /^waiting$/, "last: swarm wait"],
-  ["quiet", { state: "quiet", doing: "Bash", since: minutesAgo(12), reason: "no call since 12 min" }, /^quiet$/, "last: Bash · no call since 12 min"],
+  ["quiet", { state: "quiet", doing: "Bash", since: minutesAgo(12), reason: "no call since 12 min" }, /^quiet · 12 min$/, "last: Bash · no call since 12 min"],
   ["gone", { state: "gone", doing: "Read", since: null }, /^gone$/, "last: Read"],
 ])("a %s member shows its own label and its tool beside it", (state, liveness, label, tool) => {
   show([APP], 1, [withActivity({ tokens: null, movedAt: null, ...liveness })]);
@@ -325,7 +325,7 @@ test("a stalled member's card reads as stalled with its missing signal", () => {
   const card = activeCard();
   const status = card.querySelector(".state")!;
   expect(status.className).toBe("state stalled");
-  expect(status.textContent).toMatch(/^stalled$/);
+  expect(status.textContent).toMatch(/^stalled · 16 min$/);
   expect(card.querySelector('[data-component="MemberActivity"]')!.textContent).toBe("last: Bash · no progress for 960s, link alive; last Bash");
   expect(agesOf(card)!.textContent).toBe("progress 16 min · alive 5 s");
 });
@@ -339,21 +339,20 @@ test("a gone member's card reads as gone, its lost link named", () => {
   expect(agesOf(card)!.textContent).toBe("progress 2 min · alive 40 s");
 });
 
-test("a card keeps its ages and tool off its face, in its hover title", () => {
+test("a card shows its state's duration, ages and tool on its face, and in its hover title", () => {
   show([APP], 1, [withActivity({ state: "busy", doing: "Bash", since: minutesAgo(3), tokens: null, movedAt: null, progressAt: minutesAgo(4), aliveAt: Date.now() - 20000 })]);
   const card = activeCard();
-  expect((agesOf(card) as HTMLElement).hidden).toBe(true);
-  expect((card.querySelector('[data-component="MemberActivity"]') as HTMLElement).hidden).toBe(true);
+  expect((agesOf(card) as HTMLElement).hidden).toBe(false);
+  expect((card.querySelector('[data-component="MemberActivity"]') as HTMLElement).hidden).toBe(false);
   expect(card.title).toContain("progress 4 min · alive 20 s");
   expect(card.title).toContain("Bash");
-  expect(card.title).toContain("busy for 3 min");
-  expect(card.querySelector(".state")!.textContent).toBe("busy");
+  expect(card.querySelector(".state")!.textContent).toBe("busy · 3 min");
   expect(card.querySelector(".doing")).toBeTruthy();
 });
 
-test("a waiting card shows no doing line on its face", () => {
+test("a waiting card keeps its doing line on its face", () => {
   show([APP], 1, [withActivity({ state: "waiting", doing: "swarm wait", since: null, tokens: null, movedAt: null })]);
-  expect(activeCard().querySelector(".doing")).toBeNull();
+  expect(activeCard().querySelector(".doing")).toBeTruthy();
 });
 
 // ── ClaimsRow ────────────────────────────────────────────────────────────────────
@@ -429,19 +428,6 @@ test("clicking the merge lock opens its history, newest first; Escape closes it"
   expect(rows[1].className).toBe("merged");
   fireEvent.keyDown(document, { key: "Escape" });
   expect(screen.queryByRole("dialog", { name: "Merge lock history" })).toBeNull();
-});
-
-// ── RepoList ─────────────────────────────────────────────────────────────────────
-
-test("RepoList shows with two repositories, not with one; picking the second asks useBoard for it", () => {
-  const one = show([APP], null, [LIVE, SITE]);
-  expect(one.container.querySelector('[data-component="RepoList"]')).toBeNull();
-  cleanup();
-  show([APP, OTHER], null, [LIVE, SITE]);
-  const repos = within(screen.getByRole("navigation", { name: "Repositories" }));
-  fireEvent.click(repos.getByText("swarmstorm-site"));
-  expect(source.calls.at(-1)).toEqual({ repo: OTHER, run: null });
-  expect(tabs().getByText("The landing page")).toBeTruthy();
 });
 
 // ── The tab the board opens on by itself (D17) ──────────────────────────────────────

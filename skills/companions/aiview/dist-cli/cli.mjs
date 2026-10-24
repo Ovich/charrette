@@ -194,7 +194,17 @@ function openIndex(dbPath = SQLITE_PATH, root = STORE_ROOT) {
   if (!projectCols.includes("board_repos")) db.exec("ALTER TABLE projects ADD COLUMN board_repos TEXT NOT NULL DEFAULT '[]'");
   const boardReposOf = (slug) => {
     const row = db.prepare("SELECT board_repos FROM projects WHERE slug = ?").get(slug);
-    return row ? JSON.parse(row.board_repos) : [];
+    if (!row) return [];
+    const seen = /* @__PURE__ */ new Set();
+    const repos = [];
+    for (const r of JSON.parse(row.board_repos)) {
+      const folder = path4.resolve(r).replace(/[\\/]\.git$/i, "");
+      const key = process.platform === "win32" ? folder.toLowerCase() : folder;
+      if (seen.has(key) || !fs3.existsSync(folder)) continue;
+      seen.add(key);
+      repos.push(r);
+    }
+    return repos;
   };
   const addRepo = (slug, repo) => {
     db.prepare("INSERT INTO projects (slug, title, paths) VALUES (?, NULL, '[]') ON CONFLICT(slug) DO NOTHING").run(slug);
