@@ -1,4 +1,4 @@
-// One run's Analytics (board D10, plan D23, D24, D29-D33, D40; mockup #677 `run`, `brun`): useStats stood in
+// One run's Analytics (board D10, plan D23, D24, D29-D33, D40; prototype #677 `run`, `brun`): useStats stood in
 // for with one run's `Stats`, its members' counts disagreeing with their spans and marks.
 import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";

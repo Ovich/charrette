@@ -6,7 +6,7 @@
 //
 // Unlike Composition (overlay.ts) the layer takes no pointer event: the person is asked
 // about a screen they can still operate. It is driven by a message rather than baked
-// into the html, so pointing somewhere else does not reload the frame and the mockup
+// into the html, so pointing somewhere else does not reload the frame and the prototype
 // keeps the state the person put it in. The highlight stays until the next message; an
 // empty list of names removes it.
 //

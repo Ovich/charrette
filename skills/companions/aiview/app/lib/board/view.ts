@@ -259,7 +259,7 @@ export type Item =
   /** The orchestrator opened phase `name` (`swarm phase`), the current one ending with it: a separator across the conversation. */
   | { kind: "phase"; seq: number; at: string; run: RunId; from: string; name: string; text: string; about: null };
 
-/** Every tip, verbatim from the mockup (D9). */
+/** Every tip, verbatim from the prototype (D9). */
 export const TIPS = {
   flag: "Flag: this member wrote a file it had not claimed, while another member holds it. The board found it when the member merged or ended. The two settle it here; the flag stays open until they agree.",
   settled: "Settled flag: the two members agreed on the file a flag was about.",

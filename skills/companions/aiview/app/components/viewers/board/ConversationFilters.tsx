@@ -1,4 +1,4 @@
-// The conversation's filters (SL11, mockup #643): one quiet row of kind chips, one at a time,
+// The conversation's filters (SL11, prototype #643): one quiet row of kind chips, one at a time,
 // counted within what the pick shows, then File ▾, a searchable menu of every file the items are
 // about. Escape, × or a click outside closes the menu.
 import { useCallback, useEffect, useRef, useState } from "react";

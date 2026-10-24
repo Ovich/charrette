@@ -8,7 +8,7 @@ import { DocumentsPanel } from "./components/docs/DocumentsPage.tsx";
 import { DocHeader } from "./components/docs/DocHeader.tsx";
 import { MarkdownView } from "./components/viewers/MarkdownView.tsx";
 import { PendingCards } from "./components/docs/PendingCards.tsx";
-import { MockupFrame } from "./components/viewers/MockupFrame.tsx";
+import { PrototypeFrame } from "./components/viewers/PrototypeFrame.tsx";
 import { PdfFrame } from "./components/viewers/PdfFrame.tsx";
 import { BoardView } from "./components/viewers/board/BoardView.tsx";
 import { readRunInHash } from "./lib/board/analytics.ts";
@@ -172,7 +172,7 @@ export function App() {
     [docs, activeProject, pickProject],
   );
 
-  // A Composition label was clicked in the frame: open the source mockup at that component.
+  // A Composition label was clicked in the frame: open the source prototype at that component.
   // The source is looked up by base name in the host's folder; an unregistered file gets
   // a toast rather than a silent nothing.
   const openSource = useCallback(
@@ -348,7 +348,7 @@ export function App() {
               )}
               {format === "pdf" && <PdfFrame docId={doc.id} changedTick={changedTick} />}
               {format === "html" && response!.content !== null && (
-                <MockupFrame
+                <PrototypeFrame
                   html={response!.content}
                   bindings={response!.bindings}
                   target={sourceTarget?.id === doc.id ? sourceTarget.component : undefined}

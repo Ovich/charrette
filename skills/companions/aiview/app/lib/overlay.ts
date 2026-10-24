@@ -1,16 +1,16 @@
-// Composition mode: what the frame injects into a served mockup so the person can see
+// Composition mode: what the frame injects into a served prototype so the person can see
 // which regions were bound from elsewhere. Everything drawn lives in one fixed layer
 // appended to <body>, positioned from measured rectangles: nothing is inserted into the
 // host's flow, so the host's layout is exactly what Rendered mode shows.
 //
-// The layer takes every pointer event. In Composition the mockup is looked at, not
+// The layer takes every pointer event. In Composition the prototype is looked at, not
 // operated: its hover states and clicks stay quiet. Wheel scrolling still reaches the
 // document. A pulled region shows its label on hover and opens its source on click; an
-// offered region (a component this mockup declares, not bound and inside no bound
+// offered region (a component this prototype declares, not bound and inside no bound
 // element) shows its label on hover and does nothing on click.
 //
 // Every class the layer uses is prefixed av-, and the layer's own elements are reset,
-// so a mockup's own rules for .box or .row can never style the layer.
+// so a prototype's own rules for .box or .row can never style the layer.
 //
 // The veil is one path with even-odd holes, never an SVG mask: Chrome does not always
 // repaint a masked element when the mask's children change.
@@ -24,9 +24,10 @@ export interface OverlayOptions {
   target?: string;
 }
 
-/** Drop the date prefix of a mockup file name for the label: `2026-09-03-dock-tools.mockup.html` -> `dock-tools`. */
+/** Drop the date prefix of a prototype file name for the label: `2026-09-03-dock-tools.prototype.html` -> `dock-tools`.
+ *  The legacy `.mockup.html` suffix, of files written before the rename, is dropped the same way. */
 export const shortName = (file: string): string =>
-  file.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/\.mockup\.html$/, "").replace(/\.html$/, "");
+  file.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/\.(prototype|mockup)\.html$/, "").replace(/\.html$/, "");
 
 const UI_FONT = "font:12px/1.35 ui-sans-serif,system-ui,sans-serif";
 
@@ -53,7 +54,7 @@ const SCRIPT = `
 (function(){
   var layer=document.getElementById('__aiview'); if(!layer) return;
   var target=layer.getAttribute('data-target')||'';
-  var short=function(f){return f.replace(/^\\d{4}-\\d{2}-\\d{2}-/,'').replace(/\\.mockup\\.html$/,'').replace(/\\.html$/,'')};
+  var short=function(f){return f.replace(/^\\d{4}-\\d{2}-\\d{2}-/,'').replace(/\\.(prototype|mockup)\\.html$/,'').replace(/\\.html$/,'')};
   var svgNS='http://www.w3.org/2000/svg';
   var svg=document.createElementNS(svgNS,'svg');
   svg.innerHTML='<path fill="rgba(255,255,255,.4)" fill-rule="evenodd" d=""/>';

@@ -1,8 +1,8 @@
-// The bench bridge: the sidecar path grammar, and the app's relay as MockupFrame runs it.
+// The bench bridge: the sidecar path grammar, and the app's relay as PrototypeFrame runs it.
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { BENCH_BRIDGE_MARK, isSidecarPath } from "./lib/bench-bridge.ts";
-import { MockupFrame } from "./components/viewers/MockupFrame.tsx";
+import { PrototypeFrame } from "./components/viewers/PrototypeFrame.tsx";
 
 afterEach(() => {
   cleanup();
@@ -26,7 +26,7 @@ describe("isSidecarPath", () => {
 
 /** A workbench framed with the bridge; `answers` collects what the app posts back to the frame. */
 function frameBench(dataTick = 0) {
-  const view = render(<MockupFrame html={PAGE} workbench doc={DOC} dataTick={dataTick} />);
+  const view = render(<PrototypeFrame html={PAGE} workbench doc={DOC} dataTick={dataTick} />);
   const frame = document.querySelector("iframe")!;
   const win = frame.contentWindow!;
   const answers: unknown[] = [];
@@ -42,11 +42,11 @@ const stubFetch = (response: unknown) => {
 };
 
 describe("the bench relay", () => {
-  test("a mockup gets no bridge; a workbench does", () => {
-    render(<MockupFrame html={PAGE} />);
+  test("a prototype gets no bridge; a workbench does", () => {
+    render(<PrototypeFrame html={PAGE} />);
     expect(document.querySelector("iframe")!.getAttribute("srcdoc")).not.toContain(BENCH_BRIDGE_MARK);
     cleanup();
-    render(<MockupFrame html={PAGE} workbench doc={DOC} />);
+    render(<PrototypeFrame html={PAGE} workbench doc={DOC} />);
     expect(document.querySelector("iframe")!.getAttribute("srcdoc")).toContain(BENCH_BRIDGE_MARK);
   });
 

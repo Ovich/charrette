@@ -43,7 +43,7 @@ function BrainstormTiles({ stats, run }: { stats: Stats; run: RunStats }) {
   );
 }
 
-/** One brainstorm run's Analytics (board D15, plan D24, D33; mockup #677 `brun`): six tiles with no budget,
+/** One brainstorm run's Analytics (board D15, plan D24, D33; prototype #677 `brun`): six tiles with no budget,
  *  its questions, a lane per seat, the seats in numbers. No claims, no merge lock. */
 export function BrainstormRunAnalytics({ stats, run, onOpenPost }: { stats: Stats; run: RunStats; onOpenPost: (seq: number) => void }) {
   const to = run.closedAt ?? new Date().toISOString();

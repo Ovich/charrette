@@ -1,4 +1,4 @@
-// The board page (plan D7, D9, D14, D20, D22; mockup #643): useBoard is stood in for with the
+// The board page (plan D7, D9, D14, D20, D22; prototype #643): useBoard is stood in for with the
 // fixtures; each call's selection is recorded, and the snapshot answered is the repository it asks for.
 import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";

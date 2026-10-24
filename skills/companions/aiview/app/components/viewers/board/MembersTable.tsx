@@ -2,7 +2,7 @@ import type { Interval, MemberStats } from "../../../../../swarm-board/src/clien
 import { ESTIMATED_EVENTS_TIP, figure, formatDuration } from "../../../lib/board/analytics.ts";
 import { RunnerTag } from "./chips.tsx";
 
-/** The Time bar's order: working, silent, waiting, merging (mockup #677). */
+/** The Time bar's order: working, silent, waiting, merging (prototype #677). */
 const ORDER: Interval["what"][] = ["working", "silent", "waiting", "merging"];
 /** Past this much waiting for the lock, the member's waiting is written beside its time, in warn. */
 const LONG_WAIT_MS = 8 * 60_000;
@@ -11,7 +11,7 @@ const BAR_PX = 140;
 
 const lengthOf = (i: { from: string; to: string }): number => Date.parse(i.to) - Date.parse(i.from);
 
-/** Where each member's time went (mockup #677 MembersTable): its spans drawn as a bar in the run's
+/** Where each member's time went (prototype #677 MembersTable): its spans drawn as a bar in the run's
  *  scale, its time from joining to its end and its waiting as swarm counts it (plan D40), its posts, claims and flags. A member
  *  `estimated` (D45), its spans read from the board's events, has its Time drawn as inferred with the estimate's tip; "—" in
  *  Time when the run is not recorded and the member not estimated (D33). A row focuses that member's lane. */

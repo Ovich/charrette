@@ -5,7 +5,7 @@ const MINUTE_MS = 60_000;
 /** The axis's step, in minutes, for a run of this length: at most six ticks. */
 const stepOf = (lengthMin: number): number => [1, 2, 5, 10, 15, 30, 60].find((s) => lengthMin / s <= 6) ?? 120;
 
-/** A brainstorm run's questions (mockup #677 QuestionsChart; plan D4, D24, D29): a row per `D<n>`, a bar
+/** A brainstorm run's questions (prototype #677 QuestionsChart; plan D4, D24, D29): a row per `D<n>`, a bar
  *  from its first post to its outcome, or to the run's end while it has none, a dot per exchange, the
  *  outcome `◆ agreed #<seq>`. Scaled to the run's length; no budget, no title. */
 export function QuestionsChart({ questions, from, to }: { questions: QuestionStats[]; from: string; to: string }) {

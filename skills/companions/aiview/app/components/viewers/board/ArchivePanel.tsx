@@ -1,4 +1,4 @@
-// The archive (D7, D18, mockup #643): every closed run, newest first, searchable on title, code,
+// The archive (D7, D18, prototype #643): every closed run, newest first, searchable on title, code,
 // orchestrator and kind; a drawer from the left. A row picks the run; ×, Escape or a click outside closes.
 import { useEffect, useRef, useState } from "react";
 import { seatCount, workerCount, type ArchivedRun, type RunId } from "../../../lib/board/view.ts";

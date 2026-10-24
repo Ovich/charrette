@@ -1,4 +1,4 @@
-// The board's top row (D7, mockup #643): Archive first, opening the closed runs, then one tab per open run, an
+// The board's top row (D7, prototype #643): Archive first, opening the closed runs, then one tab per open run, an
 // archived run picked as a tab with ×, and the merge lock at the row's end, always visible.
 // Analytics, beside the lock, opens the across-runs view; while it shows, no run tab is pressed.
 import type { BoardSnapshot } from "../../../../../swarm-board/src/client/reader.ts";

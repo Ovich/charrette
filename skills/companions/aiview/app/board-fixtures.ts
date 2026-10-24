@@ -1,4 +1,4 @@
-// The mockup's "live" variant (2026-10-07-swarm-board.mockup.html) as the Board would return
+// The prototype's "live" variant (2026-10-07-swarm-board.prototype.html) as the Board would return
 // it: two plans and a brainstorm open on one repository, two closed runs, a second repository.
 import type { BoardSnapshot, RepoSummary, RunSummary, SnapshotEvent, SnapshotRunner } from "../../swarm-board/src/client/reader.ts";
 

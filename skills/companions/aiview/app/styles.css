@@ -110,7 +110,7 @@ a:focus-visible > .star-glow {
   }
 }
 
-/* rendered markdown — mirrors the mockup's .md styles */
+/* rendered markdown — mirrors the prototype's .md styles */
 .md {
   @apply leading-relaxed;
 }

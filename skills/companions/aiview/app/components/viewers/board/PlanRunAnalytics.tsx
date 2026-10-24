@@ -73,7 +73,7 @@ function PlanTiles({ stats, run }: { stats: Stats; run: RunStats }) {
   );
 }
 
-/** One plan run's Analytics (plan D33; mockup #677 `run`): its seven tiles, the timeline under the merge
+/** One plan run's Analytics (plan D33; prototype #677 `run`): its seven tiles, the timeline under the merge
  *  lock band, its members and its shared files. Owns the focused lane. */
 export function PlanRunAnalytics({ stats, run, onOpenPost }: { stats: Stats; run: RunStats; onOpenPost: (seq: number) => void }) {
   const [focus, setFocus] = useState<string | null>(null);

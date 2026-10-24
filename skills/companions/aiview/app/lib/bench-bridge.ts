@@ -10,7 +10,7 @@
 // localStorage under `aiview.bench.<id>.<key>`, never rebuilding the srcDoc (D18), which
 // would reload the frame. When the feed commits, the app posts `aiview:data-changed`;
 // the script hands it to the loader's `window.aiview.onFed` and to a window event.
-// Mockups are never bridged (D6).
+// Prototypes are never bridged (D6).
 import { type RefObject, useEffect } from "react";
 
 export const BENCH_BRIDGE_MARK = "data-aiview-bench";

@@ -1,4 +1,4 @@
-// The across-runs view (board D10, plan D28, D32-D35; mockup #677 `across` and `empty`): useStats stood
+// The across-runs view (board D10, plan D28, D32-D35; prototype #677 `across` and `empty`): useStats stood
 // in for with a `Stats` fixture whose totals disagree with its runs, useBoard with the board fixtures.
 import { afterEach, expect, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";

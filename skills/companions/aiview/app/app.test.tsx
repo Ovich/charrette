@@ -1,4 +1,4 @@
-// Component + pure-logic tests (vitest, jsdom). Visual acceptance runs against the mockup.
+// Component + pure-logic tests (vitest, jsdom). Visual acceptance runs against the prototype.
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
@@ -362,7 +362,7 @@ describe("Sidebar — clicking a row's kind chip", () => {
 describe("composition overlay", () => {
   test("withOverlay appends the layer before </body> with the summary and target", async () => {
     const { withOverlay, OVERLAY_MARK, shortName } = await import("./lib/overlay.ts");
-    const summary = { sources: ["2026-09-03-dock-tools.mockup.html"], errors: [{ ref: "a#B", message: 'Not "found"' }], warnings: [] };
+    const summary = { sources: ["2026-09-03-dock-tools.prototype.html"], errors: [{ ref: "a#B", message: 'Not "found"' }], warnings: [] };
     const out = withOverlay("<html><body><p>host</p></body></html>", { bindings: summary, target: "ToolPrefix" });
     expect(out.indexOf(OVERLAY_MARK)).toBeGreaterThan(out.indexOf("<p>host</p>"));
     expect(out.indexOf(OVERLAY_MARK)).toBeLessThan(out.indexOf("</body>"));
@@ -373,81 +373,82 @@ describe("composition overlay", () => {
     expect(JSON.parse(unescaped)).toEqual(summary);
     expect(out).toContain("<script " + OVERLAY_MARK + ">");
     expect(withOverlay("<p>no body</p>")).toContain(OVERLAY_MARK);
-    // the layer takes the mouse: the mockup is looked at, not operated, in Composition
+    // the layer takes the mouse: the prototype is looked at, not operated, in Composition
     expect(out).toMatch(/#__aiview\{[^}]*pointer-events:auto/);
     expect(out).toMatch(/#__aiview \.av-box\{[^}]*pointer-events:auto;cursor:pointer/);
     expect(out).toMatch(/#__aiview \.av-box\.av-err\{[^}]*pointer-events:none/);
     // offered components get their own colour
     expect(out).toMatch(/#__aiview \.av-box\.av-decl\{[^}]*#15803d/);
     expect(out).toMatch(/#__aiview \.av-lbl\{[^}]*pointer-events:auto/);
-    // every class the layer uses is namespaced: a mockup's own .box or .row rule must never style the layer
+    // every class the layer uses is namespaced: a prototype's own .box or .row rule must never style the layer
     const layerCss = out.slice(out.indexOf("<style " + OVERLAY_MARK), out.indexOf("</style>", out.indexOf("<style " + OVERLAY_MARK)));
     expect(layerCss).not.toMatch(/#__aiview \.(box|lbl|legend|row|pv|pvh|pvb)\b/);
     // no legend, no preview panel: the mode is outlines, labels and the veil
     expect(layerCss).not.toMatch(/av-legend|av-pv/);
-    expect(shortName("2026-09-03-dock-tools.mockup.html")).toBe("dock-tools");
+    expect(shortName("2026-09-03-dock-tools.prototype.html")).toBe("dock-tools");
+    expect(shortName("2026-09-03-dock-tools.mockup.html")).toBe("dock-tools"); // legacy suffix
   });
 
   test("sourceDocFor matches by base name inside the host's folder only", async () => {
     const { sourceDocFor } = await import("./App.tsx");
-    const host = doc({ id: 1, abs_path: "C:\\home\\docs\\JOBS\\host.mockup.html" });
+    const host = doc({ id: 1, abs_path: "C:\\home\\docs\\JOBS\\host.prototype.html" });
     const docs = [
       host,
-      doc({ id: 2, abs_path: "C:\\home\\docs\\JOBS\\tools.mockup.html" }),
-      doc({ id: 3, abs_path: "C:\\home\\docs\\OTHER\\tools.mockup.html" }),
-      doc({ id: 4, abs_path: "/home/docs/JOBS/posix.mockup.html" }),
+      doc({ id: 2, abs_path: "C:\\home\\docs\\JOBS\\tools.prototype.html" }),
+      doc({ id: 3, abs_path: "C:\\home\\docs\\OTHER\\tools.prototype.html" }),
+      doc({ id: 4, abs_path: "/home/docs/JOBS/posix.prototype.html" }),
     ];
-    expect(sourceDocFor(docs, host, "tools.mockup.html")?.id).toBe(2);
-    expect(sourceDocFor(docs, host, "missing.mockup.html")).toBeUndefined();
-    const posixHost = doc({ id: 5, abs_path: "/home/docs/JOBS/host.mockup.html" });
-    expect(sourceDocFor(docs, posixHost, "posix.mockup.html")?.id).toBe(4);
+    expect(sourceDocFor(docs, host, "tools.prototype.html")?.id).toBe(2);
+    expect(sourceDocFor(docs, host, "missing.prototype.html")).toBeUndefined();
+    const posixHost = doc({ id: 5, abs_path: "/home/docs/JOBS/host.prototype.html" });
+    expect(sourceDocFor(docs, posixHost, "posix.prototype.html")?.id).toBe(4);
   });
 });
 
-describe("MockupFrame modes", () => {
+describe("PrototypeFrame modes", () => {
   afterEach(() => localStorage.clear());
 
   test("the mode toggle persists and Composition injects the overlay", async () => {
-    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    const { PrototypeFrame } = await import("./components/viewers/PrototypeFrame.tsx");
     const { OVERLAY_MARK } = await import("./lib/overlay.ts");
-    const bindings = { sources: ["tools.mockup.html"], errors: [], warnings: [] };
-    render(<MockupFrame html="<html><body><p>h</p></body></html>" bindings={bindings} />);
+    const bindings = { sources: ["tools.prototype.html"], errors: [], warnings: [] };
+    render(<PrototypeFrame html="<html><body><p>h</p></body></html>" bindings={bindings} />);
     const frame = () => document.querySelector("iframe")!;
     expect(frame().getAttribute("srcdoc")).not.toContain(OVERLAY_MARK);
     expect(screen.getByText("1 source")).toBeTruthy();
     fireEvent.click(screen.getByText("composition"));
-    expect(localStorage.getItem("aiview.mockupMode")).toBe("composition");
+    expect(localStorage.getItem("aiview.prototypeMode")).toBe("composition");
     expect(frame().getAttribute("srcdoc")).toContain(OVERLAY_MARK);
     fireEvent.click(screen.getByText("rendered"));
     expect(frame().getAttribute("srcdoc")).not.toContain(OVERLAY_MARK);
   });
 
   test("a message from the frame's own window opens the source; others are ignored", async () => {
-    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    const { PrototypeFrame } = await import("./components/viewers/PrototypeFrame.tsx");
     const onOpenSource = vi.fn();
-    render(<MockupFrame html="<html><body></body></html>" onOpenSource={onOpenSource} />);
+    render(<PrototypeFrame html="<html><body></body></html>" onOpenSource={onOpenSource} />);
     const frame = document.querySelector("iframe")!;
-    const data = { type: "aiview:open", file: "tools.mockup.html", component: "ToolPrefix" };
+    const data = { type: "aiview:open", file: "tools.prototype.html", component: "ToolPrefix" };
     window.dispatchEvent(new MessageEvent("message", { data, source: null }));
     expect(onOpenSource).not.toHaveBeenCalled();
     window.dispatchEvent(new MessageEvent("message", { data, source: frame.contentWindow }));
-    expect(onOpenSource).toHaveBeenCalledWith("tools.mockup.html", "ToolPrefix");
+    expect(onOpenSource).toHaveBeenCalledWith("tools.prototype.html", "ToolPrefix");
   });
 
-  test("a workbench has no toggle at all (the OS theme), fills the page, and leaves the stored choices for the next mockup", async () => {
-    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+  test("a workbench has no toggle at all (the OS theme), fills the page, and leaves the stored choices for the next prototype", async () => {
+    const { PrototypeFrame } = await import("./components/viewers/PrototypeFrame.tsx");
     const { OVERLAY_MARK } = await import("./lib/overlay.ts");
     localStorage.setItem("aiview.viewport", "mobile");
-    localStorage.setItem("aiview.mockupMode", "composition");
-    const bindings = { sources: ["tools.mockup.html"], errors: [], warnings: [] };
-    render(<MockupFrame html="<html><body><p>h</p></body></html>" bindings={bindings} workbench />);
-    expect(document.querySelector('[data-component="MockupViewportToggle"]')).toBeNull();
-    expect(document.querySelector('[data-component="MockupModeToggle"]')).toBeNull();
-    expect(document.querySelector('[data-component="MockupThemeToggle"]')).toBeNull();
+    localStorage.setItem("aiview.prototypeMode", "composition");
+    const bindings = { sources: ["tools.prototype.html"], errors: [], warnings: [] };
+    render(<PrototypeFrame html="<html><body><p>h</p></body></html>" bindings={bindings} workbench />);
+    expect(document.querySelector('[data-component="PrototypeViewportToggle"]')).toBeNull();
+    expect(document.querySelector('[data-component="PrototypeModeToggle"]')).toBeNull();
+    expect(document.querySelector('[data-component="PrototypeThemeToggle"]')).toBeNull();
     expect(document.querySelector("iframe")!.getAttribute("srcdoc")).not.toContain(OVERLAY_MARK);
-    expect((document.querySelector('[data-component="MockupStage"] > div') as HTMLElement).style.width).toBe("");
+    expect((document.querySelector('[data-component="PrototypeStage"] > div') as HTMLElement).style.width).toBe("");
     expect(localStorage.getItem("aiview.viewport")).toBe("mobile");
-    expect(localStorage.getItem("aiview.mockupMode")).toBe("composition");
+    expect(localStorage.getItem("aiview.prototypeMode")).toBe("composition");
   });
 });
 
@@ -531,7 +532,7 @@ describe("the board page", () => {
   });
 });
 
-describe("mockup full screen", () => {
+describe("prototype full screen", () => {
   afterEach(() => {
     delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen;
     delete (document as { exitFullscreen?: unknown }).exitFullscreen;
@@ -539,13 +540,13 @@ describe("mockup full screen", () => {
   });
 
   test("the hover bar asks the browser for full screen on the stage, and leaves it again", async () => {
-    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    const { PrototypeFrame } = await import("./components/viewers/PrototypeFrame.tsx");
     const request = vi.fn(() => Promise.resolve());
     const exit = vi.fn(() => Promise.resolve());
     (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen = request;
     (document as { exitFullscreen?: unknown }).exitFullscreen = exit;
-    render(<MockupFrame html="<html><body><p>h</p></body></html>" />);
-    const stage = document.querySelector('[data-component="MockupStage"]')!;
+    render(<PrototypeFrame html="<html><body><p>h</p></body></html>" />);
+    const stage = document.querySelector('[data-component="PrototypeStage"]')!;
     const frameBefore = document.querySelector("iframe");
 
     fireEvent.click(screen.getByLabelText("Full screen"));
@@ -555,7 +556,7 @@ describe("mockup full screen", () => {
     Object.defineProperty(document, "fullscreenElement", { configurable: true, value: stage });
     fireEvent(document, new Event("fullscreenchange"));
     expect(stage.getAttribute("data-full")).toBe("native");
-    // the same frame, not a new one: the mockup keeps its state
+    // the same frame, not a new one: the prototype keeps its state
     expect(document.querySelector("iframe")).toBe(frameBefore);
 
     fireEvent.click(screen.getByLabelText("Exit full screen"));
@@ -566,9 +567,9 @@ describe("mockup full screen", () => {
   });
 
   test("without the API the stage covers the window, and Escape leaves it", async () => {
-    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
-    render(<MockupFrame html="<html><body><p>h</p></body></html>" />);
-    const stage = document.querySelector('[data-component="MockupStage"]')!;
+    const { PrototypeFrame } = await import("./components/viewers/PrototypeFrame.tsx");
+    render(<PrototypeFrame html="<html><body><p>h</p></body></html>" />);
+    const stage = document.querySelector('[data-component="PrototypeStage"]')!;
     fireEvent.click(screen.getByLabelText("Full screen"));
     expect(stage.getAttribute("data-full")).toBe("cover");
     expect(stage.className).toContain("fixed");
@@ -577,7 +578,7 @@ describe("mockup full screen", () => {
   });
 });
 
-describe("mockup theme", () => {
+describe("prototype theme", () => {
   afterEach(() => localStorage.clear());
 
   const themed = `<html><head><style>:root{--bg:#fff}@media (prefers-color-scheme: dark){:root{--bg:#000}}@media (prefers-color-scheme: light){:root{--bg:#eee}}</style></head><body><p>screen</p></body></html>`;
@@ -585,7 +586,7 @@ describe("mockup theme", () => {
   test("withTheme rewrites the media condition, never the rules inside it", async () => {
     const { withTheme, THEME_MARK } = await import("./lib/theme.ts");
 
-    // system is a true no-op: a mockup behaves exactly as it does on disk
+    // system is a true no-op: a prototype behaves exactly as it does on disk
     expect(withTheme(themed, "system")).toBe(themed);
 
     const dark = withTheme(themed, "dark");
@@ -612,8 +613,8 @@ describe("mockup theme", () => {
   });
 
   test("the toggle sits in the toolbar, persists, and forces the frame", async () => {
-    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
-    render(<MockupFrame html={themed} />);
+    const { PrototypeFrame } = await import("./components/viewers/PrototypeFrame.tsx");
+    render(<PrototypeFrame html={themed} />);
     const frame = () => document.querySelector("iframe")!;
 
     // system by default, so the html reaches the frame as written
@@ -629,25 +630,25 @@ describe("mockup theme", () => {
   });
 });
 
-describe("mockup variants", () => {
-  const page = `<html><body><p>screen</p><div class="mockup-bar" data-component="MockupBar"><button data-aiview-variant="documents" aria-pressed="true">documents</button><button data-aiview-variant="profile">your profile</button><button data-aiview-action="reset">reset</button></div></body></html>`;
+describe("prototype variants", () => {
+  const page = `<html><body><p>screen</p><div class="prototype-bar" data-component="PrototypeBar"><button data-aiview-variant="documents" aria-pressed="true">documents</button><button data-aiview-variant="profile">your profile</button><button data-aiview-action="reset">reset</button></div></body></html>`;
 
-  test("mockupControls reads variants, the pressed one, and actions from static markup", async () => {
-    const { mockupControls, withBridge, BRIDGE_MARK } = await import("./lib/bridge.ts");
-    const c = mockupControls(page);
+  test("prototypeControls reads variants, the pressed one, and actions from static markup", async () => {
+    const { prototypeControls, withBridge, BRIDGE_MARK } = await import("./lib/bridge.ts");
+    const c = prototypeControls(page);
     expect(c.variants).toEqual([{ name: "documents", label: "documents" }, { name: "profile", label: "your profile" }]);
     expect(c.initial).toBe("documents");
     expect(c.actions).toEqual([{ name: "reset", label: "reset" }]);
-    expect(mockupControls("<p>plain</p>")).toEqual({ variants: [], initial: null, actions: [] });
+    expect(prototypeControls("<p>plain</p>")).toEqual({ variants: [], initial: null, actions: [] });
     const out = withBridge(page);
     expect(out).toContain(BRIDGE_MARK);
-    expect(out).toContain('[data-component="MockupBar"]{display:none !important}');
+    expect(out).toContain('[data-component="PrototypeBar"],[data-component="MockupBar"]{display:none !important}'); // the legacy bar hides too
     expect(withBridge("<p>plain</p>")).not.toContain(BRIDGE_MARK);
   });
 
   test("the frame mirrors the variants, drives the page by message, and keeps the choice across a reload", async () => {
-    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
-    render(<MockupFrame html={page} />);
+    const { PrototypeFrame } = await import("./components/viewers/PrototypeFrame.tsx");
+    render(<PrototypeFrame html={page} />);
     const frame = document.querySelector("iframe")!;
     const posted: unknown[] = [];
     vi.spyOn(frame.contentWindow!, "postMessage").mockImplementation((msg: unknown) => { posted.push(msg); });
@@ -665,11 +666,11 @@ describe("mockup variants", () => {
     expect(posted).toEqual([]);
   });
 
-  test("a mockup without controls shows no variant toolbar", async () => {
-    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
-    render(<MockupFrame html="<html><body><p>h</p></body></html>" />);
+  test("a prototype without controls shows no variant toolbar", async () => {
+    const { PrototypeFrame } = await import("./components/viewers/PrototypeFrame.tsx");
+    render(<PrototypeFrame html="<html><body><p>h</p></body></html>" />);
     expect(document.querySelector('[data-component="VariantToggle"]')).toBeNull();
-    expect(document.querySelector('[data-component="MockupActions"]')).toBeNull();
+    expect(document.querySelector('[data-component="PrototypeActions"]')).toBeNull();
   });
 });
 
@@ -767,7 +768,7 @@ describe("Sidebar footer: the way to the repository", () => {
   });
 });
 
-describe("pointing at a mockup's components", () => {
+describe("pointing at a prototype's components", () => {
   test("the spotlight is installed once, idle, inside the body", async () => {
     const { withSpotlight, pointMessage, SPOTLIGHT_MARK } = await import("./lib/spotlight.ts");
     const once = withSpotlight("<html><body><p>x</p></body></html>");
@@ -777,17 +778,17 @@ describe("pointing at a mockup's components", () => {
   });
 
   test("the toolbar says what the agent is pointing at, and the person can stop it", async () => {
-    const { MockupFrame } = await import("./components/viewers/MockupFrame.tsx");
+    const { PrototypeFrame } = await import("./components/viewers/PrototypeFrame.tsx");
     const onClear = vi.fn();
     const { container, rerender } = render(
-      <MockupFrame html="<html><body></body></html>" pointed={["ApplicationStrip", "MenuSquare"]} onClearPointer={onClear} />,
+      <PrototypeFrame html="<html><body></body></html>" pointed={["ApplicationStrip", "MenuSquare"]} onClearPointer={onClear} />,
     );
     const chip = container.querySelector('[data-component="PointerChip"]')!;
     expect(chip.textContent).toContain("pointing at ApplicationStrip, MenuSquare");
     fireEvent.click(screen.getByLabelText("Stop pointing"));
     expect(onClear).toHaveBeenCalledTimes(1);
 
-    rerender(<MockupFrame html="<html><body></body></html>" />);
+    rerender(<PrototypeFrame html="<html><body></body></html>" />);
     expect(container.querySelector('[data-component="PointerChip"]')).toBeNull();
   });
 });
@@ -809,13 +810,13 @@ describe("pinned documents in the menu", () => {
     const docs = [
       doc({ id: 1, kind: "workbench", title: "B bench", pinned: true }),
       doc({ id: 2, kind: "workbench", title: "A bench", pinned: true }),
-      doc({ id: 3, kind: "mockup", title: "Shell", pinned: true }),
+      doc({ id: 3, kind: "prototype", title: "Shell", pinned: true }),
       doc({ id: 4, kind: "plan", title: "Not pinned" }),
     ];
-    expect(pinnedByKind(docs).map((k) => [k.kind, k.docs.map((d) => d.id)])).toEqual([["mockup", [3]], ["workbench", [2, 1]]]);
+    expect(pinnedByKind(docs).map((k) => [k.kind, k.docs.map((d) => d.id)])).toEqual([["prototype", [3]], ["workbench", [2, 1]]]);
     expect(pinnedByKind([doc({})])).toEqual([]);
     expect(kindPlural("workbench")).toBe("Workbenches");
-    expect(kindPlural("mockup")).toBe("Mockups");
+    expect(kindPlural("prototype")).toBe("Prototypes");
   });
 
   test("the sidebar shows the pinned bench under its kind and opens it on click; the row's pin does not open the row", () => {

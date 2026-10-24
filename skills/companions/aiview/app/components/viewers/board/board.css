@@ -1,11 +1,11 @@
 /* The board viewer (plan D12): aiview's tokens and aiview's theme (the OS's), none copied;
    every rule below sits under .board, the viewer's root, so .card, .item, .who and the like
-   touch nothing else in aiview. The page drawn is mockup #643's, as swarm's page drew it. */
+   touch nothing else in aiview. The page drawn is prototype #643's, as swarm's page drew it. */
 
 /* Red (aiview's --danger) means act now, amber (aiview's --warn) waits */
 .board { --danger-glow: color-mix(in srgb, var(--danger) 45%, transparent); --amber: var(--warn); }
 
-/* ── The page, as the mockup 2026-10-07-swarm-board draws it ─────────────────────── */
+/* ── The page, as the prototype 2026-10-07-swarm-board draws it ─────────────────────── */
 
 .board .mono, .board .code, .board .file, .board .card .meta {
   font-family: ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace;
@@ -130,7 +130,7 @@
 .board .post-md .shiki-box span { color: var(--shiki-light); }
 @media (prefers-color-scheme: dark) { .board .post-md .shiki-box span { color: var(--shiki-dark); } }
 
-/* SL5: the tab row (RunTabs, the merge lock at its end) and the archive drawer (mockup #643) */
+/* SL5: the tab row (RunTabs, the merge lock at its end) and the archive drawer (prototype #643) */
 .board .runs { flex: none; position: sticky; top: 0; z-index: 20; display: flex; align-items: stretch; gap: 2px; padding: 0 0 0 12px; border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; background: var(--background); }
 .board .run { display: flex; align-items: center; gap: 7px; padding: 10px 12px 9px; font-size: 13px; color: var(--muted-foreground); white-space: nowrap; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .board .run:hover { color: var(--foreground); }
@@ -161,7 +161,7 @@
 .board .archive .arow .am { grid-column: 2; font-size: 11.5px; color: var(--muted-foreground); }
 .board .archive .arow .ad { grid-row: 1; grid-column: 3; font: 11px var(--mono, ui-monospace, monospace); color: var(--faint-foreground); white-space: nowrap; }
 .board .archive .aempty { padding: 8px; font-size: 12px; color: var(--faint-foreground); }
-/* SL6: the one conversation (D8, D9), as mockup #643 draws it. Red only means act now. */
+/* SL6: the one conversation (D8, D9), as prototype #643 draws it. Red only means act now. */
 
 .board .convo { flex: 1; display: flex; flex-direction: column; min-height: 240px; min-width: 0; }
 .board .stream { list-style: none; margin: 0; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 24px 24px; }
@@ -270,7 +270,7 @@
 /* a run's code in the tab row and the archive: coloured text, no box (the generic .code draws one) */
 .board .run .code, .board .archive .arow .code { border: 0; border-radius: 0; padding: 0; background: none; }
 
-/* SL11: ConversationFilters, quiet chips above the conversation, and the FileMenu under File ▾ (mockup #643) */
+/* SL11: ConversationFilters, quiet chips above the conversation, and the FileMenu under File ▾ (prototype #643) */
 .board .filters { display: flex; gap: 6px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .board .fchip { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; padding: 2px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); }
 .board .fchip:hover { color: var(--foreground); }
@@ -290,7 +290,7 @@
 .board .frow .n { font-size: 11px; color: var(--faint-foreground); }
 .board .fempty { padding: 6px 8px; font-size: 12px; color: var(--faint-foreground); }
 
-/* SL4: Analytics beside the lock and the across-runs view (mockup #677, variants across and empty) */
+/* SL4: Analytics beside the lock and the across-runs view (prototype #677, variants across and empty) */
 .board .runs .lockwrap { gap: 6px; }
 .board .abtn { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
 .board .abtn svg { width: 11px; height: 11px; }
@@ -389,7 +389,7 @@
 .board .aempty .lead { margin: 0 0 6px; color: var(--foreground); font-weight: 500; }
 .board .aempty code { font-family: ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, Consolas, monospace; background: var(--surface-2); border-radius: 4px; padding: 1px 5px; color: var(--foreground); }
 
-/* SL5: one run's Analytics in its tab (mockup #677, variants run, brun and conv) */
+/* SL5: one run's Analytics in its tab (prototype #677, variants run, brun and conv) */
 .board .runhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted-foreground); padding: 10px 0 4px; flex: none; }
 .board .runhead .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .board .runhead .seg button { padding: 4px 11px; font-size: 12.5px; color: var(--muted-foreground); }
@@ -575,7 +575,7 @@
 
 /* toolbar over the conversation */
 .board .filters { height: 44px; padding: 0; gap: 4px; flex-wrap: nowrap; }
-.board .fchip { height: 26px; padding: 0 10px; border: 0; border-radius: 13px; font-weight: 500; color: var(--muted-foreground); }
+.board .fchip { white-space: nowrap; flex: none; height: 26px; padding: 0 10px; border: 0; border-radius: 13px; font-weight: 500; color: var(--muted-foreground); }
 .board .fchip:hover { background: var(--surface-2); color: var(--foreground); }
 .board .fchip[aria-pressed="true"] { background: var(--foreground); color: var(--background); border: 0; }
 .board .fchip[aria-pressed="true"] .n { color: inherit; opacity: .75; }
@@ -718,4 +718,5 @@
   .board .runtools .runline { display: none; }
   .board .agent-strip { max-height: 26vh; }
   .board .stream { padding: 8px 10px; }
+  .board .filters { overflow-x: auto; scrollbar-width: none; }
 }

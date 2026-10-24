@@ -10,7 +10,7 @@ function ConflictNote({ conflict, recorded }: { conflict: boolean | null; record
   return <span className="faint"> · conflict unknown (git older than 2.38)</span>;
 }
 
-/** The files two members held in this run (mockup #677 SharedFilesList): their holders, and whether the
+/** The files two members held in this run (prototype #677 SharedFilesList): their holders, and whether the
  *  holders agreed and how long after, or none, as the funnel counts it (D38, D46). `estimated`: a run before the shares
  *  record, its files the paths two members claimed while both were members, drawn as inferred (D44, D46). */
 export function SharedFilesList({ perFile, recorded, estimated }: { perFile: SharedFile[]; recorded: boolean; estimated: boolean }) {

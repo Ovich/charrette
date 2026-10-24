@@ -6,7 +6,7 @@ import { PinToggle } from "../docs/PinToggle.tsx";
 
 const ICONS: Record<string, LucideIcon> = {
   workbench: Wrench,
-  mockup: LayoutTemplate,
+  prototype: LayoutTemplate,
   plan: ListChecks,
   brainstorm: Lightbulb,
 };

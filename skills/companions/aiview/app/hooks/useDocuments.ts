@@ -32,7 +32,7 @@ export interface DocumentsState {
   /** Bumped when a workbench's sidecar data was committed; never refetches the document. */
   dataTick: number;
   dataId: number | null;
-  /** Bumped whenever the agent points at a mockup's components (`aiview show`). */
+  /** Bumped whenever the agent points at a prototype's components (`aiview show`). */
   shownTick: number;
   shown: Pointer | null;
   /** Bumped when the agent says the pointing is over (`aiview show --done`). */
@@ -96,7 +96,7 @@ export function useDocuments(): DocumentsState {
         if (ev.type === "index") reload();
         // A workbench's data moved, not its page: the bench refreshes itself, no reload.
         if (ev.type === "data-changed") setDataChanged((d) => ({ tick: d.tick + 1, id: ev.id ?? null }));
-        // The agent is pointing at a mockup's components: this tab goes there.
+        // The agent is pointing at a prototype's components: this tab goes there.
         if (ev.type === "show" && typeof ev.id === "number") {
           const pointer: Pointer = { id: ev.id, components: ev.components ?? [], ...(ev.variant ? { variant: ev.variant } : {}) };
           setShown((s) => ({ tick: s.tick + 1, pointer }));

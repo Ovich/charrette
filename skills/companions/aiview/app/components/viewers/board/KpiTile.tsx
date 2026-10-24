@@ -33,7 +33,7 @@ function Sparkline({ points, tone }: { points: (number | null)[]; tone?: Tone })
   );
 }
 
-/** One figure of the scope with its sparkline over runs (mockup #677). `value` null reads "not recorded";
+/** One figure of the scope with its sparkline over runs (prototype #677). `value` null reads "not recorded";
  *  `notRecorded` runs in the scope add "N runs not recorded" (D33). One run's tile has no sparkline.
  *  `inferred`: the rule a figure is inferred by (plan D23), the tile drawn as inferred with the rule as its
  *  tip. `estimatedRuns`: the runs whose figure is estimated (D44), the tile drawn as inferred with the estimate's

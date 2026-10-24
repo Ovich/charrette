@@ -8,7 +8,7 @@ const countCell = (n: number | null, tone = ""): { className: string; text: stri
   text: figure(n),
 });
 
-/** A brainstorm run's seats in numbers (mockup #677 SeatsTable): posts, agreements made, endorsements
+/** A brainstorm run's seats in numbers (prototype #677 SeatsTable): posts, agreements made, endorsements
  *  (each seat's own, plan D46), objections (inferred, plan D23), claims without a source, each as swarm counts it (plan D40). */
 export function SeatsTable({ members }: { members: MemberStats[] }) {
   return (

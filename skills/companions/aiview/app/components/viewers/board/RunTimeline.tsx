@@ -21,7 +21,7 @@ const isSpan = (k: LegendKey): k is Interval["what"] => k in SPAN_WORD;
 const isMark = (k: LegendKey): k is Mark["what"] => k in MARK_WORD;
 
 function legendWord(key: LegendKey, silentAfterMs: number): string {
-  // the rule's own words, as the mockup gives them: whole minutes read "N min"
+  // the rule's own words, as the prototype gives them: whole minutes read "N min"
   if (key === "silent") return `silent: no command for ${silentAfterMs % 60_000 === 0 ? `${silentAfterMs / 60_000} min` : formatDuration(silentAfterMs)}`;
   if (key === "post") return "post";
   return isSpan(key) ? SPAN_WORD[key] : MARK_WORD[key];
@@ -52,7 +52,7 @@ function ticksOf(from: number, to: number, clock: boolean): { at: number; label:
   return out;
 }
 
-/** A run's members over time (board D9, D33; mockup #677 RunTimeline): for a plan run a lane per member,
+/** A run's members over time (board D9, D33; prototype #677 RunTimeline): for a plan run a lane per member,
  *  the orchestrator first like any member, under the merge lock band, the axis in clock time; for a
  *  brainstorm run a lane per seat, its posts and marks, the axis in minutes from the run's open. Exact
  *  spans solid, inferred ones (`Interval.inferred`) at reduced opacity with a dashed edge. Both legends

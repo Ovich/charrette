@@ -1,4 +1,4 @@
-// The across-runs view (board D10, mockup #677 `across` and `empty`): the closed runs of the scope as
+// The across-runs view (board D10, prototype #677 `across` and `empty`): the closed runs of the scope as
 // `GET /api/stats` answers them. Every tile, the funnel and the lock panel read `Stats.totals`, each
 // sparkline `totals.series` (D28); the view formats and selects, never aggregates (D34, D35). The plan tiles show
 // when plan is among the kinds chosen, the brainstorm tiles when brainstorm is (D46); the funnel, the lock panel, the

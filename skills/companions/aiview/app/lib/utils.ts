@@ -25,7 +25,7 @@ export function cn(...inputs: ClassValue[]) {
  * alternate tone, so two kinds one spoke apart never share both. Pairs that appear
  * together are pushed apart in hue as well: a plan beside its slices and its
  * verifications, a board beside its spec, a roadmap beside its reference, the feature
- * map beside its verifications, a workbench beside the mockups and reports it sits
+ * map beside its verifications, a workbench beside the prototypes and reports it sits
  * among. `pdf` is a foreign format and takes the one grey.
  *
  * A kind not listed here still gets a stable colour from the old hash, moved off the
@@ -36,6 +36,8 @@ const KIND_COLORS: Record<string, { h: number; s: number; tone: KindTone }> = {
   roadmap: { h: 0, s: 70, tone: "strong" },
   report: { h: 30, s: 70, tone: "light" },
   verification: { h: 50, s: 80, tone: "strong" },
+  prototype: { h: 85, s: 65, tone: "light" },
+  // legacy: a mockup row not yet migrated keeps the prototype colour
   mockup: { h: 85, s: 65, tone: "light" },
   // A swarm run sits beside its plan and slices: off both in hue, more saturated than the slice.
   swarm: { h: 110, s: 80, tone: "strong" },

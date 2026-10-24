@@ -1,5 +1,5 @@
-// Mockup variants. A mockup declares its variants (states, steps, alternatives of one
-// screen) and its actions as static buttons inside a `data-component="MockupBar"`
+// Prototype variants. A prototype declares its variants (states, steps, alternatives of one
+// screen) and its actions as static buttons inside a `data-component="PrototypeBar"`
 // element: `data-aiview-variant="name"` for an exclusive variant, aria-pressed on the
 // current one, `data-aiview-action="name"` for a plain action. The viewer mirrors them
 // in its own toolbar above the frame, hides the in-page bar, and drives the page through
@@ -8,25 +8,25 @@
 // variant survives a live reload.
 export const BRIDGE_MARK = "data-aiview-bridge";
 
-export interface MockupControl {
+export interface PrototypeControl {
   name: string;
   label: string;
 }
 
-export interface MockupControls {
-  variants: MockupControl[];
+export interface PrototypeControls {
+  variants: PrototypeControl[];
   /** The variant marked aria-pressed in the file, or the first one. */
   initial: string | null;
-  actions: MockupControl[];
+  actions: PrototypeControl[];
 }
 
-const EMPTY: MockupControls = { variants: [], initial: null, actions: [] };
+const EMPTY: PrototypeControls = { variants: [], initial: null, actions: [] };
 
 /** Read the declared controls from the served html. Static markup only: what a script adds later is invisible here, by design. */
-export function mockupControls(html: string): MockupControls {
+export function prototypeControls(html: string): PrototypeControls {
   if (!html.includes("data-aiview-")) return EMPTY;
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const read = (attr: string): MockupControl[] =>
+  const read = (attr: string): PrototypeControl[] =>
     [...doc.querySelectorAll(`[${attr}]`)]
       .map((el) => ({ name: el.getAttribute(attr) ?? "", label: (el.textContent ?? "").trim() || el.getAttribute(attr) || "" }))
       .filter((c) => c.name);
@@ -35,7 +35,9 @@ export function mockupControls(html: string): MockupControls {
   return { variants, initial: pressed ?? variants[0]?.name ?? null, actions: read("data-aiview-action") };
 }
 
-const CSS = `[data-component="MockupBar"]{display:none !important}`;
+// legacyMockupBar: files written before the rename still name the bar MockupBar
+const legacyMockupBar = `[data-component="MockupBar"]`;
+const CSS = `[data-component="PrototypeBar"],${legacyMockupBar}{display:none !important}`;
 
 const SCRIPT = `
 (function(){

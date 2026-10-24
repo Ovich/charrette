@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Phase } from "../../../../../swarm-board/src/client/reader.ts";
 import type { RunView } from "../../../lib/board/analytics.ts";
 
-/** A run tab's head (plan D31, mockup #677 `run`, `brun`, `conv`): Conversation / Analytics, the run's
+/** A run tab's head (plan D31, prototype #677 `run`, `brun`, `conv`): Conversation / Analytics, the run's
  *  line, and on Analytics "Copy as JSON", the run's answer as the server sent it, equal to
  *  `swarm stats --run <id> --all --json` (D34). `json` null hides the button. `phase`: the run's current
  *  phase (`swarm phase`), shown after the line; none before the first. */

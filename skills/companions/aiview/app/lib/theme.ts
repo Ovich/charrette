@@ -1,4 +1,4 @@
-// Forcing a mockup's colour scheme from the viewer.
+// Forcing a prototype's colour scheme from the viewer.
 //
 // The frame is sandboxed with an opaque origin, so the viewer cannot reach into its
 // document and flip a class. It cannot change `prefers-color-scheme` either: that follows
@@ -6,12 +6,12 @@
 //
 // So the served html is rewritten instead, and the rewrite is on the MEDIA CONDITION
 // rather than on the rules inside it: `(prefers-color-scheme: dark)` becomes a condition
-// that is always true, or one that is never true. This works on every mockup ever written,
-// including the ones that predate any convention, because a mockup that supports a dark
+// that is always true, or one that is never true. This works on every prototype ever written,
+// including the ones that predate any convention, because a prototype that supports a dark
 // theme at all expresses it that way. `(prefers-color-scheme: light)` is inverted with it,
 // for the files that write both.
 //
-// `data-theme` is set on the root as well, for mockups that also offer their own switch
+// `data-theme` is set on the root as well, for prototypes that also offer their own switch
 // (`:root[data-theme="dark"]`). Setting both means the viewer's choice wins whichever
 // convention the file follows, and the two never disagree.
 
@@ -29,7 +29,7 @@ const LIGHT = /\(\s*prefers-color-scheme\s*:\s*light\s*\)/gi;
 
 /**
  * The served html with the reader's chosen scheme forced. `system` returns the html
- * untouched, so a mockup behaves exactly as it does on disk unless a choice was made.
+ * untouched, so a prototype behaves exactly as it does on disk unless a choice was made.
  */
 export function withTheme(html: string, theme: Theme): string {
   if (theme === "system") return html;

@@ -4,7 +4,7 @@ import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.tsx";
 import { Button } from "../ui/button.tsx";
 import type { BindingsSummary } from "../../lib/api.ts";
 import { withOverlay } from "../../lib/overlay.ts";
-import { mockupControls, withBridge } from "../../lib/bridge.ts";
+import { prototypeControls, withBridge } from "../../lib/bridge.ts";
 import { pointMessage, withSpotlight } from "../../lib/spotlight.ts";
 import { THEMES, type Theme, withTheme } from "../../lib/theme.ts";
 import { benchState, useBenchRelay, withBenchBridge } from "../../lib/bench-bridge.ts";
@@ -16,8 +16,8 @@ const VIEWPORTS: Array<[string, number]> = [
   ["full", 0],
 ];
 
-export type MockupMode = "rendered" | "composition";
-const MODES: MockupMode[] = ["rendered", "composition"];
+export type PrototypeMode = "rendered" | "composition";
+const MODES: PrototypeMode[] = ["rendered", "composition"];
 
 const stored = (key: string, fallback: string): string => {
   try {
@@ -26,13 +26,15 @@ const stored = (key: string, fallback: string): string => {
     return fallback;
   }
 };
+/** The mode's key before the rename: read once as the fallback, so the person's choice survives it. */
+const legacyModeKey = "aiview.mockupMode";
 const store = (key: string, value: string): void => {
   try {
     localStorage.setItem(key, value);
   } catch {}
 };
 
-export interface MockupFrameProps {
+export interface PrototypeFrameProps {
   html: string;
   /** What the server composed the html from; drawn by Composition mode. */
   bindings?: BindingsSummary;
@@ -58,15 +60,15 @@ const NONE: readonly string[] = [];
 const NO_DOC = { id: 0, file_path: "" };
 const NO_FRAME = { current: null };
 
-export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NONE, pointedVariant, onClearPointer, workbench = false, doc, dataTick = 0 }:MockupFrameProps) {
+export function PrototypeFrame({ html, bindings, target, onOpenSource, pointed = NONE, pointedVariant, onClearPointer, workbench = false, doc, dataTick = 0 }:PrototypeFrameProps) {
   const [storedViewport, setViewport] = useState(() => stored("aiview.viewport", "full"));
-  const [storedMode, setMode] = useState<MockupMode>(() =>
-    stored("aiview.mockupMode", "rendered") === "composition" ? "composition" : "rendered",
+  const [storedMode, setMode] = useState<PrototypeMode>(() =>
+    stored("aiview.prototypeMode", stored(legacyModeKey, "rendered")) === "composition" ? "composition" : "rendered",
   );
-  // A workbench ignores the stored choices without overwriting them: the next mockup
+  // A workbench ignores the stored choices without overwriting them: the next prototype
   // opens at the viewport and in the view the person left it.
   const viewport = workbench ? "full" : storedViewport;
-  const mode: MockupMode = workbench ? "rendered" : storedMode;
+  const mode: PrototypeMode = workbench ? "rendered" : storedMode;
   const [theme, setTheme] = useState<Theme>(() => {
     const s = stored("aiview.theme", "system");
     return THEMES.includes(s as Theme) ? (s as Theme) : "system";
@@ -75,7 +77,7 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
   const stage = useRef<HTMLDivElement>(null);
 
   // Full screen: the browser's own on the stage, so the frame is not reloaded and the
-  // mockup keeps its state; Escape leaves it. Where the API is missing or refused (an
+  // prototype keeps its state; Escape leaves it. Where the API is missing or refused (an
   // embedded browser, a test), the stage covers the window instead and Escape leaves that.
   const [full, setFull] = useState<"native" | "cover" | null>(null);
   useEffect(() => {
@@ -106,8 +108,8 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
   };
   const selectMode = (v: string) => {
     if (!v) return;
-    setMode(v as MockupMode);
-    store("aiview.mockupMode", v);
+    setMode(v as PrototypeMode);
+    store("aiview.prototypeMode", v);
   };
   const selectTheme = (v: string) => {
     if (!v) return;
@@ -115,10 +117,10 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
     store("aiview.theme", v);
   };
 
-  // The mockup's declared variants and actions, mirrored above the frame. The chosen
+  // The prototype's declared variants and actions, mirrored above the frame. The chosen
   // variant is the viewer's, so it survives a reload of the page (a save on disk, a
   // switch of mode) and can be switched in Composition, where the page takes no mouse.
-  const controls = useMemo(() => mockupControls(html), [html]);
+  const controls = useMemo(() => prototypeControls(html), [html]);
   const [variant, setVariant] = useState<string | null>(null);
   const chosen = variant && controls.variants.some((v) => v.name === variant) ? variant : controls.initial;
   const post = (msg: { type: string; name?: string; names?: string[] }) => frame.current?.contentWindow?.postMessage(msg, "*");
@@ -161,7 +163,7 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
 
   // The theme is forced last, so it also normalises whatever the overlay and the bridge
   // brought with them: one pass over the html that actually reaches the frame.
-  // A workbench gets the bench bridge instead of the variant bridge (mockups are never
+  // A workbench gets the bench bridge instead of the variant bridge (prototypes are never
   // bridged, D6). Its place is read once per html, never on a set, which would reload it.
   const benched = workbench && doc !== undefined;
   const benchId = doc?.id ?? 0;
@@ -178,13 +180,13 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
   const bound = bindings?.sources.length ?? 0;
 
   return (
-    <div data-component="MockupFrame">
+    <div data-component="PrototypeFrame">
       {(!workbench || pointed.length > 0 || controls.actions.length > 0) && (
       <div className={workbench ? "flex flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-1.5 text-[12px] text-muted-foreground" : "mb-2.5 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground"}>
         {!workbench && (
           <>
             <span>viewport</span>
-            <ToggleGroup type="single" value={viewport} onValueChange={selectViewport} data-component="MockupViewportToggle">
+            <ToggleGroup type="single" value={viewport} onValueChange={selectViewport} data-component="PrototypeViewportToggle">
               {VIEWPORTS.map(([n]) => (
                 <ToggleGroupItem key={n} value={n}>
                   {n}
@@ -193,7 +195,7 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
             </ToggleGroup>
             <span className="font-mono">{width ? `${width}px` : ""}</span>
             <span className="ml-3">view</span>
-            <ToggleGroup type="single" value={mode} onValueChange={selectMode} data-component="MockupModeToggle">
+            <ToggleGroup type="single" value={mode} onValueChange={selectMode} data-component="PrototypeModeToggle">
               {MODES.map((m) => (
                 <ToggleGroupItem key={m} value={m}>
                   {m}
@@ -205,7 +207,7 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
         {!workbench && (
           <>
             <span className="ml-3">theme</span>
-            <ToggleGroup type="single" value={theme} onValueChange={selectTheme} data-component="MockupThemeToggle">
+            <ToggleGroup type="single" value={theme} onValueChange={selectTheme} data-component="PrototypeThemeToggle">
               {THEMES.map((t) => (
                 <ToggleGroupItem key={t} value={t}>
                   {t}
@@ -245,7 +247,7 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
           </span>
         )}
         {controls.actions.length > 0 && (
-          <span className="ml-3 inline-flex items-center gap-1" data-component="MockupActions">
+          <span className="ml-3 inline-flex items-center gap-1" data-component="PrototypeActions">
             {controls.actions.map((a) => (
               <Button key={a.name} variant="outline" size="sm" className="h-auto px-2 py-0.5 text-[11px]" onClick={() => post({ type: "aiview:action", name: a.name })}>
                 {a.label}
@@ -257,7 +259,7 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
       )}
       <div
         ref={stage}
-        data-component="MockupStage"
+        data-component="PrototypeStage"
         data-full={full ?? undefined}
         className={
           full
@@ -266,10 +268,10 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
         }
       >
         <div className="group relative w-full max-w-full" style={width ? { width } : undefined}>
-          {/* sandboxed: the mockup's scripts run, but it cannot touch the viewer, storage, or navigate the top window */}
+          {/* sandboxed: the prototype's scripts run, but it cannot touch the viewer, storage, or navigate the top window */}
           <iframe
             ref={frame}
-            title="mockup"
+            title="prototype"
             sandbox="allow-scripts allow-forms allow-modals allow-popups"
             srcDoc={served}
             onLoad={onLoad}
@@ -281,10 +283,10 @@ export function MockupFrame({ html, bindings, target, onOpenSource, pointed = NO
               : "block h-[calc(100vh-10rem)] w-full max-w-full rounded-[8px] border border-border bg-white transition-[width]"
             }
           />
-          {/* Shown while the pointer is over the mockup or a control in it has focus; a pointer
+          {/* Shown while the pointer is over the prototype or a control in it has focus; a pointer
               inside the frame still counts, because the frame is a child of this group. */}
           <div
-            data-component="MockupHoverBar"
+            data-component="PrototypeHoverBar"
             className="pointer-events-none absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100"
           >
             <Button
