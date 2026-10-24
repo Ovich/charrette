@@ -8,7 +8,7 @@
 *(Agents working one piece of work together on a shared board, a person deciding what holds.
 Formerly Charrette.)*
 
-Agent skills that settle what gets built before code is written. They sharpen the engineer's thinking rather than replace it: every design, plan and screen is drawn, argued and approved by a person before an agent acts on it. A design conversation ends in one plan, a screen in a working mockup, a pull request in an analysis with the decisions only a human can make. Every document renders live in aiview, the companion app. None of it lands in your repository.
+Agent skills that settle what gets built before code is written. They sharpen the engineer's thinking rather than replace it: every design, plan and screen is drawn, argued and approved by a person before an agent acts on it. A design conversation ends in one plan, a screen in a working prototype, a pull request in an analysis with the decisions only a human can make. Every document renders live in aiview, the companion app. None of it lands in your repository.
 
 Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Swarmstorm brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
 
@@ -46,7 +46,7 @@ Swarmstorm is run iteratively. One pass of the loop is one iteration: it plans a
 
 The thing to avoid is big design up front: an agent loves writing plans, embellished and polished, and they can fall apart at the end. A plan is sized to what a person can hold in mind, understand and approve in one reading.
 
-Above the iterations sits the roadmap, one document per project kept by the `roadmap` skill: the iterations in order, each made of slots, a slot being something the customer can use or a system that can be deployed. Each slot points at the boards, mockups and plans that exist for it, its state derived from them, and the foundation reference beside it records the technology decisions, closed no later than the first slot that needs them. Only the next iteration is drawn precisely: a slot is split when the work reaches it, and the roadmap is redrawn when a slot lands.
+Above the iterations sits the roadmap, one document per project kept by the `roadmap` skill: the iterations in order, each made of slots, a slot being something the customer can use or a system that can be deployed. Each slot points at the boards, prototypes and plans that exist for it, its state derived from them, and the foundation reference beside it records the technology decisions, closed no later than the first slot that needs them. Only the next iteration is drawn precisely: a slot is split when the work reaches it, and the roadmap is redrawn when a slot lands.
 
 ## What it looks like
 
@@ -64,25 +64,25 @@ The plan's phasing diagram is its tracker: one node per step, saying in three li
 
 ![aiview: the pr-review redesign plan at its gate, trial steps done with evidence, release in progress, the untaken branch marked not needed](assets/aiview-pr-review-plan.png)
 
-### Mockups that work
+### Prototypes that work
 
-A screen is judged by human eyes, so the person stays in the loop for it. In the near future the main user of software will probably be an agent; until then there is a person at the screen, and the mockup is where they look before anything is built.
+A screen is judged by human eyes, so the person stays in the loop for it. In the near future the main user of software will probably be an agent; until then there is a person at the screen, and the prototype is where they look before anything is built.
 
-A mockup is a working prototype, not a picture: a stepper counts, a promo code applies, a questionnaire advances, the behaviour mocked in the file. Describe the flow, not only the screen, and every state, transition and edge case is settled before implementation. The demo below is a shop's cart page.
+A prototype works, it is not a picture: a stepper counts, a promo code applies, a questionnaire advances, the behaviour mocked in the file. Describe the flow, not only the screen, and every state, transition and edge case is settled before implementation. The demo below is a shop's cart page.
 
-![aiview: the Arbor cart page, the variant toolbar above the frame with "promo applied" selected](assets/aiview-mockup-variants.png)
+![aiview: the Arbor cart page, the variant toolbar above the frame with "promo applied" selected](assets/aiview-prototype-variants.png)
 
-A screen has states: empty, promo applied, an item out of stock. The mockup declares them as variants, the viewer exposes them in its toolbar, and the chosen one persists across reloads.
+A screen has states: empty, promo applied, an item out of stock. The prototype declares them as variants, the viewer exposes them in its toolbar, and the chosen one persists across reloads.
 
-### Mockups that compose
+### Prototypes that compose
 
 A component is drawn once and bound by every screen that needs it. The cart page binds the cart line, the stepper, the promo field, the checkout button, the badge and the empty state from a parts sheet, eleven bindings in all. `aiview check` says whether they resolve. The Composition view outlines what a screen binds, in indigo, and what it exposes, in green. A click on a bound region opens its source.
 
-![aiview: the cart page in Composition view, bound regions in indigo, the hovered cart line labelled "shop-parts · CartLine · pulled", the order summary in green as offered](assets/aiview-mockup-composition.png)
+![aiview: the cart page in Composition view, bound regions in indigo, the hovered cart line labelled "shop-parts · CartLine · pulled", the order summary in green as offered](assets/aiview-prototype-composition.png)
 
 The parts sheet in the same view, one outline per exposed component:
 
-![aiview: the parts sheet in Composition view, the product card outlined in green and labelled "ProductCard · offered"](assets/aiview-mockup-parts.png)
+![aiview: the parts sheet in Composition view, the product card outlined in green and labelled "ProductCard · offered"](assets/aiview-prototype-parts.png)
 
 ## Beyond the loop: workbenches
 
@@ -133,7 +133,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 
 | Skill | Use case | Example ask |
 |---|---|---|
-| [roadmap](skills/project/roadmap/SKILL.md) | A project has to be declared above its pieces of work, from nothing or from the boards and mockups already made, or a slot has landed and the picture must be redrawn | *"Declare the roadmap for this project."* Everything that exists read first, the missing slots named (accounts, the repository, the foundation), iterations of deliverable slots drafted with a recommendation in every open place, then an interview on the draft. The foundation reference beside it holds the stack, the database, the API, the hosting, each row closed no later than the first slot that needs it. |
+| [roadmap](skills/project/roadmap/SKILL.md) | A project has to be declared above its pieces of work, from nothing or from the boards and prototypes already made, or a slot has landed and the picture must be redrawn | *"Declare the roadmap for this project."* Everything that exists read first, the missing slots named (accounts, the repository, the foundation), iterations of deliverable slots drafted with a recommendation in every open place, then an interview on the draft. The foundation reference beside it holds the stack, the database, the API, the hosting, each row closed no later than the first slot that needs it. |
 | [write-conventions](skills/project/write-conventions/SKILL.md) | A decision was just made, or a repo's unwritten rules need writing down | *"We just settled on soft deletes everywhere: capture that."* Or: *"Harvest this repo's conventions into AGENTS.md."* |
 | [technical-writing](skills/project/technical-writing/SKILL.md) | A document that stays in the repository: a README, an architecture doc, an ADR, a runbook | *"Write an architecture doc of the payments service, audience: new backend hires."* |
 
@@ -160,8 +160,8 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 
 | Skill | Use case | Example ask |
 |---|---|---|
-| [design-prototype](skills/ui/design-prototype/SKILL.md) | A screen is about to be built or visually reworked | *"Before we code the settings page, propose a mockup."* Design language extracted once, every screen approved in the viewer, code after. |
-| [point-at](skills/ui/point-at/SKILL.md) | The agent is about to ask you about a screen, or you do not see what it means | *"Show me what you mean."* Finds the screen's mockup, asks in the mockup's own component names, and points your open viewer at them: the tab moves there, the components are outlined and named, the rest dimmed. Called by the skills that ask questions. |
+| [design-prototype](skills/ui/design-prototype/SKILL.md) | A screen is about to be built or visually reworked | *"Before we code the settings page, propose a prototype."* Design language extracted once, every screen approved in the viewer, code after. |
+| [point-at](skills/ui/point-at/SKILL.md) | The agent is about to ask you about a screen, or you do not see what it means | *"Show me what you mean."* Finds the screen's prototype, asks in the prototype's own component names, and points your open viewer at them: the tab moves there, the components are outlined and named, the rest dimmed. Called by the skills that ask questions. |
 
 ### Plan
 
@@ -215,7 +215,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | The data home, `$SWARMSTORM_HOME` or `swarmstorm_appdata` in your OS home directory | `docs/<project>/*.md, *.html, *.pdf`, among them the project's roadmap and its foundation reference, and `aiview.sqlite`, the index and the active project | Never in a project repo. May be its own git repo, to sync between machines |
 | Your project repository | `AGENTS.md`, grown by write-conventions. README and architecture docs, written by technical-writing | Yes, by you |
 
-Swarmstorm stores its documents outside the repository to avoid doc rot: outdated documents influence the agent badly. Boards, plans, mockups and PR analyses are obsolete when the PR merges, so by default none is versioned and none lives in a project repository. For some types of documents, an architecture doc, an ADR, a spec the team keeps current, the codebase can be considered, and it is allowed: the index only points at files, and aiview serves a document from where it is.
+Swarmstorm stores its documents outside the repository to avoid doc rot: outdated documents influence the agent badly. Boards, plans, prototypes and PR analyses are obsolete when the PR merges, so by default none is versioned and none lives in a project repository. For some types of documents, an architecture doc, an ADR, a spec the team keeps current, the codebase can be considered, and it is allowed: the index only points at files, and aiview serves a document from where it is.
 
 
 ## Updating

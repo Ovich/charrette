@@ -1,7 +1,7 @@
 # aiview
 
 Local document viewer with a central index. Renders Markdown (GFM + mermaid), HTML
-mockups (sandboxed iframe with viewport presets), PDFs (native browser viewer) and the
+prototypes (sandboxed iframe with viewport presets), PDFs (native browser viewer) and the
 project's swarm board (read from swarm's board server) at `http://localhost:4321`, live-reloads
 on save, and keeps an index of every document it has been given (path, project, title,
 kind, tags, group, start time) so earlier work is one click away. It is the one page and

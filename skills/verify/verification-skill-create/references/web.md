@@ -4,7 +4,7 @@
 
 **The starting state** the way the consumer gets it, or the way the project's e2e support restores it (a seed onto a fresh person). Sign-in as the project's tests do it locally.
 
-**What to observe**: the screen at each state, at the widths and themes the pass's inputs name (by default those the product supports); the outcome on the page the consumer would open next, never in the database; the console's errors and the failed requests; a reference mockup at the same width beside the app when the scope takes one. A page that scrolls inside its columns shows its fold only when the column is scrolled.
+**What to observe**: the screen at each state, at the widths and themes the pass's inputs name (by default those the product supports); the outcome on the page the consumer would open next, never in the database; the console's errors and the failed requests; a reference prototype at the same width beside the app when the scope takes one. A page that scrolls inside its columns shows its fold only when the column is scrolled.
 
 ## The role prompt of this surface
 

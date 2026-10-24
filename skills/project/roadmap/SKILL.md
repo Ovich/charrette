@@ -1,6 +1,6 @@
 ---
 name: roadmap
-description: Use when a project has to be declared above its pieces of work, from nothing or from the boards, plans and mockups already made, when a slot has landed or the picture has changed and the roadmap must be redrawn, or when someone asks where the project stands. Produces and keeps the roadmap (iterations of deliverable slots, each slot's state derived from what exists for it) and the foundation reference (the technology decisions). Not for designing a slot (brainstorm), planning it (write-plan) or building it (execute-plan).
+description: Use when a project has to be declared above its pieces of work, from nothing or from the boards, plans and prototypes already made, when a slot has landed or the picture has changed and the roadmap must be redrawn, or when someone asks where the project stands. Produces and keeps the roadmap (iterations of deliverable slots, each slot's state derived from what exists for it) and the foundation reference (the technology decisions). Not for designing a slot (brainstorm), planning it (write-plan) or building it (execute-plan).
 ---
 
 # Roadmap
@@ -18,13 +18,13 @@ The **roadmap** is the one document above the pieces of work: what is delivered 
 - **`YYYY-MM-DD-<project>.roadmap.md`, kind `roadmap`**, dated at declaration and kept for the life of the project.
 - **`foundation.reference.md`, kind `reference`**, undated, never retiring: the technology decisions, one row each; tags project and `roadmap`.
 - **Their contents and rows: `references/documents.md`**, read before drafting or redrawing either.
-- **Both are registered and served via the `aiview` skill** in the product's group, the one its product-level boards and mockups share, created and titled after the product when none exists, the roadmap started when the declaration began.
+- **Both are registered and served via the `aiview` skill** in the product's group, the one its product-level boards and prototypes share, created and titled after the product when none exists, the roadmap started when the declaration began.
 - **Documents in the project's folder that are not the product's are linked apart**, as not its slots.
 
 ## Slots and their state
 
 - **Every document of a slot carries the slot's slug as a tag**, whatever group it sits in.
-- **The state is derived from what the tag finds, never typed**: **empty** (nothing), **in design** (a board, or a plan not yet approved), **drawn** (mockups), **planned** (an approved plan), **in progress** (a plan's tracker has a ▶), **landed** (the person confirmed the feature delivered and working, with the evidence: a URL, a deployment, a customer).
+- **The state is derived from what the tag finds, never typed**: **empty** (nothing), **in design** (a board, or a plan not yet approved), **drawn** (prototypes), **planned** (an approved plan), **in progress** (a plan's tracker has a ▶), **landed** (the person confirmed the feature delivered and working, with the evidence: a URL, a deployment, a customer).
 - **In the tracker only in progress is ▶ and only landed is ✅**; in design, drawn and planned stay ⬜ with the state written in the slot row.
 - **At declaration the draft derives each state from the reading**, and the tags are applied when the interview confirms which slot a document serves.
 - **A board serves a slot, or the roadmap itself when the idea is product-level**, and its tag says which.

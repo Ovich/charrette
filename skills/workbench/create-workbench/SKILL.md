@@ -27,7 +27,7 @@ keeps the page, the feed and the scripts true, fast and easy to drive, adapting 
 when the project moves on. No other skill maintains them.
 
 **The person is in the build.** Every change is shown in the watched browser before the
-next question, as the `design-prototype` skill paces a mockup. A bench described in chat
+next question, as the `design-prototype` skill paces a prototype. A bench described in chat
 was not seen.
 
 ## Before building

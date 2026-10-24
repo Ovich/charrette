@@ -6,7 +6,7 @@
 
 **Five questions at most, one message each, multiple choice where the options are knowable, before any token is chosen.** Anything else is decided in the plan and shown, not asked.
 
-1. **The stack and the UI library.** What the screens will be built with, and which component library or design system, if any: shadcn, Radix, spartan, MUI, Angular Material, Bootstrap, Tailwind alone, a house system, or none yet. "None yet" is an answer, and then the mockup's own components become the proposal.
+1. **The stack and the UI library.** What the screens will be built with, and which component library or design system, if any: shadcn, Radix, spartan, MUI, Angular Material, Bootstrap, Tailwind alone, a house system, or none yet. "None yet" is an answer, and then the prototype's own components become the proposal.
 2. **The subject and the people.** What the product is, who uses it, in what setting, with what they already read every day.
 3. **What is being designed.** The screen, flow or component the person has in mind, and the one thing it must make obvious; never assumed to be the entry page.
 4. **Constraints already fixed.** A logo, brand colours, a typeface, an existing site or app it must sit beside, a platform (desktop, mobile first, both), a language.
