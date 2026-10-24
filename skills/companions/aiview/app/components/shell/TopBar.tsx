@@ -32,8 +32,10 @@ export function TopBar({
       data-component="TopBar"
       className="topbar sticky top-0 z-20 flex h-12 min-w-0 shrink-0 items-center gap-2 border-b border-border bg-card px-4 max-md:px-3"
     >
-      <ProjectSelector projects={projects} active={activeProject} docs={allDocs} onPick={onPickProject} />
-      <span className="flex min-w-0 items-center gap-2 font-medium">
+      <div className="min-w-0 shrink max-sm:max-w-[45%] [&_button]:max-w-full">
+        <ProjectSelector projects={projects} active={activeProject} docs={allDocs} onPick={onPickProject} />
+      </div>
+      <span className="flex min-w-0 shrink items-center gap-2 font-medium">
         {groupTitle && (
           <>
             <span className="text-muted-foreground">/</span>
@@ -51,9 +53,13 @@ export function TopBar({
         {doc && doc.kind !== "swarm" && (
           <PinToggle id={doc.id} pinned={doc.pinned} label className={doc.pinned ? "h-7 px-2 text-[12px] text-accent hover:bg-surface-2" : "h-7 px-2 text-[12px] hover:bg-surface-2"} />
         )}
-        {doc && doc.kind !== "swarm" && <DocPath path={doc.abs_path} />}
+        {doc && doc.kind !== "swarm" && (
+          <span className="flex min-w-0 max-md:hidden">
+            <DocPath path={doc.abs_path} />
+          </span>
+        )}
         {printable && (
-          <Button variant="outline" onClick={() => window.print()} title="Export to PDF via the browser print dialog">
+          <Button variant="outline" className="max-sm:hidden" onClick={() => window.print()} title="Export to PDF via the browser print dialog">
             Export PDF
           </Button>
         )}

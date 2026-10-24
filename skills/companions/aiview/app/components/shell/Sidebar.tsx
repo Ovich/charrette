@@ -138,6 +138,18 @@ export function Sidebar({
     timer.current = setTimeout(fn, ms);
   };
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
+  // touch has no hover: remember how the last press came, so a tap opens the rail instead
+  const lastPointerType = useRef<string>("mouse");
+  const menuRef = useRef<HTMLElement | null>(null);
+  // a menu opened by a tap closes on a tap outside it
+  useEffect(() => {
+    if (!hovered || kept || lastPointerType.current === "mouse") return;
+    const closeOnTapOutside = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setHovered(false);
+    };
+    document.addEventListener("pointerdown", closeOnTapOutside);
+    return () => document.removeEventListener("pointerdown", closeOnTapOutside);
+  }, [hovered, kept]);
   const keep = (next: boolean) => {
     setKept(next);
     setHovered(false);
@@ -159,10 +171,21 @@ export function Sidebar({
   return (
     <div className={cn("relative shrink-0 max-md:w-full", kept ? "w-[248px]" : "w-14")} data-component="SidebarSlot">
       <aside
+        ref={menuRef}
         data-component="Sidebar"
         data-open={open}
-        onMouseEnter={() => !kept && later(() => setHovered(true), OPEN_DELAY_MS)}
-        onMouseLeave={() => !kept && later(() => setHovered(false), CLOSE_DELAY_MS)}
+        onPointerEnter={(e) => e.pointerType === "mouse" && !kept && later(() => setHovered(true), OPEN_DELAY_MS)}
+        onPointerLeave={(e) => e.pointerType === "mouse" && !kept && later(() => setHovered(false), CLOSE_DELAY_MS)}
+        onPointerDown={(e) => {
+          lastPointerType.current = e.pointerType;
+        }}
+        onClickCapture={(e) => {
+          // a tap on the folded rail opens it, and does not also open what was under the finger
+          if (lastPointerType.current === "mouse" || kept || open) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setHovered(true);
+        }}
         className={cn(
           "group/menu sticky top-0 z-40 flex h-screen flex-col overflow-hidden border-r border-border bg-surface transition-[width,box-shadow] duration-150 motion-reduce:transition-none max-md:static max-md:h-auto max-md:w-full",
           open ? "w-[248px]" : "w-14 [&_.nav-text]:hidden",

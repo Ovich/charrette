@@ -679,3 +679,28 @@
 /* agent cards at a glance (T1): mark, nick, role line, state chip, one truncated doing line; ages and tool in the title */
 .board .agent-strip .card .doing { display: block; -webkit-line-clamp: unset; min-height: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .board .agent-strip .card .ages[hidden], .board .agent-strip .card .activity[hidden] { display: none; }
+
+/* narrow screens (T2): every view stays usable at ≤860px and ≤480px; desktop untouched. Keep this the last block. */
+@media (max-width: 860px) {
+  .board { height: auto; min-height: calc(100vh - 8rem); }
+  .board .runs { scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+  .board .runhead { flex-wrap: wrap; }
+  .board .runhead .phases { flex: 1 1 100%; overflow-x: auto; scrollbar-width: thin; }
+  .board .pseg.done { max-width: 160px; }
+  .board .runtools { max-width: 100%; margin-left: 0; }
+  .board .run-body.with-roster { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 12px; }
+  .board .agent-strip { max-height: 34vh; }
+  .board .post-md { overflow-wrap: anywhere; }
+  .board .post-md pre, .board .post-md table { max-width: 100%; overflow-x: auto; }
+  .board .analytics { padding-left: 12px; padding-right: 12px; }
+}
+@media (max-width: 480px) {
+  .board .content { padding: 10px; }
+  .board .run { padding: 8px 9px 7px; font-size: 12.5px; }
+  .board .pseg { padding: 0 8px; }
+  .board .pseg .said { display: none; }
+  .board .pseg.now { min-width: 0; }
+  .board .runtools .runline { display: none; }
+  .board .agent-strip { max-height: 26vh; }
+  .board .stream { padding: 8px 10px; }
+}
