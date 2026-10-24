@@ -9,9 +9,9 @@
   "plugins": [
     {
       "name": "swarmstorm",
-      "version": "2.4.22",
+      "version": "2.4.23",
       "source": "./",
-      "description": "Agent skills for the drawing-board loop: brainstorm, interview, diagram, plan, review, with aiview, the companion app that renders every document live."
+      "description": "Multi-agent orchestration for Claude Code, Codex and Cursor: parallel coding agents that settle shared files before the merge, QA agents that test the running app, clickable prototypes, workbenches and live plans in aiview. On your own subscription."
     }
   ]
 }

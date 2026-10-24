@@ -1,142 +1,143 @@
-# Swarmstorm
+# Swarmstorm: multi-agent orchestration for Claude Code, Codex and Cursor
 
-[![version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FOvich%2Fswarmstorm%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=version&prefix=v)](RELEASING.md)
-[![stars](https://img.shields.io/github/stars/Ovich/swarmstorm)](https://github.com/Ovich/swarmstorm/stargazers)
-[![last commit](https://img.shields.io/github/last-commit/Ovich/swarmstorm)](https://github.com/Ovich/swarmstorm/commits/main)
-[![licence](https://img.shields.io/github/license/Ovich/swarmstorm)](LICENSE)
+[![version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FOvich%2Fswarmstorm%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=version)](https://github.com/Ovich/swarmstorm/tags) [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-*(Agents working one piece of work together on a shared board, a person deciding what holds.
-Formerly Charrette.)*
+**Run a swarm of coding agents in parallel. They settle shared files before the merge, and QA agents test the running app before you review.**
 
-Agent skills that settle what gets built before code is written. They sharpen the engineer's thinking rather than replace it: every design, plan and screen is drawn, argued and approved by a person before an agent acts on it. A design conversation ends in one plan, a screen in a working prototype, a pull request in an analysis with the decisions only a human can make. Every document renders live in aiview, the companion app. None of it lands in your repository.
+![The Swarmstorm board in aiview: two runs as tabs, the build and verify phases, six agents with their state, and the conversation where they coordinate](assets/board.png)
 
-Diagrams are one of software engineering's most useful techniques, and they went nearly extinct because of their cost. Swarmstorm brings them back into the AI era. A diagram states a concept in a form both a person and an agent read the same way, so the design lives in one shared picture rather than in two understandings of the same prose, and it is the densest context an agent can be given about a system.
+Swarmstorm is an open-source (MIT) set of agent skills for Claude Code, Codex and Cursor: a plugin in Claude Code, a clone in Codex and Cursor. It turns the coding agents you already pay for into a coordinated team, on your own subscription: no new service to sign up for, no API keys, nothing billed on top. Ask for a swarm, and you get back one branch built by parallel agents that agreed on their shared work before they wrote it.
 
-Twenty-eight skills in plain Markdown and a companion app in plain Node. No harness, plugin format or cloud service is required.
+[Install in two commands ↓](#install-in-claude-code-codex-or-cursor)
 
-## The loop
+## What's in the box
 
-Phasing: what a piece of work passes through, from its entry points to merge.
+| | what it gives you |
+|---|---|
+| **The swarm board** | one place where every swarm on the project coordinates, and a record of what was agreed |
+| **aiview** | a live page in your browser for everything the agents produce: the board, plans, prototypes, workbenches, diagrams, reports |
+| **Prototypes** | screens to approve before they're built, in your project's own look |
+| **Workbenches** | your own engineering tools, built as you go: the way you agreed to do a recurring piece of work, kept as a skill and a live page on your real data |
+| **The agents** | an orchestrator that runs each swarm and talks to you, workers that build, verifiers that test, and role seats that brainstorm, debate or write |
+| **The protocols** | ready-made ways to run a swarm: build and verify, brainstorm, debate, editorial, or your own |
+| **28 skills** | the work around the code, from the interview and the plan to prototypes, reviews and conventions, listed under [Skills](#skills) |
 
-```mermaid
-flowchart LR
-  I["an idea"] --> P
-  B["brainstorm<br/>a board"] --> P
-  DM["deepen-module<br/>a module document"] --> P
-  RM["roadmap<br/>the next slot"] --> P
-  P["write-plan<br/>one document, written while interviewing"] -->|"until ready"| CR["cold-read<br/>a fresh agent reads the plan"]
-  CR --> PH
-  subgraph E["execute-plan · on the swarm board"]
-    PH["a phase opens"] --> WS["its tasks posted<br/>one per seat"]
-    WS --> S["workers at once<br/>each merges its own"]
-    S --> VS["verify<br/>build-verify, when the mandate asks"]
-    VS -->|"next phase cut from its verdict"| PH
-  end
-  E -->|"the plan's pull request"| R["pr-review"]
-  E -.->|"recommended"| V["validate-delivery<br/>with the person, live"]
-  V --> R
-  R --> M["merge"]
-```
+## Parallel agents without merge conflicts
 
-A plan starts from whatever exists: an idea said in chat, a board, an agreed module, the roadmap's next slot. `interview` resolves the decisions along the way and `write-diagrams` draws them. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it. The executor orchestrates on the swarm board, phase by phase: each phase's tasks are posted as it opens, one to each worker, who first shapes the code around it, then does it. When the mandate asks, the plan runs build-verify: a verifier seat, from the project's verify skill or from steps it is given, judges each phase's delivery's product quality alone, as its quality owner: done as specified, usable, finished. When the plan has delivered something a person looks at, its close recommends `validate-delivery`: the same verify process walked with the person, who guides it and decides, the agent proposing what to check and changing what they ask for.
+**More agents, more output, more to untangle.**
 
-## Iterate the loop
+> **"Teams with high AI adoption merged 98% more pull requests while review time rose 91%."**
+> [Faros AI, 2025](https://www.faros.ai/blog/ai-software-engineering)
 
-Swarmstorm is run iteratively. One pass of the loop is one iteration: it plans and builds a single increment, a feature or a bounded change that works and can be verified when the iteration ends. The plan is the iteration's plan, not the project's: it covers the increment and stops where the next one would begin, think of an agile approach. What the increment teaches feeds the next plan, so the design grows by increments and each plan is written with the last increment's learning in hand.
+Agents write faster than people can review, and when several of them work the same codebase they don't know about each other. Each one finishes its own piece, and the pieces meet for the first time in review: overlapping edits, a function renamed under another agent's feet, two takes on the same interface. Studies of agent pull requests find the same pattern: work from two different agents conflicts about twice as often as work from one ([Xu et al., 2026](https://arxiv.org/abs/2607.04697)). The cost lands on the person reviewing.
 
-The thing to avoid is big design up front: an agent loves writing plans, embellished and polished, and they can fall apart at the end. A plan is sized to what a person can hold in mind, understand and approve in one reading.
+**Swarmstorm makes the agents work it out between themselves, before it reaches you.** Inside a swarm, agents settle a shared file the moment two of them need it. We call it Peer-to-Peer Lock Negotiation: agents negotiate file locks on a shared board. Between swarms working on the same project, agreements travel to every swarm they concern, so one swarm's change to an interface reaches the others before they build on the old one. We call that Distributed Conflict Resolution. What comes back to you is one branch, already reconciled, instead of a pile of pull requests to untangle.
 
-Above the iterations sits the roadmap, one document per project kept by the `roadmap` skill: the iterations in order, each made of slots, a slot being something the customer can use or a system that can be deployed. Each slot points at the boards, prototypes and plans that exist for it, its state derived from them, and the foundation reference beside it records the technology decisions, closed no later than the first slot that needs them. Only the next iteration is drawn precisely: a slot is split when the work reaches it, and the roadmap is redrawn when a slot lands.
+![The claims on the board: every file an agent holds, and the files two runs share](assets/board-claims.png)
 
-## What it looks like
+![The merge lock: one merge at a time, how long each waited and held it](assets/board-merge-lock.png)
 
-The first two are from one real piece of work: the redesign of this collection's own `pr-review` skill into layers. The viewer follows the OS theme.
+## Plans, prototypes and QA agents that test the running app
 
-### A spec, with the work it belongs to
+**Almost right is not good enough.**
 
-What `brainstorm` and `write-plan` leave behind for one feature: the board and the spec in one group, the plan in another. The spec's diagrams render inline, here the five layers and the orchestrator that dispatches them. The header shows the absolute path, click to copy.
+> **"46% of developers distrust the accuracy of AI tools, and 'almost right, but not quite' is their top frustration."**
+> [Stack Overflow Developer Survey, 2025](https://survey.stackoverflow.co/2025/ai)
 
-![aiview: the pr-review redesign spec, its layer table and orchestrator diagram rendered, the board and plan grouped beside it](assets/aiview-pr-review-spec.png)
+Agents are confident and fast, and they fill gaps with guesses. An ask that was clear in your head becomes a screen you didn't want, a feature that compiles but doesn't work, or code that passes its tests and still misses the point. Nobody tried it the way a user would before it landed in your review.
 
-### The same plan, mid-execution
+**Swarmstorm closes the gap at both ends.** Before the code, the agent works it out with you: an interview settles the open questions, a brainstorm keeps the reasoning, and a screen is designed first as a clickable prototype in your project's own look, so you approve what will be built instead of discovering it afterwards.
 
-The plan's phasing diagram is its tracker: one node per step, saying in three lines what the step delivers and what made the orchestrator go on, pause or drop it, gates that record the branch taken, a state node with branch, commit, next step, blocked and parked, which is what a later session resumes from, and under the diagram the mandate in force, in one line.
+**After the code, QA agents test every delivery.** A verifier is an agent that didn't write the code and judges what came back the way your users would: is it done as specified, is it usable, is it finished. You build it once for your project, from your app itself, and it's proven on a real feature before you rely on it. Your project can keep as many as it needs, one per focus: one walks the web UI in a browser, another drives the CLI, another checks the API or the mobile layout, each with the expertise its focus calls for.
 
-![aiview: the pr-review redesign plan at its gate, trial steps done with evidence, release in progress, the untaken branch marked not needed](assets/aiview-pr-review-plan.png)
+They fit straight into the swarm's loop. The swarm works in phases: the builders build, then the verifiers walk the merged result in the running product, each on its own focus, and their findings are judged into one table, blockers first. Those findings become the next build's tasks, and the loop goes round again until the work is judged ready, with no blocker or major finding left. You see each pass on the board as it happens, and you can also walk a delivery yourself with a verifier at your side.
 
-### Prototypes that work
+## Clickable UI prototypes and a component library
 
-A screen is judged by human eyes, so the person stays in the loop for it. In the near future the main user of software will probably be an agent; until then there is a person at the screen, and the prototype is where they look before anything is built.
+**See it before you build it.**
 
-A prototype works, it is not a picture: a stepper counts, a promo code applies, a questionnaire advances, the behaviour mocked in the file. Describe the flow, not only the screen, and every state, transition and edge case is settled before implementation. The demo below is a shop's cart page.
+Most rework starts with something nobody saw until it was built. **Prototypes** are clickable screens in your project's own design language, built before any production code and live in aiview. Compare variants side by side, a palette per model or three layouts for the same step, and settle the states a screen can be in. Every component you settle goes into one library page, so each screen is composed from the same parts and looks the same everywhere. When the agent has a question about a screen, it lights up the parts it means in your browser, so you answer about the thing itself. For an AI feature, a prototype can show a real agent answer exactly as your user will see it, so you judge the output and its prompt before anyone wires it in.
 
-![aiview: the Arbor cart page, the variant toolbar above the frame with "promo applied" selected](assets/aiview-prototype-variants.png)
+![A full app screen prototyped in aiview, composed from the project's components](assets/prototype-app.png)
 
-A screen has states: empty, promo applied, an item out of stock. The prototype declares them as variants, the viewer exposes them in its toolbar, and the chosen one persists across reloads.
+![The prototype's component library: run tabs and the merge lock, each in its states](assets/prototype-components.png)
 
-### Prototypes that compose
+## Custom workbenches on your real data
 
-A component is drawn once and bound by every screen that needs it. The cart page binds the cart line, the stepper, the promo field, the checkout button, the badge and the empty state from a parts sheet, eleven bindings in all. `aiview check` says whether they resolve. The Composition view outlines what a screen binds, in indigo, and what it exposes, in green. A click on a bound region opens its source.
+**Your engineering environment, built as you go.**
 
-![aiview: the cart page in Composition view, bound regions in indigo, the hovered cart line labelled "shop-parts · CartLine · pulled", the order summary in green as offered](assets/aiview-prototype-composition.png)
+When you and the agent keep spending turns agreeing on how to do something that comes back, the agent offers to keep it as a workbench: a project skill that remembers how, and a live page on your real data where an idea goes from "what if" to seen in seconds. Next session, the agent picks the bench up and carries on, with nothing explained again. Bench by bench, you end up with tools shaped to your own work, which the agent keeps up to date as the project moves.
 
-The parts sheet in the same view, one outline per exposed component:
+![An AI bench built for one project: the cache share of a live run, predicted against billed, and when each model call ran](assets/workbench-ai-bench.png)
 
-![aiview: the parts sheet in Composition view, the product card outlined in green and labelled "ProductCard · offered"](assets/aiview-prototype-parts.png)
+## Open source, nothing installed at runtime
 
-## Beyond the loop: workbenches
+**Your tools, in your hands.**
 
-Some work keeps coming back during development and is done by hand with an agent each time: diffing an API's responses before and after a refactor, checking a migration's dry run table by table, comparing a parser's output with its fixtures, following a background job's runs to where they failed, stepping through an LLM agent's calls to see which prompt went wrong. A session like that ends with a way of working, scripts written on the way and a page that showed what mattered, and the next session starts from nothing.
+> **Malicious open-source packages rose 1,444% from 2024 to 2025.**
+> [OpenSSF data, cited by Google Threat Intelligence, 2026](https://cloud.google.com/blog/topics/threat-intelligence/mitigation-guidance-for-supply-chain-compromise)
 
-`create-workbench` turns that into a reusable tool, for any project and any kind of data. The best moment to run it is at the end of the session that did the work, with the agent that did it: the sources, the shape of the data and what the person kept looking at are all in its context, so the definition is mostly already answered and the interview confirms it instead of discovering it. A workbench defined cold, from a description, guesses the very things that session learned.
+AI coding agents add a new way in: they import packages that don't exist, often the same invented names every time, and an attacker can register those names first ([USENIX Security 2025, via the Cloud Security Alliance](https://labs.cloudsecurityalliance.org/research/csa-research-note-slopsquatting-ai-supply-chain-20260419/)). Meanwhile most teams install a whole tool to use a small slice of it.
 
-What it leaves is a page in aiview of kind `workbench`, fed with the project's data exactly as the project produces it, and a `workbench-<bench>` skill in the project holding the feed, the scripts and the steps to operate it. The next session, and the next agent, start from that skill, and it tells them to adapt the bench when the project's data moves on.
+**A bench built for your need is your code, in your repository**, with nothing extra to install and nothing loaded from the internet. Swarmstorm itself installs no packages when it runs: its few dependencies are bundled into each release, it's MIT-licensed and readable, and it changes only when you update it.
 
-A bench serves a scope, a kind of work on a part of the product, never one question: any model call, any agent walk, one family of screens. A new question becomes a view on the bench that covers it, so a project's benches do not multiply with every plan.
+## Live plans, prototypes and docs your team can review
 
-An agent trace bench: a support assistant walked call by call, each step with the request as the app sent it, the reply, and a verdict that quotes the prompt's own rule. Step 3 refunded a whole order unasked; the prompt was changed and the call replayed as step 4.
+**Agreeing on what to build is the real bottleneck.**
 
-![aiview: an agent trace workbench, the steps of a support assistant's walk on the left with their verdicts, step 3 open with its tool call, the wrong verdict quoting the prompt's refund rule, and the context the agent received](assets/aiview-workbench-trace.png)
+> **"Agreement about the right work becomes the bottleneck."**
+> [Maggie Appleton, GitHub Next, AI Engineer Europe 2026](https://ai.engineer/talks/one-developer-two-dozen-agents-zero-alignment-why-we-need-collaborative-ai-engineering)
 
-## Install
+When agents can build anything quickly, the hard part moves upstream: deciding what to build, and making sure everyone, people and agents, means the same thing. Those decisions usually live in someone's head, a chat thread, or a call nobody wrote down, and every agent ends up building its own interpretation.
 
-**Claude Code**, as a plugin. The skills answer to `swarmstorm:`, as `/swarmstorm:brainstorm` or `/swarmstorm:pr-review`, so nothing collides with skills you already have:
+**Swarmstorm puts the decisions where everyone can see and discuss them.** Prototypes, diagrams, plans and brainstorm boards are live documents in aiview, readable by anyone on the project and updated as the agents work. A team can argue a design over the prototype itself, settle a plan before a line is written, or run a swarm of role-playing agents to brainstorm options, debate a decision or draft a document. Decisions that keep coming back become rules in your AGENTS.md, so every agent on the repository follows them.
+
+## Install in Claude Code, Codex or Cursor
+
+With Node 22.5 or later, install the plugin in Claude Code:
 
 ```
 /plugin marketplace add Ovich/swarmstorm
 /plugin install swarmstorm@swarmstorm
 ```
 
-**Installed as Charrette before?** The plugin was renamed: remove the old one, add the new, restart. Your documents and boards stay where they are (`~/charrette_appdata` keeps being read).
+Then ask for real work, for example *run a swarm on the CSV export and the missing API tests*. The agent proposes the swarm, starts it on your yes, and gives you a link to watch it live. One branch comes back for your pull request or merge, and your own branch is left as it is.
 
+In Codex or Cursor, clone the repository and make its skills discoverable: [Codex and Cursor](#reference). If your session asks before running shell commands, add [the allow rule](#the-allow-rule) first.
+
+Star the repo, and send it to whoever on your team runs coding agents in parallel.
+
+## Reference
+
+### The allow rule
+
+A worker can't answer a permission prompt. In a session that prompts before shell commands, or in auto mode, its calls to the board wait until you add this rule to your own `settings.json`, project or user. The plugin never writes it for you.
+
+```json
+{ "permissions": { "allow": ["Bash(node ~/.claude/plugins/cache/swarmstorm/swarmstorm/<version>/skills/companions/swarm-board/swarm.mjs:*)"] } }
 ```
-/plugin uninstall charrette@charrette
-/plugin marketplace remove charrette
-/plugin marketplace add Ovich/swarmstorm
-/plugin install swarmstorm@swarmstorm
-```
 
-**Any other agent**, from a clone. Node 22.5 or later, nothing else. Prompt:
+The path contains the plugin's version, so the rule needs rewriting after each update.
 
-> Set up Swarmstorm: clone `https://github.com/Ovich/swarmstorm.git` into
-> `<the checkout>`, build the bundled viewer, and make every skill under `skills/`, at
-> the root or one folder down in its group, discoverable to you (symlink or otherwise).
-> Then tell me the aiview URL and the skills you can reach by name.
+<details>
+<summary><b>Codex and Cursor</b></summary>
 
-Then ask in plain language. Each skill states when it applies and maps your request onto its flow. Ask *"how does this work?"* at any moment: the agent explains the part your question or your current work touches, or unasked when it sees you don't follow.
+All three harnesses need Node 22.5 or later. Codex and Cursor take a clone. Make every skill folder under `skills/` discoverable to your harness, both the two at the root and the ones a level down in their group, for example by symlinking each into the harness's skills directory. Neither harness reads the plugin's agent definitions, so the orchestrator's briefs name each member's role instead. Codex needs `agents.max_depth` at 2 or more in its config before the orchestrator can spawn workers. Cursor allows a single level of nesting, which means the orchestrator launches the members and they launch nothing.
 
-## Skills
+</details>
+
+### Skills
 
 By group, in the order work usually happens. The folder under `skills/` is the group.
 
-### Help: finding your way
+#### Help: finding your way
 
 | Skill | Use case | Example ask |
 |---|---|---|
 | [help](skills/help/help/SKILL.md) | At any moment you want to know how the collection works: mid-run, about a term or a verb's answer, or as a new user | *"Why did the swarm stop?"* The run's state read and explained, who waits on whom, what unblocks it. *"What is a verifier?"* One sentence, then what it means in your run. *"What can it do here?"* A one-screen tour from your own work. |
 | [next-step](skills/help/next-step/SKILL.md) | Always on: the agent notices the moment a skill would help and offers it in one line | You hesitate on a choice: *"Want me to interview you on this?"*; you agree on a build: *"Run it as build-verify: 3 builders, 1 verifier, until ready. Go?"* A no ends it for that subject. |
 
-### Project: what a project has once and keeps
+#### Project: what a project has once and keeps
 
 | Skill | Use case | Example ask |
 |---|---|---|
@@ -144,7 +145,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | [write-conventions](skills/project/write-conventions/SKILL.md) | A decision was just made, or a repo's unwritten rules need writing down | *"We just settled on soft deletes everywhere: capture that."* Or: *"Harvest this repo's conventions into AGENTS.md."* |
 | [technical-writing](skills/project/technical-writing/SKILL.md) | A document that stays in the repository: a README, an architecture doc, an ADR, a runbook | *"Write an architecture doc of the payments service, audience: new backend hires."* |
 
-### Alignment: one understanding
+#### Alignment: one understanding
 
 | Skill | Use case | Example ask |
 |---|---|---|
@@ -153,13 +154,13 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | [brainswarm](skills/alignment/brainswarm/SKILL.md) | A swarm of role seats should work a topic for you, under a protocol you approve | *"Run a brainswarm brainstorm on onboarding."* The agent recommends a protocol from what you want done, or a custom one, and you adjust its phases, its seats and each role. Seats post ideas blind, build on them, pre-mortem the options; debate the questions to decisions, a skeptic endorsing; or draft a text and read it as its readers would. A protocol or template a project keeps for itself (a cover letter, say) is its own `protocol-<name>` skill, in the project. Each run has its record; a topic keeps one dossier across its runs. |
 | [whiteboard-defense](skills/alignment/whiteboard-defense/SKILL.md) | A system has shipped and you want to be able to explain and defend it to anyone who pulls you aside | *"Whiteboard me on the sync engine."* Hard questions on the system and on its stack, one at a time, open-book: you go read, come back, get pushed. A defense report with the gaps, the reading that closes them, the decisions an agent made without you, and the architecture leads the questions turned up. |
 
-### Working together
+#### Working together
 
 | Skill | Use case | Example ask |
 |---|---|---|
 | [swarm](skills/swarm/SKILL.md) | Everyday work you want several agents on, no plan: you ask for a swarm, or the agent proposes one when a task splits or is long | *"Swarm this: the three endpoints and their tests."* This session orchestrates; a few workers, each in its own worktree, take the tasks it posts to them on the board, merge what they change, report and take the next, for as long as you keep giving work, or under the build-verify protocol: builders, then verifiers walking the running product and reporting a findings table the orchestrator judges, looped until it holds or for the iterations you set. You choose a pull request or a merge at the close. |
 
-### Architecture
+#### Architecture
 
 | Skill | Use case | Example ask |
 |---|---|---|
@@ -168,21 +169,21 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | [deepen-module](skills/architecture/deepen-module/SKILL.md) | A module's interface has to be designed or reworked so that it hides much behind little | *"Deepen the agent module."* The code a caller writes to use it, the one entry as signatures, what stays outside, the gap from today, discussed until agreed. write-plan shapes its major areas this way. |
 | [write-diagrams](skills/architecture/write-diagrams/SKILL.md) | A design question would settle faster drawn than argued | *"Draw today's login flow: I need to see where the redirect happens."* |
 
-### UI
+#### UI
 
 | Skill | Use case | Example ask |
 |---|---|---|
 | [design-prototype](skills/ui/design-prototype/SKILL.md) | A screen is about to be built or visually reworked | *"Before we code the settings page, propose a prototype."* Design language extracted once, every screen approved in the viewer, code after. |
 | [point-at](skills/ui/point-at/SKILL.md) | The agent is about to ask you about a screen, or you do not see what it means | *"Show me what you mean."* Finds the screen's prototype, asks in the prototype's own component names, and points your open viewer at them: the tab moves there, the components are outlined and named, the rest dimmed. Called by the skills that ask questions. |
 
-### Plan
+#### Plan
 
 | Skill | Use case | Example ask |
 |---|---|---|
 | [write-plan](skills/plan/write-plan/SKILL.md) | Something non-trivial is about to be built and its plan has to be written | *"Write the plan for per-user rate limiting."* One document, written while interviewing: why, before and after, the deep modules, the flows, the failure modes, the phases with their tracker, and the mandate you give the orchestrator (seats, phases, a validator). A cold reader checks it can be carried out from the document alone; the decisions the agent took by default are put to you at approval. No code until it is approved. |
 | [cold-read](skills/plan/cold-read/SKILL.md) | Dispatched by write-plan before the mandate | An agent that was not in the conversation reads the plan and says what it would build, its questions, and ready or not ready, until the plan carries everything. |
 
-### Execute
+#### Execute
 
 | Skill | Use case | Example ask |
 |---|---|---|
@@ -190,27 +191,27 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 | [orchestrate](skills/orchestrate/SKILL.md) | Loads whenever an agent runs other agents: a plan, a task swarm or a brainswarm | Settles the charter with you, dispatches each member with its brief and role, watches them and steers a drift. |
 | [orchestrate-plan](skills/execute/orchestrate-plan/SKILL.md) | Loads with execute-plan, whenever a plan runs | Settles the mandate, then runs the plan phase by phase on the swarm board: every worker dispatched once with a brief that carries the testing prompt, each phase's tasks posted at its open, the workers claiming their files, settling a shared one on the thread and merging under the board's lock. Re-runs each task's done-when itself; under build-verify a verifier seat judges the merged result when the mandate asks. One draft pull request for the plan, marked ready only at the merge. |
 
-### Verify
+#### Verify
 
 | Skill | Use case | Example ask |
 |---|---|---|
 | [verification-skill-create](skills/verify/verification-skill-create/SKILL.md) | An agent should judge, alone, the product quality of what is delivered (done as specified, usable, finished) before a person sees it, and the project has no verifier for that focus yet | *"Create the verification skill for this app."* Four decisions settled with you through an interview: the focus (what is judged, through what), the inputs and their defaults, the experts, the feature to prove it on; the rest read from the repository. A project-local `verify-<app>-<focus>` skill, one per focus, that opens on a role prompt making the agent the product's quality owner seen through those experts, with the tooling to reach, drive and observe every part; a project skill that already runs the app is shared by every verifier. Every pass judges the scope it is given and names its inputs; findings travel as a table to the orchestrator. Proven by one complete quality pass; the agent that runs it keeps it true as the application moves. orchestrate-plan offers it when a plan's mandate is asked. |
 | [validate-delivery](skills/verify/validate-delivery/SKILL.md) | A plan has delivered and you want to go over it with the agent, live, before moving on | *"Let's walk what we delivered together."* Runs the project's verify skill part by part, with you judging and deciding; what you want changed is changed and shown at once. Refuses to start without a verify skill and proposes creating one. execute-plan recommends it at its close. |
 
-### Workbench
+#### Workbench
 
 | Skill | Use case | Example ask |
 |---|---|---|
 | [create-workbench](skills/workbench/create-workbench/SKILL.md) | A recurring piece of development work should become a dedicated development tool, built with you, fed by the project's own data, with the steps to run it again | *"We keep diffing the API's responses before and after each refactor: make it a workbench."* Or a migration's dry run checked table by table, a parser's output against its fixtures, a background job's runs and where they failed, an LLM agent's calls stepped through one by one. Best run at the end of the session that did the work by hand. One bench per scope: a new question becomes a view on the bench that already covers it. Defined through the interview, built live in a browser you watch, one change at a time. The page lives in aiview as a `workbench`; the project gets a `workbench-<bench>` skill with the feed that fills the page, the scripts to operate it, and the order to adapt the bench when the project's data moves on. |
 
-### Review
+#### Review
 
 | Skill | Use case | Example ask |
 |---|---|---|
 | [pr-review](skills/review/pr-review/SKILL.md) | A pull request needs an informed merge decision | *"Run pr-review on PR #142."* Five layers, each its own subagent, dispatched where the diff gives them material. Two documents: the analysis, and a report with what changed (drawn), a verdict per layer, what you must decide, and a comment to post as-is. |
 | [recurring-review-findings](skills/review/recurring-review-findings/SKILL.md) | The same remark keeps coming back in the pull request reviews | *"What do my reviews keep catching, and how do we stop catching it?"* The comment history read, grouped into findings by the person's words, each tried against a ladder: impossible by design, a lint or type rule, a test in CI, a convention, a sentence in the skill that produced the code. A report with the artefact drafted per finding, applied on a yes. |
 
-### The companion tools
+#### The companion tools
 
 | Skill | Use case | Example ask |
 |---|---|---|
@@ -219,37 +220,26 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 
 `write-diagrams`, `interview`, `orchestrate`, the tracker protocol in `write-plan` and the companion tools are the shared layer the others delegate to. `roadmap` sits above the loop: it names the next slot, and a board, a plan or a run finishing tells it to redraw. House rules in `AGENTS.md` win over general principles wherever the two disagree.
 
-## Where things live
+### Where your documents live
 
-| Root | Holds | Versioned |
-|---|---|---|
-| The checkout, or the plugin cache | `skills/<group>/<name>/SKILL.md`, one folder per skill under its group: the loop's phases `architecture`, `ui`, `plan`, `execute`, `review`, `project` for what a project has once and keeps, `verify` for its verification skill and the validation with the person, `workbench` for the pages worked on during development, `help` for guiding the person, `alignment` for reaching one understanding (`interview`, `brainstorm`, `brainswarm`, `whiteboard-defense`); `orchestrate` and `swarm` at the root; supporting files alongside. `companions` for the two tools: `skills/companions/aiview/`, a CLI, the one server and the one UI, drawing the documents and the swarm board; `skills/companions/swarm-board/`, a CLI and a store, its board drawn by aiview | Yes, rebuildable |
-| The data home, `$SWARMSTORM_HOME` or `swarmstorm_appdata` in your OS home directory | `docs/<project>/*.md, *.html, *.pdf`, among them the project's roadmap and its foundation reference, and `aiview.sqlite`, the index and the active project | Never in a project repo. May be its own git repo, to sync between machines |
-| Your project repository | `AGENTS.md`, grown by write-conventions. README and architecture docs, written by technical-writing | Yes, by you |
+Plans, boards, prototypes and reports sit in the data home, `~/swarmstorm_appdata` or `$SWARMSTORM_HOME`, outside your repository, and aiview reads them from there. Sync that folder between machines and the documents come with it.
 
-Swarmstorm stores its documents outside the repository to avoid doc rot: outdated documents influence the agent badly. Boards, plans, prototypes and PR analyses are obsolete when the PR merges, so by default none is versioned and none lives in a project repository. For some types of documents, an architecture doc, an ADR, a spec the team keeps current, the codebase can be considered, and it is allowed: the index only points at files, and aiview serves a document from where it is.
+### Updating
 
-
-## Updating
-
-The plugin takes three steps. The third is not optional: an update applies only to a session started after it.
+Run these in Claude Code, then restart it. An update reaches only sessions started afterwards.
 
 ```
 /plugin marketplace update swarmstorm
 /plugin update swarmstorm@swarmstorm
 ```
 
-Then restart Claude Code. `/plugin marketplace update` alone refreshes the catalogue without touching the installed copy.
+<details>
+<summary>Coming from Charrette</summary>
 
-A checkout takes a prompt, because three things move and only one is `git pull`:
+Swarmstorm used to be called Charrette. An install from before the rename keeps its data home, `~/charrette_appdata`, for as long as no `~/swarmstorm_appdata` exists, so nothing moves. `$CHARRETTE_HOME` is still read.
 
-> Update Swarmstorm in `<the checkout>`: pull, restart the viewer's server if one is
-> running, and repair skill discovery: links made against an older layout of `skills/`
-> dangle, most skills now sit one folder down, under their group. Leave the data home alone.
-> Then tell me the aiview URL and the skills you can reach by name.
+</details>
 
-A running server keeps serving the copy it started with. Skills are linked, not copied, so they update with the pull, but links made against an older layout dangle.
+### License
 
-## License
-
-MIT: see [LICENSE](LICENSE). One reference of the design-prototype skill adapts material from Anthropic's skills repository under the Apache License 2.0. Its notice is in that file and the licence in `licenses/`.
+MIT, in [LICENSE](LICENSE). [`licenses/`](licenses/) holds the Apache License 2.0 for material adapted from Anthropic's skills repository.

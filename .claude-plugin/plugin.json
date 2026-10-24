@@ -1,7 +1,7 @@
 {
   "name": "swarmstorm",
-  "description": "Agent skills for the drawing-board loop: brainstorm, interview, diagram, plan, review. Every document rendered live in aiview, the companion app, outside your repositories.",
-  "version": "2.4.22",
+  "description": "Multi-agent orchestration for Claude Code, Codex and Cursor: parallel coding agents that settle shared files before the merge, QA agents that test the running app, clickable prototypes, workbenches and live plans in aiview. On your own subscription.",
+  "version": "2.4.23",
   "author": {
     "name": "Stefan Teofanovic"
   },
@@ -14,7 +14,20 @@
     "diagrams",
     "specs",
     "pr-review",
-    "technical-writing"
+    "technical-writing",
+    "multi-agent",
+    "orchestration",
+    "parallel-agents",
+    "agent-swarm",
+    "swarm",
+    "worktree",
+    "verification",
+    "qa",
+    "prototype",
+    "workbench",
+    "claude-code",
+    "codex",
+    "cursor"
   ],
   "skills": [
     "./skills/project",
