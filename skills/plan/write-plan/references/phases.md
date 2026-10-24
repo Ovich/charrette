@@ -6,9 +6,9 @@ are cut.
 ## The seats
 
 - **The plan runs on N seats**, `seat1` … `seat<N>`, plus the validator when the person wants
-  one. N is the mandate's `seats:` field, sized from the estimate of the work as the `orchestrate`
-  skill's *Propose the run* says: the widest phase's tasks; the person's number wins, the tasks
-  re-cut to it.
+  one. N is the mandate's `seats:` field: **4 to start from** (2–3 small, 5–6 large), reconsidered
+  against the estimate of the work as the `orchestrate` skill's *Propose the run* says (the widest
+  phase's tasks); the person's number wins, the tasks re-cut to it.
 - **A seat is a place in the swarm, not an agent.** Each phase dispatches a fresh subagent into
   it; what it learned reaches the next phase through the board's thread and its report.
 

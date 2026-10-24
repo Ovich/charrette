@@ -27,7 +27,7 @@ Beyond the shared ones (the protocol, the run table, the loop, the effort):
 
 | Field | Content | Recommended |
 |---|---|---|
-| builders | how many, each one's area | from the estimate: the tasks that can run in one build at once |
+| builders | how many, each one's area | 3 to start from, reconsidered against the estimate (the tasks that can run in one build at once) |
 | verifiers | per verifier: id, focus, source (`verify-<app>-<focus>` or `instructed`) | 1; the project's verify skill when it has one |
 | app owner | the verifier that runs the product | `v1` |
 | verify after | `each build` or `the end` | `each build` |
