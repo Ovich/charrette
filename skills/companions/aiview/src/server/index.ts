@@ -238,7 +238,7 @@ export function startServer(
       });
       return;
     }
-    // The agent points at a mockup's components (`aiview show`). The CLI has validated the
+    // The agent points at a prototype's components (`aiview show`). The CLI has validated the
     // names against the file; here they are only held to what travels safely in a URL.
     // The answer counts the tabs that heard it, so the agent knows whether to hand the
     // person the link instead.
@@ -320,7 +320,7 @@ export function startServer(
       watcher.ensureWatch(doc);
       if (isPdf(doc.file_path))
         return json(res, { document: doc, format: "pdf", content: null, pending } satisfies DocumentResponse);
-      // An html mockup is composed here, never on disk: data-bind placeholders are replaced
+      // An html prototype is composed here, never on disk: data-bind placeholders are replaced
       // from sibling files of the same folder (bare names only), and the watcher learns
       // which files this document now depends on. readDoc stays raw for the indexer.
       if (isHtml(doc.file_path)) {

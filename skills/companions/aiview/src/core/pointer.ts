@@ -1,4 +1,4 @@
-// Pointing: the agent shows the person which components of a mockup a question is about.
+// Pointing: the agent shows the person which components of a prototype a question is about.
 // The pointer is the viewer's URL and nothing else: `#doc=12&show=Strip,Menu&variant=step-2`.
 // `aiview show` validates it, prints it and asks the server to move every open tab to it,
 // so the same link works an hour later from the chat, with no tab listening when it was
@@ -9,7 +9,7 @@ export interface Pointer {
   readonly id: number;
   /** The `data-component` names to highlight, in the order given. Empty: the document alone. */
   readonly components: readonly string[];
-  /** The variant to switch the mockup to first, when the components live in one. */
+  /** The variant to switch the prototype to first, when the components live in one. */
   readonly variant?: string;
 }
 
@@ -40,12 +40,12 @@ export function readPointer(hash: string): Pointer | null {
   return variant && isName(variant) ? { id, components, variant } : { id, components };
 }
 
-/** What `aiview show` was asked for that the mockup does not have, as the sentence the
+/** What `aiview show` was asked for that the prototype does not have, as the sentence the
  *  agent reads. An agent that names a region in its own words is stopped here, before
  *  the person is asked about something they cannot find on the page. */
 export function unknownNames(asked: readonly string[], known: readonly string[], what: string): string | undefined {
   const missing = asked.filter((n) => !known.includes(n));
   if (!missing.length) return undefined;
   const has = known.length ? `it has: ${known.join(", ")}` : `it declares none`;
-  return `no ${what} named ${missing.join(", ")} in this mockup; ${has}`;
+  return `no ${what} named ${missing.join(", ")} in this prototype; ${has}`;
 }

@@ -233,23 +233,23 @@ test("POST /api/show moves every open tab to the components, and says how many h
 
 test("an html document is served composed: bindings resolved, summary carried, title from the raw file", async () => {
   write(
-    "docs/tools.mockup.html",
+    "docs/tools.prototype.html",
     `<!doctype html><html><head><title>Tools</title><style>[data-component="Pill"]{color:red}</style></head>` +
       `<body><span data-component="Pill">v1</span><script>window.x=1</script></body></html>`,
   );
   const hostAbs = write(
-    "docs/host.mockup.html",
-    `<!doctype html><html><head><title>Host</title></head><body><div data-bind="tools.mockup.html#Pill" class="here"></div><div data-bind="tools.mockup.html#Nope"></div></body></html>`,
+    "docs/host.prototype.html",
+    `<!doctype html><html><head><title>Host</title></head><body><div data-bind="tools.prototype.html#Pill" class="here"></div><div data-bind="tools.prototype.html#Nope"></div></body></html>`,
   );
-  const hostId = index.register(hostAbs, { kind: "mockup" }).id;
+  const hostId = index.register(hostAbs, { kind: "prototype" }).id;
   assert.equal(index.get(hostId)!.title, "Host", "the indexer read the raw file");
 
   const r = (await (await fetch(`${base}/api/document/${hostId}`)).json()) as DocumentResponse;
   assert.equal(r.format, "html");
-  assert.ok(r.content!.includes('<span data-component="Pill" class="here" data-bound="tools.mockup.html#Pill">v1</span>'), r.content!);
-  assert.ok(r.content!.includes('<style data-bound-style="tools.mockup.html">'), "source styles injected");
+  assert.ok(r.content!.includes('<span data-component="Pill" class="here" data-bound="tools.prototype.html#Pill">v1</span>'), r.content!);
+  assert.ok(r.content!.includes('<style data-bound-style="tools.prototype.html">'), "source styles injected");
   assert.ok(!r.content!.includes("window.x"), "source scripts ignored");
-  assert.deepEqual(r.bindings!.sources, ["tools.mockup.html"]);
+  assert.deepEqual(r.bindings!.sources, ["tools.prototype.html"]);
   assert.equal(r.bindings!.errors.length, 1);
   assert.match(r.bindings!.errors[0].message, /Component Nope not in/);
 
@@ -273,12 +273,12 @@ test("an html document is served composed: bindings resolved, summary carried, t
     }
   };
   await readUntil('"hello"');
-  fs.appendFileSync(path.join(root, "docs", "tools.mockup.html"), "\n");
+  fs.appendFileSync(path.join(root, "docs", "tools.prototype.html"), "\n");
   await readUntil(`"id":${hostId}`);
   ctrl.abort();
 
   const again = (await (await fetch(`${base}/api/document/${hostId}`)).json()) as DocumentResponse;
-  assert.ok(again.content!.includes('data-bound="tools.mockup.html#Pill"'));
+  assert.ok(again.content!.includes('data-bound="tools.prototype.html#Pill"'));
 });
 
 test("the version is the nearest plugin manifest's above the skill, at any depth, and null without one", async () => {

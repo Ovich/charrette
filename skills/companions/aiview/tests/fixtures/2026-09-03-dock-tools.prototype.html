@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CV builder, chat shell, mockup</title>
+<title>Dock tools, one per card</title>
 <style>
 :root {
   --background:#f7f7f5; --foreground:#1c1c1e; --muted:#efefec; --muted-foreground:#6b6b70;
@@ -241,10 +241,10 @@ h5:first-child { margin-top:0; }
 .region.just-applied { animation:pulse 1.2s ease-out; }
 @keyframes pulse { 0% { background:var(--ok-soft); box-shadow:0 0 0 2px #15803d; } 100% { background:transparent; box-shadow:none; } }
 
-/* ── Mockup chrome ── */
-.mockup-bar { position:fixed; bottom:12px; right:12px; display:flex; gap:4px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:4px; font-size:13px; z-index:9; }
-.mockup-bar button { padding:4px 8px; border-radius:6px; }
-.mockup-bar button:hover { background:var(--muted); }
+/* ── Prototype chrome ── */
+.prototype-bar { position:fixed; bottom:12px; right:12px; display:flex; gap:4px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:4px; font-size:13px; z-index:9; }
+.prototype-bar button { padding:4px 8px; border-radius:6px; }
+.prototype-bar button:hover { background:var(--muted); }
 .mobile-toggle { display:none; }
 @media (max-width:1023px) {
   .shell { grid-template-columns:1fr; }
@@ -333,132 +333,38 @@ h5:first-child { margin-top:0; }
 .sw-row.off .top .lbl { color:var(--muted-foreground); text-decoration:line-through; }
 .sw-note { font-size:15px; color:var(--muted-foreground); margin-top:10px; }
 .offer { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+
+body { display:block; height:auto; min-height:100vh; }
+.sheet-head { max-width:1360px; margin:0 auto; padding:28px 32px 8px; }
+.sheet-head h1 { font-size:28px; margin:0 0 6px; }
+.sheet-head p { margin:0; color:var(--muted-foreground); max-width:820px; }
+.toc { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+.toc a { font-size:14px; padding:5px 12px; border:1px solid var(--border); border-radius:999px; text-decoration:none; color:var(--muted-foreground); }
+section.block { max-width:1360px; margin:0 auto; padding:12px 32px; }
+section.block h2 { font-size:20px; margin:24px 0 12px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(560px, 1fr)); gap:28px; align-items:start; }
+.demo { display:grid; gap:10px; }
+.demo .cap { font-size:15px; color:var(--muted-foreground); }
+.demo .cap b { color:var(--foreground); font-weight:600; font-size:16px; }
+.demo .cap code { font:13px Consolas, monospace; background:var(--muted); padding:1px 6px; border-radius:6px; margin-left:6px; }
+.dockdemo { border:1px solid var(--border); border-radius:var(--radius-lg); background:var(--card); padding:16px 20px 20px; }
+.dockdemo .tool { max-height:none; }
+.dockdemo .box { display:flex; gap:8px; align-items:center; border:1px solid var(--border); border-radius:var(--radius-lg); padding:10px 10px 10px 20px; }
+.dockdemo .box span { flex:1; color:var(--muted-foreground); font-size:17px; }
+.rw { border-left:3px solid var(--primary); padding:6px 0 6px 16px; font-size:17px; color:var(--muted-foreground); }
+@media (max-width:900px) { section.block, .sheet-head { padding:16px; } .grid { grid-template-columns:1fr; } }
 </style>
 </head>
-<body data-view="chat">
-
-<header class="app-bar" data-component="AppBar">
-  <div class="wordmark"><i></i>Atelier</div>
-  <div class="ctx"><b>GeneralMedia</b> · Développeur Full-Stack JavaScript · Lausanne · <span style="color:var(--muted-foreground)">model Modern ▾</span></div>
-  <div class="spacer"></div>
-  <button class="btn sm mobile-toggle" onclick="toggleView()" id="vt">See the CV</button>
-  <button class="btn sm ghost">Letter</button>
-  <button class="btn sm">Download PDF</button>
-</header>
-
-<main class="shell">
-  <section class="chat" data-component="ChatPanel" aria-label="Assistant">
-    <div class="progress" data-component="ProgressLine"><span>Your CV for GeneralMedia</span><div class="bar"><i id="bar"></i></div><b id="prog">3 of 8 done</b></div>
-
-    <div class="stream" id="stream">
-      <div class="time">Today, 14:02</div>
-      <div class="msg ai"><div class="av">A</div><div>
-        <p>Hi Stefan. I read the GeneralMedia offer. Good news: it fits you well.</p>
-        <div class="card" data-component="AnalysisCard">
-          <div class="counts">
-            <button class="ok" onmouseenter="litAll('met',true)" onmouseleave="litAll('met',false)"><b>12</b><span>already shown well</span></button>
-            <button class="warn" onclick="openFindings()" onmouseenter="litAll('adjust',true)" onmouseleave="litAll('adjust',false)"><b>5</b><span>true, but not visible enough</span></button>
-            <button class="gap" onclick="openFindings()" onmouseenter="litAll('gap',true)" onmouseleave="litAll('gap',false)"><b>2</b><span>not in your profile</span></button>
-          </div>
-          <p style="margin-top:12px"><button class="btn primary" onclick="openFindings()">Show me what to improve</button></p>
-        </div>
-      </div></div>
-      <div class="msg ai"><div class="av">A</div><div><p>Click anything on your CV, or just write to me below.</p></div></div>
-    </div>
-
-    <div class="composer" data-component="Composer">
-      <div class="findings" id="findings" data-component="FindingsDrawer" role="dialog" aria-label="Findings">
-        <div class="fh"><b>What the offer asks</b><span>click one to work on it</span><button class="btn sm ghost" onclick="closeFindings()">Close</button></div>
-        <div class="grp">True of you, not visible enough · 5</div>
-        <div class="list">
-          <button data-target="exp-b3" onclick="finding(this,'rework','reader','Working with several developers, Agile')"><i class="dot adjust"></i><span>Working with several developers, Agile</span><span class="where">Experience</span></button>
-          <button data-target="summary" onclick="finding(this,'rework','positioning','Cutting and integrating mockups')"><i class="dot adjust"></i><span>Cutting and integrating mockups</span><span class="where">Summary</span></button>
-          <button data-target="skills-front" onclick="finding(this,'list',null,'Headless components and atomic design')"><i class="dot adjust"></i><span>Headless components and atomic design</span><span class="where">Skills</span></button>
-          <button data-target="header" onclick="finding(this,'header',null,'The 2 to 5 years asked')"><i class="dot adjust"></i><span>The 2 to 5 years asked</span><span class="where">Profile block</span></button>
-          <button data-target="proj-ciip" onclick="finding(this,'rework','precision','Estimating and tracking your work time')"><i class="dot adjust"></i><span>Estimating and tracking your work time</span><span class="where">Projects</span></button>
-        </div>
-        <div class="grp">Not in your profile · 2</div>
-        <div class="list">
-          <button data-target="skills-build" onclick="finding(this,'gap',null,'Docker, Docker Compose, AWS ECS')"><i class="dot gap"></i><span>Docker, Docker Compose, AWS ECS</span><span class="where">Skills</span></button>
-          <button data-target="skills-front" onclick="finding(this,'gap2',null,'Twig, Lottie, WordPress, Expo')"><i class="dot gap"></i><span>Twig, Lottie, WordPress, Expo</span><span class="where">not on the CV</span></button>
-        </div>
-        <div class="grp">Already shown well · 12</div>
-        <div class="list">
-          <button class="done" data-target="exp-b2"><i class="dot met"></i><span>Web and mobile interfaces</span><span class="where">Experience</span></button>
-          <button class="done" data-target="keyskills"><i class="dot met"></i><span>React or Vue</span><span class="where">Summary</span></button>
-          <button class="done" data-target="proj-dds"><i class="dot met"></i><span>REST APIs, many sources</span><span class="where">Projects</span></button>
-          <button class="done" data-target="languages"><i class="dot met"></i><span>French, native</span><span class="where">Languages</span></button>
-          <button class="done" data-target="exp-b1"><i class="dot met"></i><span>8 more, all in place</span><span class="where"></span></button>
-        </div>
-      </div>
-
-      <div class="tool" id="tool" hidden data-component="ToolDock">
-        <div class="thead"><span class="seg" id="scope" hidden></span></div>
-        <div class="tbody" id="tool-body"></div>
-      </div>
-      <div class="box"><span class="prefix" id="prefix" data-component="ToolPrefix"><span class="what" id="prefix-what"></span><button class="reset" id="reset" hidden onclick="resetTool()" aria-label="Reset the tool"></button><button onclick="clearTool()" aria-label="Cancel the tool">×</button></span><input type="text" id="composer" placeholder="Tell me what you want, or click anything on the CV" aria-label="Message"><button class="btn primary sm" id="send" onclick="send()" disabled>Send</button></div>
-      <div class="hint">Nothing is sent to anyone. Every change is shown before it is applied.</div>
-    </div>
-  </section>
-
-  <div class="sheet-col">
-    <div class="overflow" id="overflow" hidden data-component="OverflowWarning">▲ <span><b>Page two is 3 lines over.</b> The PDF would run to a third page.</span><button class="btn sm" onclick="openTool('makeroom')">Make room</button></div>
-    <article class="cv-sheet" data-component="CvSheet" data-model="Modern" lang="fr">
-      <div class="band region" data-region="header" data-kind="profile" data-status="adjust">
-        <div><h1>Stefan Teofanovic</h1><div class="title">Développeur Full-Stack JavaScript</div>
-        <div class="contact"><span>Montreux, Suisse</span><span>Citoyen suisse</span><span>stefanteofanovic@hotmail.com</span><span>+41 77 966 97 52</span><span>linkedin.com/in/stefan-teofanovic</span></div></div>
-        <div class="photo-slot">photo<br>optional</div>
-      </div>
-      <div class="body">
-        <h2 data-section="Résumé">Profil</h2>
-        <p class="summary region" data-region="summary" data-kind="prose" data-status="adjust">Développeur full-stack JavaScript, avec une expérience aussi bien en prise en charge autonome de produits qu'en développement au sein d'équipes agiles. React et Next.js, Vue et Nuxt, intégration d'API REST, CI/CD et exploitation de plateformes en production. Sensibilité particulière à l'ergonomie et à l'expérience utilisateur, et développement assisté par IA au quotidien.</p>
-        <div class="tks region" data-region="keyskills" data-kind="list" data-status="met"><span class="tk"><b>React</b></span><span class="tk"><b>Next.js</b></span><span class="tk"><b>Vue.js</b></span><span class="tk"><b>Nuxt.js</b></span><span class="tk"><b>TypeScript</b></span><span class="tk"><b>Tailwind CSS</b></span><span class="tk"><b>API REST</b></span><span class="tk"><b>Docker</b></span><span class="tk"><b>CI/CD</b></span><span class="tk">Node.js</span><span class="tk">PostgreSQL</span><span class="tk">Linux</span><span class="tk">Développement assisté par IA</span></div>
-
-        <h2 data-section="Expérience">Expérience</h2>
-        <div class="timeline">
-          <div class="when">août 2022 – août 2026</div>
-          <div class="what">
-            <div class="head region" data-region="entry-heig" data-kind="entry" data-status="met"><b>Collaborateur R&amp;D en génie logiciel</b></div>
-            <div class="sub2">HEIG-VD, HES-SO Suisse occidentale · Yverdon-les-Bains, hybride</div>
-            <ul>
-              <li class="region" data-region="exp-b1" data-kind="prose" data-entry="heig" data-status="met">Référent technique des plateformes auprès des enseignants, chercheurs et administration : traduction des besoins en solutions, conception technique, support des utilisateurs en production.</li>
-              <li class="region" data-region="exp-b2" data-kind="prose" data-entry="heig" data-status="met">Conception et développement des interfaces web des plateformes Opendidac, Roster et CIIP, de la maquette à la mise en production.</li>
-              <li class="region" data-region="exp-b3" data-kind="prose" data-entry="heig" data-status="adjust">Contribution à la maintenance et à l'évolution de la plateforme CIIP au sein d'une équipe agile de plusieurs développeurs, avec un client public externe.</li>
-              <li class="region" data-region="exp-b4" data-kind="prose" data-entry="heig" data-status="met">Automatisation de la livraison : Docker, Docker Compose, pipelines CI/CD (GitHub Actions, GitLab CI, Bitbucket Pipelines), exploitation sur Kubernetes.</li>
-            </ul>
-          </div>
-          <div class="when">2011 – 2015</div>
-          <div class="what"><div class="head region" data-region="entry-nestle" data-kind="entry" data-status="met"><b>Chef de projet IT / Support applicatif L3</b></div><div class="sub2">Nestlé, Globe IS/IT · Bussigny</div></div>
-        </div>
-
-        <h2 data-section="Projets">Projets</h2>
-        <div class="cards">
-          <div class="pcard region" data-region="proj-opendidac" data-kind="prose" data-status="met"><b>Opendidac</b><span class="pt">Plateforme d'évaluation adoptée volontairement par les enseignants, conçue, construite et exploitée seul de bout en bout.</span><div class="tks"><span class="tk"><b>Next.js</b></span><span class="tk"><b>React</b></span><span class="tk">PostgreSQL</span><span class="tk">Docker</span></div></div>
-          <div class="pcard region" data-region="proj-ciip" data-kind="prose" data-status="adjust"><b>CIIP</b><span class="pt">Plateforme de la Conférence intercantonale de l'instruction publique, 43 000+ comptes et 565 établissements, Romandie et Tessin.</span><div class="tks"><span class="tk"><b>Vue.js</b></span><span class="tk"><b>Nuxt.js</b></span><span class="tk">Spring Boot</span><span class="tk">Kubernetes</span></div></div>
-          <div class="pcard region" data-region="proj-roster" data-kind="prose" data-status="met"><b>Roster</b><span class="pt">Remplaçant de GitHub Classroom, première utilisation en production un mois après le premier commit.</span><div class="tks"><span class="tk"><b>React</b></span><span class="tk"><b>TypeScript</b></span><span class="tk"><b>Tailwind CSS</b></span><span class="tk">Radix</span></div></div>
-          <div class="pcard region" data-region="proj-dds" data-kind="prose" data-status="met"><b>Data-Driven Surveys</b><span class="pt">Intégration de sources de données multiples (Fitbit, GitHub, SurveyMonkey) par API REST dans une plateforme d'enquêtes.</span><div class="tks"><span class="tk"><b>React</b></span><span class="tk">Python</span><span class="tk"><b>API REST</b></span></div></div>
-        </div>
-
-        <h2 data-section="Compétences">Compétences</h2>
-        <div class="skillgrp"><div class="g">Front end</div><div class="tks region" data-region="skills-front" data-kind="list" data-status="adjust"><span class="tk"><b>HTML5</b></span><span class="tk"><b>CSS3</b></span><span class="tk"><b>Responsive</b></span><span class="tk"><b>Tailwind CSS</b></span><span class="tk">Composants headless (Radix)</span><span class="tk">shadcn/ui</span><span class="tk">Vite</span></div></div>
-        <div class="skillgrp"><div class="g">Build et run</div><div class="tks region" data-region="skills-build" data-kind="list" data-status="gap"><span class="tk"><b>Git</b></span><span class="tk"><b>Docker</b></span><span class="tk"><b>Docker Compose</b></span><span class="tk">Linux Debian</span><span class="tk">Kubernetes</span><span class="tk">GitHub Actions</span></div></div>
-
-        <div class="twocol">
-          <div><h2 data-section="Formation">Formation</h2>
-          <div class="lines region" data-region="education" data-kind="education" data-status="met"><div><span>Bachelor HES en génie logiciel, HEIG-VD</span><span>2018 – 2022</span></div><div><span>CFC Informatique, École des Arches</span><span>2008</span></div></div></div>
-          <div><h2 data-section="Langues">Langues</h2>
-          <div class="lines region" data-region="languages" data-kind="languages" data-status="met"><div><span>Français</span><span>langue maternelle</span></div><div><span>Anglais</span><span>langue maternelle</span></div></div></div>
-        </div>
-      </div>
-    </article>
-  </div>
-</main>
-
-<div class="mockup-bar" aria-label="Mockup"><span style="padding:4px 6px;color:var(--muted-foreground)">mockup</span><button onclick="overflow.hidden=!overflow.hidden">overflow warning</button><button onclick="location.reload()">reset</button></div>
-
+<body>
+<div class="sheet-head">
+  <h1>The dock tools, one by one</h1>
+  <p>Every tool of the CV builder as it sits in the composer dock: the header with the scope toggle where it applies and the Reset and Close toolbar, the body, and the composer underneath whose button carries the tool's verb. Generated from the same templates as the chat prototype, so a change there shows here.</p>
+  <div class="toc"><a href="#the-text-tool">The text tool</a><a href="#ai-driven-opened-from-a-finding">AI-driven, opened from a finding</a><a href="#component-editors-opened-by-clicking-the-part">Component editors, opened by clicking the part</a><a href="#focus-left-out-and-make-room">Focus: left out, and make room</a><a href="#scope-and-states">Scope and states</a></div>
+</div>
+<div id="sheets"></div>
+<div style="height:48px"></div>
 <script>
-  // ───────────── The writing library, and every rewrite precomputed for the mockup ─────────────
-  const FUNCS = [
+const FUNCS = [
     { key:'reader', name:'Reader awareness' }, { key:'compress', name:'Compression' }, { key:'precision', name:'Technical precision' },
     { key:'positioning', name:'Positioning' }, { key:'engineering', name:'Engineering thinking' }, { key:'narrative', name:'Narrative', lock:'held here by your rule: it stays a contribution, never authorship' },
   ];
@@ -497,14 +403,14 @@ h5:first-child { margin-top:0; }
       const multi = lines.length > 1;
       const cells = lines.map(one);
       const current = multi ? `<ul>${cells.map(c => `<li>${c.d ? c.d.current : c.now}</li>`).join('')}</ul>` : `<div class="t">${cells[0].d ? cells[0].d.current : cells[0].now}</div>`;
-      const after = fn ? (multi ? `<ul>${cells.map(c => `<li>${c.aft ? c.d.after : '<i>not written in this mockup</i>'}</li>`).join('')}</ul>` : `<div class="t">${cells[0].aft ? cells[0].d.after : '<i>not written in this mockup for this line</i>'}</div>`)
+      const after = fn ? (multi ? `<ul>${cells.map(c => `<li>${c.aft ? c.d.after : '<i>not written in this prototype</i>'}</li>`).join('')}</ul>` : `<div class="t">${cells[0].aft ? cells[0].d.after : '<i>not written in this prototype for this line</i>'}</div>`)
                        : (multi ? `<ul>${lines.map((r, k) => `<li>${k === 0 ? 'Choose a way of saying it, or tell me what you want below.' : '…'}</li>`).join('')}</ul>` : `<div class="t">Choose a way of saying it, or tell me what you want below.</div>`);
       return { html: `<div class="pair"><div class="side current"><div class="h"><b>Current</b><span class="fnname">Clarity</span></div>${current}</div><div class="side after ${fn ? '' : 'empty'}"><div class="h"><b>After</b>${SELECT(fn)}${fn && fn === (SUGGEST[cur.region] || 'reader') ? '<span class="rec">Recommended</span>' : ''}</div>${after}${f?.lock && lines.includes('exp-b3') ? `<div class="lock">🔒 ${f.lock}</div>` : ''}${cur.note ? `<div class="note"><b>With your note:</b> ${cur.note}</div>` : ''}</div></div>`, verb: 'Apply', ready: !!fn, scope: cur.entry ? ['line', 'entry'] : null };
     },
     sameway: () => {
       const fn = cur.fn, f = FUNCS.find(x => x.key === fn);
       const parts = Object.keys(REWRITE).filter(r => !cur.doneParts.includes(r));
-      const rows = parts.map(r => { const now = textOf(r), aft = (REWRITE[r] || {})[fn]; const d = aft ? diff(now, aft) : null; return `<div class="sw-row" data-part="${r}"><div class="top"><span class="lbl">${REGION_NAME[r]}</span><input type="checkbox" checked class="sw" onchange="this.closest('.sw-row').classList.toggle('off', !this.checked)"></div><details><summary>Current against After</summary><div class="pair"><div class="side current"><div class="h"><b>Current</b></div><div class="t">${d ? d.current : now}</div></div><div class="side after"><div class="h"><b>After</b></div><div class="t">${d ? d.after : '<i>not written in this mockup</i>'}</div></div></div></details></div>`; }).join('');
+      const rows = parts.map(r => { const now = textOf(r), aft = (REWRITE[r] || {})[fn]; const d = aft ? diff(now, aft) : null; return `<div class="sw-row" data-part="${r}"><div class="top"><span class="lbl">${REGION_NAME[r]}</span><input type="checkbox" checked class="sw" onchange="this.closest('.sw-row').classList.toggle('off', !this.checked)"></div><details><summary>Current against After</summary><div class="pair"><div class="side current"><div class="h"><b>Current</b></div><div class="t">${d ? d.current : now}</div></div><div class="side after"><div class="h"><b>After</b></div><div class="t">${d ? d.after : '<i>not written in this prototype</i>'}</div></div></div></details></div>`; }).join('');
       return { verb: `Apply to ${parts.length} parts`, ready: true, html: `<div class="sw-head"><span>Say the rest the same way:</span>${SELECT(fn)}${fn === (SUGGEST[cur.region] || 'reader') ? '<span class="rec">Recommended</span>' : ''}</div>${rows}<div class="sw-note">Not touched: the profile block, the skills lists, dates and languages. Untick a part to leave it as it is. One change, one undo.</div>` };
     },
     list: () => ({ verb:'Apply', ready:true, html:`<p class="lead">The offer names headless components and atomic design. Both are true of you. Bold what it names, add the one item it would search for.</p>
@@ -542,152 +448,35 @@ h5:first-child { margin-top:0; }
     conflict: () => ({ verb:'Apply', ready:true, html:`<p class="lead">My first proposal said "administration de clusters Kubernetes". That crosses the rule you gave me today, so I dropped it.</p><div class="pair"><div class="side current"><div class="h"><b>Current</b><span class="fnname">Clarity</span></div><div class="t">Git, Docker, Docker Compose, Linux Debian, <s>Kubernetes</s>, GitHub Actions</div></div><div class="side after"><div class="h"><b>After</b><span class="fnname" style="font-weight:600">Rule respected</span></div><div class="t">Git, Docker, Docker Compose, Linux Debian, <ins>déploiement et exploitation de services sur Kubernetes</ins>, GitHub Actions</div><div class="note"><b>You told me:</b> Kubernetes as service manager of the workloads, never cluster administrator. (today)</div></div></div>` }),
   };
 
-  // ───────────── Machinery ─────────────
-  const stream = document.getElementById('stream'), regions = document.querySelectorAll('.region');
-  const tool = document.getElementById('tool'), toolBody = document.getElementById('tool-body'), scopeEl = document.getElementById('scope'), resetBtn = document.getElementById('reset');
-  const composerInput = document.getElementById('composer'), sendBtn = document.getElementById('send');
-  const drawer = document.getElementById('findings'), overflow = document.getElementById('overflow');
-  const byName = n => document.querySelector(`[data-region="${n}"]`);
-  let cur = { key:null, region:null, entry:null, scope:'line', fn:null, note:null, verb:'Send', ready:false }, initial = null, pendingCall = 0, done = 3, doneParts = [];
 
-  function me(text) { const m = document.createElement('div'); m.className = 'msg me'; m.textContent = text; stream.appendChild(m); stream.scrollTop = stream.scrollHeight; return m; }
-  function ai(html) { const m = document.createElement('div'); m.className = 'msg ai'; m.innerHTML = `<div class="av">A</div><div><p>${html}</p></div>`; stream.appendChild(m); stream.scrollTop = stream.scrollHeight; return m; }
-  function select(names) { regions.forEach(r => r.classList.toggle('is-selected', names.includes(r.dataset.region))); document.querySelector('.cv-sheet').classList.toggle('focused', names.length > 0); const first = byName(names[0]); if (first) first.scrollIntoView({ behavior:'smooth', block:'center' }); }
-  function litAll(status, on) { regions.forEach(r => { if (r.dataset.status === status) r.classList.toggle('is-lit', on); }); }
 
-  // open a tool: loading first, then the body, then the composer adapts
-  const TOOL_NAME = { sameway:'Same way everywhere', rework:'Rework', list:'List', header:'Profile block', gap:'Gap', gap2:'Gap', profile:'Profile block', listedit:'Skills', entry:'Experience entry', education:'Education', languages:'Languages', section:'Sections', projects:'Projects', experiences:'Experience', makeroom:'Make room', whole:'Whole document', credits:'Credits', error:'Retry', conflict:'Rule respected' };
-  const REGION_NAME = { header:'the profile block', summary:'your summary', keyskills:'your key skills', 'entry-heig':'the HEIG-VD entry', 'entry-nestle':'the Nestlé entry', 'exp-b1':'an experience line', 'exp-b2':'an experience line', 'exp-b3':'an experience line', 'exp-b4':'an experience line', 'proj-opendidac':'the Opendidac project', 'proj-ciip':'the CIIP project', 'proj-roster':'the Roster project', 'proj-dds':'the Data-Driven Surveys project', 'skills-front':'your front-end skills', 'skills-build':'your build skills', education:'your education', languages:'your languages' };
-  function prefix() { const el = document.getElementById('prefix'); if (tool.hidden) { el.classList.remove('on'); return; } const what = cur.scope === 'entry' ? 'the HEIG-VD experience' : (REGION_NAME[cur.region] || ''); document.getElementById('prefix-what').innerHTML = TOOL_NAME[cur.key] + (what ? ` <small>· ${what}</small>` : ''); el.classList.add('on'); }
-  const LOADING = { sameway:'Writing every other part the same way…', rework:'Reading this part against the offer and your profile…', makeroom:'Measuring the page…', default:'Preparing the tool…' };
-  function openTool(key, opts = {}) {
-    cur = Object.assign({ key, region:null, entry:null, scope:'line', fn:null, note:null, doneParts }, opts);
-    if (key === 'rework' && cur.region) { const el = byName(cur.region); cur.entry = cur.entry || el?.dataset.entry || null; if (!cur.fn) cur.fn = SUGGEST[cur.region] || 'reader'; }
-    if (key === 'sameway') { select(Object.keys(REWRITE).filter(r => !doneParts.includes(r))); }
-    select(cur.scope === 'entry' ? ENTRIES[cur.entry] : (cur.region ? [cur.region] : []));
-    const call = ++pendingCall; tool.hidden = false; scopeEl.hidden = true; resetBtn.hidden = true; prefix();
-    toolBody.innerHTML = `<div class="loading"><div class="line"><span class="typing"><i></i><i></i><i></i></span>${LOADING[key] || LOADING.default}</div><div class="sk" style="width:85%"></div><div class="sk" style="width:60%"></div></div>`;
-    sendBtn.textContent = 'Send'; sendBtn.disabled = !composerInput.value.trim();
-    setTimeout(() => { if (call !== pendingCall || tool.hidden) return; render(); initial = snapshot(); state(); }, key === 'rework' ? 900 : 600);
-  }
-  function render() {
-    const t = T[cur.key](); cur.verb = t.verb; cur.ready = t.ready; cur.goal = t.goal || null;
-    toolBody.innerHTML = t.html;
-    if (t.scope) { scopeEl.hidden = false; scopeEl.innerHTML = `<button aria-pressed="${cur.scope === 'line'}" onclick="setScope('line')">This line</button><button aria-pressed="${cur.scope === 'entry'}" onclick="setScope('entry')">This experience · ${ENTRIES[cur.entry].length} lines</button>`; } else scopeEl.hidden = true;
-    toolBody.querySelectorAll('input, select').forEach(i => i.addEventListener('change', state));
-    if (cur.goal) { toolBody.querySelectorAll('.room-opt input').forEach(cb => cb.addEventListener('change', updateRoom)); updateRoom(); }
-  }
-  const snapshot = () => JSON.stringify([...toolBody.querySelectorAll('input, select, [aria-pressed]')].map(e => e.tagName === 'INPUT' ? (e.type === 'checkbox' ? e.checked : e.value) : e.tagName === 'SELECT' ? e.value : e.getAttribute('aria-pressed')));
-  function changed() { return initial !== null && snapshot() !== initial; }
-  // the composer button: Send disabled / Send / the tool's verb / Send and apply
-  function state() {
-    const typed = composerInput.value.trim().length > 0, has = !tool.hidden && (changed() || cur.ready || !!cur.fn);
-    resetBtn.hidden = !(!tool.hidden && (changed() || cur.fn || cur.note));
-    if (tool.hidden) { sendBtn.textContent = 'Send'; sendBtn.disabled = !typed; return; }
-    if (!has && !typed) { sendBtn.textContent = 'Send'; sendBtn.disabled = true; }
-    else if (!has && typed) { sendBtn.textContent = 'Send'; sendBtn.disabled = false; }
-    else if (has && !typed) { sendBtn.textContent = cur.verb; sendBtn.disabled = false; }
-    else { sendBtn.textContent = 'Send and apply'; sendBtn.disabled = false; }
-  }
-  composerInput.addEventListener('input', state);
-  function resetTool() { cur.fn = null; cur.note = null; composerInput.value = ''; render(); state(); }
-  function clearTool() { pendingCall++; tool.hidden = true; toolBody.innerHTML = ''; cur = { key:null, scope:'line', verb:'Send', ready:false }; regions.forEach(r => r.classList.remove('is-selected')); document.querySelector('.cv-sheet').classList.remove('focused'); prefix(); state(); }
-  function setScope(s) { cur.scope = s; select(s === 'entry' ? ENTRIES[cur.entry] : [cur.region]); render(); prefix(); state(); }
-  function pickFn(v) { cur.fn = v || null; cur.note = null; render(); if (cur.key === 'sameway') { initial = null; } state(); }
-  function pickAlt(b) { b.parentElement.querySelectorAll('.alt').forEach(x => x.setAttribute('aria-pressed', x === b)); state(); }
-  function pickFacet(b) { b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); state(); }
-  function updateRoom() { const goal = cur.goal; const freed = [...toolBody.querySelectorAll('.room-opt input:checked')].reduce((s, c) => s + +c.value, 0); const bar = document.getElementById('room-bar'), cnt = document.getElementById('room-count'); if (!bar) return; bar.style.width = Math.min(100, freed / goal * 100) + '%'; bar.classList.toggle('ok', freed >= goal); cnt.textContent = `${freed} of ${goal} lines`; cur.verb = freed >= goal ? 'Apply' : 'Apply anyway'; }
-
-  // clicks on the CV
-  regions.forEach(r => r.addEventListener('click', e => {
-    const k = r.dataset.kind, n = r.dataset.region;
-    const map = { prose:['rework', { region:n }], profile:['profile', { region:n }], list:['listedit', { region:n }], entry:['entry', { region:n, entry:'heig' }], education:['education', { region:n }], languages:['languages', { region:n }] };
-    const [key, opts] = map[k]; openTool(key, opts);
-    if (window.innerWidth < 1024) toggleView('chat');
-  }));
-  const SECTION_TOOL = { 'Résumé':'section', 'Expérience':'experiences', 'Projets':'projects', 'Compétences':'listedit', 'Formation':'education', 'Langues':'languages' };
-  document.querySelectorAll('.cv-sheet h2').forEach(h => h.addEventListener('click', () => openTool(SECTION_TOOL[h.dataset.section] || 'section', {})));
-  // findings
-  function openFindings() { drawer.classList.add('open'); }
-  function closeFindings() { drawer.classList.remove('open'); }
-  drawer.querySelectorAll('.list button').forEach(b => { b.addEventListener('mouseenter', () => byName(b.dataset.target)?.classList.add('is-lit')); b.addEventListener('mouseleave', () => byName(b.dataset.target)?.classList.remove('is-lit')); });
-  function finding(btn, key, fn, label) { closeFindings(); me(label); openTool(key, { region: btn.dataset.target, fn }); }
-
-  // send: typed text wins, otherwise the tool's verb
-  function send() {
-    const typed = composerInput.value.trim();
-    if (tool.hidden) { if (!typed) return; me(typed); composerInput.value = ''; ai('Understood. Let me look at that against your profile… <span class="typing"><i></i><i></i><i></i></span>'); state(); return; }
-    if (typed && !cur.fn && cur.key === 'rework') { me(typed); composerInput.value = ''; cur.fn = SUGGEST[cur.region] || 'positioning'; render(); state(); ai('Here is an After from your words. Apply it, or choose another way of saying it.'); return; }
-    if (typed) { me(typed); cur.note = typed; composerInput.value = ''; render(); state(); ai('Rewritten with your note. Press Apply when it reads right.'); return; }
-    apply();
-  }
-
-  // The full record of the change, as the person's own message: inputs, outputs, and every selection.
-  function rowState(root) {
-    const m = {};
-    root.querySelectorAll('.opt').forEach(o => {
-      const label = o.querySelector('.lbl')?.childNodes[0]?.textContent.trim(); if (!label) return;
-      const cb = o.querySelector('input[type=checkbox]'); const seg = o.querySelector('.seg button[aria-pressed="true"]');
-      const inLeft = !!o.closest('.leftout'), room = o.classList.contains('room-opt');
-      if (cb) m[label] = room ? (cb.checked ? 'accepted' : 'not taken') : (cb.checked ? (inLeft ? 'brought back' : 'shown') : (inLeft ? 'left out' : 'hidden'));
-      else if (seg) m[label] = seg.textContent.trim();
+  const CAPTIONS = [["The text tool", [["rework", "Rework", "Current against After for any prose part, the way of saying it as a dropdown, scope This line / This experience. Interactive version: the Rework prototype (doc 85)."]]], ["AI-driven, opened from a finding", [["list", "List", "The offer names items. Bold, add or drop, one decision per row."], ["header", "Profile block (AI)", "What to show or withhold, here the years rule against a 2 to 5 years bar."], ["gap", "Gap, with a neighbour", "Nothing to rewrite: three honest handlings as blocks, none preselected."], ["gap2", "Gap, a plus only", "Two handlings, none preselected."], ["conflict", "Conflict with a rule", "The AI crossed a remembered rule, says so, and shows the honest version as Current against After."]]], ["Component editors, opened by clicking the part", [["profile", "Profile block", "Titles as blocks, then show/hide rows, links and photo as rows with a button."], ["listedit", "Skills", "Groups and tokens, then what was left out for this offer."], ["entry", "Experience entry", "First row: rework all its lines. Then title blocks and the heading fields as rows."], ["education", "Education", "One row per diploma with the reason when left out, dates and order as segments."], ["languages", "Languages", "One row per language: level segment and a shown tick."], ["section", "Sections", "One row per section with a grip and a tick."]]], ["Focus: left out, and make room", [["projects", "Projects section", "What is shown and what was left out for this offer, each with its reason and a tick to bring it back."], ["experiences", "Experience section", "Shown in full, shown short, left out. Reasons name the offer, not the person."], ["makeroom", "Make room", "Opened from the overflow warning on the CV. Document-wide solutions with the lines each frees, a goal bar."]]], ["Scope and states", [["whole", "Whole document", "The batch preview: what is rewritten, what is untouched, one undo."], ["credits", "Insufficient credits", "The verb stays visible and disabled, with the smaller option beside it."], ["error", "Error", "What happened, what was not charged, one retry."]]]];
+  // the templates read the current tool state; give them a neutral one
+  let cur = { key:null, region:'exp-b3', entry:'heig', scope:'line', fn:null, note:null };
+  const byName = () => null;
+  const root = document.getElementById('sheets');
+  CAPTIONS.forEach(([group, items]) => {
+    const sec = document.createElement('section'); sec.className = 'block'; sec.id = group.toLowerCase().replace(/[^a-z]+/g, '-');
+    sec.innerHTML = `<h2>${group}</h2><div class="grid"></div>`;
+    const grid = sec.querySelector('.grid');
+    items.forEach(([key, name, cap]) => {
+      const d = document.createElement('div'); d.className = 'demo'; d.id = 'tool-' + key;
+      let body, verb = 'Send', ready = false, scope = '';
+      if (key === 'rework') { body = `<div class="rw">Current against After, side by side, with the way of saying it as a dropdown in the After header. See the interactive Rework prototype.</div>`; scope = `<span class="seg"><button aria-pressed="true">This line</button><button>This experience · 4 lines</button></span>`; }
+      else { const t = T[key](); body = t.html; verb = t.verb; ready = t.ready; }
+      d.innerHTML = `<div class="cap"><b>${name}</b><code>${key}</code><br>${cap}</div>
+        <div class="dockdemo"><div class="tool"><div class="thead">${scope}</div><div class="tbody">${body}</div></div>
+        <div class="box"><span class="prefix on"><span class="what">${name} <small>· the part it works on</small></span><button aria-label="Cancel the tool">×</button></span><span>Tell me what you want, or use the tool above</span><button class="btn primary sm" ${ready ? '' : 'disabled'}>${ready ? verb : 'Send'}</button></div></div>`;
+      grid.appendChild(d);
     });
-    const alt = root.querySelector('.alt[aria-pressed="true"]'); if (alt) m['Choice'] = alt.querySelector('b') ? alt.querySelector('b').childNodes[0].textContent.trim() : alt.textContent.trim();
-    return m;
-  }
-  function describe() {
-    const what = cur.scope === 'entry' ? 'the HEIG-VD experience' : (REGION_NAME[cur.region] || '');
-    const head = `<span class="k">You chose</span><b>${TOOL_NAME[cur.key]}${what ? ' · ' + what : ''}</b>`;
-    if (cur.key === 'rework') {
-      const lines = cur.scope === 'entry' ? ENTRIES[cur.entry] : [cur.region];
-      const fnName = FUNCS.find(x => x.key === cur.fn)?.name || '';
-      const rows = lines.map(r => { const now = textOf(r), aft = (REWRITE[r] || {})[cur.fn]; if (!aft) return ''; const d = diff(now, aft); return `<div class="diffrow cur"><span class="k2">Current</span><span>${d.current}</span></div><div class="diffrow aft"><span class="k2">After</span><span>${d.after}</span></div>`; }).join('');
-      return `${head} · way of saying it: <b>${fnName}</b> · scope: ${cur.scope === 'entry' ? lines.length + ' lines' : 'this line'}${cur.note ? ` · your note: <q>${cur.note}</q>` : ''}${rows}`;
-    }
-    if (cur.key === 'sameway') { const rows = [...toolBody.querySelectorAll('.sw-row')]; const on = rows.filter(r => r.querySelector('.sw').checked), off = rows.filter(r => !r.querySelector('.sw').checked); const fnName = FUNCS.find(x => x.key === cur.fn)?.name; return `${head} · way of saying it: <b>${fnName}</b> · ${on.length} parts${off.length ? ` · left as they were: ${off.map(r => REGION_NAME[r.dataset.part]).join(', ')}` : ''}${on.map(r => { const part = r.dataset.part; const d = diff(textOf(part), (REWRITE[part] || {})[cur.fn] || textOf(part)); return `<div class="diffrow cur"><span class="k2">Current</span><span>${d.current}</span></div><div class="diffrow aft"><span class="k2">After</span><span>${d.after}</span></div>`; }).join('')}`; }
-    const before = (() => { const d = document.createElement('div'); d.innerHTML = T[cur.key]().html; return rowState(d); })();
-    const after = rowState(toolBody);
-    const changed = Object.keys(after).filter(k => before[k] !== after[k]);
-    const changes = changed.length ? `<ul class="chg">${changed.map(k => `<li><b>${k}</b>: ${before[k] !== undefined ? `<s>${before[k]}</s><span class="arrow">→</span>` : ''}${after[k]}</li>`).join('')}</ul>` : '<div class="chg">Applied as proposed, nothing changed by hand.</div>';
-    const all = `<details><summary>Every setting, ${Object.keys(after).length} rows</summary><ul class="chg">${Object.entries(after).map(([k, v]) => `<li>${k}: ${v}</li>`).join('')}</ul></details>`;
-    const room = cur.goal ? ` · ${document.getElementById('room-count')?.textContent} freed` : '';
-    return `${head}${room}${changes}${all}`;
-  }
-  function apply() {
-    const what = cur.key === 'rework' ? (cur.scope === 'entry' ? 'the HEIG-VD experience' : 'a line') : { sameway:'Same way everywhere', list:'Front-end skills', header:'Profile block', gap:'Build skills', gap2:'Skills', profile:'Profile block', listedit:'Skills', entry:'HEIG-VD entry', education:'Education', languages:'Languages', section:'Sections', projects:'Projects', experiences:'Experience', makeroom:'Make room', whole:'Whole document', conflict:'Build skills', error:'Retry', credits:'Credits' }[cur.key];
-    const record = describe();
-    let offer = null;
-    if (cur.key === 'sameway') { const parts = [...toolBody.querySelectorAll('.sw-row')].filter(r => r.querySelector('.sw').checked).map(r => r.dataset.part); parts.forEach(r => { const el = byName(r), pt = el.querySelector('.pt'); const txt = (REWRITE[r] || {})[cur.fn]; if (txt) (pt || el).textContent = txt; el.classList.add('just-applied'); setTimeout(() => el.classList.remove('just-applied'), 1300); }); doneParts.push(...parts); }
-    if (cur.key === 'rework' && cur.fn) { const lines = cur.scope === 'entry' ? ENTRIES[cur.entry] : [cur.region]; lines.forEach(r => { const el = byName(r), pt = el.querySelector('.pt'); const txt = (REWRITE[r] || {})[cur.fn]; if (txt) (pt || el).textContent = txt; el.classList.add('just-applied'); setTimeout(() => el.classList.remove('just-applied'), 1300); if (el.dataset.status === 'adjust') el.dataset.status = 'met'; }); doneParts.push(...lines);
-      const rest = Object.keys(REWRITE).filter(r => !doneParts.includes(r)).length;
-      if (rest) offer = { fn: cur.fn, region: cur.region, rest, name: FUNCS.find(x => x.key === cur.fn).name }; }
-    else if (cur.region) { const el = byName(cur.region); el.classList.add('just-applied'); setTimeout(() => el.classList.remove('just-applied'), 1300); if (el.dataset.status !== 'met') el.dataset.status = 'met'; }
-    if (toolBody.querySelector('.bring:checked')) overflow.hidden = false;
-    if (cur.key === 'makeroom') overflow.hidden = true;
-    const row = [...drawer.querySelectorAll('.list button:not(.done)')].find(b => b.dataset.target === cur.region); if (row) { row.classList.add('done'); row.querySelector('.dot').className = 'dot met'; }
-    done = Math.min(done + 1, 8); document.getElementById('prog').textContent = `${done} of 8 done`; document.getElementById('bar').style.width = (done / 8 * 100) + '%';
-    const choice = document.createElement('div'); choice.className = 'msg me choice'; choice.innerHTML = record; stream.appendChild(choice);
-    const m = ai(`<span class="receipt"><span class="ok-mark">✓</span><span>Applied</span><button class="undo" onclick="this.closest('.receipt').innerHTML='Undone'">Undo</button></span> <span class="ok-line">${['','One','Two','Three','Four','Five','Six','Seven','Eight'][done]} of eight done.</span>`); m.classList.add('history'); stream.scrollTop = stream.scrollHeight;
-    clearTool();
-    if (offer) ai(`<span class="offer"><span>Want the rest of the CV said the same way, <b>${offer.name}</b>? ${offer.rest} other parts.</span><button class="btn sm" onclick="openTool('sameway', { fn:'${offer.fn}', region:'${offer.region}' })">Show me</button><button class="btn sm ghost" onclick="this.closest('.offer').innerHTML='Kept as it is.'">No, keep them</button></span>`);
-  }
-  composerInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !sendBtn.disabled) send(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') clearTool(); });
-  // click on the greyed overlay, or outside the sheet, unselects and closes the tool
-  document.querySelector('.cv-sheet').addEventListener('click', e => { if (e.target === e.currentTarget && !tool.hidden) clearTool(); });
-  document.querySelector('.sheet-col').addEventListener('click', e => { if (e.target === e.currentTarget && !tool.hidden) clearTool(); });
-  function toggleView(force) { const v = force || (document.body.dataset.view === 'chat' ? 'cv' : 'chat'); document.body.dataset.view = v; document.getElementById('vt').textContent = v === 'chat' ? 'See the CV' : 'Back to the chat'; }
-  state();
+    root.appendChild(sec);
+  });
+  document.querySelectorAll('.alt').forEach(b => b.addEventListener('click', () => b.parentElement.querySelectorAll('.alt').forEach(x => x.setAttribute('aria-pressed', x === b))));
+  document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b))));
+  function pickAlt(b) { b.parentElement.querySelectorAll('.alt').forEach(x => x.setAttribute('aria-pressed', x === b)); }
+  function pickFacet(b) { b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); }
+  function openTool() {} function pickFn() {}
+
 </script>
-<!--
-Implementation note (handoff, not to build before approval):
-- One chrome for every tool (Rework board R14, umbrella U35, U37): no box, a header with the scope toggle group only where scope applies. The active tool is a ToolPrefix in the chat bar, before the text field (tool name and the part it works on), with ↺ when there is a selection and × to cancel: the typed text visibly builds on top of the tool, a light body, the composer button as the only trigger with four states (Send disabled, Send, the tool's verb, Send and apply).
-- Rework is the text tool for every prose part (summary, experience lines, project texts): Current against After side by side with a word diff, the way of saying it as a Select in the After header. It opens with the recommended way already in After (U40): the prefix shows the tool is active, ↺ returns to the neutral state, the dropdown changes the way, the button reads Apply at once. Scope: This line / This experience from the header, or the entry heading's first row "Rework all 4 lines".
-- Structured tools on the row pattern: profile, listedit, entry, education, languages, section, projects, experiences (each with Left out for this offer), makeroom (goal bar), and the AI-driven list, header, gap, gap2, whole, conflict, credits, error.
-- On apply, the full record goes into the history as the person's own message: for Rework, the way of saying it, the scope, the note, and Current against After with the word diff for every line in scope; for the structured tools, every row changed by hand as before → after, and every setting folded under "Every setting, N rows". Then the assistant's one-line receipt. The history is readable by the person and by the assistant as context.
-- Same way everywhere (U41): after every Rework apply while other prose parts remain, the assistant offers the same way for the remaining prose parts, never applies it. The tool: one dropdown, one row per part with a tick and Current/After folded, a note on what is not touched, one Apply, one undo. The record lists every part changed and every part left as it was.
-- Rewrites are precomputed per prose part and per function for the mockup; a part with no rewrite says so instead of inventing.
-- Findings drawer opens from the analysis card only (Q6, to be decided with the shell). Overflow warning on the CV opens the make-room tool. Light theme only.
--->
 </body>
 </html>

@@ -78,7 +78,7 @@ export interface PingEventPayload {
   type: "ping";
 }
 
-/** Broadcast when the agent points at a mockup's components (`aiview show`): every open
+/** Broadcast when the agent points at a prototype's components (`aiview show`): every open
  *  tab moves to the document and highlights them. The fields are a `Pointer`'s. */
 export interface ShowEventPayload {
   type: "show";

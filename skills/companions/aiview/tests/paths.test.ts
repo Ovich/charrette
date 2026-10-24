@@ -7,7 +7,8 @@ import { formatOf, kindFromName, repoRootOf, titleOf, toAbs, toStored } from "..
 
 test("kindFromName follows <name>.<kind>.<ext>", () => {
   assert.equal(kindFromName("2026-08-23-topic.brainstorm.md"), "brainstorm");
-  assert.equal(kindFromName("x.mockup.html"), "mockup");
+  assert.equal(kindFromName("x.prototype.html"), "prototype");
+  assert.equal(kindFromName("x.mockup.html"), "prototype"); // the migration: the old kind name reads as the new
   assert.equal(kindFromName("x.Spec.md"), "spec"); // lowercased
   assert.equal(kindFromName("plain.md"), "");
   assert.equal(kindFromName("cv-live.pdf"), "");
@@ -15,7 +16,7 @@ test("kindFromName follows <name>.<kind>.<ext>", () => {
 
 test("formatOf dispatches on extension", () => {
   assert.equal(formatOf("a.md"), "markdown");
-  assert.equal(formatOf("a.mockup.html"), "html");
+  assert.equal(formatOf("a.prototype.html"), "html");
   assert.equal(formatOf("a.htm"), "html");
   assert.equal(formatOf("a.pdf"), "pdf");
   assert.equal(formatOf("a"), "markdown");

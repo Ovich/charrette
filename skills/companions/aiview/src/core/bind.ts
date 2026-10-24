@@ -1,5 +1,5 @@
-// Mockup binding: a host mockup places `<div data-bind="file#Name"></div>` and the viewer
-// replaces it with the first `[data-component="Name"]` element of `file`, a sibling mockup.
+// Prototype binding: a host prototype places `<div data-bind="file#Name"></div>` and the viewer
+// replaces it with the first `[data-component="Name"]` element of `file`, a sibling prototype.
 // Pure: sources come through the reader it is given, and the result is a string. Nothing
 // here touches the file system or the index, so it is testable on in-memory fixtures.
 import {
@@ -161,7 +161,7 @@ function injectStyles(doc: T.Document, used: Map<string, Source>): void {
 
 export function resolveBindings(html: string, readSource: SourceReader): BindResult {
   const none: BindResult = { html, bound: 0, sources: [], errors: [], warnings: [] };
-  // A mockup without bindings is returned as written: no parse, no serialisation drift.
+  // A prototype without bindings is returned as written: no parse, no serialisation drift.
   if (!html.includes(BIND)) return none;
 
   const doc = parse(html);
@@ -246,7 +246,7 @@ function enclosingComponent(el: El): string | undefined {
   return undefined;
 }
 
-/** What a mockup offers to its siblings and what it pulls from them, read from the file alone. */
+/** What a prototype offers to its siblings and what it pulls from them, read from the file alone. */
 export function listComponents(html: string): ComponentsReport {
   const doc = parse(html);
   const offers: OfferedComponent[] = [];

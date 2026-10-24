@@ -19,11 +19,11 @@ test("a hash is typed and pasted by people: what is malformed is dropped, never 
   assert.deepEqual(readPointer('#doc=4&show=Ok,"]x[,&variant=a b&other=1'), { id: 4, components: ["Ok"] });
 });
 
-test("a name the mockup does not have is answered with the names it has", () => {
+test("a name the prototype does not have is answered with the names it has", () => {
   assert.equal(unknownNames(["Pill"], ["Pill", "Dock"], "component"), undefined);
   assert.equal(
     unknownNames(["ShellMiddle", "Pill"], ["Pill", "Dock"], "component"),
-    "no component named ShellMiddle in this mockup; it has: Pill, Dock",
+    "no component named ShellMiddle in this prototype; it has: Pill, Dock",
   );
-  assert.equal(unknownNames(["step-2"], [], "variant"), "no variant named step-2 in this mockup; it declares none");
+  assert.equal(unknownNames(["step-2"], [], "variant"), "no variant named step-2 in this prototype; it declares none");
 });

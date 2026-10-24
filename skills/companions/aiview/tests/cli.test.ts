@@ -271,12 +271,12 @@ test("status reports the version", () => {
 });
 
 test("show: names are held to the page the person sees, and the link is the pointer", () => {
-  write("docs/tools.mockup.html", `<!doctype html><html><body><span data-component="Pill">v1</span></body></html>`);
+  write("docs/tools.prototype.html", `<!doctype html><html><body><span data-component="Pill">v1</span></body></html>`);
   const host = write(
-    "docs/host.mockup.html",
+    "docs/host.prototype.html",
     `<!doctype html><html><head><title>Host</title></head><body>` +
-      `<div data-component="MockupBar"><button data-aiview-variant="empty" aria-pressed="true">Empty</button><button data-aiview-variant="step-2">Step 2</button></div>` +
-      `<header data-component="ApplicationStrip">strip</header><div data-bind="tools.mockup.html#Pill"></div></body></html>`,
+      `<div data-component="PrototypeBar"><button data-aiview-variant="empty" aria-pressed="true">Empty</button><button data-aiview-variant="step-2">Step 2</button></div>` +
+      `<header data-component="ApplicationStrip">strip</header><div data-bind="tools.prototype.html#Pill"></div></body></html>`,
   );
 
   const unregistered = run("show", host, "--component", "ApplicationStrip");
@@ -287,16 +287,16 @@ test("show: names are held to the page the person sees, and the link is the poin
   assert.equal(first.status, 0, first.stderr);
   try {
     const listed = JSON.parse(run("components", host, "--json").stdout);
-    assert.deepEqual(listed.page, ["MockupBar", "ApplicationStrip", "Pill"], "the names show accepts, the bound one included");
+    assert.deepEqual(listed.page, ["PrototypeBar", "ApplicationStrip", "Pill"], "the names show accepts, the bound one included");
     assert.deepEqual(listed.variants, ["empty", "step-2"]);
 
     const invented = run("show", host, "--component", "ShellMiddle");
     assert.equal(invented.status, 1);
-    assert.match(invented.stderr, /no component named ShellMiddle in this mockup; it has: .*ApplicationStrip.*Pill/);
+    assert.match(invented.stderr, /no component named ShellMiddle in this prototype; it has: .*ApplicationStrip.*Pill/);
 
     const variant = run("show", host, "--component", "Pill", "--variant", "loading");
     assert.equal(variant.status, 1);
-    assert.match(variant.stderr, /no variant named loading in this mockup; it has: empty, step-2/);
+    assert.match(variant.stderr, /no variant named loading in this prototype; it has: empty, step-2/);
 
     const shown = run("show", "#1", "--component", "ApplicationStrip", "--component", "Pill", "--variant", "step-2", "--json");
     assert.equal(shown.status, 0, shown.stderr);
@@ -568,9 +568,9 @@ test("path refuses when there is nothing to resolve against", () => {
   assert.match(ghost.stderr, /no such project: Ghost/);
 });
 
-test("components: what a mockup offers and pulls; check: whether a host resolves", () => {
+test("components: what a prototype offers and pulls; check: whether a host resolves", () => {
   const tools = write(
-    "docs/JOBS/tools.mockup.html",
+    "docs/JOBS/tools.prototype.html",
     `<html><body><div data-component="Pill" onclick="x()">p</div><span data-component="Dot">.</span><div data-bind="other.html#Thing"></div></body></html>`,
   );
   const r = run("components", tools, "--json");
@@ -583,16 +583,16 @@ test("components: what a mockup offers and pulls; check: whether a host resolves
   assert.match(text, /offers\s+Pill\s+<div>\s+!! root carries inline handler onclick/);
   assert.match(text, /pulls\s+Thing\s+from other\.html/);
 
-  const good = write("docs/JOBS/host.mockup.html", `<html><body><div data-bind="tools.mockup.html#Dot"></div></body></html>`);
+  const good = write("docs/JOBS/host.prototype.html", `<html><body><div data-bind="tools.prototype.html#Dot"></div></body></html>`);
   const ok = run("check", good, "--json");
   assert.equal(ok.status, 0, ok.stderr);
-  assert.deepEqual(JSON.parse(ok.stdout), { file: "host.mockup.html", bound: 1, sources: ["tools.mockup.html"], errors: [], warnings: [] });
-  assert.match(run("check", good).stdout, /1 bound from 1 source: tools\.mockup\.html\s+ok/);
+  assert.deepEqual(JSON.parse(ok.stdout), { file: "host.prototype.html", bound: 1, sources: ["tools.prototype.html"], errors: [], warnings: [] });
+  assert.match(run("check", good).stdout, /1 bound from 1 source: tools\.prototype\.html\s+ok/);
 
-  const bad = write("docs/JOBS/bad.mockup.html", `<html><body><div data-bind="tools.mockup.html#Nope"></div><div data-bind="missing.html#A"></div></body></html>`);
+  const bad = write("docs/JOBS/bad.prototype.html", `<html><body><div data-bind="tools.prototype.html#Nope"></div><div data-bind="missing.html#A"></div></body></html>`);
   const fail = run("check", bad);
   assert.equal(fail.status, 1);
-  assert.match(fail.stdout, /error\s+tools\.mockup\.html#Nope: Component Nope not in tools\.mockup\.html/);
+  assert.match(fail.stdout, /error\s+tools\.prototype\.html#Nope: Component Nope not in tools\.prototype\.html/);
   assert.match(fail.stdout, /error\s+missing\.html#A: Not found: missing\.html/);
 
   assert.equal(run("check", path.join(toolRoot, "nope.html")).status, 1);

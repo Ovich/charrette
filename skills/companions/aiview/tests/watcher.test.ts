@@ -64,9 +64,9 @@ test("unrelated files in the same dir emit nothing", async () => {
 
 test("a change on a source emits changed for every host composed from it", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "aiview-watch3-"));
-  const hostA = { id: 11, abs_path: path.join(tmp, "a.mockup.html") };
-  const hostB = { id: 12, abs_path: path.join(tmp, "b.mockup.html") };
-  const source = path.join(tmp, "tools.mockup.html"); // not a registered document
+  const hostA = { id: 11, abs_path: path.join(tmp, "a.prototype.html") };
+  const hostB = { id: 12, abs_path: path.join(tmp, "b.prototype.html") };
+  const source = path.join(tmp, "tools.prototype.html"); // not a registered document
   for (const f of [hostA.abs_path, hostB.abs_path, source]) fs.writeFileSync(f, "<html></html>");
   const events: ChangedEvent[] = [];
   const watcher = new DocWatcher((dir, name) =>
@@ -99,8 +99,8 @@ test("a change on a source emits changed for every host composed from it", async
 
 test("a registered source emits for itself and for its hosts", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "aiview-watch4-"));
-  const host = { id: 21, abs_path: path.join(tmp, "host.mockup.html") };
-  const source = { id: 22, abs_path: path.join(tmp, "tools.mockup.html") };
+  const host = { id: 21, abs_path: path.join(tmp, "host.prototype.html") };
+  const source = { id: 22, abs_path: path.join(tmp, "tools.prototype.html") };
   for (const d of [host, source]) fs.writeFileSync(d.abs_path, "<html></html>");
   const events: ChangedEvent[] = [];
   const watcher = new DocWatcher((dir, name) =>

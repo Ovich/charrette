@@ -7,6 +7,7 @@ import { adoptLegacyIndex, DATA_ROOT, DOCS_ROOT, ensureHome } from "./home.ts";
 import { resolveProject, type Project } from "./projects.ts";
 import {
   formatOf,
+  currentKind,
   isPdf,
   kindFromName,
   projectRoot,
@@ -262,6 +263,9 @@ export function openIndex(dbPath: string = SQLITE_PATH, root: string = STORE_ROO
     db.prepare("DELETE FROM documents WHERE id = ?").run(row.id);
   }
 
+  // The `mockup` kind is now `prototype`: its rows say so, its files keep their name on disk.
+  db.prepare("UPDATE documents SET kind = 'prototype' WHERE kind = 'mockup'").run();
+
   const parse = (row: Row): Document => ({
     ...row,
     tags: JSON.parse(row.tags) as string[],
@@ -305,10 +309,10 @@ export function openIndex(dbPath: string = SQLITE_PATH, root: string = STORE_ROO
       const file = toStored(absFile, root);
       const content = isPdf(absFile) ? "" : readDoc(absFile); // binary formats title by filename
       const existing = db.prepare("SELECT * FROM documents WHERE file_path = ?").get(file) as Row | undefined;
-      const finalKind = (kind || existing?.kind || kindFromName(file)).toLowerCase();
+      const finalKind = currentKind(kind || existing?.kind || kindFromName(file));
       if (!finalKind)
         throw new Error(
-          "kind is mandatory: name the file <name>.<kind>.md or pass --kind <kind> (e.g. brainstorm, mockup, pr-analysis)",
+          "kind is mandatory: name the file <name>.<kind>.md or pass --kind <kind> (e.g. brainstorm, prototype, pr-analysis)",
         );
       const tags = [...new Set([...(existing ? (JSON.parse(existing.tags) as string[]) : []), ...extraTags])].filter(
         (t) => t !== finalKind,
@@ -340,7 +344,7 @@ export function openIndex(dbPath: string = SQLITE_PATH, root: string = STORE_ROO
     update(id, patch) {
       const row = db.prepare("SELECT * FROM documents WHERE id = ?").get(Number(id)) as Row | undefined;
       if (!row) return undefined;
-      const kind = patch.kind ? patch.kind.toLowerCase() : row.kind;
+      const kind = patch.kind ? currentKind(patch.kind) : row.kind;
       const tags = [
         ...new Set([...(JSON.parse(row.tags) as string[]), ...(patch.addTags ?? [])]),
       ].filter((t) => t !== kind && !(patch.removeTags ?? []).includes(t));

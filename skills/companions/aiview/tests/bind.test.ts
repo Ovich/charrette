@@ -5,7 +5,7 @@ import path from "node:path";
 import { parse, serialize } from "parse5";
 import { parseRef, resolveBindings, type SourceReader } from "../src/core/bind.ts";
 
-const TOOLS = "2026-09-03-dock-tools.mockup.html";
+const TOOLS = "2026-09-03-dock-tools.prototype.html";
 
 const toolsSheet = `<!DOCTYPE html><html><head><title>Tools</title>
 <style>[data-component="ToolPrefix"]{color:red}</style>
@@ -38,7 +38,7 @@ test("parseRef accepts file#Name and rejects paths", () => {
   assert.equal(parseRef("x.html#"), undefined);
 });
 
-test("a mockup without bindings is returned byte for byte", () => {
+test("a prototype without bindings is returned byte for byte", () => {
   const html = "<!doctype html>\n<html>\n<body><p class=x>a < b</p></body></html>\n";
   const r = resolveBindings(html, reader({}));
   assert.equal(r.html, html);
@@ -129,7 +129,7 @@ test("the same component placed twice yields two independent copies", () => {
   assert.ok(r.html.includes('class="prefix a"') && r.html.includes('class="prefix b"'));
 });
 
-// Gate G1 of the plan: parse5 must hand the JOBS mockups back unchanged where it matters.
+// Gate G1 of the plan: parse5 must hand the JOBS prototypes back unchanged where it matters.
 // Scripts must be byte-identical; elsewhere only attribute quoting and doctype casing may move.
 const fixtures = path.join(import.meta.dirname, "fixtures");
 for (const f of fs.existsSync(fixtures) ? fs.readdirSync(fixtures).filter((n) => n.endsWith(".html")) : []) {

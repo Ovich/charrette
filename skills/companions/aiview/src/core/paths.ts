@@ -32,10 +32,16 @@ export type DocFormat = "markdown" | "html" | "pdf" | "swarm";
 export const formatOf = (file: string): DocFormat =>
   isHtml(file) ? "html" : isPdf(file) ? "pdf" : isSwarm(file) ? "swarm" : "markdown";
 
+/** The kind a renamed kind's old name now means: files keep their old name on disk, the index says the new one. */
+const RENAMED_KINDS: Record<string, string> = { mockup: "prototype" };
+
+/** A kind as the index stores it: a renamed kind's old name read as its new one. */
+export const currentKind = (kind: string): string => RENAMED_KINDS[kind.toLowerCase()] ?? kind.toLowerCase();
+
 /** `<name>.<kind>.md` / `<name>.<kind>.html` -> "kind"; anything else -> "" */
 export function kindFromName(file: string): string {
   const parts = path.basename(file).split(".");
-  return parts.length >= 3 ? parts[parts.length - 2].toLowerCase() : "";
+  return parts.length >= 3 ? currentKind(parts[parts.length - 2]) : "";
 }
 
 export function titleOf(text: string, file: string): string {

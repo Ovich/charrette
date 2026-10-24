@@ -28,6 +28,25 @@ afterEach(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
+test("migration: an x.mockup.html registers as a prototype, its file never renamed", () => {
+  const abs = write("docs/x.mockup.html", "<title>X</title>");
+  assert.equal(index.register(abs).kind, "prototype");
+  assert.equal(index.register(write("docs/y.md", "# Y"), { kind: "mockup" }).kind, "prototype");
+  assert.ok(fs.existsSync(abs));
+});
+
+test("migration: a row of kind mockup reads as prototype once the index reopens", () => {
+  const abs = write("docs/old.page.html", "<title>Old</title>");
+  index.register(abs, { kind: "page" });
+  index.close();
+  const { DatabaseSync } = process.getBuiltinModule("node:sqlite") as typeof import("node:sqlite");
+  const raw = new DatabaseSync(path.join(tmp, "test.sqlite"));
+  raw.prepare("UPDATE documents SET kind = 'mockup'").run();
+  raw.close();
+  index = openIndex(path.join(tmp, "test.sqlite"), root);
+  assert.equal(index.getByPath(abs)!.kind, "prototype");
+});
+
 test("register: kind from filename, stored path repo-relative, title from h1", () => {
   const abs = write("docs/x.brainstorm.md", "# Board X\n");
   const d = index.register(abs, { tags: ["proj"] });
@@ -81,7 +100,7 @@ test("a swarm document lists with its kind and the swarm format, titled by its f
 
 test("all: newest created_at first, exists + format computed", () => {
   const a = write("a.spec.md", "# A\n");
-  const b = write("b.mockup.html", "<title>B</title>");
+  const b = write("b.prototype.html", "<title>B</title>");
   index.register(a, { started: "2026-01-01T00:00:00Z" });
   index.register(b, { started: "2026-02-01T00:00:00Z" });
   const all = index.all();
