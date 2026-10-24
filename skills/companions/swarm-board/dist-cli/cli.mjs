@@ -7976,7 +7976,7 @@ function joinedSeat() {
   return seat ?? slice ?? fail(`--seat (or --slice) is required
 ${USAGE}`);
 }
-var SEAT_POSTS_DRAW = "posts render markdown and mermaid: compare in a table, draw a flow as a mermaid block";
+var POSTS_MARKDOWN = "posts are markdown, rendered on the board: steps as a list, options as a table, a task or a report in short headed parts, a flow or a structure as a mermaid block; more than one line goes through post --file <path>";
 var seatCommands = (as) => {
   const cli = self().join(" ");
   const who = `--as ${shellWord(as)}`;
@@ -8129,7 +8129,7 @@ ${USAGE}`);
       const shared = !profileOf(runner.kind).worktree;
       const as = shared ? `pass --as ${runner.name} on every call: this checkout is shared, the board cannot tell you apart` : null;
       const commands = shared ? seatCommands(runner.name) : null;
-      const drawing = profileOf(runner.kind).member === "seat" ? SEAT_POSTS_DRAW : null;
+      const drawing = POSTS_MARKDOWN;
       const phase = await phaseHeader(runner.run);
       emit({ runner: runner.name, nick: runner.nick, roster, phase, ...shared ? { as: runner.name, commands } : {}, ...drawing ? { drawing } : {}, link, next }, () => {
         console.log(`you are ${runner.name}, ${runner.nick}: @${runner.slice} or @${runner.nick.replace(/\s+/g, "")} mentions you`);

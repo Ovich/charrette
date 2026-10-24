@@ -38,9 +38,9 @@ phase is a pause.
 
 **`model:`** **opus** (recommended).
 
-**`effort:`** `low | medium | high | xhigh | max`: **medium** (recommended).
-The design is the plan's, but the subagent shapes the code around its slice and names what it
-adds. How effort reaches a subagent: the `orchestrate` skill's *Dispatch*.
+**`effort:`** `low | medium | high | xhigh | max`: **low** (recommended): the design is the
+plan's. Medium when the slices leave the subagent to shape the code around its slice and name
+what it adds. How effort reaches a subagent: the `orchestrate` skill's *Dispatch*.
 
 **`tests:`** when the tests the plan names get written. The testing prompt each answer puts in
 the brief: `references/tests.md`.

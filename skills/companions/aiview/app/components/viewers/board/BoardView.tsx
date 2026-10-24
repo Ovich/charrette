@@ -213,12 +213,11 @@ export function BoardView({ repos, run: asked }: { repos: string[]; run: number 
                 <div className="run-main">
                   <ConversationFilters items={items} narrow={narrowing} onNarrow={setNarrowing} />
                   <Conversation items={shown} archived={archivedLine} fresh={NONE} />
-                  {claims && !(selectedRun && members.length > 0) && <ClaimsRow rows={claims} />}
+                  {claims && <ClaimsRow rows={claims} />}
                 </div>
                 {selectedRun && members.length > 0 && (
                   <aside className="side" data-component="RunRail">
                     <AgentStrip agents={members} hue={runHue(selectedRun.code)} follow={focus} onFollow={setFocus} />
-                    {claims && <ClaimsRow rows={claims} />}
                   </aside>
                 )}
               </div>

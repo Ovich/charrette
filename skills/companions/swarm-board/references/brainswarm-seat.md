@@ -39,8 +39,8 @@ You never write the run's record or dossier.
    you have nothing to do (step 10). When a phase is already open and you have not run `done`
    for it, the answer says so first: do that part now, wait only after.
 4. **Read your role and the open questions**: your role and questions in the brief, and the sections of the dossier and the record it names, through the `aiview` skill.
-5. **Post per question**: `$S post "<your position>" --about D<n> --as <group>/<seat>`. **Posts
-   render markdown and mermaid**; the shape follows what the post says:
+5. **Post per question**: `$S post "<your position>" --about D<n> --as <group>/<seat>`, shaped as
+   `SKILL.md`'s thread says; for a seat:
    - **A comparison of options is a table**, one option per column, one case per row:
 
      ```

@@ -437,7 +437,7 @@ function joinedSeat(): string {
 }
 
 /** What a seat's join tells it of its posts, before the listener line (D2). */
-const SEAT_POSTS_DRAW = "posts render markdown and mermaid: compare in a table, draw a flow as a mermaid block";
+const POSTS_MARKDOWN = "posts are markdown, rendered on the board: steps as a list, options as a table, a task or a report in short headed parts, a flow or a structure as a mermaid block; more than one line goes through post --file <path>";
 
 /** The commands a member of a kind without worktree runs next, `--as` filled in (D21, D36). */
 const seatCommands = (as: string): string[] => {
@@ -604,8 +604,8 @@ ${USAGE}`);
       const shared = !profileOf(runner.kind).worktree;
       const as = shared ? `pass --as ${runner.name} on every call: this checkout is shared, the board cannot tell you apart` : null;
       const commands = shared ? seatCommands(runner.name) : null;
-      // a seat posts what it compares as a table, what flows as mermaid: low-effort seats do what the board prints (D2)
-      const drawing = profileOf(runner.kind).member === "seat" ? SEAT_POSTS_DRAW : null;
+      // every member posts markdown shaped to what it says: agents do what the board prints (D2)
+      const drawing = POSTS_MARKDOWN;
       // the run's current phase after the roster: a late or restarted member starts in it
       const phase = await phaseHeader(runner.run);
       emit({ runner: runner.name, nick: runner.nick, roster, phase, ...(shared ? { as: runner.name, commands } : {}), ...(drawing ? { drawing } : {}), link, next }, () => {

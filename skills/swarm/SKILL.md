@@ -20,7 +20,7 @@ no, do it yourself and do not ask again for this work.
 
 One message, each answered with your recommendation: **how many workers** (one per part that
 can run at once, 3 by default, at most 9); **the branch** their work merges into (a new
-`swarm/<topic>` off the current branch by default); **verify** (off by default; on, a `verifier`
+`swarm/<topic>` off the current branch by default); **the workers' effort** (low by default); **verify** (off by default; on, a `verifier`
 pass on the merged work at the person's word, as the `orchestrate` skill dispatches it).
 
 ## Open and dispatch

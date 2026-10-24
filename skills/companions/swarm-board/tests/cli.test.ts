@@ -643,13 +643,13 @@ test("a seat joining from the shared checkout is told its --as and its next comm
   assert.ok(json.commands.every((c: string) => c.includes("--as idea/skeptic")));
 });
 
-test("a seat's join tells it to draw, before the listener line; a runner's join does not", () => {
-  const draw = "posts render markdown and mermaid: compare in a table, draw a flow as a mermaid block";
+test("every join tells the member its posts are markdown, before the link line: a seat and a runner alike", () => {
+  const markdown = /^posts are markdown, rendered on the board: .*mermaid block; more than one line goes through post --file <path>$/;
   const lines = joinSeat(openBrainstorm(), "architect").stdout.trimEnd().split("\n");
-  assert.equal(lines.at(-3), draw);
+  assert.match(lines.at(-3)!, markdown);
   const runner = run("join", "--run", String(openRun()), "--slice", "S3", "--doing", "x");
   assert.equal(runner.status, 0, runner.stderr);
-  assert.doesNotMatch(runner.stdout, /posts render markdown/);
+  assert.ok(runner.stdout.split("\n").some((l) => markdown.test(l)), runner.stdout);
 });
 
 test("a seat's --files is refused by the board", () => {

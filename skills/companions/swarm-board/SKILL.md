@@ -53,7 +53,12 @@ prompt): read `references/setup.md`.
   `--about D<n>` for a decision.
 - **A message informs, an agreement binds, an endorsement backs one.** What two members
   `agree` on the thread goes, an interface change included. Nobody arbitrates it.
-- **A fenced `mermaid` block in a post renders as a diagram.**
+- **A post is markdown, rendered on the board; shape it to what it says.** Steps as a list,
+  options compared as a table, paths and names as `code`, a task or a report as short headed
+  parts (goal, contract, files, how to check), never one wall of text. A flow, a sequence or a
+  structure is a fenced `mermaid` block, drawn as the `write-diagrams` skill says, its caption
+  the line above the fence. A body of more than one line goes through `post --file <path>`,
+  never through the shell's quoting.
 - **Talk is short**: what you change, what you need, what you settled.
 
 A code run's members also hold files, claim by claim, and take turns on a merge lock: its

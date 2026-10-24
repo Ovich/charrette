@@ -67,7 +67,7 @@ template fills them.
 | protocol | from the table above, its template, or `custom` | from what the person wants done |
 | phases | each phase as this run runs it: who acts, the moves, the message that opens it; a custom protocol's in full, as a `protocol.md` phase table | the protocol's |
 | questions | what the seats work, one row each | 1 to 3 |
-| seats | per seat: id, role prompt in full (the `orchestrate` skill's `references/roles.md`), effort, `on` | the protocol's or template's |
+| seats | per seat: id, role prompt in full (the `orchestrate` skill's `references/roles.md`), effort, `on` | the protocol's or template's, every seat's effort `low` unless the person keeps the rows' |
 | evidence | below, for all or per seat | `codebase, documents` |
 | criteria | what a good result is, what is ruled out | from the ask |
 | budget | wall time across the phases; a phase's share spent ends it | 30 minutes |
