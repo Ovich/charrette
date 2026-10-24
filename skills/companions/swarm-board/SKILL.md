@@ -100,7 +100,7 @@ installed.
 
 - **A plan worker whose brief names a run and a slice**: read `references/plan-worker.md` before the first edit.
 - **A swarm worker whose brief names a task run**: read `references/swarm-worker.md` before the first call.
-- **A verifier whose brief names a run** (a plan's validator seat): `references/plan-worker.md`, its joining and waiting.
+- **A verifier whose brief names a run** (a verifier seat of a build-verify run): `references/plan-worker.md`, its joining and waiting.
 - **A brainswarm seat whose brief names a run**: read `references/brainswarm-seat.md` before the first call.
 - **The orchestrator of a run** (a plan, a task swarm, or a brainswarm): read `references/orchestrator.md` before opening it, and the `orchestrate` skill
   for dispatch.

@@ -31,7 +31,8 @@ except `open`, `slice`, `close` and `status`.
      its row's list; `subscribe` / `unsubscribe` change it later.
 
 2. **From the repository's checkout:**
-   `$S open --kind <plan|brainstorm> --group <slug> --title "<title>" --seats <file> --link <plan or board URL>`.
+   `$S open --kind <plan|brainstorm|task> --group <slug> --title "<title>" --seats <file> --link <plan or board URL>`,
+   with `--protocol <name>` when the run runs one (build-verify, debate, …; the tab shows it).
    `--plan <slug>` stays an alias of `--kind plan --group <slug>`, `--slices` of `--seats`. It
    prints the run id, the link to the project's board page in aiview (`/board`; `/board#run=<id>`
    opens this run's tab), then the line that starts your link: give the link to the person, who

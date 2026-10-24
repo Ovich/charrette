@@ -31,7 +31,7 @@ function RunTabButton({ tab, picked, onPick }: { tab: RunTab; picked: boolean; o
         {tab.code}
       </span>
       <span className="t">{tab.title}</span>
-      <span className="kind">{tab.kind}</span>
+      <span className="kind" title={tab.protocol ? `${tab.kind} run, protocol ${tab.protocol}` : undefined}>{tab.protocol ?? tab.kind}</span>
       <TabState tab={tab} />
     </button>
   );
@@ -89,7 +89,7 @@ export function RunTabs({
             {archived.code}
           </span>
           <span className="t">{archived.title}</span>
-          <span className="kind">{archived.kind}</span>
+          <span className="kind">{archived.protocol ?? archived.kind}</span>
           <span className="st">
             archived{archived.of > 0 && " · "}
             <TabCount tab={archived} />

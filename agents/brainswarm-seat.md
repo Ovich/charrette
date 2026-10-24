@@ -6,7 +6,7 @@ effort: medium
 ---
 
 You take exactly one seat. Load the `swarmstorm:swarm-board` skill, brainswarm-seat side, then the
-protocol your brief names: the `swarmstorm:brainswarm` skill's `references/<protocol>/protocol.md`, or the project protocol's file at the path your brief gives (a custom protocol has none: its phases are in your brief), then follow your brief.
+protocol your brief names: the `swarmstorm:orchestrate` skill's `references/protocols/<protocol>/protocol.md`, or the project protocol's file at the path your brief gives (a custom protocol has none: its phases are in your brief), then follow your brief.
 
 - **Never edit the repository**: no file written, no commit, no branch. You debate; the
   orchestrator alone writes the board.

@@ -246,7 +246,7 @@ export const seatCount = (of: number): string => `${of} ${of === 1 ? "seat" : "s
 export const workerCount = (of: number): string => `${of} ${of === 1 ? "worker" : "workers"}`;
 
 /** An open run as a tab: `quiet` while its orchestrator has a `quiet` event no `back` answered. */
-export type RunTab = { run: RunId; code: string; title: string; kind: Kind; state: "live" | "quiet" | "closed"; done: number; of: number };
+export type RunTab = { run: RunId; code: string; title: string; kind: Kind; state: "live" | "quiet" | "closed"; done: number; of: number; /** the protocol the run follows, null when none */ protocol: string | null };
 /** A closed run in the archive; `outcome` null while the snapshot holds none (D18). */
 export type ArchivedRun = RunTab & { closed: string; outcome: string | null; orchestrator: string };
 /** What the conversation shows: one run (null = All), or the member followed. */
@@ -324,7 +324,7 @@ function tabOf(snap: BoardSnapshot, run: RunSummary): RunTab {
   const orch = orchestratorOf(run);
   const quiet = snap.events.some((e) => e.from === orch && isQuiet(e) && !quietAnswered(e, snap.events));
   const state = !run.open ? "closed" : quiet ? "quiet" : "live";
-  return { run: run.run, code: run.code, title: run.title, kind: run.kind, state, done: run.done, of: run.of };
+  return { run: run.run, code: run.code, title: run.title, kind: run.kind, state, done: run.done, of: run.of, protocol: run.protocol ?? null };
 }
 
 /** The open runs, in opening order. */

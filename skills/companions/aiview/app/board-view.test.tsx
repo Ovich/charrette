@@ -479,3 +479,20 @@ test("the run's head shows its current phase, name and text; a run with no phase
   expect(document.querySelector('[data-component="RunViewSwitch"]')).not.toBeNull();
   expect(document.querySelector('[data-component="RunPhase"]')).toBeNull();
 });
+
+test("a phase opened more than once reads its iteration: build 1, verify 1, build 2, verify 2; a phase opened once stays bare", async () => {
+  const { phaseLabels, RunViewSwitch } = await import("./components/viewers/board/RunViewSwitch.tsx");
+  const loop = [{ name: "build", text: "" }, { name: "verify", text: "" }, { name: "build", text: "" }, { name: "verify", text: "walk again" }];
+  expect(phaseLabels(loop)).toEqual(["build 1", "verify 1", "build 2", "verify 2"]);
+  expect(phaseLabels([{ name: "diverge" }, { name: "converge" }])).toEqual(["diverge", "converge"]);
+  render(<RunViewSwitch view="conversation" line="" json={null} onView={() => {}} phases={loop} />);
+  const names = [...document.querySelectorAll('[data-component="PhaseStrip"] .name')].map((n) => n.textContent);
+  expect(names).toEqual(["build 1", "verify 1", "build 2", "verify 2"]);
+});
+
+test("a run that names a protocol shows it in its tab's chip, the kind otherwise", () => {
+  const withProtocol = { ...LIVE, runs: LIVE.runs.map((r) => (r.run === 1 ? { ...r, protocol: "build-verify" } : r)) };
+  show([APP], null, [withProtocol]);
+  expect(tabOf("Sessions with refresh tokens").querySelector(".kind")?.textContent).toBe("build-verify");
+  expect(tabOf("Audit log").querySelector(".kind")?.textContent).toBe("plan");
+});

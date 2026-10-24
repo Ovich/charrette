@@ -69,7 +69,7 @@ export function ArchivePanel({
               <span className="at">
                 {r.title}
                 <span className={`kchip ${r.kind}`} data-component="KindChip">
-                  {r.kind}
+                  {r.protocol ?? r.kind}
                 </span>
               </span>
               <span className="ad">{closedAt(r.closed)}</span>

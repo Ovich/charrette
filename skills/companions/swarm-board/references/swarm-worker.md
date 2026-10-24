@@ -26,5 +26,12 @@ directly.
    merged, what you found that the orchestrator should know. Then back to 2.
 6. **The run closes** (the closed line): `$S end`, then return a line per task you did.
 
+**Under a protocol** (build-verify: the phase line `join` and every `wait` print): a phase that
+posts you a task is worked as above, then `$S done <phase>`; a phase that gives you no part
+(verify, for a builder): stay on call, answer a verifier's question on the thread, change
+nothing, `$S done <phase>` at once. **Never start or stop the product**: a check that needs it
+asks the app owner on the thread. A fix task names the findings it fixes (`FIX F1`): your report
+says, per id, what you changed.
+
 A task you cannot do, or one that would change something it did not ask for: say so to
 `@orchestrator` and wait; never widen it yourself.

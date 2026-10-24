@@ -9,6 +9,19 @@ import type { RunView } from "../../../lib/board/analytics.ts";
 /** The phases drawn one by one at the strip's end; the earlier fold into one segment. */
 const PHASES_SHOWN = 6;
 
+/** Each phase's label: its name, and the nth time it opened when the run opened it more than once
+ *  (a build-verify loop reads "build 1", "verify 1", "build 2"…); a name opened once stays bare. */
+export function phaseLabels(phases: { name: string }[]): string[] {
+  const total = new Map<string, number>();
+  for (const p of phases) total.set(p.name, (total.get(p.name) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  return phases.map((p) => {
+    const nth = (seen.get(p.name) ?? 0) + 1;
+    seen.set(p.name, nth);
+    return (total.get(p.name) ?? 0) > 1 ? `${p.name} ${nth}` : p.name;
+  });
+}
+
 export function RunViewSwitch({
   view,
   line,
@@ -35,6 +48,7 @@ export function RunViewSwitch({
     if (json === null) return;
     void navigator.clipboard?.writeText(json).then(() => setCopied(true));
   };
+  const labels = phaseLabels(phases);
   return (
     <div className="runhead" data-component="RunViewSwitch" data-state={view === "analytics" && copied ? "analytics+copied" : view}>
       {phases.length > 1 ? (
@@ -44,7 +58,7 @@ export function RunViewSwitch({
               className="pseg done earlier"
               title={phases
                 .slice(0, phases.length - PHASES_SHOWN)
-                .map((p, i) => `${i + 1}. ${p.name}${p.text ? `: ${p.text}` : ""}`)
+                .map((p, i) => `${i + 1}. ${labels[i]}${p.text ? `: ${p.text}` : ""}`)
                 .join("\n")}
             >
               <span className="name">{phases.length - PHASES_SHOWN} earlier</span>
@@ -52,9 +66,10 @@ export function RunViewSwitch({
           )}
           {phases.slice(-PHASES_SHOWN).map((p, k, shownPhases) => {
             const now = k === shownPhases.length - 1;
+            const label = labels[phases.length - shownPhases.length + k];
             return (
-              <span key={`${k}-${p.name}`} className={now ? "pseg now" : "pseg done"} data-phase={p.name} title={p.text ? `${p.name}: ${p.text}` : p.name}>
-                <span className="name">{p.name}</span>
+              <span key={`${k}-${p.name}`} className={now ? "pseg now" : "pseg done"} data-phase={p.name} title={p.text ? `${label}: ${p.text}` : label}>
+                <span className="name">{label}</span>
                 {now && p.text && <span className="said">{p.text}</span>}
                 {!now && <span className="ok" aria-label="done">✓</span>}
               </span>

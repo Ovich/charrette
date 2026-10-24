@@ -1,13 +1,14 @@
 ---
 name: brainswarm
-description: "Use when a person wants a swarm of role seats to work a topic on the swarm board under a chosen protocol: a brainstorm (ideas before any judgment), a debate (questions argued to decisions, a skeptic endorsing) or an editorial (one text drafted, read by seats standing for its readers, revised), a protocol or template the project keeps as a `brainswarm-<name>` skill, or a custom protocol recommended for the person's intent, or a seat's brief names a brainswarm protocol. Produces the run's record in aiview, written by the orchestrator alone. Not for one person thinking aloud with the agent (brainstorm, interview) and not for a plan's slices (execute-plan)."
+description: "Use when a person wants a swarm of role seats to work a topic on the swarm board under a chosen protocol: a brainstorm (ideas before any judgment), a debate (questions argued to decisions, a skeptic endorsing) or an editorial (one text drafted, read by seats standing for its readers, revised), a protocol or template the project keeps as a `protocol-<name>` skill (or an older `brainswarm-<name>` one), or a custom protocol recommended for the person's intent, or a seat's brief names a brainswarm protocol. Produces the run's record in aiview, written by the orchestrator alone. Not for one person thinking aloud with the agent (brainstorm, interview) and not for a plan's slices (execute-plan)."
 ---
 
 # Brainswarm
 
 You are the **orchestrator**: you run role seats on the swarm board under one protocol, and you
 alone write the run's documents. The board's verbs are the `swarm-board` skill's, orchestrator side;
-dispatch, charter and roles are the `orchestrate` skill's.
+the protocols, the setup interview, dispatch, charter, roles and findings are the `orchestrate`
+skill's.
 
 - **The run goes to its end without the person.** They approve the strategy before and read the
   result after; every choice between is yours, made on the strategy's `criteria`, its reason
@@ -17,37 +18,23 @@ dispatch, charter and roles are the `orchestrate` skill's.
 
 ## Choose the protocol
 
-- **Recommend from what the person wants done**: the protocol that fits, its template when one
-  matches, with the reason; when none fits, a **custom protocol** (its phases, each phase's
-  moves and who acts, what comes out) built on the closest one.
-- **Protocols, templates and seats are defaults**: the person adjusts the phases, the seats and
-  each role in the strategy.
-- **The project's own come first**: its `brainswarm-<name>` skills in its local skills folder
-  (`.claude/skills/` when it has no other), each a protocol or a template over one below. Read
-  the one that fits before the strategy.
-- **Read the protocol's `protocol.md` before the strategy**:
+**The protocol is chosen as the `orchestrate` skill's *The protocol* says**, among those that run
+on a brainswarm: brainstorm, debate, editorial, the project's own, or a custom one; its file read
+before the strategy. **Protocols, templates and seats are defaults**: the person adjusts the phases,
+the seats and each role in the strategy. **A change for one run lives in the dossier.**
 
-| Protocol | When | File |
-|---|---|---|
-| brainstorm | options, many and varied, before choosing | `references/brainstorm/protocol.md` |
-| debate | known questions to decide, with sources | `references/debate/protocol.md` |
-| editorial | a text for a given reader: a letter, a proposal, a README | `references/editorial/protocol.md` |
-
-- **A template is one use of a protocol, kept to run again**: its inputs filled for a kind of
-  work, never its phases. The protocol lists its templates.
-- **A change for one run lives in the dossier.** A custom protocol, or a protocol filled for a
-  kind of work that recurs, can be kept as the project's `brainswarm-<name>` skill. **When the
-  strategy is settled, explain it in a few lines**: the setup (phases, seats, interview, output)
-  saved in this project's skills, so the next run of this kind starts from it instead of being
-  set up again; it lives in the project, never in the plugin; it is made with them through a
-  short interview, shown whole and written only on their yes. Then they choose `keep`: no,
-  after this run (offered once the result is judged) or now; never written without their yes.
+- **When the strategy is settled, explain `keep` in a few lines**: the setup (phases, seats,
+  interview, output) saved in this project's skills as a `protocol-<name>` skill, so the next run
+  of this kind starts from it instead of being set up again; it lives in the project, never in
+  the plugin; it is made with them through a short interview, shown whole and written only on
+  their yes. Then they choose `keep`: no, after this run (offered once the result is judged) or
+  now; never written without their yes.
 
 ## Before the run
 
 - **Two documents, through the `aiview` skill, in the topic's group**: a **record** per run,
   each phase's work then what came out; a **dossier** when the topic runs more than once, kept
-  across its runs. A new run is a new record. Read the protocol's `documents.md` before writing
+  across its runs. A new run is a new record. Read the protocol's `documents.md`, beside its `protocol.md`, before writing
   either.
 - **Interview the person** (the `interview` skill): their ask split into its demands and judged
   against the evidence, each gap one open question, then what the protocol or template asks;
@@ -58,20 +45,21 @@ dispatch, charter and roles are the `orchestrate` skill's.
 
 ## The strategy
 
-The dossier's `field: value` table, approved as the `orchestrate` skill's
-`references/charter.md` says, every field the person's to change. The protocol adds fields; a
+The dossier's `field: value` table, settled through the `orchestrate` skill's setup interview and
+its `references/charter.md`, every field the person's to change. The protocol adds fields; a
 template fills them.
 
 | Field | Content | Recommended |
 |---|---|---|
 | protocol | from the table above, its template, or `custom` | from what the person wants done |
 | phases | each phase as this run runs it: who acts, the moves, the message that opens it; a custom protocol's in full, as a `protocol.md` phase table | the protocol's |
+| loop | when the protocol has a cycle: `until <goal> · cap <n>`, `<n>`, or `unbounded` | the protocol's goal and cap |
 | questions | what the seats work, one row each | 1 to 3 |
 | seats | per seat: id, role prompt in full (the `orchestrate` skill's `references/roles.md`), effort, `on` | the protocol's or template's, every seat's effort `low` unless the person keeps the rows' |
 | evidence | below, for all or per seat | `codebase, documents` |
 | criteria | what a good result is, what is ruled out | from the ask |
 | budget | wall time across the phases; a phase's share spent ends it | 30 minutes |
-| keep | keep this setup as the project's `brainswarm-<name>` skill: `no`, `after` (offered at close, once the result is judged) or `now` (written before the run) | `after` for a custom protocol or a recurring kind of work, else `no` |
+| keep | keep this setup as the project's `protocol-<name>` skill: `no`, `after` (offered at close, once the result is judged) or `now` (written before the run) | `after` for a custom protocol or a recurring kind of work, else `no` |
 
 **Evidence**, what a seat may read; a claim names its source (`file:line`, `#<doc id>`, URL and
 date, or a recipe):
@@ -86,7 +74,7 @@ date, or a recipe):
 
 ## Open and dispatch
 
-- **Open the run** as the `swarm-board` skill's orchestrator side says: kind from the protocol, group
+- **Open the run** as the `swarm-board` skill's orchestrator side says, `--protocol <name>`: kind from the protocol, group
   the topic, one seat per strategy row, each seat's `link` the dossier; the record created and
   indexed before the dispatch.
 - **A recording** starts before the joins, on this run's own tab (`/board#run=<run>`), its
@@ -97,7 +85,7 @@ date, or a recipe):
 - **The brief**:
 
 ```markdown
-Take seat `<seat id>` in run `<run id>`, protocol `<protocol>` of the `brainswarm` skill<, its file `<the project protocol's SKILL.md, absolute path>`>, with the `swarm-board` skill, brainswarm-seat side. `$S` = `<the swarm tool's command>`.
+Take seat `<seat id>` in run `<run id>`, protocol `<protocol>` of the `orchestrate` skill<, its file `<the project protocol's SKILL.md, absolute path>`>, with the `swarm-board` skill, brainswarm-seat side. `$S` = `<the swarm tool's command>`.
 
 **Join**: `<the exact join command, --as included>`. **You**: `--as <group>/<seat id>` on every call.
 
@@ -130,6 +118,9 @@ One command per shell call. Never end your turn while the run is open; when the 
   `### <Seat>`, minus what only served the thread (mentions, `#seq`, `done` and hand-off lines),
   its headings demoted to bold; yours under `### Orchestrator`; events never. A reopened phase is
   a new section (`## 7. Read, round 2`), the earlier kept.
+- **A protocol's cycle repeats as the strategy's `loop` says**: each repeated phase's message
+  names its iteration (`read 2 of 3`), and the loop ends as the `orchestrate` skill's *The setup
+  interview* says, at the goal or the cap.
 - **A seat may propose going back** (`@orchestrator back <phase>: <reason>`): reopen the phase
   with `phase <name> "again: <reason>"`, the phases after it running again, or decline on the
   thread with why.
@@ -146,6 +137,6 @@ One command per shell call. Never end your turn while the run is open; when the 
   dated.
 - **`keep` is `after`, or the run showed a setup worth reusing**: offer the project skill once;
   `no` ends it. On a yes, or on `now` before the run, or whenever the person asks for one,
-  create it with them: read `references/new-protocol.md` first.
+  create it with them: read the `orchestrate` skill's `references/protocols/new-protocol.md` first.
 - **Nothing they keep is replaced without their yes**: a delivered file, a record, a recording;
   what it replaces is kept aside.

@@ -21,17 +21,17 @@ Carry out one slice document with the `execute-slice` skill.
 <the one thing this slice must not do, when there is one>
 ```
 
-## The validator
+## A verifier
 
-Dispatched on the `verifier` agent, which holds how a validator behaves; the brief gives only
-this run.
+Dispatched on the `verifier` agent, which holds how a verifier behaves under build-verify; the
+brief gives only this run.
 
 ```markdown
-**Plan**: `<file name>`, aiview id `#<id>`. **Board**: run `<run id>` on `<repository>`, slice `validator`; what the phases before left is on the thread: `thread <phase>`.
+**Plan**: `<file name>`, aiview id `#<id>`. **Board**: run `<run id>` on `<repository>`, protocol build-verify, slice `<v1>`<, the app owner>; what the phases before left is on the thread: `thread <phase>`.
 
 **Workspace**: a detached worktree of `<branch>`. **Prepare**: `<the command>`.
 
-**Your skill**: `verify-<app>-<focus>`. <What the person added to watch, verbatim from the *Mandate*, or nothing>.
+**Source**: <the `verify-<app>-<focus>` skill | instructed: each verify phase's message gives your steps>. <What the person added to watch, verbatim from the *Mandate*, or nothing>.
 ```
 
 **The last line** as the `orchestrate` skill's `references/brief.md` says.

@@ -1,41 +1,55 @@
 ---
 name: swarm
-description: "Use when a person asks to swarm, delegate or parallelize work without a plan ('swarm this', 'run a swarm on…', 'get a few agents on it'), or when a task in front of you splits into independent parts or is long enough to hand off: then propose a swarm in one line, workers and why, and open it only on a yes. Runs a task swarm on the board: this session orchestrates, N swarm-worker agents take the tasks posted to them, report, and take the next, for as long as the person keeps giving work. Produces the run on the board and the workers' results and merges. Not for work an approved plan covers (execute-plan), a discussion of seats (brainswarm), or a task small enough to do yourself."
+description: "Use when a person asks to swarm, delegate or parallelize work without a plan ('swarm this', 'run a swarm on…', 'get a few agents on it'), or when a task in front of you splits into independent parts or is long enough to hand off: then propose a swarm in one line, workers and why, and open it only on a yes. Runs a task swarm on the board: this session orchestrates, N swarm-worker agents take the tasks posted to them, report, and take the next, for as long as the person keeps giving work, on call or under a protocol (build-verify: builders, then verifiers walking the running product, looped until it holds). Produces the run on the board and the workers' results and merges. Not for work an approved plan covers (execute-plan), a discussion of seats (brainswarm), or a task small enough to do yourself."
 ---
 
 # Swarm
 
-**You orchestrate; the workers do the work.** The `orchestrate` skill holds dispatch, briefs and
-how findings are weighed; the `swarm-board` skill holds the board, its orchestrator side in its
+**You orchestrate; the workers do the work.** The `orchestrate` skill holds the protocols, the
+setup interview, dispatch, briefs and how findings are weighed; the `swarm-board` skill holds the board, its orchestrator side in its
 `references/orchestrator.md`, read before opening. Here: what a task swarm adds. There is no
 plan and no slice document: **a task is a post on the board**, whatever the task is.
 
 ## Proposing one
 
-Not asked, but the work splits into parts that do not wait on each other, or is long enough to
-hand off: one line, **"This could run as a swarm: <n> workers, <the parts>. Open one?"** On a
-no, do it yourself and do not ask again for this work.
+Not asked, but the work splits into parts or must be seen working: offer it as the `next-step`
+skill says, the protocol filled in. On a no, do it yourself.
 
 ## Setting it up
 
-One message, each answered with your recommendation: **how many workers** (one per part that
-can run at once, 3 by default, at most 9); **the branch** their work merges into (a new
-`swarm/<topic>` off the current branch by default); **the workers' effort** (low by default); **verify** (off by default; on, a `verifier`
-pass on the merged work at the person's word, as the `orchestrate` skill dispatches it).
+**Through the `orchestrate` skill's setup interview**, each answer with your recommendation:
+
+1. **The protocol**: `on call` (workers take tasks as the person gives them, no phases) or
+   `build-verify` (recommended when the work must be seen working: builders, then verifiers on the
+   running product, looped), or the project's own `protocol-<name>`.
+2. **The run table**: how many workers (one per part that can run at once, 3 by default, at most
+   9), each one's area; under build-verify, the verifiers, their focus and source, the app owner.
+3. **The loop**, under a protocol with a cycle (build-verify: until ready, cap 5).
+4. **The effort**, low by default.
+5. **The branch** their work merges into, a new `swarm/<topic>` off the current branch by
+   default; then the protocol's own fields.
 
 ## Open and dispatch
 
 1. Create the branch, push it, and leave it checked out nowhere (detach the main checkout): a
    worker fast-forwards it from its own worktree.
-2. A seats file, one row per worker, `w1` … `w<n>`, titled `worker`; then `$S open --kind task
-   --group <topic> --title "<what the swarm is for>" --seats <file>`, and start your link as it
-   prints. Give the person the board's URL.
+2. A seats file, one row per worker, `w1` … `w<n>`, titled `worker`, and under build-verify one
+   per verifier, `v1` … `v<m>`, titled `verifier · <focus>`; then `$S open --kind task
+   --group <topic> --title "<what the swarm is for>" --seats <file>` with `--protocol <name>` when
+   it runs one, and start your link as it prints. Give the person the board's URL.
 3. **Every worker at once** on the plugin's `swarm-worker` agent (`subagent_type:
    "swarmstorm:swarm-worker"`), each with `isolation: "worktree"`, as the `orchestrate` skill
    dispatches. The brief holds no task:
 
    ```markdown
    You are worker `<wN>` of task swarm run `<run id>` on `<repository>`. Your worktree is based on `<branch>`; merge into `<branch>`. **Prepare**: `<the command, install included>`. Join now, then wait for the tasks posted to you.
+   ```
+
+   Under build-verify, every verifier at once too, on the plugin's `verifier` agent
+   (`subagent_type: "swarmstorm:verifier"`), no `isolation`:
+
+   ```markdown
+   You are verifier `<vN>` of task swarm run `<run id>` on `<repository>`, protocol build-verify, focus `<focus>`<, the app owner>. **Source**: <the `verify-<app>-<focus>` skill | instructed: each verify phase's message gives your steps>. Join now; each verify phase's message scopes your pass.
    ```
 
 ## Giving work
@@ -53,6 +67,13 @@ pass on the merged work at the person's word, as the `orchestrate` skill dispatc
 Read it; re-run its done-when yourself on the merged branch before you tell the person it is
 done. A finding is weighed as the `orchestrate` skill's *Findings* says. Tell the person, in a
 few lines, what landed.
+
+## Under build-verify
+
+The phases, the verify message, the judged table and the loop are the protocol's: the
+`orchestrate` skill's `references/protocols/build-verify/protocol.md`, read before the first
+phase. A task is posted as above; build 1 holds the work asked, every later build the judged
+table's rows that stand.
 
 ## Closing
 

@@ -29,11 +29,23 @@ Read the plan's *Mandate* section. Ask what it leaves open before the first phas
 
 **Two seats' agreements are theirs.** One that changes a decision the plan took becomes a row in the plan's decisions, as the `execute-plan` skill says.
 
-## The validator
+## Verification: the build-verify protocol
 
-**When the mandate's `verify:` is on**, it is dispatched once, at the run's open, with the first phase's seats, on the plugin's `verifier` agent (`subagent_type: "swarmstorm:verifier"`), which holds its rules: one board row, `validator`, its role from the *Mandate* verbatim, in a detached worktree. A building phase's text says its part is none. **Its phase is yours to announce**: `phase`, its text what to validate (the feature, the stories or screens to walk), and `@validator your turn: validate <branch> at <sha>`; no other seat works in it. One that ended (its context spent) is replaced by a fresh one in the same row. When it asks for a seat, dispatch one into a fix slice (`slice add`). Its findings are weighed as the `orchestrate` skill's *Findings* says. **Its verdict decides the next cut**: the next phase as planned, amended, a fix phase, or a pause when a finding breaks a decision. Write what changed into the plan before cutting.
+**When the mandate's `verify:` is on, the plan runs the `orchestrate` skill's build-verify
+protocol** (`references/protocols/build-verify/protocol.md`, read before the run opens; the run
+opened with `--protocol build-verify`): the plan's phases are its builds, its seats its builders,
+the validator its verifier `v1` (one per focus when the mandate names several), dispatched once,
+at the run's open, with the first phase's seats, on the plugin's `verifier` agent, one board row
+each, dormant until a verify phase. **A verify phase is yours to open** after each phase or at the
+end, as `verify:` says, its message the protocol's. **The verifiers' tables are judged** as the
+`orchestrate` skill's `references/findings.md` says, and **the judged table decides the next
+cut**: the next phase as planned, amended, a fix phase of the rows that stand, or a pause when a
+finding breaks a decision. Write what changed into the plan before cutting. The mandate's `loop:`
+bounds the fix phases a verify may add beyond the plan's own.
 
-No `verify-<app>-<focus>` skill and the person wants one: the `verification-skill-create` skill runs before the first phase.
+A verifier that ended (its context spent) is replaced by a fresh one in the same row. No
+`verify-<app>-<focus>` skill and the person wants one: the `verification-skill-create` skill runs
+before the first phase; else the verifier is `instructed`, its steps in each verify message.
 
 ## Branch and pull request
 

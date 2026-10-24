@@ -1,20 +1,66 @@
 ---
 name: orchestrate
-description: "Use when an agent orchestrates other agents on a piece of work, of any kind (a plan, a task swarm, a brainswarm): settling the charter, dispatching each member with its brief and role, watching them and steering a drift. Not for the duties one kind adds (orchestrate-plan for a plan, swarm for a task swarm, brainswarm for a seat swarm), and not for the board they talk on (swarm-board)."
+description: "Use when an agent orchestrates other agents on a piece of work, of any kind (a plan, a task swarm, a brainswarm): choosing the run's protocol (build-verify, brainstorm, debate, editorial, a project's own), settling the charter with the person, dispatching each member with its brief and role, watching them, judging their findings and steering a drift. Not for the duties one kind adds (orchestrate-plan for a plan, swarm for a task swarm, brainswarm for a seat swarm), and not for the board they talk on (swarm-board)."
 ---
 
 # Orchestrate
 
 **This session holds the kind's document, its charter, the briefs and the decisions; members do the work.** A member never edits the kind's document or its charter.
 
-## The charter
+## The protocol
 
-Every kind has a charter in its own document, approved in chat. Read `references/charter.md` before the first question of a charter; the kind's skill names its fields.
+**A protocol is how a run's members work together**: its seats, its phases, what each may do in
+each, the phases that repeat and the goal that ends them. It is chosen before the charter, and
+the kind's skill runs it.
+
+| Protocol | When | Kinds | File |
+|---|---|---|---|
+| build-verify | code changed, then judged in the running product, until it holds | task swarm, plan | `references/protocols/build-verify/protocol.md` |
+| brainstorm | options, many and varied, before choosing | brainswarm | `references/protocols/brainstorm/protocol.md` |
+| debate | known questions to decide, with sources | brainswarm | `references/protocols/debate/protocol.md` |
+| editorial | a text for a given reader: a letter, a proposal, a README | brainswarm | `references/protocols/editorial/protocol.md` |
+
+- **The project's own come first**: its `protocol-<name>` skills in its local skills folder
+  (`.claude/skills/` when it has no other), and its older `brainswarm-<name>` skills, read the
+  same way; each a protocol, or a template over one above. Read the one that fits before the
+  charter.
+- **Recommend from what the person wants done**: the protocol that fits, its template when one
+  matches, with the reason; none fits: a **custom protocol** built on the closest one, its
+  phases written into the charter. A task swarm with no protocol is workers on call, taking
+  tasks as they come.
+- **Read the protocol's `protocol.md` before the charter**; a protocol's other files are read
+  where it says.
+- **A setup worth running again is kept** as the project's `protocol-<name>` skill, on the
+  person's yes: read `references/protocols/new-protocol.md` first.
+
+## The setup interview
+
+**The person settles the run before the first dispatch, through the `interview` skill**, one
+question at a time, each proposed with your recommendation and its reason, in this order:
+
+1. **The protocol**, as above.
+2. **The run, as one table**: each phase, who acts in it, every seat's role and area, the special
+   seats (a verifier, a skeptic). The person adjusts phases, seats and roles; the table is shown
+   again after each change.
+3. **The loop**, when the protocol has a cycle (its file names the phases that repeat and the
+   goal it proposes): **until the goal**, with a cap (recommended where the protocol has a goal);
+   **N iterations**, then the report; or **unbounded**, until the person stops it. Written
+   `loop: until ready · cap 5`, `loop: 3`, `loop: unbounded`.
+4. **The members' effort**, `low` recommended.
+5. **The protocol's own fields**, then the kind's.
+
+The answers are the charter. Read `references/charter.md` before the first question; the kind's
+skill says where the charter is written.
+
+**A loop runs as its charter says**: each repeated phase's message names its iteration (`verify
+3 of 5`); the judged findings table ends on the goal's state; the goal met closes the loop; at
+the cap without it, pause and give the person the choice: one more iteration, a raised cap, or
+the close. Never an iteration the charter did not grant.
 
 ## Dispatch
 
 - **One member per unit of work**, on a subagent definition carrying the charter's model and effort; the dispatch passes its model, and its effort where the `Agent` tool takes one; otherwise effort is carried by the subagent definition the dispatch names (`effort:` in its frontmatter). A dispatch naming neither inherits the session's level. **When no subagent definition carries the charter's model and effort, say so to the person before dispatching**, naming the nearest one; never dispatch on another level silently.
-- **The member's agent follows its kind, never `general-purpose`**: a plan's slice on the plugin's `plan-worker`, a task swarm's worker on `swarm-worker`, a brainswarm seat on `brainswarm-seat`, any verification pass (a validator seat, one pass, the proof of a new verify skill) on `verifier` (`subagent_type: "swarmstorm:<agent>"`). It holds the rules every brief of that kind would otherwise have to repeat.
+- **The member's agent follows its seat, never `general-purpose`**: a plan's slice on the plugin's `plan-worker`, a task swarm's worker on `swarm-worker`, a brainswarm seat on `brainswarm-seat`, any verification (a verifier seat, one pass, the proof of a new verify skill) on `verifier` (`subagent_type: "swarmstorm:<agent>"`). It holds the rules every brief of that kind would otherwise have to repeat.
 - **The brief is the only thing sent.** Read `references/brief.md` before the first dispatch.
 - **Check blockers before every dispatch.**
 - **Every ready member's `Agent` call goes in one message**, each in the background, nothing between them.
@@ -34,7 +80,7 @@ The completion notification ends a member; it does not tell you the work is heal
 
 ## Findings
 
-**Weigh every finding a member returns before anything acts on it** (a verifier's, a reviewer's, a worker's): you know the document, its decisions and the inputs, which the member may not. **Findings travel as a table in a message, never in a document**: on a board, the member's post to you; in a dispatch, its return. **Your answer is the same table, two columns added**, `judgement` (stands, weight changed, a question for the person, not a fault) and `reason`: on a board your next post, in reply, before anything is dispatched; with no board, in the brief of the next member and of the one that looks again, and to the person in chat. Only the rows that stand reach a fix; the member that found them looks again only at those.
+**Weigh every finding a member returns before anything acts on it** (a verifier's, a reviewer's, a worker's): you know the document, its decisions and the inputs, which the member may not. **Findings travel as one table, and your answer is the same table judged**, posted before anything is dispatched; only the rows that stand reach a fix. The table, its ids and the judged columns: `references/findings.md`, read before judging the first one.
 
 ## A member that stops on a finding
 

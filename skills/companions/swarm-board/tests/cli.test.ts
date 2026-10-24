@@ -207,7 +207,7 @@ test("status --json lists each open run with its kind; the text names the kind (
   assert.equal(s.runs, 1);
   const nick = s.open[0]?.members[0]?.nick as string;
   assert.match(nick, /^[A-Z][a-z]+ [A-Z][a-z]+$/, "the orchestrator's funny name, given at open (D17)");
-  assert.deepEqual(s.open, [{ run: id, kind: "plan", group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null, state: "quiet", activity: null, progressAt: s.open[0].members[0].progressAt, aliveAt: null }], lastActivity: s.open[0].lastActivity, forgotten: false }]);
+  assert.deepEqual(s.open, [{ run: id, kind: "plan", protocol: null, group: "review-tool", title: "A plan", phase: null, progress: null, members: [{ name: "review-tool/orchestrator", nick, worktree: null, state: "quiet", activity: null, progressAt: s.open[0].members[0].progressAt, aliveAt: null }], lastActivity: s.open[0].lastActivity, forgotten: false }]);
   assert.match(run("status").stdout, new RegExp(`run ${id}  plan  review-tool  A plan`));
 });
 
@@ -1088,4 +1088,28 @@ test("post --file posts a long body read from a file, guillemets, tables and quo
   assert.equal(r.status, 0, r.stderr);
   const read = run("read", seqOf(r.stdout));
   assert.ok(read.stdout.includes(body), read.stdout);
+});
+
+test("open --protocol names the run's protocol: status and the board snapshot carry it, null without; a bad name is refused", async () => {
+  const slices = path.join(toolRoot, "p.json");
+  fs.writeFileSync(slices, SLICES);
+  const r = run("open", "--kind", "task", "--group", "tt", "--title", "T", "--seats", slices, "--protocol", "build-verify", "--json");
+  assert.equal(r.status, 0, r.stderr);
+  const id = JSON.parse(r.stdout).run as number;
+  const plain = openRun("other");
+  const s = JSON.parse(run("status", "--json").stdout) as { open: { run: number; protocol: string | null }[] };
+  assert.equal(s.open.find((o) => o.run === id)?.protocol, "build-verify");
+  assert.equal(s.open.find((o) => o.run === plain)?.protocol, null);
+  const board = await openBoard(path.join(toolRoot, "swarm.sqlite"));
+  try {
+    const opened = board.runs().find((x) => x.id === id)!;
+    assert.equal(opened.protocol, "build-verify");
+    const summary = board.snapshot(opened.repo).runs.find((x) => x.run === id);
+    assert.equal(summary?.protocol, "build-verify");
+  } finally {
+    board.close();
+  }
+  const bad = run("open", "--kind", "task", "--group", "tt2", "--title", "T", "--seats", slices, "--protocol", "Build Verify");
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /--protocol takes a name in lower case, digits and dashes/);
 });

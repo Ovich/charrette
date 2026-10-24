@@ -20,10 +20,12 @@ message, each proposed from the work with its reason:
   is in only on a yes.
 - **`seats:`** the number of seats working at once, proposed as the widest phase: **4** for a
   normal plan, 2–3 small, 5–6 large; 1 when the work is strictly sequential.
-- **`verify:`** `after each phase`, `at the end`, or `off`. Look for a `verify-<app>-<focus>`
+- **`verify:`** `after each phase`, `at the end`, or `off`; on, the plan runs the `orchestrate`
+  skill's build-verify protocol, and **`loop:`** is asked with it: how many fix phases a verify may
+  add beyond the plan's own (`until ready · cap 3` recommended). Look for a `verify-<app>-<focus>`
   skill in the project's local skill folder; several: ask which one each validation phase runs.
-  None: offer to create it (yes runs `verification-skill-create` before the first phase); no is
-  `verify: off`. On, a validator seat runs it alone in its own phases, scoped by you to what the
+  None: offer to create it (yes runs `verification-skill-create` before the first phase), or an
+  `instructed` verifier whose steps you write in each verify message; no is `verify: off`. On, a validator seat runs it alone in its own phases, scoped by you to what the
   phases before merged. What the person adds to watch is written into the *Mandate* in their
   words. Any other special seat (a reviewer of every merge) is asked the same way.
 

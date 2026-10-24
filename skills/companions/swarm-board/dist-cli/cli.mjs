@@ -1542,6 +1542,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
   upkeep("runs", "paused", "paused TEXT");
   upkeep("runs", "resumed_at", "resumed_at TEXT");
   upkeep("runs", "stall_ms", `stall_ms INTEGER NOT NULL DEFAULT ${STALL_MS_DEFAULT}`);
+  upkeep("runs", "protocol", "protocol TEXT");
   upkeep("runs", "stall_posts", "stall_posts INTEGER NOT NULL DEFAULT 0");
   db.exec("CREATE INDEX IF NOT EXISTS messages_channel ON messages (repo, run, seq)");
   const claimKey = db.prepare("PRAGMA table_info(claims)").all().find((c) => c.name === "participant");
@@ -1604,6 +1605,7 @@ async function openBoard(dbPath = SQLITE_PATH) {
   const toRun = (r) => ({
     phase: phaseOf(r),
     paused: r.paused == null ? null : String(r.paused),
+    protocol: r.protocol == null ? null : String(r.protocol),
     id: Number(r.id),
     repo: String(r.repo),
     kind: profileOf(String(r.kind ?? "plan")).kind,
@@ -1778,7 +1780,8 @@ async function openBoard(dbPath = SQLITE_PATH) {
       of: count("SELECT COUNT(*) AS n FROM slices WHERE run = ?"),
       phase: phaseOf(r),
       progress: progressOf(id, r.phase == null ? null : String(r.phase)),
-      stallMs: Number(r.stall_ms ?? STALL_MS_DEFAULT)
+      stallMs: Number(r.stall_ms ?? STALL_MS_DEFAULT),
+      protocol: r.protocol == null ? null : String(r.protocol)
     };
   };
   const repoName = (repo) => {
@@ -1897,11 +1900,12 @@ async function openBoard(dbPath = SQLITE_PATH) {
     db.prepare("INSERT OR REPLACE INTO run_stats (run, repo, kind, closed_at, body) VALUES (?, ?, ?, ?, ?)").run(run2, String(r.repo), body.kind, String(r.closed_at), JSON.stringify(body));
   };
   const board2 = {
-    openRun({ repo, kind = "plan", group, title, link, seats, transcript, stallMs }) {
+    openRun({ repo, kind = "plan", group, title, link, seats, transcript, stallMs, protocol }) {
       const profile = profileOf(kind);
+      if (protocol != null && !PROTOCOL_NAME.test(protocol)) throw new Error(`a protocol is named in lower case, digits and dashes (build-verify), got ${protocol}`);
       if (stallMs !== void 0 && !(Number.isInteger(stallMs) && stallMs > 0)) throw new Error(`the stall threshold takes a positive whole number of ms, got ${stallMs}`);
       const id = transaction(() => {
-        const r = db.prepare("INSERT INTO runs (repo, kind, plan, title, link, opened_at, stall_ms) VALUES (?, ?, ?, ?, ?, ?, ?)").run(repo, profile.kind, group, title, link ?? null, now(), stallMs ?? STALL_MS_DEFAULT);
+        const r = db.prepare("INSERT INTO runs (repo, kind, plan, title, link, opened_at, stall_ms, protocol) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(repo, profile.kind, group, title, link ?? null, now(), stallMs ?? STALL_MS_DEFAULT, protocol ?? null);
         const run2 = Number(r.lastInsertRowid);
         seats.forEach((s, i) => insertSlice(run2, s, i));
         const orchestrator = db.prepare("INSERT INTO participants (run, slice, since_seq, joined_at, subs, nick) VALUES (?, ?, ?, ?, ?, ?)").run(
@@ -2665,7 +2669,7 @@ the merge lock is free: ${waiters.map((n) => `@${n}`).join(" ")}`, null, "event"
   };
   return board2;
 }
-var progressText, goneSuffix, PHASE_NAME, SLICE_STATES, TO_AUTHOR, ORCHESTRATOR2, WAIT_POLL_MS, LINE_WIDTH, STALE_MS, WAIT_LOG_EVERY_MS, UPKEEP_EVERY_MS, LAST_UPKEEP, RECORDS_SINCE2, SHARES_SINCE2, RETENTION_DEFAULT_DAYS, DAY_MS2, EVENTS_SHOWN, CASELESS2;
+var progressText, goneSuffix, PROTOCOL_NAME, PHASE_NAME, SLICE_STATES, TO_AUTHOR, ORCHESTRATOR2, WAIT_POLL_MS, LINE_WIDTH, STALE_MS, WAIT_LOG_EVERY_MS, UPKEEP_EVERY_MS, LAST_UPKEEP, RECORDS_SINCE2, SHARES_SINCE2, RETENTION_DEFAULT_DAYS, DAY_MS2, EVENTS_SHOWN, CASELESS2;
 var init_board = __esm({
   "src/board/board.ts"() {
     "use strict";
@@ -2679,6 +2683,7 @@ var init_board = __esm({
     init_liveness();
     progressText = (p) => `${p.done}/${p.of} done${p.gone.length ? `, ${p.gone.length} gone` : ""}`;
     goneSuffix = (gone) => gone.length ? ` (${gone.length} gone: ${gone.join(", ")})` : "";
+    PROTOCOL_NAME = /^[a-z0-9][a-z0-9-]*$/;
     PHASE_NAME = /^[\w.-]+$/;
     SLICE_STATES = /* @__PURE__ */ new Set(["ready", "running", "done", "blocked"]);
     TO_AUTHOR = Object.values(EVENTS).filter((e) => e.toAuthor).map((e) => `'${e.name}'`).join(", ");
@@ -7672,7 +7677,7 @@ var asJson = args.has("--json");
 var FORGOTTEN_MS = 24 * 60 * 60 * 1e3;
 var USAGE = [
   "usage: swarm <verb> [--json]        (swarm --help code: the claim and merge verbs)",
-  "  open    --kind plan|brainstorm|task --group <slug> --title <t> --seats <file.json> [--link <url>] [--stall-ms <ms>]   # opens a run, registers the project's board in aiview, prints the run id, the board's URL, then the line that starts your link (orchestrator)",
+  "  open    --kind plan|brainstorm|task --group <slug> --title <t> --seats <file.json> [--link <url>] [--stall-ms <ms>] [--protocol <name>]   # opens a run, registers the project's board in aiview, prints the run id, the board's URL, then the line that starts your link (orchestrator)",
   "          # --stall-ms: no counter moved this long posts stalled, default 60000; ends on the command that starts your link",
   "          # --plan <slug> --slices <file.json>: the same as --kind plan --group <slug> --seats <file.json>",
   '          # the seats file: [{"id", "title", "role"?, "blockers": [...], "link"?: "<URL>", "on"?: ["agreement", \u2026]}]',
@@ -8021,6 +8026,8 @@ ${USAGE}`);
       const stallMs = rawStall === void 0 ? void 0 : Number(rawStall);
       if (stallMs !== void 0 && !(Number.isInteger(stallMs) && stallMs > 0)) fail(`--stall-ms takes a positive whole number of ms, got ${rawStall}`);
       refuseTranscriptFlag("open");
+      const protocol = args.flag("--protocol");
+      if (protocol !== void 0 && !/^[a-z0-9][a-z0-9-]*$/.test(protocol)) fail(`--protocol takes a name in lower case, digits and dashes (build-verify), got ${protocol}`);
       const run2 = await board.openRun({
         repo: repoOf(process.cwd()),
         kind,
@@ -8028,7 +8035,8 @@ ${USAGE}`);
         title: need("--title"),
         link: args.flag("--link") ?? null,
         seats: readSlices(seatsFile),
-        ...stallMs !== void 0 ? { stallMs } : {}
+        ...stallMs !== void 0 ? { stallMs } : {},
+        ...protocol !== void 0 ? { protocol } : {}
       });
       const link = startLinkLine({ name: `${run2.group}/orchestrator`, run: run2.id });
       const doc = registerBoard({ toolRoot: toolRoot(), cwd: process.cwd(), repo: run2.repo });
@@ -8410,7 +8418,7 @@ ${rearm}` : rearm;
         runs.map(async (r) => {
           const lastActivity = await board.lastActivity(r.id);
           const idleMs = Date.now() - Date.parse(lastActivity);
-          return { run: r.id, kind: r.kind, group: r.plan, title: r.title, phase: r.phase, progress: await board.phaseProgress(r.id), members: await membersOf(r), lastActivity, forgotten: idleMs >= FORGOTTEN_MS, idleMs };
+          return { run: r.id, kind: r.kind, protocol: r.protocol ?? null, group: r.plan, title: r.title, phase: r.phase, progress: await board.phaseProgress(r.id), members: await membersOf(r), lastActivity, forgotten: idleMs >= FORGOTTEN_MS, idleMs };
         })
       );
       emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, runs: runs.length, open: open.map(({ idleMs: _, ...o }) => o) }, () => {

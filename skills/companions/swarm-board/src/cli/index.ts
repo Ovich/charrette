@@ -24,7 +24,7 @@ const FORGOTTEN_MS = 24 * 60 * 60 * 1000;
 
 const USAGE = [
   "usage: swarm <verb> [--json]        (swarm --help code: the claim and merge verbs)",
-  "  open    --kind plan|brainstorm|task --group <slug> --title <t> --seats <file.json> [--link <url>] [--stall-ms <ms>]   # opens a run, registers the project's board in aiview, prints the run id, the board's URL, then the line that starts your link (orchestrator)",
+  "  open    --kind plan|brainstorm|task --group <slug> --title <t> --seats <file.json> [--link <url>] [--stall-ms <ms>] [--protocol <name>]   # opens a run, registers the project's board in aiview, prints the run id, the board's URL, then the line that starts your link (orchestrator)",
   "          # --stall-ms: no counter moved this long posts stalled, default 60000; ends on the command that starts your link",
   "          # --plan <slug> --slices <file.json>: the same as --kind plan --group <slug> --seats <file.json>",
   '          # the seats file: [{"id", "title", "role"?, "blockers": [...], "link"?: "<URL>", "on"?: ["agreement", …]}]',
@@ -487,6 +487,8 @@ async function main(): Promise<void> {
       const stallMs = rawStall === undefined ? undefined : Number(rawStall);
       if (stallMs !== undefined && !(Number.isInteger(stallMs) && stallMs > 0)) fail(`--stall-ms takes a positive whole number of ms, got ${rawStall}`);
       refuseTranscriptFlag("open");
+      const protocol = args.flag("--protocol");
+      if (protocol !== undefined && !/^[a-z0-9][a-z0-9-]*$/.test(protocol)) fail(`--protocol takes a name in lower case, digits and dashes (build-verify), got ${protocol}`);
       const run = await board.openRun({
         repo: repoOf(process.cwd()),
         kind,
@@ -495,6 +497,7 @@ async function main(): Promise<void> {
         link: args.flag("--link") ?? null,
         seats: readSlices(seatsFile),
         ...(stallMs !== undefined ? { stallMs } : {}),
+        ...(protocol !== undefined ? { protocol } : {}),
       });
       // the orchestrator's link, from now on how its verbs reach the board (D29), started by its agent (D32)
       const link = startLinkLine({ name: `${run.group}/orchestrator`, run: run.id });
@@ -930,7 +933,7 @@ ${rearm}` : rearm;
           const lastActivity = await board.lastActivity(r.id);
           // a run with no activity for a day is likely forgotten: its orchestrator ended without close
           const idleMs = Date.now() - Date.parse(lastActivity);
-          return { run: r.id, kind: r.kind, group: r.plan, title: r.title, phase: r.phase, progress: await board.phaseProgress(r.id), members: await membersOf(r), lastActivity, forgotten: idleMs >= FORGOTTEN_MS, idleMs };
+          return { run: r.id, kind: r.kind, protocol: r.protocol ?? null, group: r.plan, title: r.title, phase: r.phase, progress: await board.phaseProgress(r.id), members: await membersOf(r), lastActivity, forgotten: idleMs >= FORGOTTEN_MS, idleMs };
         }),
       );
       emit({ home: DATA_ROOT, sqlite: SQLITE_PATH, runs: runs.length, open: open.map(({ idleMs: _, ...o }) => o) }, () => {

@@ -54,6 +54,9 @@ export type Presence = (member: string) => { connected: boolean; lostAt: number 
  *  read while the link is up (ms epoch; null: never linked). */
 export type Liveness = Omit<MemberState, "member"> & { tokens: number | null; movedAt: string | null; progressAt: number | null; aliveAt: number | null };
 
+/** A protocol's name: lower case, digits and dashes. */
+export const PROTOCOL_NAME = /^[a-z0-9][a-z0-9-]*$/;
+
 export interface Run {
   id: RunId;
   repo: string;
@@ -69,6 +72,8 @@ export interface Run {
   phase: Phase | null;
   /** Set by `pause`, the orchestrator's reason ("" when it gave none); null when the run is not paused. */
   paused: string | null;
+  /** The protocol the run follows, null when it names none. */
+  protocol: string | null;
 }
 
 export interface Participant {
@@ -152,6 +157,8 @@ export type RunSummary = {
   progress?: PhaseProgress | null;
   /** The run's stall threshold: no token counter moved this long posts `stalled`. */
   stallMs?: number;
+  /** The protocol the run follows (build-verify, debate…), null when it names none; absent from a reader before it. */
+  protocol?: string | null;
 };
 export type RepoSummary = { repo: string; name: string; runs: RunSummary[] };
 export type RunnerState = "working" | "waiting" | "merging" | "watching" | "ended" | "done";
@@ -229,7 +236,7 @@ export type BoardSnapshot = {
 export interface Board {
   /** `kind` defaults to plan; throws on an unknown kind. The group is stored as the plan (D44). */
   /** `transcript`: the orchestrator's, registered at once; none posts a liveness warning. `stallMs`: the run's stall threshold, default 60000. */
-  openRun(input: { repo: string; kind?: Kind; group: string; title: string; link?: string | null; seats: SeatSpec[]; transcript?: string | null; stallMs?: number }): Run;
+  openRun(input: { repo: string; kind?: Kind; group: string; title: string; link?: string | null; seats: SeatSpec[]; transcript?: string | null; stallMs?: number; protocol?: string | null }): Run;
   /** `done` also releases the slice runner's claims and lock: the orchestrator's way to free a stale runner. */
   setSliceState(run: RunId, slice: string, state: SliceState): void;
   /** A seat added mid-run (D60): after the last, `ready`; refused on an id already in the run, an
@@ -660,6 +667,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   upkeep("runs", "resumed_at", "resumed_at TEXT");
   // the run's stall threshold, and the stalled events posted since a counter last moved
   upkeep("runs", "stall_ms", `stall_ms INTEGER NOT NULL DEFAULT ${STALL_MS_DEFAULT}`);
+  upkeep("runs", "protocol", "protocol TEXT");
   upkeep("runs", "stall_posts", "stall_posts INTEGER NOT NULL DEFAULT 0");
   db.exec("CREATE INDEX IF NOT EXISTS messages_channel ON messages (repo, run, seq)");
   // a store from before D40 keys a claim by path alone: rebuild it keyed by holder too
@@ -736,6 +744,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   const toRun = (r: Row): Run => ({
     phase: phaseOf(r),
     paused: r.paused == null ? null : String(r.paused),
+    protocol: r.protocol == null ? null : String(r.protocol),
     id: Number(r.id),
     repo: String(r.repo),
     kind: profileOf(String(r.kind ?? "plan")).kind,
@@ -991,6 +1000,7 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
       phase: phaseOf(r),
       progress: progressOf(id, r.phase == null ? null : String(r.phase)),
       stallMs: Number(r.stall_ms ?? STALL_MS_DEFAULT),
+      protocol: r.protocol == null ? null : String(r.protocol),
     };
   };
   /** A repository is its common git dir; it is shown by its checkout's folder name. */
@@ -1145,14 +1155,15 @@ export async function openBoard(dbPath: string = SQLITE_PATH): Promise<Board> {
   };
 
   const board: Board = {
-    openRun({ repo, kind = "plan", group, title, link, seats, transcript, stallMs }) {
+    openRun({ repo, kind = "plan", group, title, link, seats, transcript, stallMs, protocol }) {
       const profile = profileOf(kind);
+      if (protocol != null && !PROTOCOL_NAME.test(protocol)) throw new Error(`a protocol is named in lower case, digits and dashes (build-verify), got ${protocol}`);
       if (stallMs !== undefined && !(Number.isInteger(stallMs) && stallMs > 0)) throw new Error(`the stall threshold takes a positive whole number of ms, got ${stallMs}`);
       const id = transaction(() => {
         // the group is stored as the plan (D44)
         const r = db
-          .prepare("INSERT INTO runs (repo, kind, plan, title, link, opened_at, stall_ms) VALUES (?, ?, ?, ?, ?, ?, ?)")
-          .run(repo, profile.kind, group, title, link ?? null, now(), stallMs ?? STALL_MS_DEFAULT);
+          .prepare("INSERT INTO runs (repo, kind, plan, title, link, opened_at, stall_ms, protocol) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+          .run(repo, profile.kind, group, title, link ?? null, now(), stallMs ?? STALL_MS_DEFAULT, protocol ?? null);
         const run = Number(r.lastInsertRowid);
         seats.forEach((s, i) => insertSlice(run, s, i));
         // a funny name as a member gets at join (plan D17)

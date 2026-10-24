@@ -11,8 +11,8 @@ other seats under the protocol your brief names. `$S` is the tool, as `SKILL.md`
 repository, no claim, no merge. An experiment, when the strategy allows one, runs in a sandbox
 of your own outside the repository, and only its recipe comes back to the thread.
 
-**A brief naming a `brainswarm` protocol**: that protocol's file (the `brainswarm` skill's
-`references/<protocol>/protocol.md`, or a project protocol's file at the path your brief gives;
+**A brief naming a `brainswarm` protocol**: that protocol's file (the `orchestrate` skill's
+`references/protocols/<protocol>/protocol.md`, or a project protocol's file at the path your brief gives;
 a custom protocol's phases are in your brief) sets your moves per phase and the order of your first steps, over
 the checklist below. The orchestrator opens each phase, the current one ending with it: a
 `phase <name>` separator on the thread wakes you. **What you read starts with the run's current phase**, `phase <name>:
