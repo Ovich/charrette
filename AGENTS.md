@@ -63,4 +63,4 @@ file the person was looking for. Refresh the cache with
 
 ## Documents
 
-7. **MUST NOT commit a board, spec, plan, mockup or report to this repository.** They are working material and go to the data home through `aiview path`; a document in the tree gets reviewed, goes stale and outlives its use. The README and `RELEASING.md` are deliverables and belong here.
+7. **MUST NOT commit a board, spec, plan, prototype or report to this repository.** They are working material and go to the data home through `aiview path`; a document in the tree gets reviewed, goes stale and outlives its use. The README and `RELEASING.md` are deliverables and belong here.
