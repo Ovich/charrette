@@ -1,6 +1,6 @@
 ---
 name: next-step
-description: "Use at every point of a conversation where one of this collection's skills would serve the person better than going on as is, and they have not named it: an idea still vague or choices left open (offer the interview), decisions worth keeping (a brainstorm board), agreement on something to build (a plan, or a swarm with its protocol filled in), a question to decide or a text to write from several viewpoints (a brainswarm), a run that just closed (its follow-up). Produces one offer in one line; never runs the skill unasked. Not for a new person's first steps or a tour of the collection (getting-started). Not for running any of those skills."
+description: "Use at every point of a conversation where one of this collection's skills would serve the person better than going on as is, and they have not named it: an idea still vague or choices left open (offer the interview), decisions worth keeping (a brainstorm board), agreement on something to build (a plan, or a swarm with its protocol filled in), a question to decide or a text to write from several viewpoints (a brainswarm), a run that just closed (its follow-up). Produces one offer in one line; never runs the skill unasked. Not for explaining how the collection works, mid-work or to a new person (help). Not for running any of those skills."
 ---
 
 # Next step
