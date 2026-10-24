@@ -65,13 +65,27 @@ export function DocumentsPanel({
     }
   };
   const chosen = f.kinds.size + f.tags.size;
+  // at ≤860 an open document comes first: the list folds to one line above it until asked for
+  const [narrowListOpen, setNarrowListOpen] = useState(false);
+  const foldOnNarrow = currentId !== null && !narrowListOpen ? "max-[860px]:hidden" : "";
   return (
     <section
       data-component="DocumentsPanel"
       aria-label="Documents"
-      className="sticky top-12 flex h-[calc(100vh-48px)] w-[300px] shrink-0 flex-col border-r border-border bg-surface max-md:static max-md:h-auto max-md:max-h-[50vh] max-md:w-full max-md:border-b max-md:border-r-0"
+      className="sticky top-12 flex h-[calc(100vh-48px)] w-[300px] shrink-0 flex-col border-r border-border bg-surface max-[860px]:static max-[860px]:h-auto max-[860px]:max-h-[50vh] max-[860px]:w-full max-[860px]:border-b max-[860px]:border-r-0"
     >
-      <div className="px-3 pb-2.5 pt-3">
+      {currentId !== null && (
+        <button
+          type="button"
+          data-component="DocumentsFold"
+          aria-expanded={narrowListOpen}
+          onClick={() => setNarrowListOpen((o) => !o)}
+          className="hidden h-9 w-full cursor-pointer items-center gap-1.5 px-3 text-left text-[13px] text-muted-foreground hover:bg-surface-2 max-[860px]:flex"
+        >
+          <span className="font-medium text-foreground">Documents</span> · {listed.length} · <span className="text-accent">{narrowListOpen ? "hide" : "show"}</span>
+        </button>
+      )}
+      <div className={cn("px-3 pb-2.5 pt-3", foldOnNarrow)}>
         <div className="flex items-center gap-1.5">
           <div className="relative min-w-0 flex-1">
             <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -122,7 +136,7 @@ export function DocumentsPanel({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto border-t border-border px-2 py-2" data-component="DocList">
+      <div className={cn("flex-1 overflow-y-auto border-t border-border px-2 py-2", foldOnNarrow)} data-component="DocList">
         {listed.length === 0 && (
           <div className="px-2 py-3 text-[12px] text-muted-foreground">
             {docs.length === 0 ? (

@@ -258,7 +258,9 @@ function cmdPath(): void {
     process.exit(1);
   }
   const index = openIndex();
-  const slug = args.flag("--project") ?? index.activeProject();
+  // the project the cwd is in wins over the active one, as status computes it
+  const cwdProject = projectForCwd(process.cwd(), index.allProjects())?.slug ?? null;
+  const slug = args.flag("--project") ?? cwdProject ?? index.activeProject();
   const known = index.allProjects().map((p) => p.slug);
   index.close();
   if (slug === ALL_PROJECTS) {
@@ -919,6 +921,7 @@ function cmdPlan(): void {
   );
 }
 
+async function runVerb(): Promise<void> {
 switch (args.verb) {
   case "pending":
     cmdPending();
@@ -983,6 +986,16 @@ switch (args.verb) {
   default:
     console.error(USAGE);
     process.exit(1);
+}
+}
+
+// a verb's thrown error is a user's: one line, exit 1; AIVIEW_DEBUG=1 shows the stack
+try {
+  await runVerb();
+} catch (err) {
+  if (process.env.AIVIEW_DEBUG === "1") throw err;
+  console.error(`aiview ${args.verb}: ${err instanceof Error ? err.message : String(err)}`);
+  process.exit(1);
 }
 
 // One notification per invocation, after the work is done: any open tab reloads its

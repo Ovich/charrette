@@ -322,7 +322,7 @@ export function App() {
             pickProject(slug);
           }}
         />
-        <div className="flex min-w-0 flex-1 max-md:flex-col">
+        <div className="flex min-w-0 flex-1 max-[860px]:flex-col">
         {!onBoard && documentsShown && <DocumentsPanel docs={docs} groups={groups} activeProject={activeProject} currentId={currentId} onOpen={open} />}
         <main
           className={

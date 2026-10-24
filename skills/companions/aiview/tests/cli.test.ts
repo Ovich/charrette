@@ -532,6 +532,31 @@ test("path: the tool joins the location, so no caller ever builds one", () => {
   assert.equal(JSON.parse(run("status", "--json").stdout).project, "CIIP");
 });
 
+test("path: the project the cwd is in wins over the active one", () => {
+  const ciipRepo = path.join(toolRoot, "repos", "ciip");
+  fs.mkdirSync(path.join(ciipRepo, "sub"), { recursive: true });
+  run("project", "add", "CIIP", "--path", ciipRepo);
+  run("project", "add", "JOBS");
+  run("use", "JOBS");
+  const inCiip = spawnSync(process.execPath, [CLI, "path", "x.spec.md", "--json"], {
+    encoding: "utf8",
+    cwd: path.join(ciipRepo, "sub"),
+    env: { ...process.env, AIVIEW_ROOT: toolRoot, SWARMSTORM_HOME: toolRoot },
+  });
+  assert.equal(inCiip.status, 0, inCiip.stderr);
+  assert.equal(JSON.parse(inCiip.stdout).project, "CIIP");
+  // outside any project's path, the active one
+  assert.equal(JSON.parse(run("path", "x.spec.md", "--json").stdout).project, "JOBS");
+});
+
+test("a verb's user error is one line, no stack", () => {
+  for (const r of [run("open", path.join(toolRoot, "missing.md")), run("add", write("plain.md", "# T\n"))]) {
+    assert.equal(r.status, 1);
+    assert.equal(r.stderr.trim().split(/\r?\n/).length, 1, r.stderr);
+    assert.doesNotMatch(r.stderr, /\n\s+at /);
+  }
+});
+
 test("path refuses when there is nothing to resolve against", () => {
   const noActive = run("path", "x.spec.md");
   assert.notEqual(noActive.status, 0);

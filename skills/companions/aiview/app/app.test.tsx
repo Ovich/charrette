@@ -219,6 +219,21 @@ describe("tag chips", () => {
     expect(recentTags(docs)).toEqual(["jobs", "new", "shared", "JOBS", "old"]);
   });
 
+  test("with a document open, the list folds on a narrow screen behind one line (v1-F6)", () => {
+    const docs = [doc({ id: 1, updated_at: at(1) }), doc({ id: 2, updated_at: at(2) })];
+    render(<DocumentsPage docs={docs} groups={{}} activeProject="JOBS" currentId={1} onOpen={() => {}} />);
+    const fold = document.querySelector('[data-component="DocumentsFold"]') as HTMLElement;
+    const list = document.querySelector('[data-component="DocList"]') as HTMLElement;
+    expect(fold.textContent).toBe("Documents · 2 · show");
+    expect(list.className).toContain("max-[860px]:hidden");
+    fireEvent.click(fold);
+    expect(fold.textContent).toBe("Documents · 2 · hide");
+    expect(list.className).not.toContain("max-[860px]:hidden");
+    cleanup();
+    render(<DocumentsPage docs={docs} groups={{}} activeProject="JOBS" currentId={null} onOpen={() => {}} />);
+    expect(document.querySelector('[data-component="DocumentsFold"]')).toBeNull();
+  });
+
   test("past the first twelve the rest fold behind a count, and a chosen tag stays in sight", async () => {
     const { TAGS_SHOWN } = await import("./components/shell/Sidebar.tsx");
     const docs = Array.from({ length: TAGS_SHOWN + 3 }, (_, i) =>
