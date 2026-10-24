@@ -8,7 +8,7 @@ fails quietly. A new tracker starts from `references/tracker-skeleton.md`.
 
 - **First thing in the plan**, under the header, above every other section and diagram.
 - **`%% tracker`** as the first line inside the fence, under `flowchart TB`.
-- **A slice is a `subgraph` with id `SL<phase><seat>`**, holding steps `S<phase><seat>.<step>`; its title carries its phase, its seat, the stories it serves and `👤` when it needs a person (`P2 · seat3 · US3 · 👤 decision`). The board's row for it is `S<phase><seat>`.
+- **A seat's part of a phase is a `subgraph` with id `SL<phase><seat>`**, holding steps `S<phase><seat>.<step>` (its task's done-when); its title carries its phase, its seat, the task id, the stories it serves and `👤` when it needs a person (`P2 · seat3 · T7 · US3 · 👤 decision`).
 - **A step is a node at the granularity someone would pause at.** A step found between `S12.3` and `S12.4` is `S12.3b`: insert, never renumber. A step carrying two glyphs is two steps.
 
 ## The step
@@ -24,20 +24,20 @@ done when: <the command that exits 0, or what is observed>
 | Glyph | Means | Second line |
 |---|---|---|
 | ⬜ | not started | `done when: …` |
-| ▶ | in progress; one per running slice of the open phase | `done when: …` |
+| ▶ | in progress; one per running task of the open phase | `done when: …` |
 | ✅ | done, re-run here | `went on: <what was observed here> · <sha> · #<pr>` |
 | ⏸ | blocked on someone | the done-when, then `paused: <on whom, for what, asked <date>>` |
 | ✖ | dropped | `dropped: <what happened> · <decision id, or the step replacing it>` |
 
 - **The first line names an observable outcome**, no identifier from the code.
 - **`went on` is this session's own observation**, never the subagent's claim, and names the result, not its numbers.
-- **A last line `run:`** only when the orchestrator changed the route: a steer, a retry, a slice drawn mid-run. One event.
-- **Everything else has a home elsewhere**: what changed and where is the pull request's; a decision is a row in the plan's decisions; work owed to a later slice is a dotted edge to the step that pays (`S11.1 -.->|"owes: its tests"| S20.1`); a subagent's unchecked claim keeps the step ▶.
+- **A last line `run:`** only when the orchestrator changed the route: a steer, a retry, a task added mid-run. One event.
+- **Everything else has a home elsewhere**: what changed and where is the pull request's; a decision is a row in the plan's decisions; work owed to a later task is a dotted edge to the step that pays (`S11.1 -.->|"owes: its tests"| S20.1`); a subagent's unchecked claim keeps the step ▶.
 
 ## Phases
 
-- **A phase's slices are arms from the phase before, joined at the next**: arrows leaving one node and joining at a later one, the join labeled with what it waits on (`phase 1 merged, check green`).
-- **Until a phase opens, one subgraph `SL<phase>0` stands for it**, its one step naming its goal; it is replaced by its slices when they are cut.
+- **A phase's seats are arms from the phase before, joined at the next**: arrows leaving one node and joining at a later one, the join labeled with what it waits on (`phase 1 merged, check green`).
+- **Until a phase opens, one subgraph `SL<phase>0` stands for it**, its one step naming its goal; it is replaced by its seats' subgraphs when its tasks are posted.
 - **The join's done-when covers what the phase produced together**: the full check on the merged branch.
 
 ## The state node
@@ -58,7 +58,7 @@ under the diagram, `mandate: seats 4 · phases 3 · …`, or `mandate: not asked
 
 ## Layout and styling
 
-- **One column**, `flowchart TB`; only gates and a phase's slices go sideways. Short `<br/>` lines.
+- **One column**, `flowchart TB`; only gates and a phase's seats go sideways. Short `<br/>` lines.
 - **Dotted edge is a debt, solid a dependency.** A node a dotted edge leaves labels its solid one too (`then`).
 - **No `direction` in a subgraph that is itself an edge endpoint.**
 - **`aiview tracker sync <plan>` writes the `class` lines from the glyphs**; never by hand. Colours are eight-digit hex, never `rgba()`.

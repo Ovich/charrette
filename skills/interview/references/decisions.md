@@ -9,7 +9,7 @@ The core every decisions table shares, whatever document holds it:
 - **id**: `D<n>`, from `D1` in each document, never continuing another's: no counter is
   shared between documents written on two branches. Outside its document a decision is cited
   `<topic>#D<n>` (a plan) or `<topic>.board#D<n>` (a board), the topic being the file name's
-  slug; a slice quotes its plan's short `D<n>`. A document of an older project-wide series
+  slug; a task quotes its plan's short `D<n>`. A document of an older project-wide series
   carries `> **Decision ids**: legacy series` under its title, and a bare `D<n>` in code
   resolves against those.
 - **Decision**: the decision, in one sentence.
@@ -20,4 +20,4 @@ The core every decisions table shares, whatever document holds it:
   (the person was never asked: status `for the person` until they confirm it at approval).
 
 A document adds its own columns after these, never between them: a brainstorm board adds
-`Log`, a plan adds `Kind` and `Slice`.
+`Log`, a plan adds `Kind` and `Task`.

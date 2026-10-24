@@ -12,6 +12,6 @@ description: "Use when the person and the agent go over what was just delivered 
 - **Propose what to check next**: the parts the delivery touched, the journeys and hidden states the verify skill and its map know, what you would look at first and why. The person picks, or goes elsewhere.
 - **Show it** in the watched browser or the right tool, and say what you see against the specification.
 - **The appreciation is the person's.** Your own verdict is a recommendation beside theirs.
-- **A change they want is made at once** and shown before moving on. One that changes a decision is a row of the plan's decisions; one too large for the session becomes a slice.
+- **A change they want is made at once** and shown before moving on. One that changes a decision is a row of the plan's decisions; one too large for the session becomes a task.
 
 **Whether the slot is done is the person's call.**

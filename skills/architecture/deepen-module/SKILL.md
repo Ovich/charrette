@@ -1,6 +1,6 @@
 ---
 name: deepen-module
-description: Use when a person asks to design a new module's interface or to rework an existing module so that it hides much behind little, in any tier (backend, frontend, test support, tooling), or says a module's callers know too much about it. Produces a module document in aiview, how a caller uses it, its one public entry point as signatures, what stays outside and the gap from today, discussed with the person until agreed. Not for writing the slice that carries the rework out (write-slice) and not for the rework itself.
+description: Use when a person asks to design a new module's interface or to rework an existing module so that it hides much behind little, in any tier (backend, frontend, test support, tooling), or says a module's callers know too much about it. Produces a module document in aiview, how a caller uses it, its one public entry point as signatures, what stays outside and the gap from today, discussed with the person until agreed. Not for writing the task that carries the rework out (orchestrate's tasks) and not for the rework itself.
 ---
 
 # Deepen a module
@@ -42,7 +42,7 @@ description: Use when a person asks to design a new module's interface or to rew
 
 ## Implement
 
-**The rework is a slice, and its document quotes the agreed entry word for word.**
+**The rework is a task, and it quotes the agreed entry word for word.**
 
 ## Red flags
 

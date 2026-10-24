@@ -35,18 +35,17 @@ message, each proposed from the work with its reason:
 2. **run through, the person merges**: push, mark ready, report. Never merge.
 3. **stop at each phase**: close the phase, report, name what is next, wait.
 
-Under any pace, a slice marked `👤` stops before it starts, and a finding that changes the next
+Under any pace, a task marked `👤` stops before it starts, and a finding that changes the next
 phase is a pause.
 
 **`model:`** **opus** (recommended).
 
 **`effort:`** `low | medium | high | xhigh | max`: **low** (recommended): the design is the
-plan's. Medium when the slices leave the subagent to shape the code around its slice and name
-what it adds. How effort reaches a subagent: the `orchestrate` skill's *Dispatch*.
+plan's. Medium when the tasks leave the worker much to shape around them and name. How effort reaches a subagent: the `orchestrate` skill's *Dispatch*.
 
 **`tests:`** when the tests the plan names get written. The testing prompt each answer puts in
 the brief: `references/tests.md`.
 
-1. **at the plan end** (recommended): slices write no tests; a last phase, `· the tests`, one slice per seat, writes them all. `aiview tracker check` refuses this answer until the tracker carries that phase.
-2. **at the slice end**: each slice writes its own tests after its code.
+1. **at the plan end** (recommended): tasks write no tests; a last phase, `· the tests`, one task per seat, writes them all. `aiview tracker check` refuses this answer until the tracker carries that phase.
+2. **at the task end**: each task writes its own tests after its code.
 3. **none**: no tests written in this plan.

@@ -27,9 +27,9 @@ flowchart LR
   P["write-plan<br/>one document, written while interviewing"] -->|"until ready"| CR["cold-read<br/>a fresh agent reads the plan"]
   CR --> PH
   subgraph E["execute-plan · on the swarm board"]
-    PH["a phase opens"] --> WS["write-slice<br/>one slice per seat"]
-    WS --> S["seats work at once<br/>each merges its own"]
-    S --> VS["validator<br/>when the mandate asks"]
+    PH["a phase opens"] --> WS["its tasks posted<br/>one per seat"]
+    WS --> S["workers at once<br/>each merges its own"]
+    S --> VS["verify<br/>build-verify, when the mandate asks"]
     VS -->|"next phase cut from its verdict"| PH
   end
   E -->|"the plan's pull request"| R["pr-review"]
@@ -38,7 +38,7 @@ flowchart LR
   R --> M["merge"]
 ```
 
-A plan starts from whatever exists: an idea said in chat, a board, an agreed module, the roadmap's next slot. `interview` resolves the decisions along the way and `write-diagrams` draws them. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it. The executor orchestrates on the swarm board, phase by phase: each phase's slices are written as it opens, and each goes to a fresh seat that first shapes the code around it, then does it. When the mandate asks, a validator seat running the project's verify skill judges each phase's delivery's product quality alone, as its quality owner: done as specified, usable, finished. When the plan has delivered something a person looks at, its close recommends `validate-delivery`: the same verify process walked with the person, who guides it and decides, the agent proposing what to check and changing what they ask for.
+A plan starts from whatever exists: an idea said in chat, a board, an agreed module, the roadmap's next slot. `interview` resolves the decisions along the way and `write-diagrams` draws them. The plan's diagram is the tracker, and a later session with none of the conversation in context resumes from it. The executor orchestrates on the swarm board, phase by phase: each phase's tasks are posted as it opens, one to each worker, who first shapes the code around it, then does it. When the mandate asks, the plan runs build-verify: a verifier seat, from the project's verify skill or from steps it is given, judges each phase's delivery's product quality alone, as its quality owner: done as specified, usable, finished. When the plan has delivered something a person looks at, its close recommends `validate-delivery`: the same verify process walked with the person, who guides it and decides, the agent proposing what to check and changing what they ask for.
 
 ## Iterate the loop
 
@@ -54,7 +54,7 @@ The first two are from one real piece of work: the redesign of this collection's
 
 ### A spec, with the work it belongs to
 
-What `brainstorm` and `write-plan` leave behind for one feature: the board and the spec in one group, the plan with its slice documents in another. The spec's diagrams render inline, here the five layers and the orchestrator that dispatches them. The header shows the absolute path, click to copy.
+What `brainstorm` and `write-plan` leave behind for one feature: the board and the spec in one group, the plan in another. The spec's diagrams render inline, here the five layers and the orchestrator that dispatches them. The header shows the absolute path, click to copy.
 
 ![aiview: the pr-review redesign spec, its layer table and orchestrator diagram rendered, the board and plan grouped beside it](assets/aiview-pr-review-spec.png)
 
@@ -152,7 +152,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 |---|---|---|
 | [brainstorm](skills/architecture/brainstorm/SKILL.md) | An idea is worth thinking through and keeping, before a plan or without one | *"Run brainstorm: should we move the agent onto LangGraph?"* The interview, kept on a live board with its diagrams and what was investigated. A plan can start from it and does not need it. |
 | [complexity-rework](skills/architecture/complexity-rework/SKILL.md) | Code is hard to follow: long condition chains, parse attempts tried one after another, deep nesting, a function doing several jobs, or complexity guardrails wanted | *"Audit where this codebase is complex, then rework the worst family."* Two measures in three bands (cyclomatic paths 1 to 6, 7 to 10, 11+; cognitive reading load 0 to 10, 11 to 15, 16+). An audit of families ranked by the data they branch on, the types that already exist named first; each family's behaviour pinned by tests before any code moves, then reworked with the tests unchanged; a gate against a baseline that only shrinks. |
-| [dependency-graph](skills/architecture/dependency-graph/SKILL.md) | A JavaScript or TypeScript project's dependencies have to be seen as they are: the whole graph, what a module depends on, who depends on it | *"Show me who depends on the billing module."* Parsed by dependency-cruiser, never inferred: the same options give the same graph on the same commit. A Mermaid graph in aiview, folded to folders when it is large, with the cycles and boundary breaks said under it. execute-slice reads it, unregistered, before shaping the code around a slice. |
+| [dependency-graph](skills/architecture/dependency-graph/SKILL.md) | A JavaScript or TypeScript project's dependencies have to be seen as they are: the whole graph, what a module depends on, who depends on it | *"Show me who depends on the billing module."* Parsed by dependency-cruiser, never inferred: the same options give the same graph on the same commit. A Mermaid graph in aiview, folded to folders when it is large, with the cycles and boundary breaks said under it. a worker reads it, unregistered, before shaping the code around a task. |
 | [deepen-module](skills/architecture/deepen-module/SKILL.md) | A module's interface has to be designed or reworked so that it hides much behind little | *"Deepen the agent module."* The code a caller writes to use it, the one entry as signatures, what stays outside, the gap from today, discussed until agreed. write-plan shapes its major areas this way. |
 | [write-diagrams](skills/architecture/write-diagrams/SKILL.md) | A design question would settle faster drawn than argued | *"Draw today's login flow: I need to see where the redirect happens."* |
 
@@ -169,7 +169,6 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 |---|---|---|
 | [write-plan](skills/plan/write-plan/SKILL.md) | Something non-trivial is about to be built and its plan has to be written | *"Write the plan for per-user rate limiting."* One document, written while interviewing: why, before and after, the deep modules, the flows, the failure modes, the phases with their tracker, and the mandate you give the orchestrator (seats, phases, a validator). A cold reader checks it can be carried out from the document alone; the decisions the agent took by default are put to you at approval. No code until it is approved. |
 | [cold-read](skills/plan/cold-read/SKILL.md) | Dispatched by write-plan before the mandate | An agent that was not in the conversation reads the plan and says what it would build, its questions, and ready or not ready, until the plan carries everything. |
-| [write-slice](skills/plan/write-slice/SKILL.md) | A plan's increment has to be cut into slices, or a slice of an approved plan needs the document an agent will carry it out from | *"Write the slice document for SL12."* One plan node in, its document out: the decisions quoted, the modules table, the cases to test when the mandate has tests, the environment facts the first command trips on. |
 
 ### Execute
 
@@ -177,8 +176,7 @@ By group, in the order work usually happens. The folder under `skills/` is the g
 |---|---|---|
 | [execute-plan](skills/execute/execute-plan/SKILL.md) | An approved plan is ready, or was left mid-way by an earlier session | *"Execute the rate-limiting plan."* Keeps the tracker and the plan's decisions; the orchestration itself is orchestrate-plan's. Pauses only for your decisions, your checks, or an action that does not undo. Refuses a plan with no tracker. |
 | [orchestrate](skills/orchestrate/SKILL.md) | Loads whenever an agent runs other agents: a plan, a task swarm or a brainswarm | Settles the charter with you, dispatches each member with its brief and role, watches them and steers a drift. |
-| [orchestrate-plan](skills/execute/orchestrate-plan/SKILL.md) | Loads with execute-plan, whenever a plan runs | Settles the mandate, then runs the plan phase by phase on the swarm board: each phase's slices written at its open, every seat dispatched at once with a brief that carries the testing prompt, the plan workers claiming their files, settling a shared one on the thread and merging under the board's lock. Re-runs each slice's check itself; a validator seat judges the merged result when the mandate asks. One draft pull request for the plan, marked ready only at the merge. |
-| [execute-slice](skills/execute/execute-slice/SKILL.md) | One slice document is handed to an agent to carry out | *"Do slice S12."* Stops on what the document cannot carry, shapes the code around the slice (the dependency graph shows the neighbourhood), then does the slice, naming everything for its purpose, and returns the branch and the run as evidence. |
+| [orchestrate-plan](skills/execute/orchestrate-plan/SKILL.md) | Loads with execute-plan, whenever a plan runs | Settles the mandate, then runs the plan phase by phase on the swarm board: every worker dispatched once with a brief that carries the testing prompt, each phase's tasks posted at its open, the workers claiming their files, settling a shared one on the thread and merging under the board's lock. Re-runs each task's done-when itself; under build-verify a verifier seat judges the merged result when the mandate asks. One draft pull request for the plan, marked ready only at the merge. |
 
 ### Verify
 

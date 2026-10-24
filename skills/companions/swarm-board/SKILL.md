@@ -6,9 +6,8 @@ description: "Use when agents run together on the project's swarm board: a plan,
 # swarm-board: the board
 
 **The board is where agents running together on one project see each other and settle what
-they share.** A run is one piece of work on it, of a kind: a plan, its workers working
-phase by phase, each slice in a worktree of its own; a task swarm (kind `task`, the `swarm`
-skill), its workers each in a worktree taking the tasks posted to them; or a brainswarm, its
+they share.** A run is one piece of work on it, of a kind: a task swarm or a plan's run, its workers
+each in a worktree taking the tasks posted to them, with or without phases; or a brainswarm, its
 seats talking without touching the repository. The board says who is there, doing what, and carries their talk. It knows the
 work only as the orchestrator tells it, and nothing of aiview.
 
@@ -24,10 +23,10 @@ prompt): read `references/setup.md`.
 
 ## Who is who
 
-- **A member is `<group>/<id>`**: on a plan, the seat working a slice, `<plan>/<slice>`, which
-  the plan-worker side guides (`references/plan-worker.md`); on a brainswarm, a seat `<group>/<seat>`,
+- **A member is `<group>/<id>`**: a worker's seat, `<group>/w2`, which the worker side guides
+  (`references/worker.md`); on a brainswarm, a seat `<group>/<seat>`,
   guided by the brainswarm-seat side (`references/brainswarm-seat.md`); the orchestrator `<group>/orchestrator`. Without `--as`,
-  the CLI is the plan seat that joined from the worktree it runs in; a brainswarm seat and the
+  the CLI is the worker that joined from the worktree it runs in; a brainswarm seat and the
   orchestrator always pass `--as`.
 - **A member gets a funny name at join**, an adjective and an animal, unique among the
   project's active members. `join` prints it.
@@ -62,7 +61,7 @@ prompt): read `references/setup.md`.
 - **Talk is short**: what you change, what you need, what you settled.
 
 A code run's members also hold files, claim by claim, and take turns on a merge lock: its
-verbs and their answers are the plan-worker side's, `references/plan-worker.md`.
+verbs and their answers are the worker side's, `references/worker.md`.
 
 ## What reaches you
 
@@ -98,9 +97,8 @@ installed.
 
 ## Your side
 
-- **A plan worker whose brief names a run and a slice**: read `references/plan-worker.md` before the first edit.
-- **A swarm worker whose brief names a task run**: read `references/swarm-worker.md` before the first call.
-- **A verifier whose brief names a run** (a verifier seat of a build-verify run): `references/plan-worker.md`, its joining and waiting.
+- **A worker whose brief names a run**: read `references/worker.md` before the first call.
+- **A verifier whose brief names a run** (a verifier seat of a build-verify run): `references/worker.md`, its joining, waiting and phases.
 - **A brainswarm seat whose brief names a run**: read `references/brainswarm-seat.md` before the first call.
 - **The orchestrator of a run** (a plan, a task swarm, or a brainswarm): read `references/orchestrator.md` before opening it, and the `orchestrate` skill
   for dispatch.

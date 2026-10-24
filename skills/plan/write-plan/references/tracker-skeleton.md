@@ -4,13 +4,13 @@ Copy the block, replace every phrase, delete what the plan has no use for. Keep 
 line above the fence and the mandate line under it. Unless `tests: at the plan end`, delete
 the tests phase; unless `verify:` is on, the validation phase.
 
-Phasing diagram: the phases, every seat's slice in each, and what each phase has to show before the next opens.
+Phasing diagram: the phases, every seat's task in each, and what each phase has to show before the next opens.
 
 ```mermaid
 flowchart TB
   %% tracker
   ST["📍 state · 2026-01-01<br/>branch: feat/topic @ 0000000, not pushed<br/>deployed: nothing yet<br/>next: S11.1, S12.1, S13.1, S14.1<br/>blocked: nothing<br/>parked: nothing"]
-  GO(["phase 1 opens · its slices cut"])
+  GO(["phase 1 opens · its tasks posted"])
 
   subgraph SL11["P1 · seat1 · US1 · the riskiest part"]
     S11.1["▶ S11.1 the outcome · US1<br/>done when: the command exits 0"]
@@ -26,7 +26,7 @@ flowchart TB
   end
 
   subgraph SL20["P2 · seat1–seat4 · the tests"]
-    S20.1["⬜ S20.1 slices cut at the phase's open<br/>done when: the full check exits 0 on the merged branch"]
+    S20.1["⬜ S20.1 tasks posted at the phase's open<br/>done when: the full check exits 0 on the merged branch"]
   end
 
   subgraph SL30["P3 · validator alone · validation"]

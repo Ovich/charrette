@@ -7,12 +7,13 @@ except `open`, `slice`, `close` and `status`.
 ## Open the run
 
 1. **The seats file**, one entry per member the run will have.
-   - **A plan**: the first phase's slices, each with its seat and role as `role` and the aiview
-     URL of its slice document as `link`; a later phase's are added at its open (*Slice states*):
+   - **A task swarm or a plan's run**: one row per seat for the whole run, the builders `w1` …
+     `w<n>` and the verifiers `v1` … `v<m>`, each with its role and area as `role`; on a plan, the
+     plan's aiview URL as `link`. Tasks are posts, never rows:
 
      ```json
-     [{ "id": "S11", "title": "<the slice's title>", "role": "seat1 · builder", "link": "<slice document URL>" },
-      { "id": "S12", "title": "<…>", "role": "seat2 · builder", "link": "<…>" }]
+     [{ "id": "w1", "title": "worker", "role": "builder · the api", "link": "<plan URL>" },
+      { "id": "v1", "title": "verifier · the app", "role": "verifier, app owner", "link": "<plan URL>" }]
      ```
 
    - **A brainstorm**: every seat, with its `role` and the brainstorm board's URL as `link`;
@@ -26,7 +27,7 @@ except `open`, `slice`, `close` and `status`.
    - **`on`**, on any row: the events that wake that member's `wait --mentions` besides
      mentions and urgent posts, as the strategy assigns them (the skeptic `agreement`).
      `any:<event>` for one of any run, a plain `<event>` your own run's; `$S --help` lists the events. A row without `on`
-     gets its kind's defaults: none for a member; for you, `merged, ended, stale` on a plan,
+     gets its kind's defaults: none for a member; for you, `merged, ended, stale` on a code run,
      `agreement, endorsement, ended, stale` on a brainstorm. A member's `join --on` replaces
      its row's list; `subscribe` / `unsubscribe` change it later.
 
@@ -49,21 +50,23 @@ brief carries `--as <group>/<seat>` and the join line, whose answer tells the se
 waits: in the foreground; a seat runs on the plugin's
 `brainswarm-seat` agent, as the `brainswarm` skill says.
 
-## Slice states
+## Seat states
 
-- **`$S slice <id> --run <run> --state running`** at its dispatch; `done` once its tick stands;
-  `blocked` when it waits on a person.
-- **A plan worker ends with its slice.** The seat's slice in the next phase gets a fresh plan worker.
-- **A slice or seat added mid-run**: `$S slice add <id> --run <run> --title "<title>"
-  [--blockers a,b] [--link <url>] [--role <role>] [--on <events>]`. It lands after the last,
-  `ready`; an id already in the run, an unknown blocker or a closed run is refused. Then
-  dispatch it like the others.
+The CLI calls a seat's row a `slice`.
+
+- **`$S slice <seat> --run <run> --state running`** at its dispatch; `blocked` when it waits on a
+  person; `done` when the seat leaves the run.
+- **A worker stays for the whole run**, task after task. One whose context runs long is ended
+  (`end`) and a fresh worker joins the same seat.
+- **A seat added mid-run**: `$S slice add <seat> --run <run> --title "<title>" [--link <url>]
+  [--role <role>] [--on <events>]`. It lands after the last, `ready`; an id already in the run or
+  a closed run is refused. Then dispatch it like the others.
 
 ## Watching the thread
 
 - **Listen in the background from the open**: `$S wait --mentions --as <group>/orchestrator`,
   started with the harness's background-task feature; you are not a subagent, its end reaches
-  you. The answers of `phase` and of your `wait` print this step: read them. Your subscriptions (a plan worker's `merged`
+  you. The answers of `phase` and of your `wait` print this step: read them. Your subscriptions (a worker's `merged`
   and `ended`, `stale`), every `done`, `idle`, `stalled` and `liveness` event and every mention
   of you wake it. When it ends, read its output, act, and start it again at once, in the
   background. **Block only on the board's verbs**: never a foreground loop, a poll or a sleep of
@@ -80,7 +83,7 @@ waits: in the foreground; a seat runs on the plugin's
     A member quiet because its turn ended on a background task is not woken by that task: tell
     it what to do (*Interrupt*).
   - **`gone <member>`**: its agent finished without `end`, or its link has been lost 30 s; once.
-    It is not running: dispatch a fresh agent into its slice, or close the slice (*A gone
+    It is not running: dispatch a fresh agent into its seat, or close the seat (*A gone
     member*).
   - **`idle`**: every member is `waiting` in a board wait; once when it begins, then every
     15 min while it holds. The swarm waits on you: open the next phase if all are done, else
@@ -88,12 +91,12 @@ waits: in the foreground; a seat runs on the plugin's
   - **`liveness`**: no transcript was found for a member 30 s after its join; once. Its state
     is presence only (`waiting` or `quiet`, never `working`) and `stalled` never names it: judge
     it by its posts and its doing, and mention it when it falls silent.
-- **A `merged` event is a slice to check**: re-run its check on the branch it merged into then,
-  not when the plan worker's report arrives; the report adds what it found.
+- **A `merged` event is a task to check**: re-run its done-when on the branch it merged into then,
+  not when the worker's report arrives; the report adds what it found.
 - **`$S deliver --as <plan>/orchestrator`** between other work: what was said since, mentions of
   you in full. With no background notification in the harness (`references/setup.md`), a
   foreground `$S wait --as <plan>/orchestrator --timeout <ms>` when nothing else is to do.
-- **Answer what is asked of you**, on the thread. Two plan workers' agreement is theirs to make; an
+- **Answer what is asked of you**, on the thread. Two workers' agreement is theirs to make; an
   agreement that changes a decision the plan took is recorded in the plan.
 - **A brainstorm's events**: an agreement and its endorsement, an escalation, a new question,
   handled as the `brainswarm` skill's protocol says.
@@ -102,10 +105,9 @@ waits: in the foreground; a seat runs on the plugin's
   of the run, and the run's current phase, the first line of everything a member reads from
   then on. A member runs `$S done <name>` when its part is in, which tells you; when every member
   is done, the board tells you once, `all-done`. Each answer prints the step to run next. Phases
-  belong to every kind of run: when to open which is a brainswarm's protocol (the `brainswarm`
-  skill), or, for a plan, the phases its *Mandate* names (the `orchestrate-plan` skill). Only
-  members still in the run count toward `all-done`: a plan worker that ended with its slice does not,
-  so a phase dispatching one special seat waits on it alone.
+  belong to every kind of run: when to open which is the run's protocol (the `orchestrate` skill's
+  protocols), and, for a plan, the phases it names (the `orchestrate-plan` skill). Only members
+  still in the run count toward `all-done`.
 - **`$S roster`** (and `status`) shows each run's title, current phase and its `<n>/<m> done`,
   then each member's state with its open or last tool, its doing and its files; `(stale)` after
   ten minutes without a call to the board.
@@ -122,20 +124,21 @@ the roster's `unread` shows what it has not read yet. **You may always message a
 directly** (`SendMessage`), whenever you judge it faster: a member busy in a long run of work, a
 seat between its waits, one that is `quiet`. Post it on the board too, so the thread has it:
 
-1. **`$S post --as <plan>/orchestrator "@<slice> <the message>"`**.
+1. **`$S post --as <group>/orchestrator "@<seat> <the message>"`**.
 2. **`SendMessage` to the member with the same message**; when it does not take it mid-call,
    stop it (`TaskStop`) and resume it with that message. It resumes with its context.
 
 ## A gone member
 
 **Its state decides, never a guess.** `quiet` is alive and owes a move: *Interrupt*. `gone`:
-**`$S slice <id> --run <run> --state done`** frees its claims and the merge lock if it held it;
-set the slice back to `running` and dispatch a fresh plan worker, which joins the same slice.
+**`$S slice <seat> --run <run> --state done`** frees its claims and the merge lock if it held it;
+set the seat back to `running` and dispatch a fresh worker, which joins the same seat; repost its
+open task.
 
 ## Close
 
-**`$S close --run <run>`** once every slice the agents carry is done (one left to the person
-never holds it open), or the brainstorm concluded; it archives the run's posts. **Before ending
+**`$S close --run <run>`** once the work is done (a task left to the person never holds it
+open), or the brainstorm concluded; it archives the run's posts. **Before ending
 your session, close** the run you opened unless it is still being worked: one left open stays an
 active tab. `$S status` flags a run idle a day with its close command; ask the person, then close. A member's pending `wait`, and any call it makes after, answers with the
 `end` command to run and the summary to return.

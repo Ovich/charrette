@@ -8,7 +8,7 @@ description: "Use when a person asks to swarm, delegate or parallelize work with
 **You orchestrate; the workers do the work.** The `orchestrate` skill holds the protocols, the
 setup interview, dispatch, briefs and how findings are weighed; the `swarm-board` skill holds the board, its orchestrator side in its
 `references/orchestrator.md`, read before opening. Here: what a task swarm adds. There is no
-plan and no slice document: **a task is a post on the board**, whatever the task is.
+plan behind it: **a task is a post on the board** (the `orchestrate` skill's `references/tasks.md`), whatever the task is.
 
 ## Proposing one
 

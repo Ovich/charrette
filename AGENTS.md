@@ -51,7 +51,7 @@ file the person was looking for. Refresh the cache with
 
 9. **MUST put a protocol used by more than one kind of work in a skill named for no kind, never in the first kind that needed it.** A plan-named owner reads as plan-only, and the next kind copies it instead.
 
-10. **MUST let a CLI verb's answer carry the next step it asks for, and have the skill say only to read that answer and why.** A step written in both drifts, and the agent follows whichever it read last. The swarm-board skill's `references/plan-worker.md` names the verbs and their exits; the commands to run next are in their output.
+10. **MUST let a CLI verb's answer carry the next step it asks for, and have the skill say only to read that answer and why.** A step written in both drifts, and the agent follows whichever it read last. The swarm-board skill's `references/worker.md` names the verbs and their exits; the commands to run next are in their output.
 
 11. **MUST NOT ship a harness hook (`hooks/hooks.json`, a `hooks` key in the plugin manifest, any PreToolUse, PostToolUse, Stop or other event hook), nor write to the person's harness settings (`settings.json`, `settings.local.json`, user or project).** A plugin hook runs in every session on the machine, in every project, whether or not a skill of this collection is in use, and a settings change outlives the session that made it. What a skill needs from the agent goes through the skill, its CLI's answers and the agent's own tools. A swarm member hears the board through its own listener or its own wait, and the orchestrator may always message a member directly; no skill forbids that.
 

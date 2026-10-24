@@ -44,13 +44,13 @@ Six rungs, highest first. A finding is tried against each from the top and takes
 
 ## 5. The skill or brief that produced the code
 
-**Criterion**: the author of the reviewed code is an agent, and the finding is a thing the agent would have done differently had its skill or its slice document said so. The finding recurs across pull requests because every run starts from the same text.
+**Criterion**: the author of the reviewed code is an agent, and the finding is a thing the agent would have done differently had its skill or its task said so. The finding recurs across pull requests because every run starts from the same text.
 
-**Artefacts**: one sentence in the skill's body, in the shape its collection asks, or a line in the slice document template, or a row in the plan's register that every slice quotes. Proposed with the skill named, written on the yes, since a skill is shared beyond this repository.
+**Artefacts**: one sentence in the skill's body, in the shape its collection asks, or a line in the task shape (the `orchestrate` skill's `references/tasks.md`), or a row in the plan's register that every task quotes. Proposed with the skill named, written on the yes, since a skill is shared beyond this repository.
 
 **What remains with a human**: the next run's result, read once.
 
-**Tell it is this rung**: the same comment on the first pull request of every plan, or on every slice of one plan.
+**Tell it is this rung**: the same comment on the first pull request of every plan, or on every task of one plan.
 
 ## 6. Stays a review comment
 

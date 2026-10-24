@@ -1,6 +1,6 @@
 # The plan document
 
-The tracker first, then two parts. **Design** is what gets built, and every slice carries its
+The tracker first, then two parts. **Design** is what gets built, and every task points into its
 structure. **Execution** is for whoever runs the plan. A section that does not apply is left
 out, and the header says which. A small change's section is a sentence.
 
@@ -15,7 +15,7 @@ out, and the header says which. A small change's section is a sentence.
 > **Left out**: the sections below that do not apply
 
 ## The tracker
-The diagram, above everything else. Drawn when the slices are cut; until then the heading
+The diagram, above everything else. Drawn when the phases are cut; until then the heading
 holds one line saying so. Under it, the mandate in one line: `mandate: not asked yet` until
 it is.
 
@@ -46,10 +46,10 @@ What breaks, and what the person sees.
 The recipes the experiments handed back.
 
 ## 8. Decisions
-| id | Decision | Depends on | Status | Source | Kind | Slice |
+| id | Decision | Depends on | Status | Source | Kind | Task |
 The row core of the `interview` skill's `references/decisions.md`, ids and citations included,
-plus `Kind` and `Slice`. Kinds: purpose, module (with
-its state, as write-slice names them), architecture, contract, clarification. Open
+plus `Kind` and `Task`. Kinds: purpose, module (with
+its state: new, deepened, interface change, wiring, ui, schema), architecture, contract, clarification. Open
 questions are rows with status open and an owner. A departure from a rule is a row naming
 what is owed for it. The status line names the `agent default` rows the person confirmed;
 `aiview plan check <plan>` warns on an approved plan whose defaults it does not name.
@@ -58,7 +58,7 @@ what is owed for it. The status line names the `agent default` rows the person c
 
 ## 9. The phases
 One heading per phase: what it waits on, its goal, every seat's role and area, its check,
-its mark, and its slices once written at its open.
+its mark, and its tasks once posted at its open.
 
 ## 10. The mandate
 The orchestrator's mandate, as answered.

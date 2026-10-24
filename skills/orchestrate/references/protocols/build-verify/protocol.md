@@ -12,7 +12,7 @@ for a task swarm; a plan's run keeps `--kind plan` and adds `--protocol build-ve
 
 | Seat | Who | Does |
 |---|---|---|
-| `w1` … `w<n>` | builders, the kind's worker agent (`swarm-worker`, or `plan-worker` on a plan's slices), each in its own worktree | build: the tasks or slices posted to it, merged onto the run's branch; verify: on call, `done verify` at once |
+| `w1` … `w<n>` | builders, the plugin's `swarm-worker` agent, each in its own worktree | build: the task posted to it, merged onto the run's branch; verify: on call, `done verify` at once |
 | `v1` … `v<m>` | verifiers, the plugin's `verifier` agent, no worktree of their own beyond the detached one they check out | build: idle, `done build` at once; verify: the pass the phase message scopes, one findings table each |
 | the app owner | `v1` unless the charter names another | keeps the product running for the whole run: restarts it on the merged branch at each verify's open, stops it when a build needs it stopped; **no other seat starts or stops it** |
 
@@ -74,5 +74,5 @@ loop: until the goal (with its cap), N iterations, or unbounded.
 
 | phase | text |
 |---|---|
-| build | `build <k> of <cap>: <the tasks' ids and owners, or "the slices of phase <name>">. Builders: your task is posted to you; merge, report @orchestrator, then done build. Verifiers: done build now<; app owner: stop the product until verify>.` |
+| build | `build <k> of <cap>: <the tasks' ids and owners>. Builders: your task is posted to you; merge, report @orchestrator, then done build. Verifiers: done build now<; app owner: stop the product until verify>.` |
 | verify | `verify <k> of <cap> on <branch> @ <sha>. App owner: restart the product on it first. <v1: the numbered steps, or "your skill, scope: …">. Builders: on call, change nothing, done verify. Every verifier: one findings table to @orchestrator, ids kept from the last table, then done verify.` |

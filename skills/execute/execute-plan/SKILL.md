@@ -7,12 +7,12 @@ description: Use when carrying out an implementation plan the person has already
 
 **You are the plan's orchestrator; the `orchestrate-plan` skill holds those duties** (the mandate, dispatch, checking the run, verification, merges, pull requests). Load it with this one.
 
-**The plan is a living document.** `write-plan` built it and its tracker; this skill keeps both true as the work teaches something. Amending a slice, adding one, dropping one or moving a decision is normal work, written into the plan as it happens.
+**The plan is a living document.** `write-plan` built it and its tracker; this skill keeps both true as the work teaches something. Amending a task, adding one, dropping one or moving a decision is normal work, written into the plan as it happens.
 
 ## Before starting
 
 - **Open the plan in aiview every session** and give the person the URL.
-- **Do not start** if the plan has no tracker, a phase has no goal, seats' roles and areas, or a check as a command (its slice documents are written at its open). Say so and finish the plan first.
+- **Do not start** if the plan has no tracker, a phase has no goal, seats' roles and areas, or a check as a command (its tasks are written at its open). Say so and finish the plan first.
 - **Reconcile a tracker the repository has moved past** before starting; say what you found.
 - **Every phase runs on the swarm board**, however few seats it has, through the `orchestrate-plan` skill.
 
