@@ -1,7 +1,7 @@
 {
   "name": "swarmstorm",
   "description": "Agent skills for the drawing-board loop: brainstorm, interview, diagram, plan, review. Every document rendered live in aiview, the companion app, outside your repositories.",
-  "version": "2.4.20",
+  "version": "2.4.21",
   "author": {
     "name": "Stefan Teofanovic"
   },
@@ -26,6 +26,7 @@
     "./skills/workbench",
     "./skills/review",
     "./skills/companions",
-    "./skills/help"
+    "./skills/help",
+    "./skills/alignment"
   ]
 }
