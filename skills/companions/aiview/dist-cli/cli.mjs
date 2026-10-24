@@ -100,7 +100,7 @@ function sidecarOf(absPath) {
 }
 function kindFromName(file) {
   const parts = path3.basename(file).split(".");
-  return parts.length >= 3 ? parts[parts.length - 2].toLowerCase() : "";
+  return parts.length >= 3 ? currentKind(parts[parts.length - 2]) : "";
 }
 function titleOf(text, file) {
   if (isSwarm(file)) return path3.basename(file);
@@ -111,7 +111,7 @@ function toStored(abs, root) {
   const rel = path3.relative(root, abs);
   return rel && !rel.startsWith("..") && !path3.isAbsolute(rel) ? rel.split(path3.sep).join("/") : abs;
 }
-var isHtml, isPdf, isSwarm, formatOf, projectRoot, readDoc, toAbs;
+var isHtml, isPdf, isSwarm, formatOf, RENAMED_KINDS, currentKind, projectRoot, readDoc, toAbs;
 var init_paths = __esm({
   "src/core/paths.ts"() {
     "use strict";
@@ -119,6 +119,8 @@ var init_paths = __esm({
     isPdf = (file) => /\.pdf$/i.test(file);
     isSwarm = (file) => /\.swarm\.json$/i.test(file);
     formatOf = (file) => isHtml(file) ? "html" : isPdf(file) ? "pdf" : isSwarm(file) ? "swarm" : "markdown";
+    RENAMED_KINDS = { mockup: "prototype" };
+    currentKind = (kind) => RENAMED_KINDS[kind.toLowerCase()] ?? kind.toLowerCase();
     projectRoot = (file) => path3.basename(repoRootOf(path3.dirname(file)));
     readDoc = (p) => fs2.readFileSync(p, "utf8").replace(/\r\n/g, "\n");
     toAbs = (stored, root) => path3.isAbsolute(stored) ? stored : path3.resolve(root, ...stored.split("/"));
@@ -221,6 +223,7 @@ function openIndex(dbPath = SQLITE_PATH, root = STORE_ROOT) {
     db.prepare("DELETE FROM pending WHERE document_id = ?").run(row.id);
     db.prepare("DELETE FROM documents WHERE id = ?").run(row.id);
   }
+  db.prepare("UPDATE documents SET kind = 'prototype' WHERE kind = 'mockup'").run();
   const parse2 = (row) => ({
     ...row,
     tags: JSON.parse(row.tags),
@@ -255,10 +258,10 @@ function openIndex(dbPath = SQLITE_PATH, root = STORE_ROOT) {
       const file = toStored(absFile, root);
       const content = isPdf(absFile) ? "" : readDoc(absFile);
       const existing = db.prepare("SELECT * FROM documents WHERE file_path = ?").get(file);
-      const finalKind = (kind || existing?.kind || kindFromName(file)).toLowerCase();
+      const finalKind = currentKind(kind || existing?.kind || kindFromName(file));
       if (!finalKind)
         throw new Error(
-          "kind is mandatory: name the file <name>.<kind>.md or pass --kind <kind> (e.g. brainstorm, mockup, pr-analysis)"
+          "kind is mandatory: name the file <name>.<kind>.md or pass --kind <kind> (e.g. brainstorm, prototype, pr-analysis)"
         );
       const tags = [.../* @__PURE__ */ new Set([...existing ? JSON.parse(existing.tags) : [], ...extraTags])].filter(
         (t2) => t2 !== finalKind
@@ -287,7 +290,7 @@ function openIndex(dbPath = SQLITE_PATH, root = STORE_ROOT) {
     update(id, patch) {
       const row = db.prepare("SELECT * FROM documents WHERE id = ?").get(Number(id));
       if (!row) return void 0;
-      const kind = patch.kind ? patch.kind.toLowerCase() : row.kind;
+      const kind = patch.kind ? currentKind(patch.kind) : row.kind;
       const tags = [
         .../* @__PURE__ */ new Set([...JSON.parse(row.tags), ...patch.addTags ?? []])
       ].filter((t) => t !== kind && !(patch.removeTags ?? []).includes(t));
@@ -8797,7 +8800,7 @@ function unknownNames(asked, known, what) {
   const missing = asked.filter((n) => !known.includes(n));
   if (!missing.length) return void 0;
   const has = known.length ? `it has: ${known.join(", ")}` : `it declares none`;
-  return `no ${what} named ${missing.join(", ")} in this mockup; ${has}`;
+  return `no ${what} named ${missing.join(", ")} in this prototype; ${has}`;
 }
 var NAME, isName;
 var init_pointer = __esm({
@@ -10415,9 +10418,9 @@ var USAGE = [
   "  pending list [<file|#id>] | clear <file|#id>",
   "  status",
   "  path <filename> [--project <slug>]       # where this document belongs, joined for this OS",
-  "  components <file|#id>                    # what this mockup offers to siblings, what it pulls, every name on its page and its variants",
-  "  check <file|#id>                         # do this mockup's bindings resolve? errors as text, exit 1 if any",
-  "  show <file|#id> [--component Name]... [--variant v]   # point the person's viewer at these components of a mockup; prints the link",
+  "  components <file|#id>                    # what this prototype offers to siblings, what it pulls, every name on its page and its variants",
+  "  check <file|#id>                         # do this prototype's bindings resolve? errors as text, exit 1 if any",
+  "  show <file|#id> [--component Name]... [--variant v]   # point the person's viewer at these components of a prototype; prints the link",
   "  show --done                              # the question is answered: every tab goes back to what the person was reading",
   "  mermaid-check <file|#id>                 # parse every mermaid block; warn on a missing caption or an unlabeled fork; exit 1 if one fails",
   "  tracker check <file|#id>                 # a plan's tracker judged against itself; exit 1 if anything disagrees",
@@ -10598,7 +10601,7 @@ known: ${known.join(", ")}` : ""}`);
   const full = path12.join(dir, path12.basename(name));
   emit({ path: full, dir, project: slug }, full);
 }
-function mockupArg(usage) {
+function prototypeArg(usage) {
   const ref = args.positional[0];
   if (!ref) {
     console.error(usage);
@@ -10610,13 +10613,13 @@ function mockupArg(usage) {
     process.exit(1);
   }
   if (!isHtml(abs)) {
-    console.error(`not an html mockup: ${abs}`);
+    console.error(`not an html prototype: ${abs}`);
     process.exit(1);
   }
   return abs;
 }
 function cmdComponents() {
-  const abs = mockupArg("usage: aiview components <file|#id>");
+  const abs = prototypeArg("usage: aiview components <file|#id>");
   const r = listComponents(readDoc(abs));
   const vocabulary = pageVocabulary(abs);
   emit({ file: path12.basename(abs), ...r, ...vocabulary }, () => {
@@ -10657,7 +10660,7 @@ function cmdShow() {
     emit({ done: true, tabs: tabs2 }, tabs2 ? `${tabs2} open tab${tabs2 > 1 ? "s" : ""} sent back to what the person was reading` : "no tab is open: nothing to send back");
     return;
   }
-  const abs = mockupArg(usage);
+  const abs = prototypeArg(usage);
   const doc = resolveRef(args.positional[0]);
   if (!doc) {
     console.error(`not registered: ${abs}. Register and serve it with: aiview open <file>`);
@@ -10683,7 +10686,7 @@ function cmdShow() {
   });
 }
 function cmdCheck() {
-  const abs = mockupArg("usage: aiview check <file|#id>");
+  const abs = prototypeArg("usage: aiview check <file|#id>");
   const r = composed(abs);
   emit({ file: path12.basename(abs), bound: r.bound, sources: r.sources, errors: r.errors, warnings: r.warnings }, () => {
     console.log(`${r.bound} bound from ${r.sources.length} source${r.sources.length === 1 ? "" : "s"}${r.sources.length ? `: ${r.sources.join(", ")}` : ""}`);
