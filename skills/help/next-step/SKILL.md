@@ -1,6 +1,6 @@
 ---
 name: next-step
-description: "Use at every point of a conversation where one of this collection's skills would serve the person better than going on as is, and they have not named it: an idea still vague or choices left open (offer the interview), decisions worth keeping (a brainstorm board), agreement on something to build (a plan, or a swarm with its protocol filled in), a question to decide or a text to write from several viewpoints (a brainswarm), a run that just closed (its follow-up); and when the person asks what the collection can do or how to start. Produces one offer in one line, or a one-screen tour; never runs the skill unasked. Not for running any of those skills."
+description: "Use at every point of a conversation where one of this collection's skills would serve the person better than going on as is, and they have not named it: an idea still vague or choices left open (offer the interview), decisions worth keeping (a brainstorm board), agreement on something to build (a plan, or a swarm with its protocol filled in), a question to decide or a text to write from several viewpoints (a brainswarm), a run that just closed (its follow-up). Produces one offer in one line; never runs the skill unasked. Not for a new person's first steps or a tour of the collection (getting-started). Not for running any of those skills."
 ---
 
 # Next step
@@ -36,13 +36,3 @@ over together → the `validate-delivery` skill.
   back to it.
 - **Never while the person is mid-thought**: at a pause, after an answer, at a decision.
 - **The person's own request always wins**: they named a skill, you run that one.
-
-## The tour
-
-When asked what the collection can do, or how to start: one screen, each line a kind of help with
-an example drawn from **this project's own work** (its open documents, its recent commits, the
-subject of the conversation), never a manual: think it through (interview, brainstorm), decide
-with several voices (brainswarm), plan and build (write-plan, execute-plan, swarm with
-build-verify), design a screen (design-prototype), review (pr-review), keep conventions
-(write-conventions), watch it all (aiview: the documents and the board). End on the one you would
-start with here, and why.

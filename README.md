@@ -123,11 +123,18 @@ An agent trace bench: a support assistant walked call by call, each step with th
 > the root or one folder down in its group, discoverable to you (symlink or otherwise).
 > Then tell me the aiview URL and the skills you can reach by name.
 
-Then ask in plain language. Each skill states when it applies and maps your request onto its flow.
+Then ask in plain language. Each skill states when it applies and maps your request onto its flow. New here? Ask *"help me get started"*: the agent readies the project and shows what the collection can do with it.
 
 ## Skills
 
 By group, in the order work usually happens. The folder under `skills/` is the group.
+
+### Help: finding your way
+
+| Skill | Use case | Example ask |
+|---|---|---|
+| [getting-started](skills/help/getting-started/SKILL.md) | You just installed the collection, or want to know what it can do here | *"Help me get started."* Node, the data home, the project and the viewer checked and fixed with you, then a one-screen tour drawn from this project's own work, ending on the first step it would take. |
+| [next-step](skills/help/next-step/SKILL.md) | Always on: the agent notices the moment a skill would help and offers it in one line | You hesitate on a choice: *"Want me to interview you on this?"*; you agree on a build: *"Run it as build-verify: 3 builders, 1 verifier, until ready. Go?"* A no ends it for that subject. |
 
 ### Project: what a project has once and keeps
 
