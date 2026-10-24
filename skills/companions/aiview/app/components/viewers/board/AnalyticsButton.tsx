@@ -6,7 +6,8 @@ export function AnalyticsButton({ pressed, onPress }: { pressed: boolean; onPres
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
         <path d="M2 14V9M6 14V4M10 14V7M14 14V2" />
       </svg>
-      Analytics
+      {/* "All runs", not "Analytics": the phase row's Analytics is this run's alone */}
+      All runs
     </button>
   );
 }

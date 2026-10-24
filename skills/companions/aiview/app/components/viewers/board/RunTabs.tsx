@@ -66,6 +66,8 @@ export function RunTabs({
 }) {
   return (
     <nav className="runs" data-component="RunTabs" aria-label="Runs">
+      {/* the tabs scroll in their own strip, so the tools beside them never cover one */}
+      <span className="tabstrip">
       <button
         className="run menu"
         aria-label="Archive"
@@ -99,6 +101,7 @@ export function RunTabs({
           </button>
         </span>
       )}
+      </span>
       <span className="lockwrap">
         <AnalyticsButton pressed={analytics} onPress={onAnalytics} />
         <MergeLock lock={lock} history={lockHistory} />

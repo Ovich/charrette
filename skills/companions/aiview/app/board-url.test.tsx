@@ -51,7 +51,7 @@ test("the URL keeps the views: run=<id>&view=analytics reopens that run on Analy
   expect(location.hash).not.toContain("view=analytics");
 
   // the across view with its period and kinds: kept in the URL, reopened after a reload
-  fireEvent.click(tabs().getByRole("button", { name: "Analytics" }));
+  fireEvent.click(tabs().getByRole("button", { name: "All runs" }));
   fireEvent.change(screen.getByRole("combobox", { name: "Period" }), { target: { value: "7d" } });
   fireEvent.click(screen.getByRole("button", { name: "brainstorm" }));
   reload();
@@ -66,7 +66,7 @@ test("the URL keeps the views: run=<id>&view=analytics reopens that run on Analy
   expect(acrossShown()).toBe(false);
   expect(pressedView()).toBe("Conversation");
   expect(location.hash).not.toContain("across=1");
-  fireEvent.click(tabs().getByRole("button", { name: "Analytics" }));
+  fireEvent.click(tabs().getByRole("button", { name: "All runs" }));
   expect(acrossShown()).toBe(true);
   fireEvent.click(tabOf("Sessions with refresh tokens"));
   expect(acrossShown()).toBe(false);

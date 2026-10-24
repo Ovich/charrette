@@ -34,12 +34,18 @@ function statusOf(p: SnapshotRunner, activity: MemberActivity | null, now: numbe
   if (p.state === "ended" || p.state === "done") return { text: p.ended ? `ended ${hhmm(p.ended)}` : "ended", className: "ended" };
   if (activity) {
     const label = isStalled(activity) ? "stalled" : activity.state;
-    const timed = (activity.state === "busy" || activity.state === "quiet") && activity.since !== null;
-    return { text: timed ? `${label} · ${minutesSince(activity.since!, now)}` : label, className: label };
+    // the state word only: how long it has held goes in the hover title (stateHeldFor)
+    return { text: label, className: label };
   }
   if (p.stale) return { text: `quiet ${Math.max(1, Math.round((now - Date.parse(p.lastCall)) / 60000))} min`, className: "quiet" };
   const doing = p.listening && p.slice !== ORCHESTRATOR ? "listening" : p.state;
   return { text: `${doing} · ${hhmm(p.joined)}`, className: p.state };
+}
+
+/** How long a busy or quiet member has been so, for the hover title; null for the other states. */
+function stateHeldFor(activity: MemberActivity, now: number): string | null {
+  const timed = (activity.state === "busy" || activity.state === "quiet") && activity.since !== null;
+  return timed ? `${isStalled(activity) ? "stalled" : activity.state} for ${minutesSince(activity.since!, now)}` : null;
 }
 
 /** The tool the member has open (busy) or called last, and why it is quiet when the server says. */
@@ -97,7 +103,7 @@ function AgentCard({ p, hue, followed, onFollow, now }: { p: SnapshotRunner; hue
   const ended = p.state === "ended" || p.state === "done";
   // the face keeps one doing line only while the member works; the rest waits in the hover title
   const showsDoing = !ended && !!p.doing && (activity ? activity.state === "busy" || activity.state === "working" : true);
-  const hoverTitle = [p.doing, activity && agesText(activity, now), activity && activityText(activity)].filter(Boolean).join("\n");
+  const hoverTitle = [p.doing, activity && stateHeldFor(activity, now), activity && agesText(activity, now), activity && activityText(activity)].filter(Boolean).join("\n");
   return (
     <button
       title={hoverTitle || undefined}

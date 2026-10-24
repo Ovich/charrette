@@ -55,7 +55,7 @@ test("the tab row: the Archive icon, then each open run with its code, title and
   // the run tabs, then the Analytics pill drawn beside the merge lock at the row's end (SL4)
   // a brainstorm's slice rows are seats, never slices to merge: never "0/1"
   expect(names.slice(1, -2)).toEqual(["RTSessions with refresh tokensplanlive · 2/7", "ALAudit logplanlive · 0/3", "NMNaming the kindsbrainstormlive · 1 seat"]);
-  expect(names.slice(-2)).toEqual(["Analytics", "merge lock free"]);
+  expect(names.slice(-2)).toEqual(["All runs", "merge lock free"]);
   for (const r of CLOSED) expect(tabs().queryByText(r.title)).toBeNull();
   expect(pressed()).toBe(tabOf("Naming the kinds"));
 });
@@ -274,9 +274,9 @@ const minutesAgo = (m: number) => Date.now() - m * 60000;
 
 test.each([
   ["working", { state: "working", doing: "Edit", since: null }, /^working$/, "last: Edit"],
-  ["busy", { state: "busy", doing: "browser_click /jobs", since: minutesAgo(3) }, /^busy · 3 min$/, "browser_click /jobs"],
+  ["busy", { state: "busy", doing: "browser_click /jobs", since: minutesAgo(3) }, /^busy$/, "browser_click /jobs"],
   ["waiting", { state: "waiting", doing: "swarm wait", since: null }, /^waiting$/, "last: swarm wait"],
-  ["quiet", { state: "quiet", doing: "Bash", since: minutesAgo(12), reason: "no call since 12 min" }, /^quiet · 12 min$/, "last: Bash · no call since 12 min"],
+  ["quiet", { state: "quiet", doing: "Bash", since: minutesAgo(12), reason: "no call since 12 min" }, /^quiet$/, "last: Bash · no call since 12 min"],
   ["gone", { state: "gone", doing: "Read", since: null }, /^gone$/, "last: Read"],
 ])("a %s member shows its own label and its tool beside it", (state, liveness, label, tool) => {
   show([APP], 1, [withActivity({ tokens: null, movedAt: null, ...liveness })]);
@@ -325,7 +325,7 @@ test("a stalled member's card reads as stalled with its missing signal", () => {
   const card = activeCard();
   const status = card.querySelector(".state")!;
   expect(status.className).toBe("state stalled");
-  expect(status.textContent).toMatch(/^stalled · 16 min$/);
+  expect(status.textContent).toMatch(/^stalled$/);
   expect(card.querySelector('[data-component="MemberActivity"]')!.textContent).toBe("last: Bash · no progress for 960s, link alive; last Bash");
   expect(agesOf(card)!.textContent).toBe("progress 16 min · alive 5 s");
 });
@@ -346,6 +346,8 @@ test("a card keeps its ages and tool off its face, in its hover title", () => {
   expect((card.querySelector('[data-component="MemberActivity"]') as HTMLElement).hidden).toBe(true);
   expect(card.title).toContain("progress 4 min · alive 20 s");
   expect(card.title).toContain("Bash");
+  expect(card.title).toContain("busy for 3 min");
+  expect(card.querySelector(".state")!.textContent).toBe("busy");
   expect(card.querySelector(".doing")).toBeTruthy();
 });
 

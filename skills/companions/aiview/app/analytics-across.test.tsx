@@ -21,7 +21,7 @@ afterEach(() => {
 const openAcross = (across = ACROSS) => {
   standIn([LIVE], across, [PLAN_RUN]);
   const view = render(<BoardView repos={[LIVE.repo]} run={null} />);
-  fireEvent.click(within(screen.getByRole("navigation", { name: "Runs" })).getByRole("button", { name: "Analytics" }));
+  fireEvent.click(within(screen.getByRole("navigation", { name: "Runs" })).getByRole("button", { name: "All runs" }));
   return view;
 };
 const across = () => screen.getByText("Across runs").closest('[data-component="AcrossRunsView"]') as HTMLElement;
